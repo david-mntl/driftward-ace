@@ -1,0 +1,1 @@
+- sprites/player_ship.png: tools/art/make_ship.py, original work (no third-party source; no license restriction), 100x100, docs/contracts/tasks/DEMO-1-01-art-audio-engineer.md, 2026-10-07. Style (flat shapes, hard edges, four-color palette) accepted by Director via coordinator message.
