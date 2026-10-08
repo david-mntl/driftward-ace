@@ -38,7 +38,7 @@ Every decision gets checked against these three.
 ## Tech rules (hard constraints)
 
 - Use **pygame-ce**. Never classic pygame.
-- Package with **pygbag** at the pinned version. Do not upgrade it. Build with `pygbag --archive game` to get a static `web.zip`. Only `game/` ships.
+- Package with **pygbag** at the pinned version. Do not upgrade it. Build with `pygbag --archive game` to get a static `web.zip`.
 - The game must run in the browser. The main loop must be `async` and yield every frame with `await asyncio.sleep(0)`. No blocking calls, no threads.
 - Audio is **.ogg only**. MP3 and WAV break the pygbag build.
 - pygbag's click-to-start screen unlocks browser audio. Do not build a custom one.
