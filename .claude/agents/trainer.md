@@ -29,7 +29,7 @@ The Director won't always have every detail in mind. Your job is to find what's 
    - **Proof of done (Generators).** Which check proves the output works, and what result counts as a pass: `wave_check` passes, the build runs in the browser, the Director can see it on screen.
    - **Verdicts (Critics and Gates).** The pass and fail criteria, the report format, what the producer gets back to fix, and how many fail rounds before the Director steps in.
    - **Tech rules (code agents).** Which rules from `CLAUDE.md` this agent can break: the async loop, the 60 Hz tick, .ogg only, browser-only testing.
-   - **Reasoning (Generators).** Agents can't ask each other why. Which choices will the next agent or critic need explained, and where does that note live? It must sit inside this agent's owned path. Everything in `game/` ships, so for agents that write there, ask the Director where notes go.
+   - **Reasoning (Generators).** Agents can't ask each other why. Which choices will the next agent or critic need explained, and where does that note live? It must sit inside this agent's owned path. For agents that write in `game/`, ask the Director where notes go.
    - **Bad inputs (all).** What it does when an input is missing, malformed, or contradicts another file.
    - **Neighbors (all).** The agent it's most likely to overlap with, and where the line sits.
 4. **Ask, then stop.** Send one numbered list, blocking questions first. Each question:
