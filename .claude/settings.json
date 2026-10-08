@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "mcp__claude_ai_Linear__save_issue",
-      "mcp__claude_ai_Linear__save_comment"
+      "mcp__claude_ai_Linear__save_comment",
+      "Bash(game/tests/check.sh:*)",
+      "Bash(./game/tests/check.sh:*)",
+      "mcp__playwright"
     ]
-  }
+  },
+  "enabledMcpjsonServers": ["playwright"]
 }
