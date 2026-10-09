@@ -4,46 +4,29 @@ Endless arcade dodger, no weapons. Single-player, desktop web browser. Python + 
 
 Gravity always pulls the ship down. Arrow keys add thrust. The player survives by mastering momentum and drift. There are no weapons. It is pure movement skill.
 
-The Director (the human) makes every final call. 11 agents build the game. A Trainer writes and revises their definitions. Who owns what, and how work moves between agents, is in `docs/crew/roster.md`.
+The Director (the human) makes every final call. A crew of AI agents builds the game. A Trainer writes and revises their definitions. Who owns what, and how work moves between agents, is in `docs/crew/roster.md`.
 
 ## Where details live
 
-This file holds only what every agent needs on every task. Numbers, schemas, object behavior, level tables and scoring live in the GDD, in `docs/design/gdd/`.
+The GDD in `docs/design/gdd/` is the only source of truth for the game. This file holds only what every agent needs on every task, and points into the GDD for the rest.
 
+- Start at `docs/design/gdd/00-index.md`. Open only the file its routing table names.
 - Check the GDD before using any number, schema, or object behavior.
+- A value marked `guess` may be used; say so in your report. A value marked `TBD` is missing: ask the Director. Never fill it in.
 - If the GDD doesn't answer it, ask the Director. Do not guess a value.
-- If the GDD contradicts this file, stop and flag it. Do not pick a side.
+- If the GDD contradicts this file, the GDD wins. Stop and flag it anyway.
 
 ## Design pillars
 
-Every decision gets checked against these three.
+Every decision gets checked against the three pillars: **Master the drift**, **See it before it hits you**, **Risk brings reward**. What each one means and rules out is in `docs/design/gdd/01-vision.md`, section Pillars. Read it before any design, scope or review call.
 
-1. **Master the drift.** Momentum control and fast reflexes are the core skills. Rules out: weapons, instant stop, set-speed control.
-2. **See it before it hits you.** Every hazard warns before it strikes, even side entries. Deaths must feel fair. Rules out: instant hits, spawns on top of the ship.
-3. **Risk brings reward.** The best points sit next to danger. Rules out: free safe pickups, score for hiding.
+## Locked decisions and out of scope
 
-## Locked decisions (do not reopen)
+Listed in `docs/design/gdd/01-vision.md`, sections Locked decisions and Out of scope. Do not reopen them.
 
-- Controls are arrow keys only.
-- The camera follows the ship up and never down. It also rises on its own, so the floor below the player keeps rising. Falling off the floor costs a life.
-- Side walls are solid. They stop the ship with no bounce.
-- Every game rule runs on a fixed 60 Hz tick. Gravity is always on. Horizontal velocity has drag. Fall speed is capped.
-- The ship has 3 lives. A hit or a fall costs one, then brief invulnerability. A hit also stuns.
-- Waves are hand-authored JSON. Every run opens with the same fixed meteorites-only Wave 0.
-- A control card shows after click-to-start.
-- Saves go to browser localStorage: nickname, score and level reached. Nothing else.
-- Hazards are defined by behavior archetype, not by visual skin.
-- Out of scope: combat, online leaderboard, mobile or touch controls, multiplayer, procedural levels, wave editor.
+## Tech rules
 
-## Tech rules (hard constraints)
-
-- Use **pygame-ce**. Never classic pygame.
-- Package with **pygbag** at the pinned version. Do not upgrade it. Build with `pygbag --archive game` to get a static `web.zip`.
-- The game must run in the browser. The main loop must be `async` and yield every frame with `await asyncio.sleep(0)`. No blocking calls, no threads.
-- Audio is **.ogg only**. MP3 and WAV break the pygbag build.
-- pygbag's click-to-start screen unlocks browser audio. Do not build a custom one.
-- Hosting is static only (itch.io or GitHub Pages). No server code, no paid services.
-- Test every build in a real browser. A desktop run does not count.
+Hard constraints (engine, pygbag build, async loop, audio format, hosting, browser testing) are in `docs/design/gdd/15-tech-constraints.md`. Read it before writing or building any game code.
 
 ## Rules for every agent
 
