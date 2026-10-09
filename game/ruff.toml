@@ -1,0 +1,14 @@
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = [
+  "E", "W",  # pycodestyle: PEP 8 style
+  "F",       # pyflakes: unused names, undefined names
+  "I",       # import order
+  "N",       # PEP 8 naming
+  "B",       # bugbear: common bug patterns
+  "UP",      # modern Python syntax
+  "ASYNC",   # blocking calls inside async functions
+  "ANN",     # type annotations on every function
+]

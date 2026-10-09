@@ -1,0 +1,53 @@
+{
+  "name": "Driftward Ace",
+  "build": {
+    "context": "..",
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+
+  "mounts": [
+    // Host ~/.claude so Claude Code settings and keybindings work inside the container
+    "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
+    // Map this project's memory to the path Claude expects when the workspace is at /workspace
+    "source=${localEnv:HOME}/.claude/projects/-home-david-projects-GameDevelopmentCourse-driftward-ace,target=/home/vscode/.claude/projects/-workspace,type=bind",
+    // Host X11 socket so a desktop pygame window can open (Linux host only)
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind"
+  ],
+
+  "containerEnv": {
+    "DISPLAY": "${localEnv:DISPLAY}"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "ruff.importStrategy": "fromEnvironment",
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        }
+      }
+    }
+  },
+
+  // pygbag's local test server: `pygbag --port 6060 game`
+  // Do not pass --bind. pygbag writes the bind address into the page's asset URLs,
+  // so 0.0.0.0 makes the browser block them (COEP) and the page hangs on "Loading".
+  // VS Code forwards localhost:6060 on the host to the container's localhost.
+  "forwardPorts": [6060],
+  "portsAttributes": {
+    "6060": { "label": "pygbag", "onAutoForward": "notify" }
+  },
+
+  "remoteUser": "vscode"
+}
