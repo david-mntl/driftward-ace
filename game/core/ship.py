@@ -9,48 +9,48 @@ Source: docs/contracts/DRA-6/DRA-6-ship.md, Interface and Rules.
 
 import logging
 from dataclasses import dataclass
-from typing import Literal
+from typing import Final, Literal
 
 from core.world import SCREEN_H, SCREEN_W, TOP_LINE_Y
 
 log = logging.getLogger(__name__)
 
-SHIP_W: int = 32
+SHIP_W: Final[int] = 32
 """Ship width, px. Source: 04-ship.md, ship_w (guess)."""
 
-SHIP_H: int = 32
+SHIP_H: Final[int] = 32
 """Ship height, px. Source: 04-ship.md, ship_h (guess)."""
 
-GRAVITY: float = 0.16
+GRAVITY: Final[float] = 0.16
 """Added to vy every tick, px/tick². Source: 04-ship.md, gravity (guess)."""
 
-THRUST_SIDE: float = 0.42
+THRUST_SIDE: Final[float] = 0.42
 """Left or right thrust, px/tick². Source: 04-ship.md, thrust_side (guess)."""
 
-THRUST_UP: float = 0.42
+THRUST_UP: Final[float] = 0.42
 """Up thrust, px/tick². Source: 04-ship.md, thrust_up (guess)."""
 
-THRUST_DOWN: float = 0.42
+THRUST_DOWN: Final[float] = 0.42
 """Down thrust, px/tick². Source: 04-ship.md, thrust_down (guess)."""
 
-DRAG_X: float = 0.94
+DRAG_X: Final[float] = 0.94
 """Multiplies vx every tick. Source: 04-ship.md, drag_x (guess)."""
 
-FALL_CAP: float = 5.5
+FALL_CAP: Final[float] = 5.5
 """Highest downward speed, px/tick. Source: 04-ship.md, fall_cap (guess)."""
 
-SPAWN_X: float = 320.0
+SPAWN_X: Final[float] = 320.0
 """Spawn center x, px. Source: 03-world-and-camera.md, ship_start (guess);
 05-lives-and-damage.md, fall_respawn (locked)."""
 
-SPAWN_Y: float = 240.0
+SPAWN_Y: Final[float] = 240.0
 """Spawn center y, px. Source: 03-world-and-camera.md, ship_start (guess);
 05-lives-and-damage.md, fall_respawn (locked)."""
 
 Wall = Literal["left", "right"]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Thrust:
     """Which arrow keys are held this tick."""
 
@@ -60,16 +60,27 @@ class Thrust:
     right: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Ship:
     """Ship state after a tick. Screen px, y down. x and y are the ship's center."""
 
     x: float
+    """Center x, screen px."""
+
     y: float
+    """Center y, screen px, y down."""
+
     vx: float
+    """Horizontal velocity, px/tick. Positive is right."""
+
     vy: float
+    """Vertical velocity, px/tick. Positive is down (falling)."""
+
     wall: Wall | None = None
+    """The wall the ship was clamped against this tick, None if none."""
+
     at_top_line: bool = False
+    """True when the top line (ceiling) clamped the ship this tick."""
 
 
 def spawn() -> Ship:

@@ -10,30 +10,31 @@ Source: docs/contracts/DRA-13/DRA-13-scroll.md, Interface and Rules.
 import logging
 import math
 from dataclasses import dataclass
+from typing import Final
 
 log = logging.getLogger(__name__)
 
-SCROLL_BASE: float = 1.1
+SCROLL_BASE: Final[float] = 1.1
 """Base scroll speed, px/tick. Source: 03-world-and-camera.md, scroll_base (guess)."""
 
-LEVEL_1_SCROLL_MULT: float = 1.0
+LEVEL_1_SCROLL_MULT: Final[float] = 1.0
 """Level 1 scroll speed multiplier. Source: 08-difficulty.md, Level table (locked)."""
 
-SCROLL_PER_TICK: float = SCROLL_BASE * LEVEL_1_SCROLL_MULT
+SCROLL_PER_TICK: Final[float] = SCROLL_BASE * LEVEL_1_SCROLL_MULT
 """Scroll speed at Level 1, px/tick: 1.1. Source: 08-difficulty.md, rule 2."""
 
-SCROLL_START_DELAY: int = 30
+SCROLL_START_DELAY: Final[int] = 30
 """Ticks of a still world after play starts. Source: 03-world-and-camera.md,
 scroll_start_delay (guess)."""
 
-DISTANCE_START: int = 0
+DISTANCE_START: Final[int] = 0
 """Distance at play start, m. Source: 03-world-and-camera.md, distance_start (locked)."""
 
-PX_PER_METER: int = 10
+PX_PER_METER: Final[int] = 10
 """Pixels in one meter. Source: 03-world-and-camera.md, px_per_meter (locked)."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Scroll:
     """Scroll state after a tick."""
 
