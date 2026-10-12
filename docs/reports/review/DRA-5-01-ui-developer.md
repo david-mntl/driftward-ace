@@ -1,0 +1,36 @@
+Status: reviewed
+Created by: implementation-reviewer
+
+1. **Task:** Review the UI Developer's work on `docs/contracts/DRA-5/tasks/DRA-5-01-ui-developer.md` (error screen view and shared background color), from `docs/reports/implementation/ui/DRA-5-01-ui-developer.md`. Requested by the `/implement` skill.
+2. **Delivered:** `docs/reports/review/DRA-5-01-ui-developer.md` (this file). Reviewed: `game/ui/look.py`, `game/ui/error_screen.py`.
+3. **Checks:** Read the implementation report, the task file, contract `docs/contracts/DRA-5/DRA-5-app.md` (Interface, Presentation, Rules, Rationale), `docs/design/gdd/10-ui.md`, `12-art-and-audio.md`, `15-tech-constraints.md`, `01-vision.md`, `game/CONTEXT.md`, `game/ruff.toml` and both delivered files. There is no schema in `docs/contracts/schemas/`, and this code reads no data file. All 10 checklist items marked below. 0 must-fix, 0 should-fix, 3 notes. Nothing was run.
+4. **Assumptions:**
+   - The ui-developer agent rule "a `pygame.font.Font` is passed in" is a lane standard, not a GDD or `CLAUDE.md` rule. So where the contract fixes a signature without a font, the contract wins. That gives a note, not a block.
+   - `surface.get_rect().center` and `surface.get_width() // 2` count as "centering uses `surface.get_size()`". Both come from the surface size and neither hard-codes 640×480.
+5. **Documentation differences:** None. Every value in the contract's Presentation matches `10-ui.md` and `12-art-and-audio.md`. The code matches the contract.
+6. **Next:** QA Engineer, task `docs/contracts/DRA-5/tasks/DRA-5-02-qa-engineer.md`, with this report at `docs/reports/review/DRA-5-01-ui-developer.md`. 0 must-fix. The DRA-5-02 task left the detail cut to this review. By reading, it matches the contract (finding 2 and checklist 1). Notes 1 and 3 are for the Architect, through the Director, before the DRA-6 contract.
+7. **Status:** done.
+
+## Findings
+1. **note** `game/ui/error_screen.py:38` and `:44`: both fonts are built inside `draw_error_screen`. Rule: "a `pygame.font.Font` is passed in. Never build one inside a draw call." Source: `.claude/agents/ui-developer.md`, pygame-ce rules. The contract's Interface fixes `draw_error_screen(surface, detail)` with no font argument, and its Presentation names `pygame.font.Font(None, 24)` and `pygame.font.Font(None, 16)`. The guard calls this once per error, not once per frame. Decision 1 states this and it matches the code. Change: none in this task. For the Architect: the DRA-6 debug overlay uses the same 16 px font every frame (`10-ui.md`, debug_text_font). Its contract should pass the font in so this pattern doesn't carry over.
+2. **note** `game/ui/error_screen.py:57-58`: `_fit_to_width` calls `font.size` once per dropped character. A detail of n characters costs up to n measurements of up to n characters each. Rule: "Errors never freeze the page." Source: `15-tech-constraints.md`, rule 8 (and rule 5, WebAssembly is slow). The contract's Presentation asks for this algorithm word for word ("one character at a time"), and the detail only exists in debug mode, so players never hit it. The cut itself is correct: it cuts from the end, adds no ellipsis, stops at the first width at or under `surface.get_width()`, and logs one DEBUG line with both lengths only when it cuts. Change: none now. If a very long exception message ever stalls the debug-mode error screen in the browser, the Architect can allow a faster search that gives the same result.
+3. **note** `game/ui/error_screen.py:46`: `detail_font.render(fitted, ...)` raises `ValueError` if `detail` contains a null character. The guard only replaces newlines (contract, Rules, Error guard step 2). The contract lets the view raise, and the guard then logs "error screen failed" and leaves the last frame up. That is allowed, but it means no error screen in debug mode for that rare message. Rule: `15-tech-constraints.md`, rule 8. Change: none in `game/ui/`. For the Architect: consider having the guard strip `\x00` as well as newlines.
+
+## Checklist
+1. Interface matches the contract exactly: **pass**. `BACKGROUND: tuple[int, int, int] = (0, 0, 0)` (`look.py:7`). `draw_error_screen(surface: pygame.Surface, detail: str | None) -> None` (`error_screen.py:29`). Import root `game/` (`from ui.look import BACKGROUND`), as the contract says. Nothing extra is public except named constants and a private helper.
+2. UI/core split: **pass**. No rule, score, timer or life count. Nothing reads or mutates core. No `game/core/` code exists, so nothing imports `ui`. The view never reads the run mode, per the contract's Rationale.
+3. Fixed 60 Hz tick: **n/a**. No timing in either file. No clock is read.
+4. Randomness: **n/a**. No randomness.
+5. Browser rules: **pass**. No sleep, thread, `await`, blocking call, `pygame.display`, `pygame.event`, audio or file path. `pygame.font.Font(None, ...)` loads pygame's bundled default font, not a path.
+6. Every number traces to the GDD: **pass**. (0, 0, 0): placeholder_bg. 24: error_text_font. 16: debug_text_font. (255, 255, 255): error_text_color. Message text: error_screen. Layout: error_layout. Cut: error_debug_line. All are `guess` in the GDD and the report says so. No fallback defaults.
+7. Pillars and locked decisions: **n/a**. No ship, hazard or wall behavior. The message text keeps the direct voice of `10-ui.md` rule 6.
+8. Smells: **pass**. Short functions, an early return for `detail is None`, named constants with sources, type hints on every function and local. No module-level state beyond constants and the required `log`. No dead or commented-out code. No `print`, no `except`. The unused `log` in `look.py` is required by `game/CONTEXT.md`, Logging.
+9. Decisions present and matching the code: **pass**. All seven match: fonts built in the call (`:38`, `:44`), sources in docstrings, draw order fill, main line, detail (`:37-48`), one-char cut with a single DEBUG line (`:56-61`), early return (`:42-43`), antialias `True` (`:39`, `:46`), a logger in each module.
+10. Report claims match the files: **pass**. The pixel bands are consistent with the code. The main ink is centered on 240 for a 480-high surface and on 150 for a 300-high one. The x span moves by exactly +80 from a 640-wide surface to an 800-wide one. The detail top sits 18 px (`get_linesize()`) below the main rect top. The 500-char detail cut fits within 640 px. The grep claims hold for both files. The images are saved to the scratchpad, outside the repo, as the acceptance check asks. ruff should pass: every function and local is typed and no line is over 100 characters. Not run here.
+
+## For QA
+- `detail=None`: nothing but `BACKGROUND` below the main line's bottom row, and the main line's ink center x is 320 on 640×480.
+- `detail="ValueError: boom"`: the main line's pixels are identical to the `None` case. The second band starts below the main band and is centered on x 320 (±1).
+- A surface pre-filled with another color: every pixel outside the text bands becomes `BACKGROUND`, including all four corners.
+- An empty `detail=""` is a string. Confirm it draws without raising and adds no visible pixels. The report assumes this but never shows it.
+- Fonts need `pygame.font` initialized. Use the `pygame_headless` fixture, or the call raises.
