@@ -23,6 +23,7 @@ flowchart TD
     D -.->|agent request| T
     D -->|feature| SG
     SG -->|ship| AR
+    SG <-.->|advice, read only| AR
     AR -->|gameplay task| GI
     AR -->|presentation task| UI
     AR -->|new entity type| AA
@@ -60,7 +61,7 @@ Diamonds block work until they pass. Pink nodes are critics.
 | 0 | Director (human) | `docs/design/`, `docs/crew/` | — | Decides | a game with a point of view rather than a committee's average |
 | 1 | Trainer | `.claude/agents/` | Director asks to create or revise an agent, or reports an ownership gap | Builder | a finished game, because no work fell between two agents |
 | 2 | Scope Guardian | `docs/reports/scope/`; Linear feature issues and their task statuses | the Director opens a chat with a feature or idea | Gate, blocks; the Director's assistant for Linear | one finished game instead of three half-built systems |
-| 3 | Architect | `docs/contracts/`; Linear task sub-issues (create, close at close-out) | Scope Guardian approves a feature | Generator | new features land without breaking what already worked |
+| 3 | Architect | `docs/contracts/`; Linear task sub-issues (create, close at close-out) | Scope Guardian approves a feature, or asks for technical advice | Generator | new features land without breaking what already worked |
 | 4 | Gameplay Implementer | `game/core/`, `game/requirements.txt`, `game/ruff.toml`, `docs/reports/implementation/gameplay/` | Architect issues a gameplay task | Generator | the ship thrusts, drifts, falls, and dies on contact |
 | 5 | UI Developer | `game/ui/`, `docs/reports/implementation/ui/` | Architect issues a presentation task | Generator | height, score, and death state shown clearly on screen |
 | 6 | Tuning Engineer | `game/tuning/` | physics loop first runs, or Director calls a tuning session | Generator | controls that feel tight instead of floaty or leaden |
