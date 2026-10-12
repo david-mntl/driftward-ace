@@ -38,7 +38,7 @@ Derived from the guesses above. Recompute when a value changes:
    4. Fall cap: if `vy > fall_cap`, set `vy = fall_cap`.
    5. Move: `x += vx`, `y += vy`.
    6. Side walls: clamp, `vx = 0`, no bounce ([03-world-and-camera.md](03-world-and-camera.md) rule 6).
-   7. Top line: camera follow ([03-world-and-camera.md](03-world-and-camera.md) rule 2).
+   7. Top line: clamp the top edge, `vy = 0` ([03-world-and-camera.md](03-world-and-camera.md) rule 2).
    8. Floor check: fall ([05-lives-and-damage.md](05-lives-and-damage.md)).
 3. **Every tick runs every step.** No hit or fall ever pauses the physics or the input. Source: [01-vision.md](01-vision.md), Pillar 1; [05-lives-and-damage.md](05-lives-and-damage.md).
 4. **Input only changes acceleration.** No key sets a speed or stops the ship. Source: [01-vision.md](01-vision.md), Pillar 1.

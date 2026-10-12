@@ -16,9 +16,6 @@ Status: `open`, or `blocking` (stops other work now).
 ## World and camera
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| WC-01 | Where is altitude 0 m? For example, the ship's spawn point at run start. | 03-world-and-camera.md | Scoring, levels | open |
-| WC-04 | Does auto-rise start at once when play starts, and does it keep going right after a fall respawn? | 03-world-and-camera.md | Camera | open |
-| WC-05 | When the ship pushes the top line and auto-rise runs in the same tick, does the camera move by the larger amount or the sum? | 03-world-and-camera.md | Camera | open |
 | WC-07 | Is the whole 640×480 window the play area, with HUD and warnings drawn on top? Or is part of it a HUD strip (top) or warning margins (sides)? If so, how big? | 03-world-and-camera.md, 10-ui.md | Walls, top line, wave coordinates, HUD | open |
 
 ## Ship
@@ -43,7 +40,6 @@ Status: `open`, or `blocking` (stops other work now).
 ## Scoring
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| SC-01 | Meters: round down, round to nearest, or keep decimals? | 06-scoring.md | Score | open |
 | SC-02 | The ship enters a graze zone while invulnerable and leaves after it ends. Does it pay? | 06-scoring.md | Graze | open |
 | SC-03 | Graze zone for hazards that aren't circles: slabs, arcs, walls. | 06-scoring.md | Graze | open |
 | SC-04 | A hazard leaves the screen while the ship is still in its zone. Does it pay? | 06-scoring.md | Graze | open |
@@ -64,7 +60,7 @@ Status: `open`, or `blocking` (stops other work now).
 | OBJ-02 | Satellite: size, hitbox, speed, telegraph. (1) Pattern shape: straight line across, back and forth, or a wave (sine)? (2) Does it leave the screen after crossing, or keep patrolling? (3) Is the pattern set per satellite in the wave file, or one fixed pattern for all? | objects/02-satellite.md | Priority 2 object | open |
 | OBJ-03 | Chain lightning: size, hitbox, speed, telegraph. (1) How many nodes per link (the art shows 2 and 3)? (2) Are the nodes themselves harmful, or only the arc? (3) Charge time and arc duration at Level 1. (4) Does it fire once or repeat? (5) Graze zone for a line-shaped hazard (see SC-03). | objects/03-chain-lightning.md | Priority 2 object | open |
 | OBJ-04 | Coin: size, pickup radius, speed. (1) Size and pickup radius. (2) Static in the world, or does it move? (3) Does it disappear if not collected (below the floor)? (4) How near danger counts as 'near' (see WV-07)? | objects/04-coin.md | Priority 2 object | open |
-| OBJ-05 | Floating islands: size, hitbox, speed, telegraph. (1) Touching a slab: a hit, or solid ground the ship bumps against like a wall? (2) Slab thickness. (3) Static in the world (scrolls with the camera), or does it drift down? (4) How does graze work for a long slab (see SC-03)? | objects/05-floating-islands.md | Priority 2 object | open |
+| OBJ-05 | Floating islands: size, hitbox, speed, telegraph. (1) Touching a slab: a hit, or solid ground the ship bumps against like a wall? (2) Slab thickness. (3) Static in the world (moves down with the scroll), or does it also move on its own? (4) How does graze work for a long slab (see SC-03)? | objects/05-floating-islands.md | Priority 2 object | open |
 | OBJ-06 | Fireball: size, hitbox, speed, telegraph. (1) Speed at Level 1. (2) Is the angle set per fireball in the wave file, or fixed? (3) How long does its entry warning show before it enters? | objects/06-fireball.md | Priority 2 object | open |
 | OBJ-07 | UFO: size, hitbox, speed, telegraph. (1) What patterns can it choose from? (2) What makes it readable: a tell before each move? How long? (3) Is the beam under it a hazard (a heat zone)? (4) Random every run, or seeded so the same wave plays the same way? | objects/07-ufo.md | Priority 3 object | open |
 | OBJ-08 | Planet: size, hitbox, speed, telegraph. (1) Is touching the planet's body a hit? (2) Pull radius and pull strength. (3) Is the pull constant inside the radius, or stronger near the center? (4) Is the radius shown on screen (the rings)? (5) Does it move down, or stay static in the world? | objects/08-planet.md | Priority 3 object | open |
@@ -79,6 +75,7 @@ Status: `open`, or `blocking` (stops other work now).
 | DF-02 | Base rest gap between waves at Level 1, in ticks. | 08-difficulty.md, 09-waves.md | Waves | open |
 | DF-03 | What "Cap" means at Level 8. For example: no more levels, Level 8 values forever. | 08-difficulty.md | Levels | open |
 | DF-04 | A level change during a wave: apply at once, or at the next wave? | 08-difficulty.md | Levels | open |
+| DF-05 | Each level is designed one by one and sets its own start distance. Where does each of Levels 2 to 8 start? | 08-difficulty.md | Levels | open |
 
 ## Waves
 | ID | Question | File | Blocks | Status |
@@ -86,9 +83,8 @@ Status: `open`, or `blocking` (stops other work now).
 | WV-01 | After Wave 0, how is the next wave chosen: fixed order, or random from the waves the current tier allows? | 09-waves.md | Endless mode | open |
 | WV-02 | After the last wave, what happens: loop, reshuffle, or something else? | 09-waves.md | Endless mode | open |
 | WV-03 | How many waves for the MVP? | 09-waves.md | Wave work | open |
-| WV-04 | Are wave coordinates and trigger altitudes relative to the wave's start, or absolute? | 09-waves.md | Wave schema | open |
-| WV-05 | Wave 0: how many meteorites, where, and how long it lasts. | 09-waves.md | Wave 0 | open |
-| WV-06 | Confirm "120 px clear seams": 120 px of empty world between the end of one wave and the start of the next? | 09-waves.md | wave_check | open |
+| WV-04 | Are wave coordinates and trigger distances relative to the wave's start, or absolute? | 09-waves.md | Wave schema | open |
+| WV-05 | Wave 0: how many meteorites, where, and how long it lasts. | 09-waves.md | Wave 0 | open || WV-06 | Confirm "120 px clear seams": 120 px of empty world between the end of one wave and the start of the next? | 09-waves.md | wave_check | open |
 | WV-07 | Coins: how many per wave, and how close to a hazard counts as "near"? | 09-waves.md | Wave work | open |
 
 ## UI
