@@ -1,8 +1,8 @@
 """The async frame loop on the fixed 60 Hz tick. Imported only by app.loop.start, inside the guard.
 
 Each frame: read events, build the thrust from the held arrow keys, run up to
-MAX_TICKS_PER_FRAME ticks of core.ship.step, draw the ship and, if visible, the debug
-overlay, flip, then yield to the browser.
+MAX_TICKS_PER_FRAME ticks (core.ship.step, then core.scroll.step_scroll), draw the starfield,
+the ship, the debug overlay if visible and the HUD, flip, then yield to the browser.
 Source: docs/contracts/DRA-5/DRA-5-app.md, Rules, Frame loop. 15-tech-constraints.md, rules 1 and 2.
 """
 
@@ -14,11 +14,14 @@ import pygame
 
 from app.mode import RunMode
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
+from core.scroll import Scroll, start_scroll, step_scroll
 from core.ship import Ship, Thrust, spawn, step
 from core.world import SCREEN_H, SCREEN_W
 from ui.debug_overlay import draw_debug_overlay
+from ui.hud import draw_hud
 from ui.look import BACKGROUND
 from ui.ship_view import draw_ship
+from ui.starfield import draw_starfield
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +42,7 @@ async def frame_loop(mode: RunMode) -> None:
     surface: pygame.Surface = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     debug: bool = mode is RunMode.DEBUG
     ship: Ship = spawn()
+    scroll: Scroll = start_scroll()
     overlay_visible: bool = debug
     accumulator: float = 0.0
     was_capped: bool = False
@@ -51,11 +55,11 @@ async def frame_loop(mode: RunMode) -> None:
         now: float = time.perf_counter()
         accumulator += now - previous
         previous = now
-        ship, accumulator = _run_ticks(ship, thrust, accumulator)
+        ship, scroll, accumulator = _run_ticks(ship, scroll, thrust, accumulator)
         was_capped = _apply_cap(accumulator, was_capped)
         if was_capped:
             accumulator = 0.0
-        _draw(surface, ship, overlay_visible)
+        _draw(surface, ship, scroll, overlay_visible, debug)
         pygame.display.flip()
         await asyncio.sleep(0)
     log.info("quit")
@@ -93,17 +97,22 @@ def _held_thrust() -> Thrust:
     )
 
 
-def _run_ticks(ship: Ship, thrust: Thrust, accumulator: float) -> tuple[Ship, float]:
+def _run_ticks(
+    ship: Ship, scroll: Scroll, thrust: Thrust, accumulator: float
+) -> tuple[Ship, Scroll, float]:
     """Run one tick per whole TICK_SECONDS in the accumulator, at most MAX_TICKS_PER_FRAME.
 
-    Returns (ship, accumulator left). Source: 15-tech-constraints.md, rule 2.
+    Each tick steps the ship, then the scroll; the two never pass state to each other.
+    Returns (ship, scroll, accumulator left). Source: 15-tech-constraints.md, rule 2;
+    DRA-5-app.md, Rules, Tick.
     """
     ticks: int = 0
     while accumulator >= TICK_SECONDS and ticks < MAX_TICKS_PER_FRAME:
         ship = step(ship, thrust)
+        scroll = step_scroll(scroll)
         accumulator -= TICK_SECONDS
         ticks += 1
-    return ship, accumulator
+    return ship, scroll, accumulator
 
 
 def _apply_cap(accumulator: float, was_capped: bool) -> bool:
@@ -118,9 +127,17 @@ def _apply_cap(accumulator: float, was_capped: bool) -> bool:
     return capped
 
 
-def _draw(surface: pygame.Surface, ship: Ship, overlay_visible: bool) -> None:
-    """Fill the background, draw the ship, then the debug overlay on top if it is visible."""
+def _draw(
+    surface: pygame.Surface, ship: Ship, scroll: Scroll, overlay_visible: bool, debug: bool
+) -> None:
+    """Fill the background, then draw the starfield, the ship, the overlay if visible, the HUD.
+
+    The HUD sits below the overlay's place for the whole run in debug mode, even while F3
+    hides the overlay. Source: DRA-5-app.md, Rules, Draw and below_overlay.
+    """
     surface.fill(BACKGROUND)
+    draw_starfield(surface, scroll)
     draw_ship(surface, ship)
     if overlay_visible:
         draw_debug_overlay(surface, ship)
+    draw_hud(surface, scroll, below_overlay=debug)
