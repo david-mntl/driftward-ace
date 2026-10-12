@@ -1,7 +1,7 @@
 """Ship state and its one-tick physics step.
 
 The step runs on the fixed 60 Hz tick: thrust, gravity, drag, fall cap, move, side walls,
-then two TEMPORARY DRA-6 stand-ins, the top-line stop and the floor respawn. It never
+the top-line ceiling, then the floor respawn, a TEMPORARY DRA-6 stand-in. It never
 mutates its input, never reads frame time, randomness or the run mode.
 
 Source: docs/contracts/DRA-6/DRA-6-ship.md, Interface and Rules.
@@ -134,10 +134,10 @@ def _clamp_to_walls(x: float, vx: float) -> tuple[float, float, Wall | None]:
 
 
 def _stop_at_top_line(y: float, vy: float) -> tuple[float, float, bool]:
-    """Step 7, TEMPORARY for DRA-6 until the camera exists.
+    """Step 7, the top line as a ceiling.
 
     A top edge above TOP_LINE_Y is set onto it and vy becomes 0. Returns (y, vy, stopped).
-    Source: scope report DRA-6, Limits; 03-world-and-camera.md, rule 2.
+    Source: 03-world-and-camera.md, rule 2; 04-ship.md, rule 2, step 7.
     """
     half_h: float = SHIP_H / 2
     if y - half_h < TOP_LINE_Y:

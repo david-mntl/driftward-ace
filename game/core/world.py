@@ -1,6 +1,7 @@
 """Screen geometry: the walls, the top line and the floor. Constants only, no imports.
 
-DRA-6 has no camera, so world and screen are the same space. Screen px, x right, y down.
+The screen is fixed and never moves. There is no camera, and the rules use screen px.
+Screen px, x right, y down.
 The left wall is x 0, the right wall is x SCREEN_W, the floor is y SCREEN_H.
 
 Source: docs/contracts/DRA-6/DRA-6-world.md, Interface and Rules.
