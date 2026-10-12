@@ -37,6 +37,7 @@ Never run `check.sh fix`. It edits code you don't own.
 ## Fixtures
 - `rng`: a `random.Random` with a fixed seed. Pass it to any code that takes randomness.
 - `pygame_headless`: initialises pygame once per session. Use it in UI tests that need fonts or surfaces.
+- `caplog` (built into pytest): for event-log tests. Set DEBUG on the module's logger only (`caplog.set_level(logging.DEBUG, logger="core.ship")`) and count lines by message prefix. Example: `core/test_ship.py`.
 
 Every test runs headless (SDL dummy drivers). Import game code the way the game does: `from core.ship import Ship`.
 
@@ -55,6 +56,7 @@ Everything else QA checks with inline headless runs (`SDL_VIDEODRIVER=dummy pyth
 - Every expected number comes from the GDD or `game/tuning/`. Never invent one.
 - Tests are deterministic. Time is ticks, never the wall clock. Randomness comes only from `rng`.
 - Tests follow `game/ruff.toml`, including type hints (`-> None` on every test).
+- UI tests read positions from the drawn pixels (`pygame.image.tobytes`), never from a hard-coded font size. Example: `ui/test_error_screen.py`.
 - Test files go only inside `game/tests/`. Never edit game code to make a test pass.
 - Never edit `check.sh`, `pytest.ini` or the fixtures in `conftest.py` to get a pass. Change them only when the Director asks. Never use `skip`, `xfail` or `# noqa` to hide a failure. If the harness itself is wrong, report it to the Director.
 - When a test task adds a fixture, folder or convention, update this file in the same run.
