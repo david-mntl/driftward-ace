@@ -1,14 +1,16 @@
 # Debug overlay
-Version: 1
+Version: 2
 Status: frozen
-Features: DRA-6
+Features: DRA-6, DRA-13
 Created by: architect
 
 ## Purpose
 In debug mode, show the ship's numbers and the lines the rules use, so the drift can be read and tuned. The view only reads core state. Whether it shows is decided by the app.
 
+From DRA-13 the overlay also tells the HUD where its text ends, so the HUD can sit below it with no overlap (`docs/contracts/DRA-13/DRA-13-hud.md`). What the overlay shows doesn't change.
+
 Who builds what:
-- `game/ui/debug_overlay.py`: the UI Developer, task `DRA-6-04-ui-developer`.
+- `game/ui/debug_overlay.py`: the UI Developer, task `DRA-6-04-ui-developer`. `overlay_text_bottom()`: task `DRA-13-03-ui-developer`.
 - `overlay_visible` and the F3 toggle: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/DRA-5/DRA-5-app.md`.
 
 ## Diagram
@@ -28,6 +30,11 @@ OVERLAY_FONT_SIZE: int = 16                         # 10-ui.md, debug_text_font:
 OVERLAY_MARGIN: int = 4                             # 10-ui.md, debug_overlay_layout: text 4 px from left and top (guess)
 
 def draw_debug_overlay(surface: pygame.Surface, ship: Ship) -> None: ...
+
+def overlay_text_bottom() -> int: ...       # DRA-13
+    # The first screen row below every pixel the four text lines can cover:
+    # OVERLAY_MARGIN + 3 * linesize + max(linesize, font height), from the overlay's own font.
+    # Draws nothing. Needs pygame.font initialized. Uses the same cached font as the draw.
 ```
 
 ## Presentation
@@ -49,15 +56,29 @@ def draw_debug_overlay(surface: pygame.Surface, ship: Ship) -> None: ...
 - Draw order inside the view: the two lines, then the text, so the text stays readable where they cross.
 - The font is created once, on the first draw, and kept. Never once per frame. Source: 15-tech-constraints.md, rule 5 (Python in WebAssembly is slow).
 - The view only draws. It never flips, never logs per frame, never catches an error, never changes the ship, never reads the run mode.
+- `overlay_text_bottom()` is in screen px. With the text layout above, line 4's top is `OVERLAY_MARGIN + 3 × linesize`, so the value is that plus the larger of the line size and the font height. It is the same whether the overlay is shown or hidden. Source: scope report DRA-13, HUD layout (debug mode).
 
 ## Rules
 - Exists only in debug mode. In normal mode it never shows. Source: 10-ui.md, rule 7 and debug_overlay_toggle.
 - Shown from the first frame in debug mode. F3 hides or shows it, in debug mode only. In normal mode F3 does nothing. The app owns this flag and calls the view only while it is True. Source: 10-ui.md, debug_overlay_toggle (guess); scope report DRA-6, Decision log.
 - The overlay only reads game state. It never changes it. Source: 10-ui.md, rules 5 and 7.
 - Layout as in Presentation. Source: 10-ui.md, debug_overlay_layout (guess); 91-decision-log.md, row 20.
+- DRA-13 adds no content: no distance line, no scroll value. The overlay shows exactly what DRA-6 built. Source: scope report DRA-13, Limits and Decision log (Director: "Leave it simple as before").
+- The overlay sits above the HUD on screen and never overlaps it. The HUD moves; the overlay stays where it is. Source: scope report DRA-13, Decision log; DRA-13-hud.md.
+
+## Impact
+DRA-13 changes this frozen contract (v1) by adding one function. Nothing drawn changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `debug_overlay`, `draw_debug_overlay`, `OVERLAY_`:
+
+| File | Change needed |
+|---|---|
+| `game/ui/debug_overlay.py` | add `overlay_text_bottom()`. `draw_debug_overlay` and the constants stay as they are. Task `DRA-13-03-ui-developer`. |
+| `game/ui/hud.py` | new reader of `overlay_text_bottom()`. Same task. |
+| `game/app/frame.py` | none from this contract. The draw order changes in `DRA-5-app.md`. |
+| `game/tests/` | none. No test imports the overlay today. Task `DRA-13-05-qa-engineer` adds the first. |
 
 ## Rationale
 - **The app passes nothing about the mode.** game/CONTEXT.md lets the debug overlay read the run mode, but it doesn't need to. The app decides whether to call it, so the view stays a pure function of the ship.
-- **A separate contract.** The overlay is its own system in 10-ui.md. Later features (camera, hazards) will add fields to it without touching the ship contract.
+- **A separate contract.** The overlay is its own system in 10-ui.md. Later features (hazards) will add fields to it without touching the ship contract.
+- **`overlay_text_bottom()` lives here.** Only the overlay owns its font, and the line size is a font metric, not a fixed number. The HUD asks the overlay instead of rebuilding the overlay's font and repeating its layout.
 - **The floor line is on row 479, not 480.** The floor is the screen's bottom edge, y 480, one row past the last visible row. Row 479 is the closest row that can be seen. The Director chose this (decision-log row 20).
 - **Every fact the overlay shows is a core field or a core constant.** Ship numbers come from `core.ship.Ship`. Line positions come from `core.world`. The view computes nothing but pixel positions.

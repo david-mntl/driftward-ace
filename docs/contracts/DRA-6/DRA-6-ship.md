@@ -1,11 +1,13 @@
 # Ship
-Version: 1
+Version: 2
 Status: frozen
-Features: DRA-6
+Features: DRA-6, DRA-13
 Created by: architect
 
 ## Purpose
-The ship's state and its one-tick physics step: thrust, gravity, drag, fall cap, move, side walls. For DRA-6 only, two temporary stand-ins end the tick: the top-line stop (until the camera exists) and the floor respawn (until lives exist). Plus the view that draws the ship as its placeholder rectangle.
+The ship's state and its one-tick physics step: thrust, gravity, drag, fall cap, move, side walls, top line. One temporary stand-in ends the tick: the floor respawn, until lives exist. Plus the view that draws the ship as its placeholder rectangle.
+
+From DRA-13 the top-line stop is the real rule, not a stand-in: the screen is fixed and the top line is a ceiling (03-world-and-camera.md, rule 2; 04-ship.md, rule 2, step 7). Its behavior doesn't change. The world scroll never touches the ship (`docs/contracts/DRA-13/DRA-13-scroll.md`).
 
 Who builds what:
 - `game/core/ship.py`: the Gameplay Implementer, task `DRA-6-01-gameplay-implementer`.
@@ -25,7 +27,7 @@ flowchart TD
   T6 -- yes --> W["clamp edge to wall, vx = 0<br/>wall = side"]
   T6 -- no --> WN["wall = None"]
   W --> T7
-  WN --> T7{"7 top line, TEMPORARY<br/>top edge above TOP_LINE_Y?"}
+  WN --> T7{"7 top line, ceiling<br/>top edge above TOP_LINE_Y?"}
   T7 -- yes --> TL["top edge = TOP_LINE_Y, vy = 0<br/>at_top_line = True"]
   T7 -- no --> TN["at_top_line = False"]
   TL --> T8
@@ -77,7 +79,7 @@ class Ship:
     vx: float                      # px/tick, + is right
     vy: float                      # px/tick, + is down (falling)
     wall: Wall | None = None       # wall the ship was clamped against this tick
-    at_top_line: bool = False      # top-line stop clamped the ship this tick (TEMPORARY, DRA-6)
+    at_top_line: bool = False      # the top line (ceiling) clamped the ship this tick
 
 def spawn() -> Ship: ...
     # Ship at (SPAWN_X, SPAWN_Y), vx = vy = 0, wall None, at_top_line False.
@@ -120,8 +122,8 @@ The step, in this order, every tick. Source: 04-ship.md, rule 2:
 4. **Fall cap.** If `vy > FALL_CAP`, `vy = FALL_CAP`. No cap on upward speed. Source: 04-ship.md, rules 2.4 and 7.
 5. **Move.** `x += vx`, `y += vy`. Source: 04-ship.md, rule 2.5.
 6. **Side walls.** If the left edge is below 0: set the left edge to 0, `vx = 0`, `wall = "left"`. If the right edge is past `SCREEN_W`: set the right edge to `SCREEN_W`, `vx = 0`, `wall = "right"`. Otherwise `wall = None`. No bounce. Source: 03-world-and-camera.md, rule 6; 01-vision.md, locked decision 3; 04-ship.md, rule 2.6.
-7. **Top line, TEMPORARY.** If the top edge is above `TOP_LINE_Y` (`y - SHIP_H / 2 < TOP_LINE_Y`): set the top edge to `TOP_LINE_Y`, `vy = 0`, `at_top_line = True`. Otherwise `at_top_line = False`. Source: scope report DRA-6, Limits (temporary build rule, approved by the Director); 03-world-and-camera.md, rule 2 (the top edge is the point that counts). Replaced when the camera exists.
-8. **Floor, TEMPORARY.** If the ship is fully below the floor (`y - SHIP_H / 2 >= SCREEN_H`): return `spawn()`. No life is lost, nothing else happens. Source: scope report DRA-6, Limits (temporary build rule, approved by the Director); 03-world-and-camera.md, rule 5; 05-lives-and-damage.md, fall_respawn. Replaced when lives exist.
+7. **Top line, a ceiling.** If the top edge is above `TOP_LINE_Y` (`y - SHIP_H / 2 < TOP_LINE_Y`): set the top edge to `TOP_LINE_Y`, `vy = 0`, `at_top_line = True`. Otherwise `at_top_line = False`. Permanent from DRA-13. Source: 03-world-and-camera.md, rule 2 (a ceiling; the top edge is the point that counts); 04-ship.md, rule 2, step 7; 91-decision-log.md, row 22; scope report DRA-13, Limits.
+8. **Floor, TEMPORARY.** If the ship is fully below the floor (`y - SHIP_H / 2 >= SCREEN_H`): return `spawn()`. No life is lost, nothing else happens. The world scroll and the distance keep going through it. Source: scope report DRA-6, Limits (temporary build rule, approved by the Director); scope report DRA-13, Limits (kept as is); 03-world-and-camera.md, rules 4 and 5; 05-lives-and-damage.md, fall_respawn. Replaced when lives exist.
 
 Other rules:
 - Every tick runs every step. Nothing pauses the physics or the input. Source: 04-ship.md, rule 3.
@@ -130,6 +132,7 @@ Other rules:
 - `step` uses no frame time and no randomness. Same input, same output. Source: 15-tech-constraints.md, rule 2.
 - Core behaves the same in normal and debug mode. It never reads the run mode. Source: game/CONTEXT.md, Run modes; 15-tech-constraints.md, rule 7.
 - Core never imports pygame, `ui` or `app`. Source: game/CONTEXT.md, Layout.
+- The ship never reads the world scroll, and the scroll never changes the ship. `step` takes no scroll. Source: 03-world-and-camera.md, rule 4; DRA-13-scroll.md.
 
 Logging (logger `core.ship`, DEBUG, by event, never by tick). Source: game/CONTEXT.md, Logging; 15-tech-constraints.md, rule 9:
 - `wall hit side=%s x=%.2f y=%.2f`: when the returned ship has `wall` set and the input ship's `wall` was different. Holding a key against a wall logs once, not every tick.
@@ -138,10 +141,22 @@ Logging (logger `core.ship`, DEBUG, by event, never by tick). Source: game/CONTE
 - Values are the new position after the clamp. Nothing else is logged. No line on a tick where nothing happened.
 - If the ship hits a wall and falls off the floor in the same tick, the wall line comes first, then the respawn line.
 
+## Impact
+DRA-13 changes this frozen contract (v1). Only the top-line stop's status changes, from temporary to permanent. No behavior, signature, constant or log line changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.ship`, `TEMPORARY`, `at_top_line`, `TOP_LINE_Y` and `camera`:
+
+| File | Change needed |
+|---|---|
+| `game/core/ship.py` | docstrings only. The module docstring and `_stop_at_top_line` call the top-line stop TEMPORARY and tie it to a camera. Reword: the top line is a ceiling (03, rule 2; 04, step 7). The floor respawn stays marked TEMPORARY. Task `DRA-13-01-gameplay-implementer`. |
+| `game/ui/ship_view.py` | none. |
+| `game/ui/debug_overlay.py` | none from this contract. See `DRA-6-debug-overlay.md`. |
+| `game/app/frame.py` | none from this contract. See `DRA-5-app.md`. |
+| `game/tests/core/test_ship.py` | none. Its top-line and respawn tests check behavior that doesn't change, and it has no TEMPORARY wording. |
+
 ## Rationale
+- **The top-line stop stays as built.** The GDD now makes the top line a ceiling with the same clamp and `vy = 0` that DRA-6 built as a stand-in (91-decision-log.md, row 22). Only its label changes. The floor respawn is still a stand-in: the GDD's fall costs a life, and lives are out of DRA-13.
 - **`x`, `y` are the ship's center.** The GDD puts `ship_start` and `fall_respawn` at "screen center (320, 240)", and the scope says the ship starts at screen center. With center coordinates the overlay shows exactly 320 and 240 at the start, the same numbers the GDD uses.
 - **`step` returns a new frozen `Ship`.** A pure step is easy to test and to repeat. DRA-5 reserved `state = core_step(state, held_input)` in the loop.
-- **`wall` and `at_top_line` live in the state.** The log policy forbids a line every tick, but holding a key against a wall clamps every tick. Keeping the last tick's contact lets `step` log only when contact starts. They are also the facts a later feature (lava walls, camera) will need.
+- **`wall` and `at_top_line` live in the state.** The log policy forbids a line every tick, but holding a key against a wall clamps every tick. Keeping the last tick's contact lets `step` log only when contact starts. They are also the facts a later feature (lava walls) will need.
 - **Fully below the floor is `top edge >= SCREEN_H`.** With the top edge at 480 the ship covers rows 480 to 511. No pixel of it is on the 480-row screen, so it is fully below the floor (03, rule 5).
 - **The top-line clamp triggers only when the edge is past the line.** A ship resting exactly on the line with no upward speed isn't "hitting" it. So `vy = 0` and the log happen when the ship actually pushes past.
 - **Physics constants live in `core/ship.py`.** The tuning file is out of DRA-6 scope. When the Tuning Engineer's file exists, a later contract moves these values to it, with a schema.
