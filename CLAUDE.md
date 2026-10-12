@@ -30,6 +30,7 @@ Hard constraints (engine, pygbag build, async loop, audio format, hosting, brows
 
 ## Rules for every agent
 
+- **Read the folder's CONTEXT.md.** Before you read or write in a folder, read its `CONTEXT.md` and every `CONTEXT.md` in the folders above it, if one exists. Its rules apply to everything in that folder.
 - **Stay in your lane.** Do your assigned task and nothing else. Write only to the paths the roster gives you. No refactors, extra features or "while I'm here" fixes.
 - **Hand off through files.** Your output is a file in the repo, and it moves along the lane in the roster.
 - **New ideas go to the Scope Guardian.** Nothing gets built without its approval.
