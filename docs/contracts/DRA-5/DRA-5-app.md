@@ -1,7 +1,7 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
-Version: 3
+Version: 4
 Status: frozen
-Features: DRA-5, DRA-6, DRA-13
+Features: DRA-5, DRA-6, DRA-13, DRA-19
 Created by: architect
 
 ## Purpose
@@ -10,6 +10,8 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 From DRA-6, each tick steps the ship, each frame draws the ship and, in debug mode, the debug overlay. The arrow-key log lines carry the ship's x and y. F3 toggles the overlay in debug mode.
 
 From DRA-13, play starts when the ship first appears: the app starts the world scroll right after it spawns the ship. Each tick also steps the scroll. Each frame draws the starfield behind the ship and the HUD on top of everything.
+
+From DRA-19, the guard also removes null characters from the debug-mode detail line, so an error message holding one still shows the error screen.
 
 Who builds what:
 - `game/main.py`, `game/app/`, `game/scripts/`, `pygbag.ini` (repo root): the Integration Engineer, during integration, from this contract. No task file.
@@ -301,7 +303,7 @@ Error guard (`app/guard.py`):
 - The only `except Exception` in the game. Source: game/CONTEXT.md, Error handling.
 - On an exception from `body`:
   1. `log.exception("unexpected error, showing the error screen")`. That is ERROR level with the full traceback. Source: 15-tech-constraints.md, rule 8.
-  2. `detail = None` in normal mode. In debug mode, `detail = f"{type(exc).__name__}: {exc}"` with every newline replaced by a space, so it is one line. Source: 10-ui.md, error_screen, error_debug_line.
+  2. `detail = None` in normal mode. In debug mode, `detail = f"{type(exc).__name__}: {exc}"` with every newline replaced by a space, so it is one line, and every null character (`\x00`) removed, so the error screen can render it. Source: 10-ui.md, error_screen, error_debug_line. Null characters: scope report DRA-19, item 4; review DRA-5-01-ui-developer, finding 3; 15-tech-constraints.md, rule 8.
   3. Show the error screen, once. Source: 10-ui.md, rule 8. In this order:
      1. Import pygame, `core.world` and `ui.error_screen` here, inside the step. Source: Director decision (DRA-5 close-out).
      2. If `pygame.display.get_surface()` is `None` (the error came before the window existed, such as an import error in `app.frame`), call `pygame.init()` and `pygame.display.set_mode((SCREEN_W, SCREEN_H))` from `core.world`. If a window already exists, reuse it.
@@ -325,10 +327,15 @@ Release package (`pygbag.ini`):
 - Configured only in `pygbag.ini` at the repo root, `[DEPENDENCIES]` section, `ignoreDirs` and `ignoreFiles`. Built by the Integration Engineer. Source: Director decision (DRA-5 close-out). docs/crew/roster.md, row 12.
 - No pygbag flag or template change. pygbag stays at 0.9.3. Source: 15-tech-constraints.md, web_build.
 
+How the browser checks below are done. These methods are the checks as written, not stand-ins, so using them is never an observation on its own. Source: Director decision (DRA-19 close-out).
+- **Screenshot** means reading the canvas pixels and comparing them with the expected color or text, for example text drawn in the same page with the game's own font. A pixel match counts as the screenshot.
+- **Hide the tab** means freezing the page's main thread for the stated time, then letting it run again. For the game this is the same thing: one long gap between frames.
+- **Real browser behavior** (pygbag's click screen, a truly hidden tab) can only be seen in a desktop browser. The Director checks it by hand when the frame loop or start-up changes, and before a release. The click-to-start checks below still record what they ask for, in Browser run. They go under Observations only when the result differs from the earlier runs (the game starting before any click, in the test browser, is the known result).
+
 Integration checks for DRA-5, on top of the required browser checks in game/CONTEXT.md, INTEGRATION:
 - **Arrow keys:** passes when the key-down and key-up lines appear with the right key name. DRA-5 has no ship, so there is no x/y to compare. That comparison starts with DRA-6. Source: Director decision D3 (DRA-5 integration).
 - **Run modes:** no switch logs `start mode=normal`. `?debug=1` logs `start mode=debug`. `?debug=yes` logs one WARNING, then `start mode=normal`. `?debug=1` reaches Python unchanged and doesn't switch pygbag into a mode of its own.
-- **Click to start:** record whether pygbag's click screen shows, whether "MEDIA USER ACTION REQUIRED" appears, and the time of the start line against the time of the click. Report what happened. A game that starts before the click doesn't fail DRA-5, but it goes under Observations. Source: Director decision (DRA-5 close-out, round 1 observations: follow up).
+- **Click to start:** record whether pygbag's click screen shows, whether "MEDIA USER ACTION REQUIRED" appears, and the time of the start line against the time of the click. Report what happened. A game that starts before the click doesn't fail DRA-5. It goes under Observations only as the "How the browser checks are done" rules above say. Source: Director decision (DRA-5 close-out, round 1 observations: follow up; DRA-19 close-out).
 - **Package contents:** list the files in `game.apk` from `pygbag --archive game`. None of the left-out files may be there, and `main.py`, `app/*.py` and `ui/*.py` must be.
 - **Import errors (desktop, headless, `SDL_VIDEODRIVER=dummy`):** no code change, only a blocked import from the command line.
   - Block `app.frame` (for example `sys.modules["app.frame"] = None` before `import main`): the log shows the start line, then ERROR `unexpected error, showing the error screen` with the `ImportError` traceback. The error screen is drawn and the process idles until it is stopped.
@@ -340,8 +347,8 @@ Integration checks for DRA-6, on top of the required browser checks and every DR
 - **Respawn (`?debug=1`):** after the keys are released, a `respawn from x=... y=...` line appears within about 2 s, with `y` at least 496.00 (top edge at or past 480). Source: DRA-6 scope report, Limits.
 - **Ship visible (`/`):** the canvas shows white (255, 255, 255) pixels (the ship) and no (0, 255, 0) pixels. F3 logs nothing and changes nothing. Source: DRA-6-ship.md, Presentation; 10-ui.md, rule 7.
 - **Overlay and F3 (`?debug=1`):** from the first frame there are (0, 255, 0) pixels on row 168, away from the ship. F3 logs `overlay visible=False` and those pixels go to the background color. F3 again logs `overlay visible=True` and they come back. Source: 10-ui.md, debug_overlay, debug_overlay_toggle.
-- **Click to start, follow-up:** the Director asked for this again, because in DRA-5 headless Chromium skipped the click. Record, in a fresh tab: whether pygbag's click screen shows, whether "MEDIA USER ACTION REQUIRED" appears, `navigator.userActivation.hasBeenActive` before any click, the time of the start line, and whether `respawn` lines appear before the click (the ship already moving). Report what happened under Observations. A game that starts before the click doesn't fail DRA-6. A game that doesn't start after a click fails it. Source: Director decision (DRA-5 close-out, follow up; DRA-6 design input).
-- **Catch-up cap (`?debug=1`):** hide the tab for about 5 s, or open another tab over it, then come back. One `tick cap hit, dropped ... s` line appears, with about the hidden time. It is not repeated every frame. The game carries on: the ship doesn't jump ahead by the hidden time, and the respawn lines stay about one a second. If the browser keeps the tab running while it's hidden, so no line appears, report that under Observations. It doesn't fail DRA-6. Source: 15-tech-constraints.md, max_ticks_per_frame, rules 2 and 9.
+- **Click to start, follow-up:** the Director asked for this again, because in DRA-5 headless Chromium skipped the click. Record, in a fresh tab: whether pygbag's click screen shows, whether "MEDIA USER ACTION REQUIRED" appears, `navigator.userActivation.hasBeenActive` before any click, the time of the start line, and whether `respawn` lines appear before the click (the ship already moving). Report what happened in Browser run, and under Observations only as the "How the browser checks are done" rules above say. A game that starts before the click doesn't fail DRA-6. A game that doesn't start after a click fails it. Source: Director decision (DRA-5 close-out, follow up; DRA-6 design input; DRA-19 close-out).
+- **Catch-up cap (`?debug=1`):** hide the tab for about 5 s (see "How the browser checks are done" above), then let it run. One `tick cap hit, dropped ... s` line appears, with about the hidden time. It is not repeated every frame. The game carries on: the ship doesn't jump ahead by the hidden time, and the respawn lines stay about one a second. Source: 15-tech-constraints.md, max_ticks_per_frame, rules 2 and 9; Director decision (DRA-19 close-out).
 - **Package contents:** as for DRA-5, and `core/world.py`, `core/ship.py`, `ui/ship_view.py` and `ui/debug_overlay.py` must be in `game.apk`.
 
 Integration checks for DRA-13, on top of the required browser checks and every DRA-5 and DRA-6 check above (all must still pass). Background: 1.1 px a tick at 60 ticks a second is 66 px, so 6.6 m, a second. The readout gains about 66 m in 10 s.
@@ -353,19 +360,23 @@ Integration checks for DRA-13, on top of the required browser checks and every D
 - **Top line is still a ceiling (`?debug=1`):** the DRA-6 ArrowUp check still ends at `y=184.00`. Source: DRA-6-ship.md, step 7.
 - **Package contents:** as for DRA-6, and `core/scroll.py`, `ui/starfield.py` and `ui/hud.py` must be in `game.apk`.
 
+Integration checks for DRA-19, on top of the required browser checks and every DRA-5, DRA-6 and DRA-13 check above (all must still pass: DRA-19 changes no gameplay).
+- **No `-0.00` in the overlay (`?debug=1`):** hold ArrowUp the whole time, so the ship sits on the top line and never falls to a respawn. While holding it, tap ArrowLeft for about 0.2 s, release it, wait about 3 s, and take a screenshot. The overlay's third line reads `vx 0.00`, not `vx -0.00`. Source: scope report DRA-19, Player sees; DRA-6-debug-overlay.md, Presentation.
+- **Null character in debug mode (desktop, headless, `SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`):** no code change, only a stand-in from the command line. Before calling `run()`, replace `app.loop.start` with an async function that raises `ValueError("bad\x00value")`. The log shows the start line, then ERROR `unexpected error, showing the error screen` with the `ValueError` traceback, and no `error screen failed` line. The error screen is drawn and the process idles until it is stopped. Source: scope report DRA-19, item 4; this contract, Rules, Error guard.
+
 ## Impact
-DRA-13 changes this frozen contract (v2). Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `frame_loop`, `spawn`, `step`, `draw_`, `overlay_visible`, `app.` imports and `BACKGROUND`:
+DRA-19 changes this frozen contract (v3). One guard rule changes: the debug-mode detail line also loses its null characters. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `guarded`, `_detail`, `detail`, `splitlines` and `draw_error_screen`:
 
 | File | Change needed |
 |---|---|
-| `game/app/frame.py` | import `core.scroll` (`Scroll`, `start_scroll`, `step_scroll`), `ui.starfield.draw_starfield` and `ui.hud.draw_hud`. Own `scroll`: `start_scroll()` right after `spawn()`, `step_scroll` once per tick after the ship's step. Draw order: background, starfield, ship, overlay if visible, HUD with `below_overlay = debug`. |
-| `game/app/loop.py`, `game/app/guard.py`, `game/app/mode.py`, `game/app/log.py`, `game/app/settings.py` | none. |
+| `game/app/guard.py` | the debug-mode detail also drops every `\x00`, next to the newline handling. Normal mode still passes `None`. |
+| `game/app/loop.py`, `game/app/frame.py`, `game/app/mode.py`, `game/app/log.py`, `game/app/settings.py` | none. |
 | `game/main.py` | none. |
-| `game/ui/look.py`, `game/ui/error_screen.py` | none. |
-| `game/tests/ui/test_error_screen.py` | none. |
-| `game/scripts/start-driftward-ace.sh`, `pygbag.ini` | none. `core/` and `ui/` are already packed as runtime folders. |
+| `game/ui/error_screen.py` | none. It draws whatever `detail` it gets. |
+| `game/tests/ui/test_error_screen.py` | none. It calls the view directly with its own strings. |
+| `game/scripts/start-driftward-ace.sh`, `pygbag.ini` | none. |
 
-All app changes are the Integration Engineer's, during DRA-13 integration.
+All app changes are the Integration Engineer's, during DRA-19 integration. No task file.
 
 ## Rationale
 - **`choose_mode` is pure and returns the rejected value.** The WARNING for a bad switch must go out after logging is configured, and logging needs the mode first. Returning the rejected value lets `run()` set up logging and then warn, with one config call.
@@ -391,6 +402,7 @@ All app changes are the Integration Engineer's, during DRA-13 integration.
 - **The cap logs only when it starts.** A slow device can hit the cap every frame. Logging each time would be a line per frame, which the log policy forbids.
 - **Browser logs go to `console.log`.** In pygbag 0.9.3, stdout and stderr reach only its hidden terminal, never the devtools console. Writing through `platform.window.console.log` makes the start line visible, as the scope report promises. Every level uses `console.log`, not `console.warn` or `console.error`, as the Director decided (D2). Desktop keeps stdout, so the level is still readable from the line text.
 - **The PEP 723 block in `main.py`.** pygbag reads only `main.py` to pick the packages it installs. `main.py` imports only `asyncio` and `app.loop`, so the block is what gets pygame-ce into the browser build (D1). It is metadata only, with no logic and no import, so `main.py` stays a thin entry point.
+- **The guard removes null characters, the view doesn't (DRA-19).** pygame's font render raises on a string with `\x00` in it. Before DRA-19 that made the guard log "error screen failed" and leave the last frame up, so a debug-mode player saw no error screen for that message. The guard already shapes `detail` into one line, so it is the one place that turns an exception into displayable text. Removing the character, not replacing it, keeps the rest of the message as it was. The full message with the null stays in the logged traceback (10-ui.md, error_debug_line).
 - **Idle after the error, don't exit.** Ending `run()` hands control back to pygbag in a state we haven't tested. Idling keeps the canvas showing the error screen and keeps the page responsive.
 - **The error screen is tested headless.** A browser run can't trigger an unexpected error without a debug-only trigger, and that would be new scope. Task DRA-5-02 proves the screen draws right in both modes.
 - **Run-mode parsing has no permanent test.** It lives in `game/app/`, and `game/tests/check.sh` runs only `tests/core` and `tests/ui`. Only the Director can add an `app` step. The integration browser run covers the three cases (Rules, Integration checks, Run modes).

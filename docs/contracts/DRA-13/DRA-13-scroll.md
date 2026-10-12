@@ -1,7 +1,7 @@
 # Scroll: world scroll, distance and starfield
-Version: 1
+Version: 2
 Status: frozen
-Features: DRA-13
+Features: DRA-13, DRA-19
 Created by: architect
 
 ## Purpose
@@ -10,7 +10,7 @@ The screen stays fixed. The world scrolls down past it at a steady speed, and di
 The scroll and the ship never touch each other. The ship's step doesn't read the scroll, and the scroll's step doesn't read the ship.
 
 Who builds what:
-- `game/core/scroll.py`: the Gameplay Implementer, task `DRA-13-01-gameplay-implementer`.
+- `game/core/scroll.py`: the Gameplay Implementer, task `DRA-13-01-gameplay-implementer`. `Final` and `slots` in DRA-19: task `DRA-19-01-gameplay-implementer`.
 - `game/ui/starfield.py`: the UI Developer, task `DRA-13-02-ui-developer`.
 - `game/tests/core/test_scroll.py`: the QA Engineer, task `DRA-13-04-qa-engineer`.
 - Creating the scroll at play start, stepping it once per tick, drawing the starfield: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/DRA-5/DRA-5-app.md`.
@@ -49,16 +49,17 @@ meters    0 ...  0 |  0     0     0   ...   11
 ## Interface
 ```python
 # game/core/scroll.py
-# Imports: stdlib only (math, logging, dataclasses). Never pygame, ui or app.
+# Imports: stdlib only (math, logging, dataclasses, typing). Never pygame, ui or app.
+# Every module-level constant is typing.Final (DRA-19).
 
-SCROLL_BASE: float = 1.1             # 03-world-and-camera.md, scroll_base, px/tick (guess)
-LEVEL_1_SCROLL_MULT: float = 1.0     # 08-difficulty.md, Level table, Level 1 scroll speed × (locked)
-SCROLL_PER_TICK: float               # = SCROLL_BASE * LEVEL_1_SCROLL_MULT -> 1.1 px/tick
-SCROLL_START_DELAY: int = 30         # 03-world-and-camera.md, scroll_start_delay, ticks (guess)
-DISTANCE_START: int = 0              # 03-world-and-camera.md, distance_start, m (locked)
-PX_PER_METER: int = 10               # 03-world-and-camera.md, px_per_meter (locked)
+SCROLL_BASE: Final[float] = 1.1             # 03-world-and-camera.md, scroll_base, px/tick (guess)
+LEVEL_1_SCROLL_MULT: Final[float] = 1.0     # 08-difficulty.md, Level table, Level 1 scroll speed × (locked)
+SCROLL_PER_TICK: Final[float]               # = SCROLL_BASE * LEVEL_1_SCROLL_MULT -> 1.1 px/tick
+SCROLL_START_DELAY: Final[int] = 30         # 03-world-and-camera.md, scroll_start_delay, ticks (guess)
+DISTANCE_START: Final[int] = 0              # 03-world-and-camera.md, distance_start, m (locked)
+PX_PER_METER: Final[int] = 10               # 03-world-and-camera.md, px_per_meter (locked)
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Scroll:
     """Scroll state after a tick."""
     ticks: int = 0             # ticks run since play started
@@ -139,7 +140,18 @@ Logging (logger `core.scroll`, DEBUG, by event, never by tick). Source: game/CON
 - `scroll start tick=%d`: once, on the tick the world first moves (the returned scroll has `scrolled_ticks == 1`), with that tick's `ticks` (31).
 - Nothing else. No line per tick, no line per meter.
 
+## Impact
+DRA-19 changes this frozen contract (v1). No behavior, signature, value or log line changes. Constants gain `Final`, and `Scroll` gains `slots=True`. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.scroll`, `Scroll`, `__dict__`, `__slots__`, `setattr`, `vars(` and the constant names:
+
+| File | Change needed |
+|---|---|
+| `game/core/scroll.py` | `Final[...]` on the six constants, `slots=True` on `Scroll`. Task `DRA-19-01-gameplay-implementer`. |
+| `game/ui/starfield.py`, `game/ui/hud.py` | none. They read `scroll.distance_px` and `scroll.meters`. Properties work the same on a slotted dataclass. |
+| `game/app/frame.py` | none. It calls `start_scroll` and `step_scroll` and passes the result on. |
+| `game/tests/core/test_scroll.py`, `game/tests/ui/test_hud.py` | none. They build `Scroll` with keywords and read fields and properties. They copy the constant values from the GDD and never import or patch them. |
+
 ## Rationale
+- **`Final` and `slots=True` (DRA-19).** Same reasons as in `DRA-6-ship.md`, Rationale. Core modules stay alike. `Scroll`'s field docstrings and its two properties are unaffected by slots.
 - **A separate system, not part of `core/world.py`.** `world.py` is constants only, and the DRA-6 world contract keeps it that way. The scroll has state and a step, like the ship. Its constants live with it, the same way the ship's physics constants live in `core/ship.py`.
 - **The state counts ticks, not pixels.** Adding 1.1 to a float every tick piles up rounding error, and a meter boundary can land a hair below the true value: floor then shows one meter less for a tick. `scrolled_ticks × SCROLL_PER_TICK` is one multiplication. At every whole-meter boundary the exact value is a whole number of px, which a float holds exactly, and rounding to nearest can't fall below it. So `meters` is exact. When levels arrive, a level feature changes the state to count ticks per speed. That is a contract change for that feature.
 - **`distance_px` and `meters` are properties.** They are core facts the UI reads, computed in core, and a frozen state can't hold a distance that disagrees with its tick count.

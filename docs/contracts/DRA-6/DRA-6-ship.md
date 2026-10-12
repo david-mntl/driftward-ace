@@ -1,7 +1,7 @@
 # Ship
-Version: 2
+Version: 3
 Status: frozen
-Features: DRA-6, DRA-13
+Features: DRA-6, DRA-13, DRA-19
 Created by: architect
 
 ## Purpose
@@ -10,7 +10,7 @@ The ship's state and its one-tick physics step: thrust, gravity, drag, fall cap,
 From DRA-13 the top-line stop is the real rule, not a stand-in: the screen is fixed and the top line is a ceiling (03-world-and-camera.md, rule 2; 04-ship.md, rule 2, step 7). Its behavior doesn't change. The world scroll never touches the ship (`docs/contracts/DRA-13/DRA-13-scroll.md`).
 
 Who builds what:
-- `game/core/ship.py`: the Gameplay Implementer, task `DRA-6-01-gameplay-implementer`.
+- `game/core/ship.py`: the Gameplay Implementer, task `DRA-6-01-gameplay-implementer`. Field docs, `Final` and `slots` in DRA-19: task `DRA-19-01-gameplay-implementer`.
 - `game/ui/ship_view.py`: the UI Developer, task `DRA-6-02-ui-developer`.
 - `game/tests/core/test_ship.py`: the QA Engineer, task `DRA-6-03-qa-engineer`.
 - Calling `step` once per tick and building `Thrust` from the keys: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/DRA-5/DRA-5-app.md`.
@@ -49,21 +49,22 @@ flowchart LR
 ```python
 # game/core/ship.py
 # Imports: stdlib, core.world. Never pygame, ui or app.
+# Every module-level constant is typing.Final (DRA-19).
 
-SHIP_W: int = 32               # 04-ship.md, ship_w (guess)
-SHIP_H: int = 32               # 04-ship.md, ship_h (guess)
-GRAVITY: float = 0.16          # 04-ship.md, gravity, px/tick² (guess)
-THRUST_SIDE: float = 0.42      # 04-ship.md, thrust_side, px/tick² (guess)
-THRUST_UP: float = 0.42        # 04-ship.md, thrust_up, px/tick² (guess)
-THRUST_DOWN: float = 0.42      # 04-ship.md, thrust_down, px/tick² (guess)
-DRAG_X: float = 0.94           # 04-ship.md, drag_x, × per tick (guess)
-FALL_CAP: float = 5.5          # 04-ship.md, fall_cap, px/tick (guess)
-SPAWN_X: float = 320.0         # 03-world-and-camera.md ship_start = 05-lives-and-damage.md fall_respawn
-SPAWN_Y: float = 240.0         # same
+SHIP_W: Final[int] = 32               # 04-ship.md, ship_w (guess)
+SHIP_H: Final[int] = 32               # 04-ship.md, ship_h (guess)
+GRAVITY: Final[float] = 0.16          # 04-ship.md, gravity, px/tick² (guess)
+THRUST_SIDE: Final[float] = 0.42      # 04-ship.md, thrust_side, px/tick² (guess)
+THRUST_UP: Final[float] = 0.42        # 04-ship.md, thrust_up, px/tick² (guess)
+THRUST_DOWN: Final[float] = 0.42      # 04-ship.md, thrust_down, px/tick² (guess)
+DRAG_X: Final[float] = 0.94           # 04-ship.md, drag_x, × per tick (guess)
+FALL_CAP: Final[float] = 5.5          # 04-ship.md, fall_cap, px/tick (guess)
+SPAWN_X: Final[float] = 320.0         # 03-world-and-camera.md ship_start = 05-lives-and-damage.md fall_respawn
+SPAWN_Y: Final[float] = 240.0         # same
 
-Wall = Literal["left", "right"]
+Wall = Literal["left", "right"]       # a type alias, not a constant: no Final
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Thrust:
     """Which arrow keys are held this tick."""
     up: bool = False
@@ -71,7 +72,7 @@ class Thrust:
     left: bool = False
     right: bool = False
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Ship:
     """Ship state after a tick. Screen px, y down."""
     x: float                       # center x
@@ -89,6 +90,8 @@ def step(ship: Ship, thrust: Thrust) -> Ship: ...
     # same ship out. Never mutates its input.
 ```
 Derived edges, used by the rules below: left edge `x - SHIP_W / 2`, right edge `x + SHIP_W / 2`, top edge `y - SHIP_H / 2`.
+
+The code carries each `Ship` field's comment above (what it is, its unit, its sign) as that field's documentation, together with the class docstring's "Screen px, y down". From DRA-19. Source: scope report DRA-19, item 1; review DRA-6-01-gameplay-implementer, finding 1.
 
 ```python
 # game/ui/ship_view.py
@@ -134,23 +137,23 @@ Other rules:
 - Core never imports pygame, `ui` or `app`. Source: game/CONTEXT.md, Layout.
 - The ship never reads the world scroll, and the scroll never changes the ship. `step` takes no scroll. Source: 03-world-and-camera.md, rule 4; DRA-13-scroll.md.
 
-Logging (logger `core.ship`, DEBUG, by event, never by tick). Source: game/CONTEXT.md, Logging; 15-tech-constraints.md, rule 9:
-- `wall hit side=%s x=%.2f y=%.2f`: when the returned ship has `wall` set and the input ship's `wall` was different. Holding a key against a wall logs once, not every tick.
-- `top line stop x=%.2f y=%.2f`: when the returned ship has `at_top_line` True and the input ship had it False. Holding Up at the line logs once.
+Logging (logger `core.ship`, DEBUG, by event, never by tick). Source: game/CONTEXT.md, Logging; 15-tech-constraints.md, rule 9. The wall and top-line wording ("the ship after the clamps, before any respawn") is from DRA-19 and matches the code; no log line changes. Source: scope report DRA-19, item 2; review DRA-6-01-gameplay-implementer, finding 2:
+- `wall hit side=%s x=%.2f y=%.2f`: when the ship after the clamps, before any respawn, has `wall` set and the input ship's `wall` was different. Holding a key against a wall logs once, not every tick.
+- `top line stop x=%.2f y=%.2f`: when the ship after the clamps, before any respawn, has `at_top_line` True and the input ship had it False. Holding Up at the line logs once.
 - `respawn from x=%.2f y=%.2f`: on every respawn, with the position the ship fell from (after step 5 and the clamps, before the reset).
 - Values are the new position after the clamp. Nothing else is logged. No line on a tick where nothing happened.
 - If the ship hits a wall and falls off the floor in the same tick, the wall line comes first, then the respawn line.
 
 ## Impact
-DRA-13 changes this frozen contract (v1). Only the top-line stop's status changes, from temporary to permanent. No behavior, signature, constant or log line changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.ship`, `TEMPORARY`, `at_top_line`, `TOP_LINE_Y` and `camera`:
+DRA-19 changes this frozen contract (v2). No behavior, signature, value or log line changes. Constants gain `Final`, `Thrust` and `Ship` gain `slots=True`, the code documents each `Ship` field, and the Logging wording is fixed to match the code. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.ship`, `Ship`, `Thrust`, `__dict__`, `__slots__`, `setattr`, `vars(` and the constant names:
 
 | File | Change needed |
 |---|---|
-| `game/core/ship.py` | docstrings only. The module docstring and `_stop_at_top_line` call the top-line stop TEMPORARY and tie it to a camera. Reword: the top line is a ceiling (03, rule 2; 04, step 7). The floor respawn stays marked TEMPORARY. Task `DRA-13-01-gameplay-implementer`. |
-| `game/ui/ship_view.py` | none. |
+| `game/core/ship.py` | `Final[...]` on the ten constants, `slots=True` on `Thrust` and `Ship`, a doc for each `Ship` field. Task `DRA-19-01-gameplay-implementer`. |
+| `game/ui/ship_view.py` | none. It reads `SHIP_W`, `SHIP_H`, `ship.x`, `ship.y`, which keep their names, types and values. |
 | `game/ui/debug_overlay.py` | none from this contract. See `DRA-6-debug-overlay.md`. |
-| `game/app/frame.py` | none from this contract. See `DRA-5-app.md`. |
-| `game/tests/core/test_ship.py` | none. Its top-line and respawn tests check behavior that doesn't change, and it has no TEMPORARY wording. |
+| `game/app/frame.py` | none. It builds `Thrust` with keywords and replaces `ship` each tick; neither needs a `__dict__`. |
+| `game/tests/core/test_ship.py`, `game/tests/ui/test_hud.py` | none. They build `Ship` and `Thrust` with keywords and read fields. No test sets an attribute, reads `__dict__` or patches a constant. |
 
 ## Rationale
 - **The top-line stop stays as built.** The GDD now makes the top line a ceiling with the same clamp and `vy = 0` that DRA-6 built as a stand-in (91-decision-log.md, row 22). Only its label changes. The floor respawn is still a stand-in: the GDD's fall costs a life, and lives are out of DRA-13.
@@ -163,3 +166,6 @@ DRA-13 changes this frozen contract (v1). Only the top-line stop's status change
 - **No art task.** The ship is a new entity type, but the scope rules out sprite art and the thrust flame. The placeholder rectangle needs no asset.
 - **The view rounds the corner with `round`.** pygame draws on whole pixels. Rounding the corner, not the center, keeps the rectangle exactly 32 × 32.
 - **The ship color lives in `ship_view.py`, not `ui/look.py`.** Only the ship view uses it. `look.py` holds values shared by several views.
+- **`Final[int]` and `Final[float]`, not bare `Final` (DRA-19).** The Interface has always stated each constant's type. Keeping it inside `Final` keeps that text and the code the same. `Final` changes nothing at run time; it tells a reader and a type checker that the value is never reassigned.
+- **`slots=True` on both dataclasses (DRA-19).** Both are small frozen records built thousands of times a run. Slots make them lighter and stop stray attributes. Nothing in `game/` reads their `__dict__`, so it fits. Fields stay as they are.
+- **Logging wording names the pre-respawn ship (DRA-19).** After a respawn the returned ship is `spawn()`, with `wall` None and `at_top_line` False. So "the returned ship" could never log a wall hit on a respawn tick, yet the same section says the wall line comes before the respawn line. The code reads the ship after the clamps, before the respawn. The wording now says that.
