@@ -1,6 +1,6 @@
 """HUD: the meters flown, drawn top-left on top of the frame.
 
-Source: docs/contracts/DRA-13/DRA-13-hud.md, Interface and Presentation. The view only draws.
+Source: docs/contracts/systems/hud.md, Interface and Presentation. The view only draws.
 It never fills, flips, logs per frame, catches an error, changes the scroll, or reads the run
 mode or a key. The app passes ``below_overlay``.
 """

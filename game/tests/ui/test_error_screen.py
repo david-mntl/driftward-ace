@@ -1,4 +1,4 @@
-"""Error screen tests. Contract: docs/contracts/DRA-5/DRA-5-app.md, Presentation.
+"""Error screen tests. Contract: docs/contracts/systems/app.md, Presentation.
 
 Positions are read from the drawn pixels, never from the font size. Every expected color
 comes from the GDD.

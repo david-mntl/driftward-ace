@@ -1,6 +1,6 @@
 """Starfield view: dim dots that drift down with the world scroll.
 
-Source: docs/contracts/DRA-13/DRA-13-scroll.md, Interface and Presentation. The view only
+Source: docs/contracts/systems/scroll.md, Interface and Presentation. The view only
 draws. It never fills the background, never flips the display, never logs per frame, never
 catches an error and never changes the scroll.
 """
@@ -55,7 +55,7 @@ def draw_starfield(surface: pygame.Surface, scroll: Scroll) -> None:
 
     The top-left of each star is (x, int((base_y + scroll.distance_px) % SCREEN_H)), so stars
     fall at the scroll speed and wrap from the bottom to the top. Reads only
-    scroll.distance_px. Units: pixels. Source: DRA-13-scroll.md, Presentation.
+    scroll.distance_px. Units: pixels. Source: systems/scroll.md, Presentation.
     """
     distance_px: float = scroll.distance_px
     for x, base_y, size in STARS:

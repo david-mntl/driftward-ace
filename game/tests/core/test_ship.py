@@ -1,4 +1,4 @@
-"""Ship physics tests. Contract: docs/contracts/DRA-6/DRA-6-ship.md, Rules.
+"""Ship physics tests. Contract: docs/contracts/systems/ship.md, Rules.
 
 Task: docs/contracts/DRA-6/tasks/DRA-6-03-qa-engineer.md. One test per behavior it lists.
 Every expected number is computed from the GDD values below, never typed in as a result.
@@ -44,7 +44,7 @@ TOP_LINE_RATIO: float = 0.35
 """Of screen_h, from the top. Source: 03-world-and-camera.md, Values, top_line_ratio (locked)."""
 
 TOP_LINE_Y: int = round(SCREEN_H * TOP_LINE_RATIO)
-"""Top line screen y. Source: 03-world-and-camera.md, rule 2; DRA-6-world.md, Interface (round)."""
+"""Top line screen y. Source: 03-world-and-camera.md rule 2; systems/world.md, Interface (round)."""
 
 START_X: float = 320.0
 """Source: 03-world-and-camera.md, ship_start (guess) = 05-lives-and-damage.md, fall_respawn."""
@@ -54,7 +54,7 @@ START_Y: float = 240.0
 
 NO_KEY = Thrust()
 SHIP_LOGGER = "core.ship"
-"""Logger name. Source: DRA-6-ship.md, Rules, Logging."""
+"""Logger name. Source: systems/ship.md, Rules, Logging."""
 
 
 def _left_edge(ship: Ship) -> float:

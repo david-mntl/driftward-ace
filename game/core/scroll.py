@@ -4,7 +4,7 @@ The screen is fixed. The world scrolls down past it at a steady Level 1 speed af
 delay. Distance counts that scroll. The scroll never reads the ship and the ship never
 reads the scroll. Stdlib only, no frame time, no randomness, no run mode.
 
-Source: docs/contracts/DRA-13/DRA-13-scroll.md, Interface and Rules.
+Source: docs/contracts/systems/scroll.md, Interface and Rules.
 """
 
 import logging

@@ -13,8 +13,8 @@ Who builds what:
 - `game/core/scroll.py`: the Gameplay Implementer, task `DRA-13-01-gameplay-implementer`. `Final` and `slots` in DRA-19: task `DRA-19-01-gameplay-implementer`.
 - `game/ui/starfield.py`: the UI Developer, task `DRA-13-02-ui-developer`.
 - `game/tests/core/test_scroll.py`: the QA Engineer, task `DRA-13-04-qa-engineer`.
-- Creating the scroll at play start, stepping it once per tick, drawing the starfield: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/DRA-5/DRA-5-app.md`.
-- The meters readout that shows `meters`: `docs/contracts/DRA-13/DRA-13-hud.md`.
+- Creating the scroll at play start, stepping it once per tick, drawing the starfield: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
+- The meters readout that shows `meters`: `docs/contracts/systems/hud.md`.
 
 ## Diagram
 ```mermaid
@@ -151,7 +151,7 @@ DRA-19 changes this frozen contract (v1). No behavior, signature, value or log l
 | `game/tests/core/test_scroll.py`, `game/tests/ui/test_hud.py` | none. They build `Scroll` with keywords and read fields and properties. They copy the constant values from the GDD and never import or patch them. |
 
 ## Rationale
-- **`Final` and `slots=True` (DRA-19).** Same reasons as in `DRA-6-ship.md`, Rationale. Core modules stay alike. `Scroll`'s field docstrings and its two properties are unaffected by slots.
+- **`Final` and `slots=True` (DRA-19).** Same reasons as in `systems/ship.md`, Rationale. Core modules stay alike. `Scroll`'s field docstrings and its two properties are unaffected by slots.
 - **A separate system, not part of `core/world.py`.** `world.py` is constants only, and the DRA-6 world contract keeps it that way. The scroll has state and a step, like the ship. Its constants live with it, the same way the ship's physics constants live in `core/ship.py`.
 - **The state counts ticks, not pixels.** Adding 1.1 to a float every tick piles up rounding error, and a meter boundary can land a hair below the true value: floor then shows one meter less for a tick. `scrolled_ticks × SCROLL_PER_TICK` is one multiplication. At every whole-meter boundary the exact value is a whole number of px, which a float holds exactly, and rounding to nearest can't fall below it. So `meters` is exact. When levels arrive, a level feature changes the state to count ticks per speed. That is a contract change for that feature.
 - **`distance_px` and `meters` are properties.** They are core facts the UI reads, computed in core, and a frozen state can't hold a distance that disagrees with its tick count.

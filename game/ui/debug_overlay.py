@@ -1,6 +1,6 @@
 """Debug overlay: the ship's numbers and the lines the rules use, drawn on top of the frame.
 
-Source: docs/contracts/DRA-6/DRA-6-debug-overlay.md, Interface and Presentation;
+Source: docs/contracts/systems/debug-overlay.md, Interface and Presentation;
 10-ui.md, debug_overlay, debug_overlay_layout, debug_text_font, debug_overlay_color.
 The view only draws. It never fills, flips, logs per frame, catches an error, changes
 the ship or reads the run mode. The app decides whether to call it.
@@ -46,7 +46,7 @@ def overlay_text_bottom() -> int:
 
     Value: OVERLAY_MARGIN + 3 * linesize + max(linesize, font height), from the overlay's own
     cached font. Units: pixels. Needs ``pygame.font`` initialized.
-    Source: docs/contracts/DRA-6/DRA-6-debug-overlay.md, Interface and Presentation (DRA-13).
+    Source: docs/contracts/systems/debug-overlay.md, Interface and Presentation (DRA-13).
     """
     font: pygame.font.Font = _overlay_font()
     linesize: int = font.get_linesize()
@@ -57,7 +57,7 @@ def _draw_lines(surface: pygame.Surface) -> None:
     """Draw the top line on row TOP_LINE_Y and the floor on row SCREEN_H - 1, full width.
 
     The floor is y SCREEN_H, one row past the last visible row, so it shows on the row above.
-    Source: DRA-6-debug-overlay.md, Presentation and Rationale; 91-decision-log.md, row 20.
+    Source: systems/debug-overlay.md, Presentation and Rationale; 91-decision-log.md, row 20.
     """
     right: int = surface.get_width() - 1
     for row in (TOP_LINE_Y, SCREEN_H - 1):
@@ -88,6 +88,6 @@ def _overlay_font() -> pygame.font.Font:
     """Return the overlay font, built on the first call and reused after.
 
     Default font at OVERLAY_FONT_SIZE. Built once, never per frame.
-    Source: DRA-6-debug-overlay.md, Presentation; 15-tech-constraints.md, rule 5.
+    Source: systems/debug-overlay.md, Presentation; 15-tech-constraints.md, rule 5.
     """
     return pygame.font.Font(None, OVERLAY_FONT_SIZE)

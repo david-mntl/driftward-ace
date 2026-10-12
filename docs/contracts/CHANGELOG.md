@@ -30,3 +30,14 @@
 - Review follow-ups, no new gameplay: the guard removes null characters from the debug detail line, the overlay shows `0.00` instead of `-0.00`, ship fields are documented with unit and sign, core constants are `Final` and core dataclasses use `slots`, and the ship logging rule says "after the clamps, before any respawn".
 - Director verdict on the integration observations, given in the main session and relayed by the coordinator: "yes do that and dont run it through the pipeline. Just edit it." All seven observations were accepted as they stand.
 - Check-method rewording, edited by the main session on the Director's instruction, outside the pipeline: `DRA-5-app.md` gains "How the browser checks below are done" (a screenshot is a canvas pixel comparison, hiding the tab is a main-thread freeze, real click-screen and hidden-tab behavior is a manual Director check when the frame loop or start-up changes and before a release), and the DRA-5 and DRA-6 click-to-start and catch-up cap checks were reworded to match.
+
+## Contracts moved to systems/, 2026-10-12
+- Contracts now live in `docs/contracts/systems/`, one file per part of the code. Task files stay in `docs/contracts/<feature-id>/tasks/`. Content and versions are unchanged. Only the paths in links changed.
+- `DRA-5/DRA-5-app.md` → `systems/app.md` (v4)
+- `DRA-6/DRA-6-ship.md` → `systems/ship.md` (v3)
+- `DRA-6/DRA-6-world.md` → `systems/world.md` (v3)
+- `DRA-6/DRA-6-debug-overlay.md` → `systems/debug-overlay.md` (v3)
+- `DRA-13/DRA-13-scroll.md` → `systems/scroll.md` (v2)
+- `DRA-13/DRA-13-hud.md` → `systems/hud.md` (v1)
+- Closed task files, reports and the entries above still use the old paths. Read them with this mapping. `git log --follow` shows each contract's full history.
+- Director decision, made in the main session, outside the pipeline.
