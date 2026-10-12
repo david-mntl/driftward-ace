@@ -65,9 +65,10 @@ def _draw_lines(surface: pygame.Surface) -> None:
 
 
 def _draw_text(surface: pygame.Surface, ship: Ship) -> None:
-    """Draw ``x``, ``y``, ``vx`` and ``vy`` as ``<name> <value:.2f>``, one per line, top-left.
+    """Draw ``x``, ``y``, ``vx`` and ``vy`` as ``<name> <value:z.2f>``, one per line, top-left.
 
-    Source: 10-ui.md, debug_overlay_layout (guess).
+    The ``z`` option turns a value that rounds to zero into ``0.00``, never ``-0.00``.
+    Source: 10-ui.md, debug_overlay_layout (guess); DRA-19 scope report, item 3.
     """
     font: pygame.font.Font = _overlay_font()
     readings: tuple[tuple[str, float], ...] = (
@@ -77,7 +78,7 @@ def _draw_text(surface: pygame.Surface, ship: Ship) -> None:
         ("vy", ship.vy),
     )
     for index, (name, value) in enumerate(readings):
-        line: pygame.Surface = font.render(f"{name} {value:.2f}", True, OVERLAY_COLOR)
+        line: pygame.Surface = font.render(f"{name} {value:z.2f}", True, OVERLAY_COLOR)
         top: int = OVERLAY_MARGIN + index * font.get_linesize()
         surface.blit(line, (OVERLAY_MARGIN, top))
 

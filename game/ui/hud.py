@@ -20,8 +20,8 @@ HUD_COLOR: tuple[int, int, int] = (255, 255, 255)
 not in the GDD (UI-01 is TBD)."""
 
 HUD_FONT_SIZE: int = 16
-"""Readout text size, default font, px. Scope report DRA-13, HUD layout approved by the
-Director, not in the GDD (UI-01 is TBD)."""
+"""Readout text size, default font, px. Scope report DRA-13, temporary stand-in (readout text),
+not in the GDD (UI-01 is TBD)."""
 
 HUD_MARGIN: int = 4
 """Gap from the left edge to the text, px. Scope report DRA-13, HUD layout approved by the
