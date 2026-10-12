@@ -19,7 +19,7 @@ The ship has no weapon and no brake. Arrow keys add thrust, gravity always pulls
 | thrust_up | 0.42 | px/tick² | TBD | guess | Director tuning guess |
 | thrust_down | 0.42 | px/tick² | TBD | guess | Director tuning guess |
 | drag_x | 0.94 | × per tick | TBD | guess | Director tuning guess |
-| fall_cap | TBD | px/tick | TBD | TBD | SH-01 |
+| fall_cap | 5.5 | px/tick | TBD | guess | Director. Leaves headroom under the rule 6 bound: a top-line fall takes about 57 ticks |
 | min_fall_ticks | 54 | ticks (0.9 s) | — | locked | Director |
 
 All Range cells: SH-02.
@@ -52,7 +52,7 @@ Derived from the guesses above. Recompute when a value changes:
 - Up and down held together: they cancel, and gravity still pulls.
 
 ## Open
-- SH-01, SH-02, SH-03, SH-04, SH-05, SH-06.
+- SH-02, SH-03, SH-04, SH-05, SH-06.
 
 ## How to extend
 A new physics value: add a row with unit, range and status, and place it in the tick order. If it's live-tunable, the tuning file needs a matching key, which is a schema change.

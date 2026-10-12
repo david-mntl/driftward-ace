@@ -17,17 +17,13 @@ Status: `open`, or `blocking` (stops other work now).
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | WC-01 | Where is altitude 0 m? For example, the ship's spawn point at run start. | 03-world-and-camera.md | Scoring, levels | open |
-| WC-02 | Which point of the ship the top line stops: its top edge or its center? | 03-world-and-camera.md | Camera | open |
-| WC-03 | When does the ship count as fallen: center below the floor, or fully off screen? | 03-world-and-camera.md, 05-lives-and-damage.md | Falls | open |
 | WC-04 | Does auto-rise start at once when play starts, and does it keep going right after a fall respawn? | 03-world-and-camera.md | Camera | open |
 | WC-05 | When the ship pushes the top line and auto-rise runs in the same tick, does the camera move by the larger amount or the sum? | 03-world-and-camera.md | Camera | open |
-| WC-06 | Where does the ship start a run? | 03-world-and-camera.md | Run start | open |
 | WC-07 | Is the whole 640×480 window the play area, with HUD and warnings drawn on top? Or is part of it a HUD strip (top) or warning margins (sides)? If so, how big? | 03-world-and-camera.md, 10-ui.md | Walls, top line, wave coordinates, HUD | open |
 
 ## Ship
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| SH-01 | fall_cap value. It must be ≤ 5.77 px/tick to meet the 0.9 s rule at 640×480. | 04-ship.md | Physics | open |
 | SH-02 | Slider min and max for gravity, the three thrusts, drag_x, fall_cap and scroll_base. | 04-ship.md, 03-world-and-camera.md | Tuning tool | open |
 | SH-03 | Ship hitbox: circle (graze uses a radius) or box? What size? | 04-ship.md | Collisions, graze | open |
 | SH-04 | Keep the ship at 32×32 px? | 04-ship.md | Art, wave_check gaps | open |
@@ -102,7 +98,6 @@ Status: `open`, or `blocking` (stops other work now).
 | UI-02 | Lives as icons or a number? | 10-ui.md | HUD | open |
 | UI-03 | Control card: exact text and look. | 10-ui.md | Control card | open |
 | UI-04 | Game-over screen: what it shows and the retry prompt. | 10-ui.md | Game over | open |
-| UI-05 | Debug overlay (week 1): what it shows and how it's toggled. Arrow keys only applies to play. | 10-ui.md | Tuning | open |
 
 ## Save data (stretch)
 | ID | Question | File | Blocks | Status |
