@@ -1,4 +1,4 @@
-"""World scroll and distance tests. Contract: docs/contracts/DRA-13/DRA-13-scroll.md, Rules.
+"""World scroll and distance tests. Contract: docs/contracts/systems/scroll.md, Rules.
 
 Task: docs/contracts/DRA-13/tasks/DRA-13-04-qa-engineer.md. One test per behavior it lists.
 Every expected number is computed from the GDD values below, never typed in as a result.

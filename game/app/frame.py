@@ -3,7 +3,7 @@
 Each frame: read events, build the thrust from the held arrow keys, run up to
 MAX_TICKS_PER_FRAME ticks (core.ship.step, then core.scroll.step_scroll), draw the starfield,
 the ship, the debug overlay if visible and the HUD, flip, then yield to the browser.
-Source: docs/contracts/DRA-5/DRA-5-app.md, Rules, Frame loop. 15-tech-constraints.md, rules 1 and 2.
+Source: docs/contracts/systems/app.md, Rules, Frame loop. 15-tech-constraints.md, rules 1 and 2.
 """
 
 import asyncio
@@ -104,7 +104,7 @@ def _run_ticks(
 
     Each tick steps the ship, then the scroll; the two never pass state to each other.
     Returns (ship, scroll, accumulator left). Source: 15-tech-constraints.md, rule 2;
-    DRA-5-app.md, Rules, Tick.
+    systems/app.md, Rules, Tick.
     """
     ticks: int = 0
     while accumulator >= TICK_SECONDS and ticks < MAX_TICKS_PER_FRAME:
@@ -119,7 +119,7 @@ def _apply_cap(accumulator: float, was_capped: bool) -> bool:
     """Return True if the cap drops time this frame. Log only when capping starts.
 
     The caller sets the accumulator to 0.0 when this returns True.
-    Source: DRA-5-app.md, Rules, Catch-up cap and Cap log; 91-decision-log.md, row 21.
+    Source: systems/app.md, Rules, Catch-up cap and Cap log; 91-decision-log.md, row 21.
     """
     capped: bool = accumulator >= TICK_SECONDS
     if capped and not was_capped:
@@ -133,7 +133,7 @@ def _draw(
     """Fill the background, then draw the starfield, the ship, the overlay if visible, the HUD.
 
     The HUD sits below the overlay's place for the whole run in debug mode, even while F3
-    hides the overlay. Source: DRA-5-app.md, Rules, Draw and below_overlay.
+    hides the overlay. Source: systems/app.md, Rules, Draw and below_overlay.
     """
     surface.fill(BACKGROUND)
     draw_starfield(surface, scroll)

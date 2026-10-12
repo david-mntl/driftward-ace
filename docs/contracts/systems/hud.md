@@ -12,8 +12,8 @@ In debug mode the HUD sits below the debug overlay's text, so the two never over
 Who builds what:
 - `game/ui/hud.py`, and the helper `overlay_text_bottom()` in `game/ui/debug_overlay.py`: the UI Developer, task `DRA-13-03-ui-developer`.
 - `game/tests/ui/test_hud.py`: the QA Engineer, task `DRA-13-05-qa-engineer`.
-- Calling `draw_hud` every frame and deciding `below_overlay`: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/DRA-5/DRA-5-app.md`.
-- The `meters` field: `docs/contracts/DRA-13/DRA-13-scroll.md`.
+- Calling `draw_hud` every frame and deciding `below_overlay`: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
+- The `meters` field: `docs/contracts/systems/scroll.md`.
 
 ## Diagram
 Normal mode:

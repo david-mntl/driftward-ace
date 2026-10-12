@@ -17,7 +17,7 @@ The player sees: the ship thrusts, drifts, falls, and dies on contact.
 
 ## Read first, every run
 - The task file or the QA bug report: what to build or fix, the contract link, the acceptance check.
-- The contract it links in `docs/contracts/<feature-id>/<feature-id>-<system>.md`: Interface (signatures, data shapes), Rules (each with a source), Rationale.
+- The contract it links in `docs/contracts/systems/<system>.md`: Interface (signatures, data shapes), Rules (each with a source), Rationale.
 - `docs/contracts/schemas/`: the schema of any data file your code reads.
 - `docs/design/gdd/`: every number and behavior.
 - `CLAUDE.md`: pillars, locked decisions, tech rules.

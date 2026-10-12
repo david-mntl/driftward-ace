@@ -1,4 +1,4 @@
-"""HUD layout tests. Contract: docs/contracts/DRA-13/DRA-13-hud.md, Rules.
+"""HUD layout tests. Contract: docs/contracts/systems/hud.md, Rules.
 
 Positions are read from the drawn pixels, never from a font size or a line height. The HUD
 and the debug overlay must never overlap (Director, scope report DRA-13, Decision log).

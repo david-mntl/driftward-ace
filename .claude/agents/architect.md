@@ -56,7 +56,7 @@ You may spawn `art-audio-engineer` once per task file in `docs/contracts/<featur
 ## Outputs
 All files go in `docs/contracts/`.
 
-**Contract**, `docs/contracts/<feature-id>/<feature-id>-<system>.md`, markdown, e.g. `docs/contracts/DEMO-1/DEMO-1-ship-physics.md`. Each feature has its own folder `docs/contracts/<feature-id>/`, holding its contracts and a `tasks/` subfolder. The feature-id is the feature that first created the contract. It is one per game system, not one per feature, and a later feature that changes the system edits that file and keeps its name and folder. Task files always go in the folder of the feature they belong to. It always shows the system as it is now.
+**Contract**, `docs/contracts/systems/<system>.md`, markdown, e.g. `docs/contracts/systems/ship.md`. It is one per game system, not one per feature. A later feature that changes the system edits that file and keeps its name, and adds its feature-id to the `Features:` line. It always shows the system as it is now. Task files go in the folder of the feature they belong to: `docs/contracts/<feature-id>/tasks/`.
 ```
 # <System>
 Version: <last frozen version, 0 if never frozen>
@@ -82,7 +82,7 @@ Feature: <feature-id>
 Created by: architect
 Assignee: gameplay-implementer | ui-developer | art-audio-engineer | qa-engineer
 Writes to: <the assignee's owned path>
-Contract: docs/contracts/<feature-id>/<feature-id>-<system>.md#<section>
+Contract: docs/contracts/systems/<system>.md#<section>
 Status: open
 Linear: <sub-issue key>
 

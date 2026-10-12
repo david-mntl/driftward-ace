@@ -3,7 +3,7 @@
 Module level imports only the standard library and startup modules. pygame and ui are
 first imported by start(), inside the guard, so an import error there is logged and
 shows the error screen.
-Source: docs/contracts/DRA-5/DRA-5-app.md, Rules, Startup and Import boundary.
+Source: docs/contracts/systems/app.md, Rules, Startup and Import boundary.
 """
 
 import functools

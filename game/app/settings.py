@@ -1,7 +1,7 @@
 """Frame loop constants. Constants only, no imports.
 
 From DRA-6 the screen size lives in core/world.py (SCREEN_W, SCREEN_H).
-Source: docs/contracts/DRA-5/DRA-5-app.md, Interface, game/app/settings.py, and Impact.
+Source: docs/contracts/systems/app.md, Interface, game/app/settings.py, and Impact.
 """
 
 TICK_RATE: int = 60

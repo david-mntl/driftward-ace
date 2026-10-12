@@ -1,7 +1,7 @@
 """Top-level error guard: log the error, show the error screen, idle until the page closes.
 
 Source: 15-tech-constraints.md, rule 8. 10-ui.md, rule 8, error_screen, error_debug_line.
-docs/contracts/DRA-5/DRA-5-app.md, Rules, Error guard and Import boundary.
+docs/contracts/systems/app.md, Rules, Error guard and Import boundary.
 This module holds the game's only `except Exception`. At module level it imports only the
 standard library and startup modules. pygame, core.world and ui.error_screen are imported
 in the error step.
@@ -30,7 +30,7 @@ def _detail(exc: Exception, mode: RunMode) -> str | None:
     """Return the one-line `<ErrorType>: <message>` in debug mode, None in normal mode.
 
     Newlines become spaces and null characters are removed, so the error screen can
-    render the line. Source: DRA-5-app.md, Rules, Error guard (nulls from DRA-19).
+    render the line. Source: systems/app.md, Rules, Error guard (nulls from DRA-19).
     """
     if mode is not RunMode.DEBUG:
         return None

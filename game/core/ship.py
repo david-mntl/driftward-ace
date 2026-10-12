@@ -4,7 +4,7 @@ The step runs on the fixed 60 Hz tick: thrust, gravity, drag, fall cap, move, si
 the top-line ceiling, then the floor respawn, a TEMPORARY DRA-6 stand-in. It never
 mutates its input, never reads frame time, randomness or the run mode.
 
-Source: docs/contracts/DRA-6/DRA-6-ship.md, Interface and Rules.
+Source: docs/contracts/systems/ship.md, Interface and Rules.
 """
 
 import logging
@@ -96,7 +96,7 @@ def step(ship: Ship, thrust: Thrust) -> Ship:
 
     Pure apart from DEBUG event logging on `core.ship`: a line when wall or top-line
     contact starts, and one on each respawn. No line on a tick where nothing happened.
-    Source: 04-ship.md, rule 2 (tick order); DRA-6-ship.md, Rules and Logging.
+    Source: 04-ship.md, rule 2 (tick order); systems/ship.md, Rules and Logging.
     """
     vx, vy = _accelerate(ship.vx, ship.vy, thrust)
     x: float = ship.x + vx
@@ -167,7 +167,7 @@ def _is_below_floor(ship: Ship) -> bool:
 def _log_contact_starts(before: Ship, after: Ship) -> None:
     """Log a wall hit or a top-line stop only on the tick the contact starts.
 
-    Source: DRA-6-ship.md, Rules, Logging.
+    Source: systems/ship.md, Rules, Logging.
     """
     if after.wall is not None and after.wall != before.wall:
         log.debug("wall hit side=%s x=%.2f y=%.2f", after.wall, after.x, after.y)

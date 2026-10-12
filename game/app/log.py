@@ -1,7 +1,7 @@
 """The one place that configures logging. Called once, at startup.
 
 Source: 15-tech-constraints.md, log_level_normal, log_level_debug, log_format.
-docs/contracts/DRA-5/DRA-5-app.md, Rules, Logging (Director decision D2).
+docs/contracts/systems/app.md, Rules, Logging (Director decision D2).
 """
 
 import logging

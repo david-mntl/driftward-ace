@@ -26,7 +26,7 @@ This is the rule that matters most in your lane.
 
 ## Read first, every run
 - The task file or the QA bug report: what to build or fix, the contract link, the acceptance check.
-- The contract it links in `docs/contracts/<feature-id>/<feature-id>-<system>.md`: Interface (the core state and the view objects), Presentation, Rules (each with a source), Rationale.
+- The contract it links in `docs/contracts/systems/<system>.md`: Interface (the core state and the view objects), Presentation, Rules (each with a source), Rationale.
 - `docs/contracts/schemas/`: the schema of any data file your code reads.
 - `docs/design/gdd/`: every number, layout, color and text.
 - `CLAUDE.md`: pillars, locked decisions, tech rules.

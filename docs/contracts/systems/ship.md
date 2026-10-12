@@ -7,13 +7,13 @@ Created by: architect
 ## Purpose
 The ship's state and its one-tick physics step: thrust, gravity, drag, fall cap, move, side walls, top line. One temporary stand-in ends the tick: the floor respawn, until lives exist. Plus the view that draws the ship as its placeholder rectangle.
 
-From DRA-13 the top-line stop is the real rule, not a stand-in: the screen is fixed and the top line is a ceiling (03-world-and-camera.md, rule 2; 04-ship.md, rule 2, step 7). Its behavior doesn't change. The world scroll never touches the ship (`docs/contracts/DRA-13/DRA-13-scroll.md`).
+From DRA-13 the top-line stop is the real rule, not a stand-in: the screen is fixed and the top line is a ceiling (03-world-and-camera.md, rule 2; 04-ship.md, rule 2, step 7). Its behavior doesn't change. The world scroll never touches the ship (`docs/contracts/systems/scroll.md`).
 
 Who builds what:
 - `game/core/ship.py`: the Gameplay Implementer, task `DRA-6-01-gameplay-implementer`. Field docs, `Final` and `slots` in DRA-19: task `DRA-19-01-gameplay-implementer`.
 - `game/ui/ship_view.py`: the UI Developer, task `DRA-6-02-ui-developer`.
 - `game/tests/core/test_ship.py`: the QA Engineer, task `DRA-6-03-qa-engineer`.
-- Calling `step` once per tick and building `Thrust` from the keys: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/DRA-5/DRA-5-app.md`.
+- Calling `step` once per tick and building `Thrust` from the keys: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
 
 ## Diagram
 ```mermaid
@@ -110,7 +110,7 @@ def draw_ship(surface: pygame.Surface, ship: Ship) -> None: ...
 | `SHIP_W`, `SHIP_H` | the rectangle's size, 32 × 32. Source: 04-ship.md, ship_w, ship_h (guess) |
 | (always) | filled, color `SHIP_COLOR`, (255, 255, 255). Source: 04-ship.md, placeholder_look (guess) |
 
-- `vx`, `vy`, `wall` and `at_top_line` are not shown by the ship view. The debug overlay shows `vx` and `vy` (`docs/contracts/DRA-6/DRA-6-debug-overlay.md`).
+- `vx`, `vy`, `wall` and `at_top_line` are not shown by the ship view. The debug overlay shows `vx` and `vy` (`docs/contracts/systems/debug-overlay.md`).
 - A ship partly past the floor is drawn as is. pygame clips what falls outside the surface.
 - The view only draws. It never flips, never logs per frame, never catches an error, never changes the ship.
 
@@ -135,7 +135,7 @@ Other rules:
 - `step` uses no frame time and no randomness. Same input, same output. Source: 15-tech-constraints.md, rule 2.
 - Core behaves the same in normal and debug mode. It never reads the run mode. Source: game/CONTEXT.md, Run modes; 15-tech-constraints.md, rule 7.
 - Core never imports pygame, `ui` or `app`. Source: game/CONTEXT.md, Layout.
-- The ship never reads the world scroll, and the scroll never changes the ship. `step` takes no scroll. Source: 03-world-and-camera.md, rule 4; DRA-13-scroll.md.
+- The ship never reads the world scroll, and the scroll never changes the ship. `step` takes no scroll. Source: 03-world-and-camera.md, rule 4; systems/scroll.md.
 
 Logging (logger `core.ship`, DEBUG, by event, never by tick). Source: game/CONTEXT.md, Logging; 15-tech-constraints.md, rule 9. The wall and top-line wording ("the ship after the clamps, before any respawn") is from DRA-19 and matches the code; no log line changes. Source: scope report DRA-19, item 2; review DRA-6-01-gameplay-implementer, finding 2:
 - `wall hit side=%s x=%.2f y=%.2f`: when the ship after the clamps, before any respawn, has `wall` set and the input ship's `wall` was different. Holding a key against a wall logs once, not every tick.
@@ -151,7 +151,7 @@ DRA-19 changes this frozen contract (v2). No behavior, signature, value or log l
 |---|---|
 | `game/core/ship.py` | `Final[...]` on the ten constants, `slots=True` on `Thrust` and `Ship`, a doc for each `Ship` field. Task `DRA-19-01-gameplay-implementer`. |
 | `game/ui/ship_view.py` | none. It reads `SHIP_W`, `SHIP_H`, `ship.x`, `ship.y`, which keep their names, types and values. |
-| `game/ui/debug_overlay.py` | none from this contract. See `DRA-6-debug-overlay.md`. |
+| `game/ui/debug_overlay.py` | none from this contract. See `systems/debug-overlay.md`. |
 | `game/app/frame.py` | none. It builds `Thrust` with keywords and replaces `ship` each tick; neither needs a `__dict__`. |
 | `game/tests/core/test_ship.py`, `game/tests/ui/test_hud.py` | none. They build `Ship` and `Thrust` with keywords and read fields. No test sets an attribute, reads `__dict__` or patches a constant. |
 

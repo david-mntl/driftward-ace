@@ -4,7 +4,7 @@ The screen is fixed and never moves. There is no camera, and the rules use scree
 Screen px, x right, y down.
 The left wall is x 0, the right wall is x SCREEN_W, the floor is y SCREEN_H.
 
-Source: docs/contracts/DRA-6/DRA-6-world.md, Interface and Rules.
+Source: docs/contracts/systems/world.md, Interface and Rules.
 """
 
 from typing import Final

@@ -7,11 +7,11 @@ Created by: architect
 ## Purpose
 In debug mode, show the ship's numbers and the lines the rules use, so the drift can be read and tuned. The view only reads core state. Whether it shows is decided by the app.
 
-From DRA-13 the overlay also tells the HUD where its text ends, so the HUD can sit below it with no overlap (`docs/contracts/DRA-13/DRA-13-hud.md`). What the overlay shows doesn't change.
+From DRA-13 the overlay also tells the HUD where its text ends, so the HUD can sit below it with no overlap (`docs/contracts/systems/hud.md`). What the overlay shows doesn't change.
 
 Who builds what:
 - `game/ui/debug_overlay.py`: the UI Developer, task `DRA-6-04-ui-developer`. `overlay_text_bottom()`: task `DRA-13-03-ui-developer`. No `-0.00` in DRA-19: task `DRA-19-02-ui-developer`.
-- `overlay_visible` and the F3 toggle: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/DRA-5/DRA-5-app.md`.
+- `overlay_visible` and the F3 toggle: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
 
 ## Diagram
 ```mermaid
@@ -64,7 +64,7 @@ def overlay_text_bottom() -> int: ...       # DRA-13
 - The overlay only reads game state. It never changes it. Source: 10-ui.md, rules 5 and 7.
 - Layout as in Presentation. Source: 10-ui.md, debug_overlay_layout (guess); 91-decision-log.md, row 20.
 - DRA-13 adds no content: no distance line, no scroll value. The overlay shows exactly what DRA-6 built. Source: scope report DRA-13, Limits and Decision log (Director: "Leave it simple as before").
-- The overlay sits above the HUD on screen and never overlaps it. The HUD moves; the overlay stays where it is. Source: scope report DRA-13, Decision log; DRA-13-hud.md.
+- The overlay sits above the HUD on screen and never overlaps it. The HUD moves; the overlay stays where it is. Source: scope report DRA-13, Decision log; systems/hud.md.
 
 ## Impact
 DRA-19 changes this frozen contract (v2). One display rule changes: a number that rounds to zero shows `0.00`, never `-0.00`. No signature, constant, layout or color changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `debug_overlay`, `draw_debug_overlay`, `overlay_text_bottom`, `OVERLAY_` and `-0.00`:
