@@ -27,10 +27,14 @@ async def guarded(body: Callable[[], Awaitable[None]], mode: RunMode) -> None:
 
 
 def _detail(exc: Exception, mode: RunMode) -> str | None:
-    """Return the one-line `<ErrorType>: <message>` in debug mode, None in normal mode."""
+    """Return the one-line `<ErrorType>: <message>` in debug mode, None in normal mode.
+
+    Newlines become spaces and null characters are removed, so the error screen can
+    render the line. Source: DRA-5-app.md, Rules, Error guard (nulls from DRA-19).
+    """
     if mode is not RunMode.DEBUG:
         return None
-    return " ".join(f"{type(exc).__name__}: {exc}".splitlines())
+    return " ".join(f"{type(exc).__name__}: {exc}".splitlines()).replace("\x00", "")
 
 
 def _show_error_screen(detail: str | None) -> bool:
