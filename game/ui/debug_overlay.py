@@ -41,6 +41,18 @@ def draw_debug_overlay(surface: pygame.Surface, ship: Ship) -> None:
     _draw_text(surface, ship)
 
 
+def overlay_text_bottom() -> int:
+    """Return the first screen row below every pixel the four text lines can cover. Draws nothing.
+
+    Value: OVERLAY_MARGIN + 3 * linesize + max(linesize, font height), from the overlay's own
+    cached font. Units: pixels. Needs ``pygame.font`` initialized.
+    Source: docs/contracts/DRA-6/DRA-6-debug-overlay.md, Interface and Presentation (DRA-13).
+    """
+    font: pygame.font.Font = _overlay_font()
+    linesize: int = font.get_linesize()
+    return OVERLAY_MARGIN + 3 * linesize + max(linesize, font.get_height())
+
+
 def _draw_lines(surface: pygame.Surface) -> None:
     """Draw the top line on row TOP_LINE_Y and the floor on row SCREEN_H - 1, full width.
 
