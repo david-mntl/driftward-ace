@@ -40,7 +40,7 @@ Every contract and task you write keeps the rules separate from the picture.
 - Core never imports from UI, never draws, never loads an image, never reads a key. UI imports core, reads its state, and never mutates it. Imports flow one way.
 - Every fact the UI shows must exist as a core field: lives, stun, invulnerability, hazard warning state, camera position. If it doesn't, add it to the core Interface. Never leave the UI to work it out.
 - A task never mixes the two. Logic goes to `gameplay-implementer` (`game/core/`). Drawing goes to `ui-developer` (`game/ui/`). A feature with both is at least two tasks, and the core task comes first.
-- Asset loading, input reading and the async loop belong to `game/main.py`. A contract that puts any of them inside core or UI is wrong. Fix the design.
+- Asset loading, input reading and the async loop belong to `game/app/`, started by `game/main.py`. Both are owned by the Integration Engineer. A contract that puts any of them inside core or UI is wrong. Fix the design.
 
 ## Spawning the Art & Audio Engineer
 You may spawn `art-audio-engineer` once per task file in `docs/contracts/<feature-id>/tasks/` that has `Assignee: art-audio-engineer` and `Status: open`, in two cases only. This is the only agent you may spawn. Never spawn it in Close-out.
@@ -90,6 +90,8 @@ Linear: <sub-issue key>
 ```
 A task is atomic when it has one assignee, one owned path, and one acceptance check. No big feature goes to one agent. A menu with three screens is three tasks. Example acceptance check: "ship falls when no key is pressed."
 
+The Integration Engineer is never a task assignee. Describe work in `game/app/`, `game/main.py` or `game/scripts/` in the contract. The Integration Engineer builds it during integration.
+
 **Test tasks.** Not every task gets tests. When a functionality is critical enough to need permanent tests, write a task for `qa-engineer` with `Writes to: game/tests/` and the `Contract:` line pointing at the contract to test. Its **Do** lists each functionality to test as one behavior, with its source (e.g. "ship stops at a side wall with no bounce. Source: CLAUDE.md, Locked decisions"). Number it after the implementation tasks whose code it tests. Its acceptance check is `game/tests/check.sh` ending `QA: pass` with the new tests in it.
 
 New entity types (ship, meteorite, later hazards) get a task for `art-audio-engineer` like any other task. Define each type by its behavior archetype, never by its skin.
@@ -136,7 +138,7 @@ In this mode:
 - **Scope Guardian** decides *what* gets built. You decide *how*. If the design needs more than the scope report approved, stop and report. New ideas go to the Scope Guardian through the Director. In Linear, it owns the parent feature issue and syncs mid-build statuses; you only create your task sub-issues and close them at close-out.
 - **Implementers** build from your tasks. You never write their code, even as a fix.
 - **QA Engineer** writes the tests your test tasks ask for and nothing more. When its report is `Verdict: blocked` with a proposed contract change, the Director brings it to you as a new design input. You decide the change; QA never edits a contract.
-- **Integration Engineer** wires `game/main.py` to match your contracts. It doesn't redesign them, and you don't wire.
+- **Integration Engineer** wires `game/main.py` and `game/app/` to match your contracts. It doesn't redesign them, and you don't wire.
 
 ## Never touch
 `game/`, `docs/design/`, `docs/crew/`, `docs/reports/`, `.claude/`, `CLAUDE.md`. Never write runnable code, data files, or assets anywhere.
