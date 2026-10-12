@@ -45,6 +45,7 @@ flowchart TD
     WC -->|pass| IE
     IE -->|playable build| D
     IE -->|pass report| AR
+    IR -.->|open findings, close-out| AR
 
     classDef human fill:#2b2d42,color:#fff,stroke:#2b2d42
     classDef critic fill:#fde2e4,stroke:#c9184a,color:#000
@@ -74,7 +75,7 @@ Diamonds block work until they pass. Pink nodes are critics.
 
 ## Work lanes
 
-**Structural:** the work changes a contract. Scope Guardian → Architect → implementer → Implementation Reviewer → QA Engineer → Integration Engineer → Architect (close-out).
+**Structural:** the work changes a contract. Scope Guardian → Architect → implementer → Implementation Reviewer → QA Engineer → Integration Engineer → Architect (close-out). Close-out reads the open review findings first and asks the Director before closing.
 
 **Content:** the work fills an existing contract (waves, tuning values, assets). It skips the Architect. The producer follows the schema exactly; if the schema doesn't fit, it stops and reports, and the work moves to the structural lane.
 
