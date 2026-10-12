@@ -69,7 +69,7 @@ Diamonds block work until they pass. Pink nodes are critics.
 | 9 | Art & Audio Engineer | `game/assets/`, `staging/assets/`, `tools/art/` | Architect registers a new entity type, or the Director asks directly | Generator | a coherent world instead of colored rectangles |
 | 10 | Implementation Reviewer | `docs/reports/review/` | Gameplay Implementer or UI Developer finishes a task | Critic, advises | a game that stays stable as features pile up |
 | 11 | QA Engineer | `game/tests/`, `docs/reports/qa/` | Implementation Reviewer finishes a task, an implementer submits a fix, Architect issues a test task, or the Director reports a bug | Critic, blocks | collisions, scoring, and wave loading correct on every run |
-| 12 | Integration Engineer | `game/main.py`, `docs/reports/integration/` | work from two or more agents needs to merge | Generator | the game launches and runs in the browser |
+| 12 | Integration Engineer | `game/main.py`, `game/app/`, `game/scripts/`, `pygbag.ini`, `docs/reports/integration/` | work from two or more agents needs to merge | Generator | the game launches and runs in the browser |
 
 ## Work lanes
 
