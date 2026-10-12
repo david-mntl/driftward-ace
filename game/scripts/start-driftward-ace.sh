@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build Driftward Ace with pygbag and serve it at http://localhost:6060
-# Usage: game/scripts/start-driftward-ace.sh   (foreground, Ctrl+C stops it)
+# Usage: game/scripts/start-driftward-ace.sh           (foreground, Ctrl+C stops it)
+#        game/scripts/start-driftward-ace.sh --debug   (same build, prints the debug URL)
 # Change the port with: PORT=7070 game/scripts/start-driftward-ace.sh
 #
 # The server stops when this script ends for any reason (Ctrl+C, kill, error,
@@ -42,6 +43,16 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP
 
+URL="http://localhost:${PORT}"
+case "$#:${1:-}" in
+  0:) ;;
+  1:--debug) URL="${URL}/?debug=1" ;;
+  *)
+    err "Unknown argument: $*. Usage: $(basename "$0") [--debug]"
+    exit 2
+    ;;
+esac
+
 cd "$(dirname "$0")/../.."
 
 if ! python -c "import pygbag" 2>/dev/null; then
@@ -54,7 +65,7 @@ if (echo >"/dev/tcp/127.0.0.1/${PORT}") 2>/dev/null; then
   exit 1
 fi
 
-log "Serving Driftward Ace at http://localhost:${PORT}"
+log "Serving Driftward Ace at ${URL}"
 python -m pygbag --port "${PORT}" game &
 SERVER_PID=$!
 wait "${SERVER_PID}"

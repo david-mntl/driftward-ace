@@ -28,7 +28,7 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 |---|---|
 | What the game is, pillars, locked decisions, out of scope, win and lose | [01-vision.md](01-vision.md) |
 | Screens and states: start, control card, play, game over, retry | [02-game-flow.md](02-game-flow.md) |
-| Screen size, coordinates, meters, camera, top line, rising floor, walls | [03-world-and-camera.md](03-world-and-camera.md) |
+| Screen size, coordinates, scroll, distance, top line, floor, walls | [03-world-and-camera.md](03-world-and-camera.md) |
 | Ship size, hitbox, gravity, thrust, drag, fall cap, tick order | [04-ship.md](04-ship.md) |
 | Lives, hits, falls, invulnerability, life-lost feedback, respawn | [05-lives-and-damage.md](05-lives-and-damage.md) |
 | Score, meters, coins, graze | [06-scoring.md](06-scoring.md) |

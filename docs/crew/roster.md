@@ -23,6 +23,7 @@ flowchart TD
     D -.->|agent request| T
     D -->|feature| SG
     SG -->|ship| AR
+    SG <-.->|advice, read only| AR
     AR -->|gameplay task| GI
     AR -->|presentation task| UI
     AR -->|new entity type| AA
@@ -44,6 +45,7 @@ flowchart TD
     WC -->|pass| IE
     IE -->|playable build| D
     IE -->|pass report| AR
+    IR -.->|open findings, close-out| AR
 
     classDef human fill:#2b2d42,color:#fff,stroke:#2b2d42
     classDef critic fill:#fde2e4,stroke:#c9184a,color:#000
@@ -60,7 +62,7 @@ Diamonds block work until they pass. Pink nodes are critics.
 | 0 | Director (human) | `docs/design/`, `docs/crew/` | — | Decides | a game with a point of view rather than a committee's average |
 | 1 | Trainer | `.claude/agents/` | Director asks to create or revise an agent, or reports an ownership gap | Builder | a finished game, because no work fell between two agents |
 | 2 | Scope Guardian | `docs/reports/scope/`; Linear feature issues and their task statuses | the Director opens a chat with a feature or idea | Gate, blocks; the Director's assistant for Linear | one finished game instead of three half-built systems |
-| 3 | Architect | `docs/contracts/`; Linear task sub-issues (create, close at close-out) | Scope Guardian approves a feature | Generator | new features land without breaking what already worked |
+| 3 | Architect | `docs/contracts/`; Linear task sub-issues (create, close at close-out) | Scope Guardian approves a feature, or asks for technical advice | Generator | new features land without breaking what already worked |
 | 4 | Gameplay Implementer | `game/core/`, `game/requirements.txt`, `game/ruff.toml`, `docs/reports/implementation/gameplay/` | Architect issues a gameplay task | Generator | the ship thrusts, drifts, falls, and dies on contact |
 | 5 | UI Developer | `game/ui/`, `docs/reports/implementation/ui/` | Architect issues a presentation task | Generator | height, score, and death state shown clearly on screen |
 | 6 | Tuning Engineer | `game/tuning/` | physics loop first runs, or Director calls a tuning session | Generator | controls that feel tight instead of floaty or leaden |
@@ -69,11 +71,11 @@ Diamonds block work until they pass. Pink nodes are critics.
 | 9 | Art & Audio Engineer | `game/assets/`, `staging/assets/`, `tools/art/` | Architect registers a new entity type, or the Director asks directly | Generator | a coherent world instead of colored rectangles |
 | 10 | Implementation Reviewer | `docs/reports/review/` | Gameplay Implementer or UI Developer finishes a task | Critic, advises | a game that stays stable as features pile up |
 | 11 | QA Engineer | `game/tests/`, `docs/reports/qa/` | Implementation Reviewer finishes a task, an implementer submits a fix, Architect issues a test task, or the Director reports a bug | Critic, blocks | collisions, scoring, and wave loading correct on every run |
-| 12 | Integration Engineer | `game/main.py`, `docs/reports/integration/` | work from two or more agents needs to merge | Generator | the game launches and runs in the browser |
+| 12 | Integration Engineer | `game/main.py`, `game/app/`, `game/scripts/`, `pygbag.ini`, `docs/reports/integration/` | work from two or more agents needs to merge | Generator | the game launches and runs in the browser |
 
 ## Work lanes
 
-**Structural:** the work changes a contract. Scope Guardian → Architect → implementer → Implementation Reviewer → QA Engineer → Integration Engineer → Architect (close-out).
+**Structural:** the work changes a contract. Scope Guardian → Architect → implementer → Implementation Reviewer → QA Engineer → Integration Engineer → Architect (close-out). Close-out reads the open review findings first and asks the Director before closing.
 
 **Content:** the work fills an existing contract (waves, tuning values, assets). It skips the Architect. The producer follows the schema exactly; if the schema doesn't fit, it stops and reports, and the work moves to the structural lane.
 

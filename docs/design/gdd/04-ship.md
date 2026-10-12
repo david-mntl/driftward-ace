@@ -19,7 +19,7 @@ The ship has no weapon and no brake. Arrow keys add thrust, gravity always pulls
 | thrust_up | 0.42 | px/tick² | TBD | guess | Director tuning guess |
 | thrust_down | 0.42 | px/tick² | TBD | guess | Director tuning guess |
 | drag_x | 0.94 | × per tick | TBD | guess | Director tuning guess |
-| fall_cap | TBD | px/tick | TBD | TBD | SH-01 |
+| fall_cap | 5.5 | px/tick | TBD | guess | Director. Leaves headroom under the rule 6 bound: a top-line fall takes about 57 ticks |
 | min_fall_ticks | 54 | ticks (0.9 s) | — | locked | Director |
 
 All Range cells: SH-02.
@@ -38,7 +38,7 @@ Derived from the guesses above. Recompute when a value changes:
    4. Fall cap: if `vy > fall_cap`, set `vy = fall_cap`.
    5. Move: `x += vx`, `y += vy`.
    6. Side walls: clamp, `vx = 0`, no bounce ([03-world-and-camera.md](03-world-and-camera.md) rule 6).
-   7. Top line: camera follow ([03-world-and-camera.md](03-world-and-camera.md) rule 2).
+   7. Top line: clamp the top edge, `vy = 0` ([03-world-and-camera.md](03-world-and-camera.md) rule 2).
    8. Floor check: fall ([05-lives-and-damage.md](05-lives-and-damage.md)).
 3. **Every tick runs every step.** No hit or fall ever pauses the physics or the input. Source: [01-vision.md](01-vision.md), Pillar 1; [05-lives-and-damage.md](05-lives-and-damage.md).
 4. **Input only changes acceleration.** No key sets a speed or stops the ship. Source: [01-vision.md](01-vision.md), Pillar 1.
@@ -52,7 +52,7 @@ Derived from the guesses above. Recompute when a value changes:
 - Up and down held together: they cancel, and gravity still pulls.
 
 ## Open
-- SH-01, SH-02, SH-03, SH-04, SH-05, SH-06.
+- SH-02, SH-03, SH-04, SH-05, SH-06.
 
 ## How to extend
 A new physics value: add a row with unit, range and status, and place it in the tick order. If it's live-tunable, the tuning file needs a matching key, which is a schema change.

@@ -15,7 +15,7 @@ Waves are hand-authored JSON files that place hazards and coins. Every run opens
 | wave_count_mvp | TBD | waves | — | TBD | WV-03 |
 
 ## Rules
-1. **Format.** JSON. Each object entry has world coordinates (x, y up), an entry side and a trigger altitude. Source: Director. The exact field names and types are the wave schema's job, not the GDD's. Never add, rename or drop a field without a schema change.
+1. **Format.** JSON. Each object entry has world coordinates (x, y up), an entry side and a trigger distance ([03-world-and-camera.md](03-world-and-camera.md) rule 8). Source: Director. The exact field names and types are the wave schema's job, not the GDD's. Never add, rename or drop a field without a schema change.
 2. Coordinates are relative to the wave's start or absolute: WV-04.
 3. **Wave 0** holds meteorites only, is the same every run, and always comes first. Source: [01-vision.md](01-vision.md), Locked decisions. Its content is WV-05.
 4. **Order after Wave 0:** WV-01. **After the last wave:** WV-02. Procedural levels are out of scope ([01-vision.md](01-vision.md)).

@@ -20,7 +20,7 @@ The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor i
    2. Play the **life-lost feedback** (rule 3).
    3. Become invulnerable for `invuln_ticks`, blinking.
    4. Nothing else changes. Position, velocity and control stay as they were. No stun, no freeze.
-2. **Fall.** The ship drops off the floor ([03-world-and-camera.md](03-world-and-camera.md), WC-03).
+2. **Fall.** The ship drops fully below the floor ([03-world-and-camera.md](03-world-and-camera.md) rule 5).
    1. Lose 1 life.
    2. Play the **life-lost feedback** (rule 3).
    3. Respawn at `fall_respawn`: x 320, y 240, `vx = vy = 0`.
