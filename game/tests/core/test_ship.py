@@ -1,6 +1,7 @@
 """Ship physics tests. Contract: docs/contracts/systems/ship.md, Rules.
 
 Task: docs/contracts/DRA-6/tasks/DRA-6-03-qa-engineer.md. One test per behavior it lists.
+DRA-23 replaced the respawn stand-in tests: docs/contracts/DRA-23/tasks/DRA-23-04-qa-engineer.md.
 Every expected number is computed from the GDD values below, never typed in as a result.
 """
 
@@ -8,7 +9,7 @@ import logging
 
 import pytest
 
-from core.ship import Ship, Thrust, spawn, step
+from core.ship import Ship, Thrust, is_below_floor, spawn, step
 
 GRAVITY: float = 0.16
 """px/tick². Source: 04-ship.md, Values, gravity (guess)."""
@@ -162,20 +163,26 @@ def test_top_line_stops_climb() -> None:
     assert ship.vy == pytest.approx(0.0)
 
 
-def test_floor_respawns_at_spawn() -> None:
+def test_step_never_respawns_and_floor_check_reports_the_fall() -> None:
     # Already at fall_cap, so the next tick moves y by exactly FALL_CAP.
     at_floor_y = SCREEN_H + SHIP_H / 2 - FALL_CAP
     for start_y in (at_floor_y, at_floor_y + 1):
         ship = step(Ship(x=100.0, y=start_y, vx=0.0, vy=FALL_CAP), NO_KEY)
-        assert ship == spawn()
-        assert (ship.x, ship.y, ship.vx, ship.vy) == pytest.approx((START_X, START_Y, 0.0, 0.0))
+        assert ship != spawn()
+        assert ship.x == pytest.approx(100.0)
+        assert ship.y == pytest.approx(start_y + FALL_CAP)
+        assert ship.vy == pytest.approx(FALL_CAP)
+        assert _top_edge(ship) >= SCREEN_H
+        assert is_below_floor(ship)
 
     just_above_y = at_floor_y - 0.5
     ship = step(Ship(x=100.0, y=just_above_y, vx=0.0, vy=FALL_CAP), NO_KEY)
     assert _top_edge(ship) < SCREEN_H
-    assert ship.x == pytest.approx(100.0)
     assert ship.y == pytest.approx(just_above_y + FALL_CAP)
-    assert ship.vy == pytest.approx(FALL_CAP)
+    assert not is_below_floor(ship)
+
+    assert is_below_floor(Ship(x=100.0, y=SCREEN_H + SHIP_H / 2, vx=0.0, vy=0.0))
+    assert not is_below_floor(Ship(x=100.0, y=SCREEN_H + SHIP_H / 2 - 0.01, vx=0.0, vy=0.0))
 
 
 def test_events_log_once(caplog: pytest.LogCaptureFixture) -> None:
@@ -199,8 +206,9 @@ def test_events_log_once(caplog: pytest.LogCaptureFixture) -> None:
     caplog.clear()
     ship = step(spawn(), NO_KEY)
     for _ in range(600):
-        ship = step(ship, NO_KEY)
-        if ship == spawn():
+        if is_below_floor(ship):
             break
-    assert ship == spawn()
-    assert len(_lines(caplog, "respawn")) == 1
+        ship = step(ship, NO_KEY)
+    assert is_below_floor(ship)
+    ship = step(ship, NO_KEY)
+    assert _lines(caplog, "respawn") == []
