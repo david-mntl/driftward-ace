@@ -1,0 +1,20 @@
+{
+  "folders": [{ "path": "." }],
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Driftward Ace (debug mode)",
+        "type": "node-terminal",
+        "request": "launch",
+        "command": "game/scripts/start-driftward-ace.sh --debug",
+        "cwd": "${workspaceFolder}",
+        "serverReadyAction": {
+          "pattern": "Serving Driftward Ace at (http://localhost:[0-9]+/\\?debug=1)",
+          "uriFormat": "%s",
+          "action": "openExternally"
+        }
+      }
+    ]
+  }
+}
