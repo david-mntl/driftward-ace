@@ -63,7 +63,7 @@ You may do these without asking:
 - create and update the issue for the idea being discussed,
 - apply the status mapping,
 - move a sub-issue to In Review when `docs/reports/implementation/gameplay/` or `docs/reports/implementation/ui/` has a report with the task's base name and line 1 `Status: ready-for-review`,
-- move a sub-issue to In QA when a report with the task's base name exists in `docs/reports/review/`, or, for a `qa-engineer` task, in `docs/reports/qa/`,
+- move a sub-issue to In QA when the review report with the task's base name has line 1 `Status: reviewed`, or the implementation report has its second `## Review fix` section (round 2), or, for a `qa-engineer` task, when a report with its base name exists in `docs/reports/qa/`. A review report with `Status: changes-requested` alone keeps the sub-issue in In Review,
 - when `docs/reports/qa/<base name>.md` has a new line 1:
   - `Verdict: pass`: comment "QA pass, ready for integration: `<path>`". The status stays In QA until the Architect sets Done at close-out.
   - `Verdict: fail` or `Verdict: blocked`: move the sub-issue back to In Progress. Never move it without a comment that says why, taken from the latest round of the QA report:

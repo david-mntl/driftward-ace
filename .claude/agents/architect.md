@@ -18,7 +18,7 @@ The player sees: new features land without breaking what already worked.
 ## Read first, every run
 - `docs/reports/scope/<feature-id>.md`: the approved feature and its limits. The feature-id is the file name. Not in Advice; Advice reads its candidates from the spawn prompt.
 - `docs/reports/integration/<feature-id>.md`: the Integration Engineer's verdict. Close-out only.
-- `docs/reports/review/<feature-id>-*.md`: the Implementation Reviewer's findings per task, plus the matching `## Fix <date>` sections in `docs/reports/implementation/` and reports in `docs/reports/qa/`. Close-out only.
+- `docs/reports/review/<feature-id>-*.md`: the Implementation Reviewer's findings per task and its `## Re-check` section, plus the matching `## Review fix <date>` and `## Fix <date>` sections in `docs/reports/implementation/` and reports in `docs/reports/qa/`. Close-out only.
 - `docs/design/gdd/`: every number, behavior and rule the design may use.
 - `CLAUDE.md`: design pillars, locked decisions, tech rules.
 - `docs/contracts/`: existing contracts, schemas, tasks and the CHANGELOG.
@@ -103,7 +103,7 @@ If a design needs new content (tuning values, waves), don't write a task for the
 ## Close-out run
 The Integration Engineer starts this run after writing `Verdict: pass`. Before step 1, check open review findings, then read the `## Observations` section of `docs/reports/integration/<feature-id>.md`. If both need the Director, ask once: findings summary first, then the quoted observations.
 
-**Open review findings.** Read every `docs/reports/review/<feature-id>-*.md`. A finding is open if it is must-fix, should-fix or note and its suggested change isn't "none". A finding that asks for a check, such as "Confirm in a browser debug build", stays open until a later report shows the check was done. It is closed if a later `## Fix <date>` section or the matching QA report shows it resolved.
+**Open review findings.** Read every `docs/reports/review/<feature-id>-*.md`. A finding is open if it is must-fix, should-fix or note and its suggested change isn't "none". A finding that asks for a check, such as "Confirm in a browser debug build", stays open until a later report shows the check was done. Findings a `## Re-check` adds count like the others. A finding is closed when the Re-check marks it closed, or a later `## Review fix` or `## Fix` section, or the matching QA report, shows it resolved. Notes the Re-check left open, and findings answered "Not fixable", stay open.
 - **Any open finding:** write nothing, make no Linear call, and stop. Ask the Director for a verdict, and open the question with a short summary: one line per finding (severity, `file:line`, what's wrong in a few words, the owner who would fix it), each review report path once for detail, and a clear recommendation to address them in a follow-up before accepting close-out. Never paste the full finding text.
 - The Director picks findings to address, or accepts them as they stand. Follow the answer. Run steps 1 to 3 only if no finding is open or the Director accepted them.
 
