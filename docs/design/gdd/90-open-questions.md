@@ -9,7 +9,6 @@ Status: `open`, or `blocking` (stops other work now).
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | FL-01 | Which key dismisses the control card and starts the run? Controls are arrow keys only. | 02-game-flow.md | Control card | open |
-| FL-02 | Which key retries after game over? Is there a delay, so a held arrow key doesn't skip the screen? | 02-game-flow.md | Game over | open |
 | FL-03 | Saves are deferred, so there is no best score. What does "win" look like until saves ship? | 01-vision.md, 02-game-flow.md, 06-scoring.md, 10-ui.md | Game over screen | open |
 | FL-04 | Pause (week 4): which key, and does losing browser focus pause the game? | 02-game-flow.md, 13-scope-and-schedule.md | Pause card | open |
 
@@ -31,7 +30,6 @@ Status: `open`, or `blocking` (stops other work now).
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | LD-04 | Blink speed while invulnerable. | 05-lives-and-damage.md | UI | open |
-| LD-05 | Can the ship fall off the floor while invulnerable (lose a second life within 30 ticks)? | 05-lives-and-damage.md, 03-world-and-camera.md | Falls | open |
 | LD-06 | What happens to the hazard that hit the ship: stays, vanishes, or passes through? If it stays and the ship is still inside it when invulnerability ends, is that a new hit? | 05-lives-and-damage.md | Hit handling | open |
 | LD-07 | Fall respawn at screen center lands on a hazard. Is invulnerability enough, or must the spot be cleared? | 05-lives-and-damage.md | Falls | open |
 | LD-08 | Life-lost feedback look: flash color and length, how the HUD life breaks, particle count, how long burst and rebuild take (rebuild must end within 30 ticks). Add screen shake too? | 05-lives-and-damage.md, 10-ui.md | UI, art | open |
