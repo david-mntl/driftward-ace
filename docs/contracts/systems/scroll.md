@@ -1,7 +1,7 @@
 # Scroll: world scroll, distance and starfield
-Version: 2
+Version: 3
 Status: frozen
-Features: DRA-13, DRA-19
+Features: DRA-13, DRA-19, DRA-23
 Created by: architect
 
 ## Purpose
@@ -13,7 +13,7 @@ Who builds what:
 - `game/core/scroll.py`: the Gameplay Implementer, task `DRA-13-01-gameplay-implementer`. `Final` and `slots` in DRA-19: task `DRA-19-01-gameplay-implementer`.
 - `game/ui/starfield.py`: the UI Developer, task `DRA-13-02-ui-developer`.
 - `game/tests/core/test_scroll.py`: the QA Engineer, task `DRA-13-04-qa-engineer`.
-- Creating the scroll at play start, stepping it once per tick, drawing the starfield: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
+- Creating the scroll at play start and stepping it once per playing tick: `core.run`, from `docs/contracts/systems/run.md` (DRA-23). Drawing the starfield from `run.scroll`: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
 - The meters readout that shows `meters`: `docs/contracts/systems/hud.md`.
 
 ## Diagram
@@ -30,10 +30,10 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-  APP["app.frame"] -- "once per tick" --> STEP["core.scroll.step_scroll"]
-  STEP -- "Scroll" --> APP
-  APP -- "Scroll" --> SF["ui.starfield.draw_starfield"]
-  APP -- "Scroll" --> HUD["ui.hud.draw_hud"]
+  RUN["core.run.step_run"] -- "once per playing tick" --> STEP["core.scroll.step_scroll"]
+  STEP -- "Scroll" --> RUN
+  APP["app.frame"] -- "run.scroll" --> SF["ui.starfield.draw_starfield"]
+  APP -- "run" --> HUD["ui.hud.draw_hud"]
   SF -. reads .-> D["scroll.distance_px"]
   HUD -. reads .-> M["scroll.meters"]
 ```
@@ -128,8 +128,9 @@ Distance:
 - Distance and meters never go down. Source: 06-scoring.md, rule 1.
 
 Other rules:
-- Play starts when the ship first appears at screen center: the app calls `start_scroll()` right after `spawn()`, before the first frame. That is tick 0. Source: scope report DRA-13, Values needed (play start, temporary stand-in until the control card exists).
-- Once started, the scroll never stops. Nothing in the run pauses or resets it, including a fall and respawn. Source: 03-world-and-camera.md, rule 4; scope report DRA-13, Limits.
+- Play starts when the ship first appears at screen center: `core.run.start_run()` calls `start_scroll()` right after `spawn()`, and the app calls `start_run()` before the first frame. That is tick 0. Source: scope report DRA-13, Values needed (play start, temporary stand-in until the control card exists); systems/run.md (DRA-23).
+- Once started, the scroll never stops until game over. A fall, a respawn and the respawn wait don't pause or reset it. Source: 03-world-and-camera.md, rule 4; 05-lives-and-damage.md, rule 2.5; scope report DRA-13, Limits.
+- At game over the scroll freezes: `core.run` stops stepping it. A retry starts a new run with a new `start_scroll()`, so distance is 0 m again and the start delay counts again. Source: 02-game-flow.md, rules 3, 5 and 6; systems/run.md (DRA-23).
 - The scroll never changes the ship, and the ship never changes the scroll. `step_scroll` takes no ship. `core.ship.step` takes no scroll. Source: 03-world-and-camera.md, rule 4; 04-ship.md, rules 3 and 4; 01-vision.md, Pillar 1.
 - Level 1 speed only. Source: scope report DRA-13, Limits (levels are out).
 - No frame time, no randomness. Same input, same output. Source: 15-tech-constraints.md, rule 2.
@@ -137,18 +138,21 @@ Other rules:
 - Core never imports pygame, `ui` or `app`. Source: game/CONTEXT.md, Layout.
 
 Logging (logger `core.scroll`, DEBUG, by event, never by tick). Source: game/CONTEXT.md, Logging; 15-tech-constraints.md, rule 9:
-- `scroll start tick=%d`: once, on the tick the world first moves (the returned scroll has `scrolled_ticks == 1`), with that tick's `ticks` (31).
+- `scroll start tick=%d`: once per scroll, on the tick the world first moves (the returned scroll has `scrolled_ticks == 1`), with that tick's `ticks` (31). From DRA-23 each run has its own scroll, so a retry logs it again for the new run.
 - Nothing else. No line per tick, no line per meter.
 
 ## Impact
-DRA-19 changes this frozen contract (v1). No behavior, signature, value or log line changes. Constants gain `Final`, and `Scroll` gains `slots=True`. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.scroll`, `Scroll`, `__dict__`, `__slots__`, `setattr`, `vars(` and the constant names:
+DRA-23 changes this frozen contract (v2). No code, signature, value or log line changes. Only who creates and steps the scroll changes (`core.run` instead of the app), and the scroll now freezes at game over and restarts on retry. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.scroll`, `Scroll`, `start_scroll` and `step_scroll`:
 
 | File | Change needed |
 |---|---|
-| `game/core/scroll.py` | `Final[...]` on the six constants, `slots=True` on `Scroll`. Task `DRA-19-01-gameplay-implementer`. |
-| `game/ui/starfield.py`, `game/ui/hud.py` | none. They read `scroll.distance_px` and `scroll.meters`. Properties work the same on a slotted dataclass. |
-| `game/app/frame.py` | none. It calls `start_scroll` and `step_scroll` and passes the result on. |
-| `game/tests/core/test_scroll.py`, `game/tests/ui/test_hud.py` | none. They build `Scroll` with keywords and read fields and properties. They copy the constant values from the GDD and never import or patch them. |
+| `game/core/scroll.py` | none. |
+| `game/core/run.py` (new) | calls `start_scroll` and `step_scroll`. Task `DRA-23-01-gameplay-implementer`. |
+| `game/ui/starfield.py` | none. The app passes `run.scroll`. |
+| `game/ui/hud.py` | reads `run.scroll.meters` instead of `scroll.meters`. See `systems/hud.md`, Impact. Task `DRA-23-02-ui-developer`. |
+| `game/app/frame.py` | stops calling `start_scroll` and `step_scroll`; `core.run` does. Integration Engineer, from `systems/app.md`. |
+| `game/tests/core/test_scroll.py` | none. It calls the scroll directly. |
+| `game/tests/ui/test_hud.py` | see `systems/hud.md`, Impact. |
 
 ## Rationale
 - **`Final` and `slots=True` (DRA-19).** Same reasons as in `systems/ship.md`, Rationale. Core modules stay alike. `Scroll`'s field docstrings and its two properties are unaffected by slots.

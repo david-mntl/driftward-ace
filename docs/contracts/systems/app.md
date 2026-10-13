@@ -1,7 +1,7 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
-Version: 4
+Version: 5
 Status: frozen
-Features: DRA-5, DRA-6, DRA-13, DRA-19
+Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23
 Created by: architect
 
 ## Purpose
@@ -13,6 +13,8 @@ From DRA-13, play starts when the ship first appears: the app starts the world s
 
 From DRA-19, the guard also removes null characters from the debug-mode detail line, so an error message holding one still shows the error screen.
 
+From DRA-23, the app holds one `Run` (`docs/contracts/systems/run.md`) instead of a ship and a scroll. Each tick it calls `step_run` once; core does the ship, the scroll, the lives, the respawn wait, game over and retry. Each frame it draws the ship only while `run.ship_visible` (the blink), the Game Over box while `run.game_over`, and the HUD with the hearts.
+
 Who builds what:
 - `game/main.py`, `game/app/`, `game/scripts/`, `pygbag.ini` (repo root): the Integration Engineer, during integration, from this contract. No task file.
 - `game/ui/look.py`, `game/ui/error_screen.py`: the UI Developer, task `DRA-5-01-ui-developer`.
@@ -21,6 +23,7 @@ Who builds what:
 - `game/ui/ship_view.py`, `game/ui/debug_overlay.py`: DRA-6, see `docs/contracts/systems/ship.md` and `docs/contracts/systems/debug-overlay.md`.
 - `game/core/scroll.py`, `game/ui/starfield.py`: DRA-13, see `docs/contracts/systems/scroll.md`.
 - `game/ui/hud.py`: DRA-13, see `docs/contracts/systems/hud.md`.
+- `game/core/run.py`, `game/ui/game_over.py`: DRA-23, see `docs/contracts/systems/run.md`.
 
 ## Diagram
 ```mermaid
@@ -55,11 +58,12 @@ flowchart LR
     FR["app.frame"] --> PG["pygame"]
     FR --> CW["core.world"]
     FR --> CS["core.ship"]
-    FR --> CC["core.scroll"]
+    FR --> CR["core.run"]
     FR --> UL["ui.look"]
     FR --> SF["ui.starfield"]
     FR --> SV["ui.ship_view"]
     FR --> DO["ui.debug_overlay"]
+    FR --> GO["ui.game_over"]
     FR --> HU["ui.hud"]
     ES["ui.error_screen"] --> PG
   end
@@ -75,10 +79,10 @@ flowchart LR
   EV --> HK["thrust = held arrow keys"]
   HK --> AC["add frame time<br/>to accumulator"]
   AC --> T{"acc >= 1/60 s<br/>and ticks < 5?"}
-  T -- yes --> TK["one tick:<br/>ship = step(ship, thrust)<br/>scroll = step_scroll(scroll)"] --> T
+  T -- yes --> TK["one tick:<br/>run = step_run(run, thrust)"] --> T
   T -- no --> CAP{"acc still >= 1/60 s?"}
   CAP -- yes --> DROP["acc = 0<br/>(owed time dropped)"] --> D
-  CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, draw_ship,<br/>draw_debug_overlay if overlay_visible,<br/>then draw_hud"]
+  CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, draw_ship if run.ship_visible,<br/>draw_debug_overlay if overlay_visible,<br/>draw_game_over if run.game_over,<br/>then draw_hud"]
   D --> FL["display.flip()"]
   FL --> Y["await asyncio.sleep(0)"]
   Y --> F
@@ -163,19 +167,18 @@ ARROW_NAMES: dict[int, str]   # pygame.K_UP -> "up", K_DOWN -> "down", K_LEFT ->
 
 async def frame_loop(mode: RunMode) -> None: ...
     # pygame init, window, frames until pygame.QUIT.
-    # Owns: ship (core.ship.Ship), scroll (core.scroll.Scroll), thrust (core.ship.Thrust),
-    #       overlay_visible (bool).
+    # Owns: run (core.run.Run), thrust (core.ship.Thrust), overlay_visible (bool).
 ```
-Imports pygame, `app.settings`, `app.mode`, `core.world`, `core.ship`, `core.scroll`, `ui.look`, `ui.starfield`, `ui.ship_view`, `ui.debug_overlay` and `ui.hud`. Only `start()` imports this module, inside the guard.
+Imports pygame, `app.settings`, `app.mode`, `core.world`, `core.ship` (for `Thrust`), `core.run`, `ui.look`, `ui.starfield`, `ui.ship_view`, `ui.debug_overlay`, `ui.game_over` and `ui.hud`. From DRA-23 it no longer imports `core.scroll`, `spawn` or `step`. Only `start()` imports this module, inside the guard.
 
-App-owned state in `frame_loop`:
+App-owned state in `frame_loop` (DRA-23):
 ```python
-ship: Ship              # core.ship.spawn() before the first frame; replaced by step() every tick
-scroll: Scroll          # core.scroll.start_scroll() right after spawn(); replaced by step_scroll() every tick
+run: Run                # core.run.start_run() before the first frame; replaced by step_run() every tick
 thrust: Thrust          # rebuilt once per frame from the held arrow keys
 overlay_visible: bool   # True from the first frame in debug mode, always False in normal mode.
                         # F3 flips it, debug mode only.
 ```
+The ship and the scroll are `run.ship` and `run.scroll`. The app never keeps its own copy.
 
 ### pygbag.ini (repo root, Integration Engineer)
 ```ini
@@ -184,6 +187,8 @@ ignoreDirs = [...]    # folders under game/ left out of the package
 ignoreFiles = [...]   # files under game/ left out of the package
 ```
 pygbag 0.9.3 reads it from its working directory. The start script and the build check both run pygbag from the repo root. Source: Director decision (DRA-5 close-out, round 1 observations). docs/crew/roster.md, row 12.
+
+The DRA-6 and DRA-13 call blocks below are kept as history. From DRA-23 the ship and scroll calls in them are replaced: the current order is the DRA-23 block after them.
 
 DRA-6 calls, all made by `frame_loop`. Their signatures are set in the DRA-6 contracts:
 ```python
@@ -217,6 +222,26 @@ if overlay_visible:
 draw_hud(surface, scroll, below_overlay=debug)  # systems/hud.md, last; debug = mode is RunMode.DEBUG
 ```
 
+DRA-23 calls, all made by `frame_loop`. Their signatures are set in `systems/run.md` and `systems/hud.md`. They replace the DRA-6 and DRA-13 ship and scroll calls above. The full order:
+```python
+# before the first frame:
+run = start_run()                               # systems/run.md: spawn() and start_scroll(), play starts
+# per frame, after the events:
+thrust = Thrust(up=..., down=..., left=..., right=...)
+# per tick, inside the accumulator loop:
+run = step_run(run, thrust)                     # systems/run.md: the only call per tick
+# per frame, draw:
+surface.fill(BACKGROUND)
+draw_starfield(surface, run.scroll)
+if run.ship_visible:
+    draw_ship(surface, run.ship)                # the blink
+if overlay_visible:
+    draw_debug_overlay(surface, run.ship)
+if run.game_over:
+    draw_game_over(surface)                     # systems/run.md, Presentation
+draw_hud(surface, run, below_overlay=debug)     # systems/hud.md, last
+```
+
 ### game/ui/look.py (UI Developer)
 ```python
 BACKGROUND: tuple[int, int, int]   # 12-art-and-audio.md, placeholder_bg
@@ -236,7 +261,7 @@ start-driftward-ace.sh --debug    # same build, prints http://localhost:<PORT>/?
 ```
 
 ## Presentation
-The app draws nothing itself beyond the background fill. The ship view and the debug overlay have their own Presentation sections in `docs/contracts/systems/ship.md` and `docs/contracts/systems/debug-overlay.md`. The starfield and the HUD have theirs in `docs/contracts/systems/scroll.md` and `docs/contracts/systems/hud.md`. The error screen reads no core state, only what the guard passes it.
+The app draws nothing itself beyond the background fill. The ship view and the debug overlay have their own Presentation sections in `docs/contracts/systems/ship.md` and `docs/contracts/systems/debug-overlay.md`. The starfield and the HUD have theirs in `docs/contracts/systems/scroll.md` and `docs/contracts/systems/hud.md`. The blink and the Game Over box have theirs in `docs/contracts/systems/run.md` (DRA-23). The error screen reads no core state, only what the guard passes it.
 
 | Input | Shown as |
 |---|---|
@@ -283,18 +308,19 @@ Logging (`setup_logging`):
 
 Frame loop (`app/frame.py`, `frame_loop(mode)`):
 - Inside the guard: `pygame.init()`, then `pygame.display.set_mode((SCREEN_W, SCREEN_H))` from `core.world`. Source: 03-world-and-camera.md, screen_w, screen_h (guess). systems/world.md.
-- Before the first frame: `ship = spawn()`, then at once `scroll = start_scroll()`, and `overlay_visible = mode is RunMode.DEBUG`. Play starts here: the ship first appears at screen center on the first frame drawn after this. Source: 03-world-and-camera.md, ship_start; 10-ui.md, debug_overlay_toggle (shown from the first frame); scope report DRA-13, Values needed (play start); systems/scroll.md.
-- Nothing ever calls `start_scroll()` again in the run. A respawn is not a new play start. The scroll is never reset, paused or skipped. Source: 03-world-and-camera.md, rule 4; scope report DRA-13, Limits.
+- Before the first frame: `run = start_run()`, and `overlay_visible = mode is RunMode.DEBUG`. Play starts here: the ship first appears at screen center on the first frame drawn after this. Source: 03-world-and-camera.md, ship_start; 10-ui.md, debug_overlay_toggle (shown from the first frame); scope report DRA-13, Values needed (play start); systems/run.md (DRA-23).
+- The app never calls `spawn`, `step`, `start_scroll` or `step_scroll` itself, and never calls `start_run()` again. A respawn, the wait, game over and a retry all happen inside `step_run`. Source: systems/run.md (DRA-23).
+- **Game over.** While `run.game_over` is True the frame loop carries on as always: it reads events, builds `thrust`, runs ticks (`step_run` keeps the run frozen and watches for the retry) and draws. Nothing in the app changes. Source: 02-game-flow.md, rules 5 and 6; systems/run.md.
 - Each frame, in order: read all events, build `thrust` from the held keys, add the frame time to the accumulator, run one tick per whole 1/60 s in the accumulator, draw, `pygame.display.flip()`, `await asyncio.sleep(0)`. Source: 15-tech-constraints.md, rules 1 and 2.
 - Frame time comes from a monotonic clock (`time.perf_counter`). Ticks never use frame time. Source: 15-tech-constraints.md, rule 2.
 - **Held keys.** After the events, read `pygame.key.get_pressed()` once and build `Thrust(up=pressed[K_UP], down=pressed[K_DOWN], left=pressed[K_LEFT], right=pressed[K_RIGHT])`. Every tick in that frame uses the same `thrust`. Only the four arrow keys move the ship. Source: 01-vision.md, locked decision 1; 04-ship.md, rule 2.1.
-- **Tick.** `ship = step(ship, thrust)`, then `scroll = step_scroll(scroll)`. One call of each per tick, nothing else. The two never pass state to each other. Source: 04-ship.md, rules 1 and 3; 03-world-and-camera.md, rule 4; systems/ship.md; systems/scroll.md.
-- **Draw.** In this order: fill with `ui.look.BACKGROUND`; `draw_starfield(surface, scroll)`; `draw_ship(surface, ship)`; `draw_debug_overlay(surface, ship)` only if `overlay_visible`; `draw_hud(surface, scroll, below_overlay=debug)` last, on top of everything. Source: systems/ship.md, systems/debug-overlay.md, systems/scroll.md and systems/hud.md, Presentation; 10-ui.md, rule 1 (the HUD on top); 12-art-and-audio.md, rule 2 (the background stays behind).
+- **Tick.** `run = step_run(run, thrust)`. One call per tick, nothing else. From DRA-23. Source: 04-ship.md, rule 1; 15-tech-constraints.md, rule 2; systems/run.md.
+- **Draw.** In this order: fill with `ui.look.BACKGROUND`; `draw_starfield(surface, run.scroll)`; `draw_ship(surface, run.ship)` only if `run.ship_visible`; `draw_debug_overlay(surface, run.ship)` only if `overlay_visible`; `draw_game_over(surface)` only if `run.game_over`; `draw_hud(surface, run, below_overlay=debug)` last, on top of everything. Source: systems/ship.md, systems/debug-overlay.md, systems/scroll.md, systems/run.md and systems/hud.md, Presentation; 10-ui.md, rules 1 (the HUD on top) and 3 (the blink); 12-art-and-audio.md, rule 2 (the background stays behind).
 - **`below_overlay`** is `mode is RunMode.DEBUG`, fixed for the run. Never `overlay_visible`: in debug mode the HUD stays below the overlay's place while F3 hides it, so the readout never jumps. Source: scope report DRA-13, HUD layout.
 - `pygame.QUIT`: log INFO `quit` and leave the loop. That only happens on desktop.
-- **Arrow keys** (Up, Down, Left, Right): on `KEYDOWN` log DEBUG `key down key=%s x=%.2f y=%.2f`, on `KEYUP` log DEBUG `key up key=%s x=%.2f y=%.2f`, with names `up`, `down`, `left`, `right` and the ship's `x` and `y` at the moment the event is read (before this frame's ticks). Example: `key down key=up x=320.00 y=240.00`. No other arrow event is logged. Source: game/CONTEXT.md, Logging (a key pressed or released is an event). 01-vision.md, locked decision 1. Director decision (DRA-6: the integration check compares y between key-down and key-up).
-- **F3.** In debug mode, on `KEYDOWN` of `pygame.K_F3`: flip `overlay_visible` and log DEBUG `overlay visible=%s`. `KEYUP` of F3 does nothing. In normal mode F3 does nothing and logs nothing. Source: 10-ui.md, debug_overlay_toggle (guess) and rule 7.
-- **Log by event.** The frame loop logs only on the events in these rules: quit, arrow keys, F3 and the cap. Never a line per tick or per frame. Ship events (wall hit, top-line stop, respawn) are logged by `core.ship`, and the scroll start by `core.scroll`, not by the app. Source: 15-tech-constraints.md, rule 9; systems/ship.md, Rules, Logging.
+- **Arrow keys** (Up, Down, Left, Right): on `KEYDOWN` log DEBUG `key down key=%s x=%.2f y=%.2f`, on `KEYUP` log DEBUG `key up key=%s x=%.2f y=%.2f`, with names `up`, `down`, `left`, `right` and the ship's `x` and `y` (`run.ship.x`, `run.ship.y` from DRA-23) at the moment the event is read (before this frame's ticks). Example: `key down key=up x=320.00 y=240.00`. No other arrow event is logged. Source: game/CONTEXT.md, Logging (a key pressed or released is an event). 01-vision.md, locked decision 1. Director decision (DRA-6: the integration check compares y between key-down and key-up).
+- **F3.** In debug mode, on `KEYDOWN` of `pygame.K_F3`: flip `overlay_visible` and log DEBUG `overlay visible=%s`. `KEYUP` of F3 does nothing. In normal mode F3 does nothing and logs nothing. F3 never retries: only `thrust`, built from the four arrows, reaches `step_run` (02-game-flow.md, retry_key, locked). Source: 10-ui.md, debug_overlay_toggle (guess) and rule 7.
+- **Log by event.** The frame loop logs only on the events in these rules: quit, arrow keys, F3 and the cap. Never a line per tick or per frame. Ship events (wall hit, top-line stop) are logged by `core.ship`, the scroll start by `core.scroll`, and the run's events (life lost, respawn, wait end, invulnerable end, game over, new run) by `core.run`, not by the app. Source for the run's lines: systems/run.md, Logging (DRA-23). Source: 15-tech-constraints.md, rule 9; systems/ship.md, Rules, Logging.
 - **Catch-up cap.** One frame runs at most `MAX_TICKS_PER_FRAME` (5) ticks. If, after the 5th tick, the accumulator still holds one tick or more, set it to 0.0: the owed time is dropped, never run later. The game carries on from where it was. Source: 15-tech-constraints.md, max_ticks_per_frame (guess) and rule 2; 91-decision-log.md, row 21.
 - **Cap log, by event.** Log DEBUG `tick cap hit, dropped %.3f s` (the seconds dropped) on a frame where the cap drops time and the frame before didn't. While frames keep hitting the cap, log nothing more. The next capped frame after an uncapped one logs again. Source: 15-tech-constraints.md, rule 9.
 - No `time.sleep`, no thread, no blocking call. Source: 15-tech-constraints.md, rule 1.
@@ -341,22 +367,22 @@ Integration checks for DRA-5, on top of the required browser checks in game/CONT
   - Block `app.frame` (for example `sys.modules["app.frame"] = None` before `import main`): the log shows the start line, then ERROR `unexpected error, showing the error screen` with the `ImportError` traceback. The error screen is drawn and the process idles until it is stopped.
   - Block `pygame` the same way: the log shows the start line, the ERROR with the traceback, then ERROR `error screen failed` with its own traceback. The process ends by itself and doesn't hang.
 
-Integration checks for DRA-6, on top of the required browser checks and every DRA-5 check above (all must still pass). Background: with no key held, the ship falls off the floor and respawns about once a second.
+Integration checks for DRA-6, on top of the required browser checks and every DRA-5 check above (all must still pass). Background, from DRA-23: with no key held, the ship falls off the floor once, about 1.07 s after play starts, loses a life, respawns at the center and waits there for an arrow press. Every later fall needs a press first, and the third fall ends the run with the Game Over box. Between checks, retry with a fresh arrow press (release every arrow, then press one) or open a fresh page. Before DRA-23 the ship respawned about once a second with no key held; the checks below that relied on it are reworded and marked (DRA-23).
 - **Arrow keys with x/y (`?debug=1`):** hold ArrowUp for about 2 s (`keyboard.down`, wait, `keyboard.up`). The key-down and key-up lines both carry `x=` and `y=`. The key-up `y` is smaller than the key-down `y`, and after a 2 s hold it is `184.00` (top edge on the top line). Source: Director decision (DRA-5 integration, D3; DRA-6 design input).
-- **Log by event, not by tick (`?debug=1`):** hold ArrowUp and ArrowLeft together for about 3 s. Between that key-down and key-up there is exactly one `top line stop` line and exactly one `wall hit side=left` line. With no key held for 5 s, the only new lines are `respawn from ...`, about one a second, never one per tick. From DRA-13, the one `scroll start` line may also fall in that window if it covers the first 0.5 s of play. Source: 15-tech-constraints.md, rule 9; systems/ship.md, Rules, Logging.
-- **Respawn (`?debug=1`):** after the keys are released, a `respawn from x=... y=...` line appears within about 2 s, with `y` at least 496.00 (top edge at or past 480). Source: DRA-6 scope report, Limits.
+- **Log by event, not by tick (`?debug=1`):** hold ArrowUp and ArrowLeft together for about 3 s. Between that key-down and key-up there is exactly one `top line stop` line and exactly one `wall hit side=left` line. (DRA-23) With the ship waiting at the respawn point and no key held for 5 s, the only new line is one `invulnerable end`, about 0.5 s after the respawn, never a line per tick. From DRA-13, the one `scroll start` line may also fall in that window if it covers the first 0.5 s of play. Source: 15-tech-constraints.md, rule 9; systems/ship.md and systems/run.md, Logging.
+- **Respawn (`?debug=1`):** after the keys are released, a `respawn from x=... y=... wait=True` line appears within about 2 s, with `y` at least 496.00 (top edge at or past 480). (DRA-23) The line now comes from `core.run`, right after a `life lost lives=...` line. Source: DRA-6 scope report, Limits; systems/run.md, Logging.
 - **Ship visible (`/`):** the canvas shows white (255, 255, 255) pixels (the ship) and no (0, 255, 0) pixels. F3 logs nothing and changes nothing. Source: systems/ship.md, Presentation; 10-ui.md, rule 7.
 - **Overlay and F3 (`?debug=1`):** from the first frame there are (0, 255, 0) pixels on row 168, away from the ship. F3 logs `overlay visible=False` and those pixels go to the background color. F3 again logs `overlay visible=True` and they come back. Source: 10-ui.md, debug_overlay, debug_overlay_toggle.
 - **Click to start, follow-up:** the Director asked for this again, because in DRA-5 headless Chromium skipped the click. Record, in a fresh tab: whether pygbag's click screen shows, whether "MEDIA USER ACTION REQUIRED" appears, `navigator.userActivation.hasBeenActive` before any click, the time of the start line, and whether `respawn` lines appear before the click (the ship already moving). Report what happened in Browser run, and under Observations only as the "How the browser checks are done" rules above say. A game that starts before the click doesn't fail DRA-6. A game that doesn't start after a click fails it. Source: Director decision (DRA-5 close-out, follow up; DRA-6 design input; DRA-19 close-out).
-- **Catch-up cap (`?debug=1`):** hide the tab for about 5 s (see "How the browser checks are done" above), then let it run. One `tick cap hit, dropped ... s` line appears, with about the hidden time. It is not repeated every frame. The game carries on: the ship doesn't jump ahead by the hidden time, and the respawn lines stay about one a second. Source: 15-tech-constraints.md, max_ticks_per_frame, rules 2 and 9; Director decision (DRA-19 close-out).
+- **Catch-up cap (`?debug=1`):** hide the tab for about 5 s (see "How the browser checks are done" above), then let it run. One `tick cap hit, dropped ... s` line appears, with about the hidden time. It is not repeated every frame. The game carries on: the ship doesn't jump ahead by the hidden time, and the meters readout doesn't jump by the hidden time's distance. (DRA-23: before, this also checked that the respawn lines stayed about one a second. The ship now waits after a fall, so there is no steady respawn rate to check.) Source: 15-tech-constraints.md, max_ticks_per_frame, rules 2 and 9; Director decision (DRA-19 close-out).
 - **Package contents:** as for DRA-5, and `core/world.py`, `core/ship.py`, `ui/ship_view.py` and `ui/debug_overlay.py` must be in `game.apk`.
 
 Integration checks for DRA-13, on top of the required browser checks and every DRA-5 and DRA-6 check above (all must still pass). Background: 1.1 px a tick at 60 ticks a second is 66 px, so 6.6 m, a second. The readout gains about 66 m in 10 s.
-- **Scroll start, logged once (`?debug=1`):** exactly one `scroll start tick=31` line after the start line. In about 10 s of play no second one appears, including across several `respawn from` lines. Source: systems/scroll.md, Rules, Logging; 03-world-and-camera.md, rule 4.
-- **Readout counts up (`/`):** a screenshot right after play starts shows `0 m` at the top-left, with its text top near y 24. Screenshots about 5 s and 10 s later, with no key held (the ship falling and respawning), show larger whole numbers, the 10 s one about 66 m. Within a run the number never goes down. Source: scope report DRA-13, Player sees; systems/hud.md, Layout.
+- **Scroll start, logged once (`?debug=1`):** exactly one `scroll start tick=31` line after the start line. In about 10 s of play no second one appears, including across a fall, its `respawn from` line and the wait. (DRA-23) A retry starts a new run, and the new run logs its own `scroll start tick=31`. Source: systems/scroll.md, Rules, Logging; 03-world-and-camera.md, rule 4.
+- **Readout counts up (`/`):** a screenshot right after play starts shows `0 m` at the top-left, with its text top near y 24. Screenshots about 5 s and 10 s later, with no key held (DRA-23: the ship falls once, then waits at the center), show larger whole numbers, the 10 s one about 66 m. Within a run the number never goes down. Source: scope report DRA-13, Player sees; systems/hud.md, Layout.
 - **Hovering still earns meters (`/`):** hold ArrowUp for about 5 s so the ship sits on the top line. The readout keeps counting at the same rate as with no key held. Source: 03-world-and-camera.md, Edge cases.
 - **Starfield moves (`/`):** the canvas has (90, 100, 140) pixels. Two screenshots about 1 s apart, after the first 0.5 s, show the dots about 66 px lower, with dots that left the bottom back at the top. In the first 0.5 s after play starts they sit still. Source: systems/scroll.md, Presentation.
-- **No overlap in debug mode (`?debug=1`):** the four green overlay lines sit at the top-left, and the white readout sits below the last one, with a gap and no shared pixel row. Press F3: the overlay text goes away and the readout stays exactly where it was. F3 again brings the overlay back, still with no overlap. The overlay shows only x, y, vx and vy and its two lines, as in DRA-6. Source: systems/hud.md, Rules; scope report DRA-13, Decision log.
+- **No overlap in debug mode (`?debug=1`):** the four green overlay lines sit at the top-left, and the white readout sits below the last one, with a gap and no shared pixel row. Press F3: the overlay text goes away and the readout stays exactly where it was. F3 again brings the overlay back, still with no overlap. The overlay shows only x, y, vx and vy and its two lines, as in DRA-6. (DRA-23) The white hearts at the top right are not part of this check; read the top-left area only. Source: systems/hud.md, Rules; scope report DRA-13, Decision log.
 - **Top line is still a ceiling (`?debug=1`):** the DRA-6 ArrowUp check still ends at `y=184.00`. Source: systems/ship.md, step 7.
 - **Package contents:** as for DRA-6, and `core/scroll.py`, `ui/starfield.py` and `ui/hud.py` must be in `game.apk`.
 
@@ -364,19 +390,33 @@ Integration checks for DRA-19, on top of the required browser checks and every D
 - **No `-0.00` in the overlay (`?debug=1`):** hold ArrowUp the whole time, so the ship sits on the top line and never falls to a respawn. While holding it, tap ArrowLeft for about 0.2 s, release it, wait about 3 s, and take a screenshot. The overlay's third line reads `vx 0.00`, not `vx -0.00`. Source: scope report DRA-19, Player sees; systems/debug-overlay.md, Presentation.
 - **Null character in debug mode (desktop, headless, `SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`):** no code change, only a stand-in from the command line. Before calling `run()`, replace `app.loop.start` with an async function that raises `ValueError("bad\x00value")`. The log shows the start line, then ERROR `unexpected error, showing the error screen` with the `ValueError` traceback, and no `error screen failed` line. The error screen is drawn and the process idles until it is stopped. Source: scope report DRA-19, item 4; this contract, Rules, Error guard.
 
+Integration checks for DRA-23, on top of the required browser checks and every DRA-5, DRA-6, DRA-13 and DRA-19 check above, as reworded for DRA-23 (all must still pass). Each check starts in a fresh page unless it says otherwise. Background: with no key held, the first fall comes on tick 64, about 1.07 s after play starts, from y 500.20. Positions are on the 640 × 480 canvas.
+- **A fall costs a life (`?debug=1`, no key held):** about 1.07 s after play starts, `life lost lives=2`, then `respawn from x=320.00 y=500.20 wait=True`. Read the canvas after it: white heart pixels in the boxes at x 576 to 599 and x 608 to 631 (rows 8 to 31), and none in the box at x 544 to 567. Source: systems/run.md, Rules, step 5.2 and Logging; systems/hud.md, Presentation.
+- **Three hearts at the start (`/`):** the first frames show white heart pixels in all three boxes, x 544 to 567, 576 to 599 and 608 to 631, rows 8 to 31, and no white pixel elsewhere in the area x 536 to 639, rows 0 to 39. Source: systems/hud.md, Presentation; scope report DRA-23, Player sees.
+- **Blink (`/`, no key held):** read the canvas pixel at the ship's center, (320, 240), on every frame from the fall until about 1 s after it. In the first 0.5 s after the respawn it is white (the ship) for about 0.1 s, then not white for about 0.1 s, and so on: three white spans and two not-white spans. After that it stays white. In `?debug=1`, `invulnerable end` follows the `respawn from` line by about 0.5 s. Source: systems/run.md, Diagram (blink timeline) and Rules; scope report DRA-23, Limits.
+- **The wait (`?debug=1`, no key held):** after the respawn, wait 5 s. The overlay reads `x 320.00`, `y 240.00`, `vx 0.00`, `vy 0.00` the whole time. The only new line is `invulnerable end`. The meters readout keeps counting, about 33 m more in the 5 s, and the stars keep moving. Source: 05-lives-and-damage.md, rule 2.5; systems/run.md, Rules, steps 3 and 4.
+- **A press ends the wait and thrusts (`?debug=1`):** while the ship waits, tap ArrowUp for about 0.2 s. The log shows `key down key=up x=320.00 y=240.00`, then `respawn wait end`, then `key up key=up x=320.00 y=...` with y below 240.00: the ship rose from the first tick. After the release the ship falls under gravity. Source: 05-lives-and-damage.md, rule 2.5; 91-decision-log.md, row 28.
+- **A held key doesn't end the wait (`?debug=1`):** hold ArrowDown from the start, so the ship dives off the floor and respawns with Down still held. Keep holding for 2 s: no `respawn wait end`, and the overlay stays at `x 320.00 y 240.00 vx 0.00 vy 0.00`. Release Down, then tap ArrowLeft: `respawn wait end`, and the ship moves left. Source: systems/run.md, Rules, step 1 and Rationale.
+- **Game over (`?debug=1`):** let the ship fall three times, ending each wait with a short tap of ArrowUp. After the third fall: `life lost lives=0`, then INFO `game over meters=<n>`, and no `respawn from` line after it. The canvas shows no heart, and the Game Over box: inside x 160 to 479, rows 180 to 299, star pixels are darker than outside (about (58, 65, 91) instead of (90, 100, 140)), and the white text "Game Over" with "Press any arrow to retry" below it, both centered, matches reference text rendered with the game's default font at 32 px and 16 px. No white ship pixel anywhere: the ship stays below the floor. Source: systems/run.md, Rules, step 5.3 and Presentation; 02-game-flow.md, rule 5; scope report DRA-23, Values needed (Game Over box).
+- **Everything freezes (`?debug=1`):** on the Game Over box, two canvas reads 2 s apart are identical: stars, readout, overlay values (the overlay shows the y the ship fell from, at least 496.00). No `scroll start`, `wall hit`, `top line stop` or `respawn` line appears. Source: 02-game-flow.md, rule 5.
+- **Retry needs a fresh press (`?debug=1`):** make the third fall a dive with ArrowDown held, and keep holding it for 2 s after the box appears: no `new run`. Press F3 twice: only `overlay visible=...` lines, no `new run`. Release Down, wait about 0.5 s, then tap ArrowLeft: INFO `new run`. Source: 02-game-flow.md, rule 6 and Edge cases; retry_key (locked); 91-decision-log.md, row 31.
+- **A new run plays like the first (`?debug=1`, right after the retry):** the box is gone, the readout reads `0 m`, three hearts show, and the ship falls from the center with no wait and no blink. `scroll start tick=31` appears about 0.5 s after `new run`. The next fall, about 1.07 s after `new run`, logs `life lost lives=2`. Source: 02-game-flow.md, rules 3 and 6; 91-decision-log.md, row 30.
+- **Normal mode (`/`):** the same game over and retry by pixels only: after three falls the box shows; a fresh arrow press clears it and shows three hearts and `0 m`. No (0, 255, 0) pixels at any point.
+- **Package contents:** as for DRA-13, and `core/run.py` and `ui/game_over.py` must be in `game.apk`.
+
 ## Impact
-DRA-19 changes this frozen contract (v3). One guard rule changes: the debug-mode detail line also loses its null characters. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `guarded`, `_detail`, `detail`, `splitlines` and `draw_error_screen`:
+DRA-23 changes this frozen contract (v4). The frame loop holds one `Run` and calls `step_run` once per tick, instead of stepping the ship and the scroll itself. The draw order gains the blink and the Game Over box, and `draw_hud` takes the run. Several DRA-6 and DRA-13 integration checks are reworded, because the ship no longer respawns once a second. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `frame_loop`, `spawn`, `step(`, `start_scroll`, `step_scroll`, `draw_ship`, `draw_hud` and `ship.x`:
 
 | File | Change needed |
 |---|---|
-| `game/app/guard.py` | the debug-mode detail also drops every `\x00`, next to the newline handling. Normal mode still passes `None`. |
-| `game/app/loop.py`, `game/app/frame.py`, `game/app/mode.py`, `game/app/log.py`, `game/app/settings.py` | none. |
+| `game/app/frame.py` | holds `run` instead of `ship` and `scroll`; `run = start_run()` before the first frame; `run = step_run(run, thrust)` per tick; the arrow-key log lines read `run.ship.x`, `run.ship.y`; the DRA-23 draw order; imports `core.run` and `ui.game_over`, and drops `core.scroll`, `spawn` and `step`. Integration Engineer, during DRA-23 integration. |
+| `game/app/loop.py`, `game/app/guard.py`, `game/app/mode.py`, `game/app/log.py`, `game/app/settings.py` | none. |
 | `game/main.py` | none. |
-| `game/ui/error_screen.py` | none. It draws whatever `detail` it gets. |
-| `game/tests/ui/test_error_screen.py` | none. It calls the view directly with its own strings. |
-| `game/scripts/start-driftward-ace.sh`, `pygbag.ini` | none. |
+| `game/scripts/start-driftward-ace.sh` | none. |
+| `pygbag.ini` | none. `core/run.py` and `ui/game_over.py` are runtime files and go into the package by default. |
+| `game/ui/look.py`, `game/ui/error_screen.py`, `game/tests/ui/test_error_screen.py` | none. |
 
-All app changes are the Integration Engineer's, during DRA-19 integration. No task file.
+All app changes are the Integration Engineer's, during DRA-23 integration. No task file.
 
 ## Rationale
 - **`choose_mode` is pure and returns the rejected value.** The WARNING for a bad switch must go out after logging is configured, and logging needs the mode first. Returning the rejected value lets `run()` set up logging and then warn, with one config call.
@@ -396,13 +436,17 @@ All app changes are the Integration Engineer's, during DRA-19 integration. No ta
 - **F3 lives in the app.** It is input, and only the app reads input. The overlay view never sees the mode or the key, only whether the app calls it.
 - **The catch-up cap drops time instead of saving it.** The Director chose 5 ticks per frame, with owed time beyond that dropped (decision-log row 21). Without it, a long hidden-tab gap would run every missed tick in one frame: the ship would jump ahead unseen, and a slow frame could snowball. Setting the accumulator to 0.0 is the plain reading of "dropped". The fraction of a tick it also drops is under 1/60 s and can't be seen.
 - **The cap is in `app/settings.py`, not core.** It is about frames, and only the loop knows about frames. Core sees only whole ticks, so the rules stay the same whatever the frame rate.
-- **The scroll starts right after the spawn (DRA-13).** The control card doesn't exist yet, so the Director set play start to the moment the ship first appears at screen center. Calling `start_scroll()` next to `spawn()`, before the first frame, makes tick 0 the state the first frame shows.
+- **The scroll starts right after the spawn (DRA-13).** The control card doesn't exist yet, so the Director set play start to the moment the ship first appears at screen center. Calling `start_scroll()` next to `spawn()`, before the first frame, makes tick 0 the state the first frame shows. From DRA-23 `core.run.start_run()` makes both calls.
 - **Dropped catch-up time doesn't scroll (DRA-13).** Distance counts ticks the game ran. Time the cap drops is never run, so the world doesn't jump ahead after a hidden tab, the same as the ship.
 - **The HUD is drawn last (DRA-13).** 10-ui.md, rule 1 puts the HUD on top of everything. The overlay and the HUD never overlap, so moving the overlay from last to second-to-last changes no pixel today.
 - **The cap logs only when it starts.** A slow device can hit the cap every frame. Logging each time would be a line per frame, which the log policy forbids.
 - **Browser logs go to `console.log`.** In pygbag 0.9.3, stdout and stderr reach only its hidden terminal, never the devtools console. Writing through `platform.window.console.log` makes the start line visible, as the scope report promises. Every level uses `console.log`, not `console.warn` or `console.error`, as the Director decided (D2). Desktop keeps stdout, so the level is still readable from the line text.
 - **The PEP 723 block in `main.py`.** pygbag reads only `main.py` to pick the packages it installs. `main.py` imports only `asyncio` and `app.loop`, so the block is what gets pygame-ce into the browser build (D1). It is metadata only, with no logic and no import, so `main.py` stays a thin entry point.
 - **The guard removes null characters, the view doesn't (DRA-19).** pygame's font render raises on a string with `\x00` in it. Before DRA-19 that made the guard log "error screen failed" and leave the last frame up, so a debug-mode player saw no error screen for that message. The guard already shapes `detail` into one line, so it is the one place that turns an exception into displayable text. Removing the character, not replacing it, keeps the rest of the message as it was. The full message with the null stays in the logged traceback (10-ui.md, error_debug_line).
+- **The app holds one `Run` (DRA-23).** Game over freezes the ship and the scroll together, and a retry resets them together. Those are game rules, so they live in core. The app keeps one state, calls one step per tick, and only decides what to draw from the run's fields.
+- **The app skips `draw_ship` while the ship blinks hidden (DRA-23).** `run.ship_visible` is the core fact; the app reads it and doesn't call the view, the same way it calls the overlay only while `overlay_visible`. The ship view stays unchanged.
+- **The Game Over box is drawn before the HUD (DRA-23).** 10-ui.md, rule 1 puts the HUD on top of everything. The box is in the middle of the screen and the HUD at the top, so they never overlap, and the HUD stays the last call.
+- **The DRA-6 and DRA-13 checks are reworded, not dropped (DRA-23).** They relied on the ship respawning once a second with no key held. The behavior they check (one line per event, the cap, the readout rate) still holds; only the way to see it changes.
 - **Idle after the error, don't exit.** Ending `run()` hands control back to pygbag in a state we haven't tested. Idling keeps the canvas showing the error screen and keeps the page responsive.
 - **The error screen is tested headless.** A browser run can't trigger an unexpected error without a debug-only trigger, and that would be new scope. Task DRA-5-02 proves the screen draws right in both modes.
 - **Run-mode parsing has no permanent test.** It lives in `game/app/`, and `game/tests/check.sh` runs only `tests/core` and `tests/ui`. Only the Director can add an `app` step. The integration browser run covers the three cases (Rules, Integration checks, Run modes).

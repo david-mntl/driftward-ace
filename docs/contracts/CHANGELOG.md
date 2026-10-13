@@ -41,3 +41,14 @@
 - `DRA-13/DRA-13-hud.md` → `systems/hud.md` (v1)
 - Closed task files, reports and the entries above still use the old paths. Read them with this mapping. `git log --follow` shows each contract's full history.
 - Director decision, made in the main session, outside the pipeline.
+
+## DRA-23, 2026-10-13
+- `systems/app.md`: 4 to 5, frozen.
+- `systems/ship.md`: 3 to 4, frozen.
+- `systems/scroll.md`: 2 to 3, frozen.
+- `systems/hud.md`: 1 to 2, frozen.
+- `systems/run.md`: 0 to 1, frozen (new).
+- Lives, falls and game over: the new core run holds 3 lives, invulnerability with a blink, the respawn wait until a fresh arrow press, the game-over freeze and the arrow-key retry. The ship step no longer respawns. The HUD shows lives as white hearts at the top right, and the Game Over box is drawn over the frozen frame. The app makes one `step_run` call per tick.
+- `systems/ship.md`, Rationale: the stale "raised with the Director" line now cites 04-ship.md rule 3 and decision-log row 32. Approved by the Director at close-out.
+- Director verdict, relayed by the coordinator: the click-screen hand check was done in a desktop browser and works. All five integration observations were accepted.
+- 5 review findings (all notes) were accepted as they stand: `docs/reports/review/DRA-23-01-gameplay-implementer.md`, `docs/reports/review/DRA-23-02-ui-developer.md`, `docs/reports/review/DRA-23-03-ui-developer.md`. The `ship.md` finding was fixed in this close-out.
