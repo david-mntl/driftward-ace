@@ -9,7 +9,7 @@ Source: docs/contracts/systems/run.md, Interface, Rules and Logging.
 """
 
 import logging
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Final
 
 from core.scroll import Scroll, start_scroll, step_scroll
@@ -56,7 +56,7 @@ class Run:
     game_over: bool = False
     """The Game Over box shows and everything is frozen."""
 
-    held: Thrust = Thrust()
+    held: Thrust = field(default_factory=Thrust)
     """The arrow keys held on the last tick, to tell a press from a hold."""
 
     retry_armed: bool = False

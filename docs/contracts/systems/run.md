@@ -91,7 +91,7 @@ class Run:
     invuln_ticks_left: int = 0       # ticks of invulnerability still to come. 0 = not invulnerable
     waiting: bool = False            # the ship stands at the respawn point until an arrow press
     game_over: bool = False          # the Game Over box shows and everything is frozen
-    held: Thrust = Thrust()          # the arrow keys held on the last tick, to tell a press from a hold
+    held: Thrust = field(default_factory=Thrust)  # the arrow keys held on the last tick, to tell a press from a hold
     retry_armed: bool = False        # game over only: every arrow has been released since the box appeared
 
     @property
