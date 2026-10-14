@@ -1,0 +1,60 @@
+# Runs the QA gate and the browser build on every pull request to main and every push to main.
+# Lint and tests run through game/tests/check.sh, the same command used locally.
+# Actions are pinned to a commit SHA. The comment names the release.
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Lint and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: game/requirements.txt
+
+      - name: Install pinned tools
+        run: pip install -r game/requirements.txt
+
+      - name: Run check.sh
+        run: game/tests/check.sh
+
+  build:
+    name: Browser build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: game/requirements.txt
+
+      - name: Install pinned tools
+        run: pip install -r game/requirements.txt
+
+      # pygbag reads pygbag.ini from its working directory, so this runs from the repo root.
+      - name: Build web.zip
+        run: python -m pygbag --archive game
+
+      - name: Check the release package holds runtime files only
+        run: python .github/scripts/check_release_package.py
