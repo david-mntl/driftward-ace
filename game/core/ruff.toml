@@ -1,0 +1,9 @@
+# Lint rules for game/core: the parent rules, plus no pygame.
+extend = "../ruff.toml"
+
+# Ruff replaces this table instead of merging it, so the parent's bans are repeated here.
+[lint.flake8-tidy-imports.banned-api]
+"threading".msg = "No threads: the browser build has none. Use the async loop."
+"multiprocessing".msg = "No processes: the browser build has none. Use the async loop."
+"time.sleep".msg = "Blocks the browser page. Use `await asyncio.sleep(...)`."
+"pygame".msg = "core/ holds game rules only, with no pygame. Drawing and input go in ui/ or app/."

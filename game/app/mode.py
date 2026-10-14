@@ -25,12 +25,16 @@ DEBUG_VALUE: str = "1"
 
 
 class RunMode(Enum):
+    """How the game runs. Debug adds logs and the overlay, never a rule change."""
+
     NORMAL = "normal"
     DEBUG = "debug"
 
 
 @dataclass(frozen=True)
 class ModeChoice:
+    """The chosen mode, and the switch value that was rejected, if any."""
+
     mode: RunMode
     rejected: str | None
     """The switch value that was present but not "1"; None otherwise."""
@@ -49,7 +53,8 @@ def read_switch() -> str | None:
 
 def _read_url_switch() -> str | None:
     """Return the first value of the debug URL parameter, read through pygbag's window bridge."""
-    query: str = str(platform.window.location.search).removeprefix("?")
+    # pygbag adds `window` to `platform` in the browser only, so type checkers can't see it.
+    query: str = str(platform.window.location.search).removeprefix("?")  # type: ignore[attr-defined]
     values: list[str] = parse_qs(query, keep_blank_values=True).get(URL_SWITCH, [])
     return values[0] if values else None
 

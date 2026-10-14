@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Driftward Ace test harness. One entry point for lint, format and tests.
 #
-#   check.sh [all]              env, lint, format, core, ui
+#   check.sh [all]              env, lint, format, typecheck, core, ui
 #   check.sh lint               ruff check + ruff format --check
+#   check.sh typecheck          mypy --strict
 #   check.sh core [pytest args] tests for game/core
 #   check.sh ui [pytest args]   tests for game/ui
 #   check.sh fix                ruff --fix + ruff format (implementers only)
@@ -40,6 +41,7 @@ assert sys.version_info[:2] == (3, 12), f"Python 3.12 required, got {sys.version
 import pygame
 
 assert pygame.IS_CE, "classic pygame installed, pygame-ce required"
+import mypy
 import pytest
 import ruff
 
@@ -56,6 +58,17 @@ step_lint() {
 step_format() {
     header format
     if "$PY" -m ruff format --check .; then record format PASS; else record format FAIL; fi
+}
+
+step_typecheck() {
+    header typecheck
+    # build/ is pygbag output, not source.
+    if "$PY" -m mypy --strict --python-version 3.12 --explicit-package-bases \
+        --exclude '^build/' .; then
+        record typecheck PASS
+    else
+        record typecheck FAIL
+    fi
 }
 
 step_pytest() {  # step_pytest <core|ui> [pytest args]
@@ -89,12 +102,16 @@ case "$cmd" in
         step_env || summary 2
         step_lint
         step_format
+        step_typecheck
         step_pytest core
         step_pytest ui
         ;;
     lint)
         step_lint
         step_format
+        ;;
+    typecheck)
+        step_typecheck
         ;;
     core | ui)
         step_pytest "$cmd" "$@"
@@ -105,7 +122,7 @@ case "$cmd" in
         exit $?
         ;;
     *)
-        echo "usage: check.sh [all | lint | core [pytest args] | ui [pytest args] | fix]" >&2
+        echo "usage: check.sh [all | lint | typecheck | core [pytest args] | ui [pytest args] | fix]" >&2
         exit 2
         ;;
 esac

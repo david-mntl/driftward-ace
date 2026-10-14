@@ -1,5 +1,8 @@
 target-version = "py312"
 line-length = 100
+# One cache for all of game/. Without this, core/ruff.toml makes a second one in core/,
+# and pygbag would ship it.
+cache-dir = ".ruff_cache"
 
 [lint]
 select = [
@@ -11,4 +14,29 @@ select = [
   "UP",      # modern Python syntax
   "ASYNC",   # blocking calls inside async functions
   "ANN",     # type annotations on every function
+  "T20",     # no print: use the module logger
+  "G",       # logging calls use lazy %s formatting, never f-strings
+  "BLE",     # blind `except Exception` must log the error
+  "TRY400",  # inside except, log with log.exception to keep the traceback
+  "ERA",     # no commented-out code
+  "TID251",  # banned imports, listed below
+  "PT",      # pytest style
+  "RUF",     # ruff's own bug checks
+  "SIM", "RET", "C4", "PIE", "PERF",  # simpler code: conditions, returns, comprehensions
+  "D1",      # public modules, classes and functions have a docstring
+  "D419",    # a docstring is never empty
 ]
+ignore = [
+  "D105",    # magic methods: the class docstring covers them
+  "D107",    # __init__: the class docstring covers it
+  "RUF001",  # ambiguous characters in strings: tests use × on purpose
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["D1"]  # a test's name is its description
+
+# core/ruff.toml adds pygame to this list. Keep both lists in sync.
+[lint.flake8-tidy-imports.banned-api]
+"threading".msg = "No threads: the browser build has none. Use the async loop."
+"multiprocessing".msg = "No processes: the browser build has none. Use the async loop."
+"time.sleep".msg = "Blocks the browser page. Use `await asyncio.sleep(...)`."

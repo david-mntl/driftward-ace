@@ -8,6 +8,7 @@ venv/
 # Tool caches
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 
 # pygbag build output
 build/

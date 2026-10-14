@@ -21,8 +21,9 @@ Run from any directory:
 
 | Command | Does |
 |---|---|
-| `game/tests/check.sh` | everything: env, lint, format, core, ui |
+| `game/tests/check.sh` | everything: env, lint, format, typecheck, core, ui |
 | `game/tests/check.sh lint` | `ruff check` and `ruff format --check` on `game/` |
+| `game/tests/check.sh typecheck` | `mypy --strict` on `game/` |
 | `game/tests/check.sh core [pytest args]` | core tests only, e.g. `core -k ship -v` |
 | `game/tests/check.sh ui [pytest args]` | ui tests only |
 
