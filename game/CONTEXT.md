@@ -3,11 +3,28 @@
 Read this before you touch anything under `game/`.
 
 ## Good practice
-- Follow the existing style of the file you edit. Run `game/tests/check.sh lint` before you hand off.
+- Follow the existing style of the file you edit. Run `game/tests/check.sh lint` and `game/tests/check.sh typecheck` before you hand off.
 - Validate input at the edge, where data comes from a file, the browser or the player. Trust values inside `game/core/`.
 - Keep functions short and names plain. No dead code, no commented-out code.
 - Respect the tech rules in `docs/design/gdd/15-tech-constraints.md`: async main loop, no blocking calls, no threads, `.ogg` audio only.
 - Shell scripts start with `set -euo pipefail`, quote every variable and clean up what they start. They log plain timestamped lines.
+
+## Docstrings (rule)
+Ruff requires a docstring on every public module, class and function. It doesn't check private `_helpers`, tests, `__init__` or magic methods, but give them one too whenever the name doesn't tell the whole story: a non-obvious step, a unit, an edge case, or why it exists. Tests are the exception: the test name is the description.
+
+Write it short:
+- One line that says what it does. Add more only for what the name and type hints can't say.
+- Always give units and ranges: px, px/tick, ticks, 0..1.
+- Don't repeat the name. Don't list arguments the type hints already explain.
+
+```python
+def apply_thrust(self, direction: Vec2) -> None:
+    """Add one tick of thrust. Speed is capped at max_speed (px/tick)."""
+```
+
+## Types (rule)
+- mypy runs in strict mode. Every value has a known type; no `Any` unless a library gives you one.
+- `# type: ignore[<code>]` only for a fact the checker can't see, such as pygbag's browser-only `platform.window`. Always name the code and say why in a comment. Never use it to hide a real error.
 
 ## Logging (rule)
 Every agent that writes Python under `game/` follows this.

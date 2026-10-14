@@ -29,8 +29,10 @@ class BrowserConsoleHandler(logging.Handler):
     """
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Send one formatted record to the browser console."""
         try:
-            platform.window.console.log(self.format(record))
+            # pygbag adds `window` to `platform` in the browser only.
+            platform.window.console.log(self.format(record))  # type: ignore[attr-defined]
         except (AttributeError, TypeError, ValueError):
             self.handleError(record)
 

@@ -48,8 +48,9 @@ Pixels = list[list[tuple[int, int, int]]]
 def _pixels(surface: pygame.Surface) -> Pixels:
     width, height = surface.get_size()
     data = pygame.image.tobytes(surface, "RGB")
+    row_len = width * 3
     return [
-        [tuple(data[(y * width + x) * 3 : (y * width + x) * 3 + 3]) for x in range(width)]
+        [(data[i], data[i + 1], data[i + 2]) for i in range(y * row_len, (y + 1) * row_len, 3)]
         for y in range(height)
     ]
 
