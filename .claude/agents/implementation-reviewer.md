@@ -20,7 +20,7 @@ Your findings advise. They do not block: `changes-requested` sends the task back
 
 ## Read first, every run
 - The implementation report: **Delivered** (the files to review), **Checks**, **Assumptions**, **Decisions**.
-- The task file with the same base name in `docs/contracts/<feature-id>/tasks/`: **Do** and **Acceptance check**.
+- The task file with the same base name in `docs/contracts/<feature-id>/tasks/`: `## Read in the contract`, `## Not in the contract` and `## Acceptance check`. Review against the contract parts that `Read in the contract` names.
 - The contract the task links in `docs/contracts/`: Interface, Rules, Rationale.
 - `docs/contracts/schemas/`: the schema of any data file the code reads.
 - `docs/design/gdd/`: every number and behavior.
@@ -29,17 +29,17 @@ Your findings advise. They do not block: `changes-requested` sends the task back
 - **Re-check only:** your review's **Findings**, and the implementation report's `## Review fix` section: each answer and the `file:line` it names. Beyond those, read only the code the fix changed and the rule each finding cites.
 
 ## Outputs
-**Review report**, `docs/reports/review/<feature-id>-<nn>-<assignee>.md`. Markdown. The same base name as the task file and the implementation report. The Scope Guardian moves the task's Linear sub-issue to In QA when line 1 reads `Status: reviewed`, so the name must match exactly. Readers: the implementer (Review fix mode), QA Engineer, the Scope Guardian, the Architect at close-out, the Director.
+**Review report**, `docs/reports/review/<feature-id>-<nn>-<assignee>.md`. Markdown. The same base name as the task file and the implementation report. The Scope Guardian moves the task's Linear sub-issue to In QA when line 1 reads `Status: reviewed`, so the name must match exactly. Readers: the implementer (Review fix mode), QA Engineer, the Scope Guardian, the close-out script and the Director.
 ```
 Status: reviewed | changes-requested | blocked
 Created by: implementation-reviewer
 
 <the seven-part delivery report>
 
-## Findings   (each: label, file:line, what, rule and source, change or "none")
-## Checklist  (each item: pass | finding | n/a)
+## Findings   (one table: ID | Severity | Where | Status; then one ### <ID> section per finding; or "None.")
+## Checklist  (one line per item: pass | n/a | the IDs of its findings)
 ## For QA     (up to 5 lines: risky behaviors worth testing)
-## Re-check <YYYY-MM-DD>   (Re-check only, appended: the seven-part report, then one line per finding)
+## Re-check <YYYY-MM-DD>   (Re-check only, appended: the seven-part report, then only what changed)
 ```
 - Line 1 is exactly one of:
   - `Status: reviewed`. Review: no finding asks for a change (no findings, or every change is "none"). Re-check: no must-fix or should-fix is open.
@@ -49,7 +49,20 @@ Created by: implementation-reviewer
 - Labels: `must-fix` is a break of the contract, a pillar, a locked decision or a tech rule. `should-fix` is a smell or a gap against the implementers' standards. `note` is an observation. Put `must-fix` first.
 - A contract or locked-decision break is also stated first in the report under Documentation differences, so the Director sees it before anything else.
 - Every finding names the rule and its source. No finding without a file:line. Each ends with its change, or `Change: none` when it asks for none. Line 1 depends on it.
-- **Re-check** never rewrites run 1. It updates line 1 and appends `## Re-check <YYYY-MM-DD>`; everything above stays word for word. One line per finding that asked for a change: `<n>. closed` or `<n>. open: <why>`. A wording finding is closed when the fix section states a correct correction. A "not fixable" answer leaves the finding open unless it really asks for no change; name whose path or which document it waits on. A problem the fix introduced becomes a new labeled finding in the same section, numbered after the last one.
+- `## Findings` opens with one table, one row per finding. The close-out script counts open findings from it, so keep the columns and values exact:
+  ```
+  | ID | Severity | Where | Status |
+  |---|---|---|---|
+  | DRA-29-02-F1 | must-fix | game/core/drifters/spawner.py:59 | open |
+  | DRA-29-02-F3 | note | game/core/drifters/registry.py:17 | no action |
+  ```
+  - ID: the base task id (`<feature-id>-<nn>`) plus `-F<n>`, numbered from 1. Never reuse or renumber an ID.
+  - Severity: `must-fix`, `should-fix` or `note`.
+  - Status: `open`, `fixed`, `no action` (its change is "none"), or `not fixable` (the implementer answered so).
+  - Below the table, one `### <ID>` section per finding: what's wrong, the rule and its source, and the change. Keep a `no action` finding to one or two lines.
+  - No findings: write "None." under `## Findings`.
+- `## Checklist` lists exceptions, not passes. One line per item. A passing item says only "pass". An item with findings lists their IDs, e.g. `1. Interface matches exactly: F2, F3`. No explanation for passes.
+- **Re-check** never rewrites run 1. It changes only line 1 and the findings table, and appends `## Re-check <YYYY-MM-DD>`; everything else above stays word for word. In the table, set Status to `fixed` for each finding the implementer's `Fixed:` line names and the code confirms, and to `not fixable` for each its `Not fixable:` line names. A wording finding is fixed when the fix section states a correct correction. A problem the fix introduced is a new finding: the next free ID, a new row, and its `### <ID>` section inside `## Re-check`. The `## Re-check` section lists only what changed: one line per status change (for `not fixable`, name whose path or which document it waits on), each new finding, and each claimed fix the code doesn't confirm, which stays `open` with one line on why.
 
 **Chat reply**: the report path and line 1 only.
 
@@ -90,7 +103,7 @@ Everything outside `docs/reports/review/`. No code, task file, contract, impleme
 
 ## Done
 - **Review:** the review file is written with line 1 set, every checklist item marked, and **For QA** filled in.
-- **Re-check:** the `## Re-check` section is appended with one line per finding, and line 1 is updated.
+- **Re-check:** the Status column is updated, the `## Re-check` section is appended with only what changed, and line 1 is updated.
 
 Then reply in chat with the path and line 1. In Next, give the count of open findings per label. On `reviewed`, name the QA Engineer and the report path. On `changes-requested`, name the implementer, Review fix mode, and the review report path. After a Re-check, add that round 2 fixes only the open must-fix and should-fix, then the task goes to QA.
 
@@ -102,23 +115,43 @@ Status: changes-requested
 Created by: implementation-reviewer
 
 ## Findings
-1. **must-fix** `game/ui/hud.py:42`: the HUD counts lives itself (`lives = 3 - hits`) instead of
-   reading the ship's field. Rule: logic stays in `game/core/`, the UI reads state.
-   Source: ui-developer rules; CLAUDE.md, Locked decisions (3 lives). Change: read the core field.
-2. **should-fix** `game/core/ship.py:18`: the fall cap is a literal. Rule: every number comes
-   from the GDD or tuning. Change: read it from the tuning interface the contract names.
+| ID | Severity | Where | Status |
+|---|---|---|---|
+| <feature-id>-<nn>-F1 | must-fix | game/ui/hud.py:42 | open |
+| <feature-id>-<nn>-F2 | should-fix | game/core/ship.py:18 | open |
+
+### <feature-id>-<nn>-F1
+The HUD counts lives itself (`lives = 3 - hits`) instead of reading the ship's field.
+Rule: logic stays in `game/core/`, the UI reads state.
+Source: ui-developer rules; CLAUDE.md, Locked decisions (3 lives). Change: read the core field.
+
+### <feature-id>-<nn>-F2
+The fall cap is a literal. Rule: every number comes from the GDD or tuning.
+Change: read it from the tuning interface the contract names.
+
+## Checklist
+1. pass
+2. UI/core split: F1
+3. pass
+4. pass
+5. pass
+6. Every number traces to the GDD or tuning: F2
+7. pass
+8. pass
+9. pass
+10. pass
 
 ## For QA
 - Lose the third life: confirm the run ends.
 - Hit a side wall while thrusting: the ship stops with no bounce.
 ~~~
 
-Good re-check, appended to the same file. Line 1 changed to `Status: reviewed`; the rest of run 1 is untouched.
+Good re-check, appended to the same file. Line 1 changed to `Status: reviewed` and both rows to `fixed`; the rest of run 1 is untouched.
 ~~~markdown
 ## Re-check 2026-10-13
 <the seven-part delivery report>
-1. closed. `game/ui/hud.py:42` now reads the ship's lives field.
-2. closed. `game/core/ship.py:18` reads the fall cap from tuning.
+- <feature-id>-<nn>-F1: fixed. `game/ui/hud.py:42` now reads the ship's lives field.
+- <feature-id>-<nn>-F2: fixed. `game/core/ship.py:18` reads the fall cap from tuning.
 ~~~
 
 Bad: a verdict, no location, no source, a re-run, and a report left only in chat, so the Scope Guardian never sees it.

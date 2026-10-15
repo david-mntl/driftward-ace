@@ -47,9 +47,7 @@ flowchart TD
     WD -->|wave file| WC
     WC -->|fail + fixes| WD
     WC -->|pass| IE
-    IE -->|playable build| D
-    IE -->|pass report| AR
-    IR -.->|open findings, close-out| AR
+    IE -->|playable build, pass report| D
 
     classDef human fill:#2b2d42,color:#fff,stroke:#2b2d42
     classDef critic fill:#fde2e4,stroke:#c9184a,color:#000
@@ -66,7 +64,7 @@ Diamonds block work until they pass. Pink nodes are critics.
 | 0 | Director (human) | `docs/design/`, `docs/crew/` | — | Decides | a game with a point of view rather than a committee's average |
 | 1 | Trainer | `.claude/agents/` | Director asks to create or revise an agent, or reports an ownership gap | Builder | a finished game, because no work fell between two agents |
 | 2 | Scope Guardian | `docs/reports/scope/`; Linear feature issues and their task statuses | the Director opens a chat with a feature or idea | Gate, blocks; the Director's assistant for Linear | one finished game instead of three half-built systems |
-| 3 | Architect | `docs/contracts/`; Linear task sub-issues (create, close at close-out) | Scope Guardian approves a feature, or asks for technical advice | Generator | new features land without breaking what already worked |
+| 3 | Architect | `docs/contracts/` (content); Linear task sub-issues (create; close when the Director asks) | Scope Guardian approves a feature, or asks for technical advice | Generator | new features land without breaking what already worked |
 | 4 | Gameplay Implementer | `game/core/`, `game/requirements.txt`, `game/ruff.toml`, `docs/reports/implementation/gameplay/` | Architect issues a gameplay task, or the Implementation Reviewer requests changes | Generator | the ship thrusts, drifts, falls, and dies on contact |
 | 5 | UI Developer | `game/ui/`, `docs/reports/implementation/ui/` | Architect issues a presentation task, or the Implementation Reviewer requests changes | Generator | height, score, and death state shown clearly on screen |
 | 6 | Tuning Engineer | `game/tuning/` | physics loop first runs, or Director calls a tuning session | Generator | controls that feel tight instead of floaty or leaden |
@@ -79,7 +77,7 @@ Diamonds block work until they pass. Pink nodes are critics.
 
 ## Work lanes
 
-**Structural:** the work changes a contract. Scope Guardian → Architect → implementer → Implementation Reviewer → QA Engineer → Integration Engineer → Architect (close-out). Close-out reads the open review findings first and asks the Director before closing.
+**Structural:** the work changes a contract. Scope Guardian → Architect → implementer → Implementation Reviewer → QA Engineer → Integration Engineer → close-out (Director with the main session). `scripts/close-out.sh <feature-id>` shows the open review findings and the integration Observations first. Nothing closes until the Director decides. After it writes, the main session sets the feature's Linear sub-issues to Done. Any contract change that comes out of it goes to a fresh Architect run.
 
 **Review fixes:** inside the structural lane. If the review asks for any change, the implementer fixes every finding it can (round 1) → the Reviewer re-checks once → if a must-fix or should-fix is still open, the implementer fixes only those (round 2) → QA. Notes left open stay open. The Reviewer runs at most twice per task.
 
@@ -90,3 +88,5 @@ Diamonds block work until they pass. Pink nodes are critics.
 ## Rules
 - No two agents write the same path. Any agent may read anything.
 - Only the Director edits `docs/design/` and `docs/crew/`.
+- The Architect writes contract content. The close-out script (`scripts/close-out.sh`, which runs `scripts/python/contracts.py`) may change only contract `Status:` and `Version:` lines and task `Status:` lines, and append to `docs/contracts/CHANGELOG.md`.
+- `scripts/` belongs to the Director and the main session. No agent writes there.
