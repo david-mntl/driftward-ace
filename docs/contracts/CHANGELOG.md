@@ -52,3 +52,20 @@
 - `systems/ship.md`, Rationale: the stale "raised with the Director" line now cites 04-ship.md rule 3 and decision-log row 32. Approved by the Director at close-out.
 - Director verdict, relayed by the coordinator: the click-screen hand check was done in a desktop browser and works. All five integration observations were accepted.
 - 5 review findings (all notes) were accepted as they stand: `docs/reports/review/DRA-23-01-gameplay-implementer.md`, `docs/reports/review/DRA-23-02-ui-developer.md`, `docs/reports/review/DRA-23-03-ui-developer.md`. The `ship.md` finding was fixed in this close-out.
+
+## DRA-29, 2026-10-15
+- `systems/objects.md`: 0 to 1, frozen (new).
+- `systems/run.md`: 1 to 2, frozen.
+- `systems/ship.md`: 4 to 5, frozen.
+- `systems/debug-overlay.md`: 3 to 4, frozen.
+- `systems/app.md`: 5 to 6, frozen.
+- New schemas: `schemas/object-tuning.schema.json`, `schemas/playtest-switches.schema.json`.
+- The first object, the meteorite. A shared object base with phases and an entry warning. Circle and box hitboxes with a strict overlap test. The ship's hitbox is an inverted T, and the ship is drawn as that T. The level table and the spawner are the only way to create an object. In the run, a hit costs one life with no stun, and objects that have gone are dropped. Object views and the entry warning are in UI. The debug overlay draws hitbox and graze outlines with labels. The app loads the tuning files at start. In debug mode only, it adds a test spawn list. Normal mode spawns nothing yet.
+- Director verdict, relayed by the coordinator: the click-screen hand check was done in a desktop browser and works as before. The "Normal mode spawns nothing" check in `systems/app.md` stays as written. All six integration observations were accepted.
+- `systems/objects.md`, Interface: the `tick_warning` and `register_object` comments now show the PEP 695 type parameter form the code uses, in place of `TypeVar` (review DRA-29-02, note 3). Approved by the Director at close-out.
+- Numbers-only hotfix before close-out. The Director ordered it, and the main session applied it outside the pipeline. Meteorite speed is halved: `speed_ratio` 0.75 to 0.375, about 2.4675 px/tick at Level 1. The entry warning is 0.5 s longer: 30 to 60 ticks.
+  - Changed: `game/tuning/objects/meteorite.json`; GDD `objects/01-meteorite.md` and `91-decision-log.md` row 40; the timeline, speed lines and rationale in `systems/objects.md`; the DRA-29 browser-check timings in `systems/app.md`.
+  - The recomputed timings: hits at about 3.2, 6.2 and 9.2 s on the top line; 3.53 s at the respawn point; a 1 s warning; id 1 gone at about 4.4 s.
+  - The labels of the two test constants in `game/tests/core/test_objects.py` and `test_run_objects.py` now say "fixed test value, not the live tuning file". The numbers are unchanged.
+  - `game/tests/check.sh` ends `QA: pass`.
+  - The browser build was not re-run for the hotfix, at the Director's request. The integration report's browser timings are from before it.

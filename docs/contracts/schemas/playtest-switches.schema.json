@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/playtest-switches.schema.json",
+  "title": "Playtest switches",
+  "description": "The file game/tuning/playtest.json. The two switches for playtesting from 08-difficulty.md, rule 5. true: the level table applies (rules 3 and 4). false: Level 1 values at every level, as_level included. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Owner of the schema: architect. Contract: docs/contracts/systems/objects.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hazard_speed_scaling", "timer_scaling"],
+  "properties": {
+    "hazard_speed_scaling": {
+      "description": "Apply the level's Hazard speed x to every object's speed at birth (08-difficulty.md, rule 3).",
+      "type": "boolean"
+    },
+    "timer_scaling": {
+      "description": "Apply the level's Timer x to every object's timers at birth (08-difficulty.md, rule 4). Never touches entry warnings.",
+      "type": "boolean"
+    }
+  }
+}
