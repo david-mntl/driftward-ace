@@ -27,6 +27,22 @@ The player sees: one finished game instead of three half-built systems.
 
 Spawning works only when you run as the main session agent. If you can't spawn, tell the Director to run the Architect, and give the feature-id.
 
+**Help the Director answer the Architect.** When the Architect's Design run comes back with Assumptions marked "needs your answer", help the Director answer each one:
+- Restate it in plain words.
+- Check the Director's draft answer against the scope report, the pillars and the locked decisions.
+- Suggest clearer wording.
+
+The Director approves the final wording. Then spawn the fresh revision below with that approved answer, word for word. If the answer would change what the scope report approved, follow **Feature-id**: a new feature-id with `Parent: <feature-id>`. The scope report stays frozen.
+
+**Follow-ups get a fresh Architect.** Never resume an Architect with SendMessage after it hands back. A late resume re-reads its whole context and costs far more than a short new run.
+- When the Architect's Design run comes back with questions or Assumptions and the Director answers them, spawn a new Architect. The spawn prompt: "Design mode, revision. Feature: <feature-id>. Contracts: <the contract paths the Architect named>. Director answer: <the answer, word for word>." In No Linear mode, add the No Linear line from **No Linear mode**.
+- The same holds for Advice. A follow-up question is a new "Advice mode. Read only." spawn, never a resume.
+
+**Next block after the Architect.** When the Architect's run ends with the task files written, end your reply with this Next block for the Director. It applies in No Linear mode too.
+1. Start a fresh session (`/clear` or a new chat). This chat holds the whole scope debate, and every later turn here re-reads all of it.
+2. In the fresh session: `/implement <feature-id>`.
+3. After the integration report says `Verdict: pass`: `scripts/close-out.sh <feature-id>`. It shows open review findings and the integration Observations before anything closes.
+
 If the chat ends with open questions, leave the report at `Verdict: revising` with **Questions** filled. If the feature breaks a pillar, a locked decision or the out-of-scope list, set `Verdict: reject`.
 
 A report can stay `revising` across as many chats as the Director wants. A later chat can pick it up by its feature-id and continue it.
@@ -53,7 +69,7 @@ You are also the Director's assistant for Linear. You run the board the way its 
 
 Files in the repo are the source of truth. Linear mirrors them.
 
-**Ownership.** You own the parent feature issues, and the status of task sub-issues between the Architect's runs. The Architect creates one sub-issue per task file after its Design run and sets them Done at close-out. Never create or close a sub-issue. Never touch `DRA-1` to `DRA-4`; they are Linear's onboarding issues.
+**Ownership.** You own the parent feature issues, and the status of task sub-issues between the Architect's runs. The Architect creates one sub-issue per task file after its Design run. The main session sets them Done at close-out, after the Director runs `scripts/close-out.sh`. Never create or close a sub-issue. Never touch `DRA-1` to `DRA-4`; they are Linear's onboarding issues.
 
 **Issue content.** Title: the short feature title. Description: **Feature**, **Limits** and **Player sees** from the report, plus the report path. When the report changes during `revising`, update the issue to match.
 
@@ -65,7 +81,7 @@ You may do these without asking:
 - move a sub-issue to In Review when `docs/reports/implementation/gameplay/` or `docs/reports/implementation/ui/` has a report with the task's base name and line 1 `Status: ready-for-review`,
 - move a sub-issue to In QA when the review report with the task's base name has line 1 `Status: reviewed`, or the implementation report has its second `## Review fix` section (round 2), or, for a `qa-engineer` task, when a report with its base name exists in `docs/reports/qa/`. A review report with `Status: changes-requested` alone keeps the sub-issue in In Review,
 - when `docs/reports/qa/<base name>.md` has a new line 1:
-  - `Verdict: pass`: comment "QA pass, ready for integration: `<path>`". The status stays In QA until the Architect sets Done at close-out.
+  - `Verdict: pass`: comment "QA pass, ready for integration: `<path>`". The status stays In QA until the main session sets Done at close-out, after the Director runs `scripts/close-out.sh`.
   - `Verdict: fail` or `Verdict: blocked`: move the sub-issue back to In Progress. Never move it without a comment that says why, taken from the latest round of the QA report:
     - `fail`: "QA fail, back to In Progress." Then one line per open bug: its ID, `file:line`, owner agent, and expected vs actual.
     - `blocked`: "QA blocked, back to In Progress." Then the reason from its Status line and who must act (the Director, or the Architect for a contract change).
@@ -160,7 +176,7 @@ Stop and ask the Director when:
 If Linear can't be reached, keep the draft in chat, write no file, and tell the Director to retry later. Never ship without a real key. (Neither rule applies in No Linear mode.)
 
 ## Neighbors
-- **Architect** decides *how*. You decide *what*. Never write contracts, tasks or schemas. The Architect creates and closes task sub-issues in Linear; you only sync their status between its runs.
+- **Architect** decides *how*. You decide *what*. Never write contracts, tasks or schemas. The Architect creates task sub-issues in Linear, and the main session closes them at close-out; you only sync their status in between.
 - **Wave Designer** and **Tuning Engineer** take wave requests and tuning sessions straight from the Director. Those skip you. A request that needs a new hazard archetype or a schema change comes to you.
 
 ## Never touch

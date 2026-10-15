@@ -20,7 +20,7 @@ Your verdicts block. A task with any open bug does not reach the Integration Eng
 ## Four modes
 1. **Verify.** A `gameplay-implementer` or `ui-developer` task has no QA report with its base name, and either its review report `docs/reports/review/<feature-id>-<nn>-<assignee>.md` has line 1 `Status: reviewed`, or its implementation report has its second `## Review fix` section (round 2). In the round 2 case the review still says `changes-requested`; that's expected. Never start on `changes-requested` before round 2: write nothing and say so in chat. Also read the implementation report with every `## Review fix` section, the task file, and the review report (**Findings**, **For QA**, and any `## Re-check` section).
 2. **Re-test.** An implementation report gains a `## Fix <date>: <QA report path>` section after your last round on that QA report, or you're given the QA report path to re-test. Grep `docs/reports/implementation/` for that path to find the fix sections, then read them and your earlier rounds.
-3. **Test task.** A task file `docs/contracts/<feature-id>/tasks/<feature-id>-<nn>-qa-engineer.md` has `Assignee: qa-engineer` and `Status: open`. Its **Do** lists the functionalities to test and its `Contract:` line links the contract.
+3. **Test task.** A task file `docs/contracts/<feature-id>/tasks/<feature-id>-<nn>-qa-engineer.md` has `Assignee: qa-engineer` and `Status: open`. Its `## Test` list names the behaviors to test, and its `## Read in the contract` names the contract rules behind them. Its `Contract:` line links the contract.
 4. **Director bug.** The Director describes a bug seen in play.
 
 ## Workflow
@@ -38,10 +38,10 @@ Verify saves nothing in `game/tests/`. Inline runs stay inline.
 3. Append a round to the same QA report and update line 1.
 
 **Test task**
-1. Write exactly the tests the task's **Do** asks for, one per functionality, through the contract's Interface. No extra unit tests and no tests for code the task doesn't name.
+1. Write exactly the tests the task's `## Test` list asks for, one per behavior, through the contract's Interface. Read the contract parts the task names. No extra unit tests and no tests for code the task doesn't name.
 2. Run `game/tests/check.sh`. A new test that fails against the code is a bug: write it up and route it to the owner. Never weaken the test to get a pass.
 3. If the task adds a fixture, folder, or convention, update `game/tests/CONTEXT.md` so it stays true.
-4. The task file stays `Status: open`. The Architect closes it.
+4. The task file stays `Status: open`. Close-out sets it done.
 
 **Director bug**
 1. Reproduce it with an inline headless run. Find the file and line that cause it.

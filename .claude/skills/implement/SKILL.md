@@ -63,7 +63,7 @@ Its review report: `docs/reports/review/<base name>.md`.
 4. After 2 failed fix rounds, stop.
 
 ## 3. Integrate
-When every task has passed QA, start `integration-engineer` once with: "Integrate mode. Feature: `$ARGUMENTS`." Then read line 1 of `docs/reports/integration/$ARGUMENTS.md`. On `Verdict: pass` it starts the Architect's close-out itself. Don't start the Architect yourself.
+When every task has passed QA, start `integration-engineer` once with: "Integrate mode. Feature: `$ARGUMENTS`." Then read line 1 of `docs/reports/integration/$ARGUMENTS.md`. On `Verdict: pass` the feature is ready for close-out. Never run the close-out yourself: the Director decides it.
 
 ## When to stop
 Stop the chain and tell the Director when:
@@ -80,5 +80,5 @@ Say which task you stopped on, at which step, and the report path to read.
 Keep it short:
 - each task, and its implementation, review and QA report paths
 - the integration report path, its line 1, and how to open the build in the browser
-- whether the Architect close-out was started, or is waiting on the Director's answer about an observation
+- on pass, the next step for the Director: `scripts/close-out.sh $ARGUMENTS`. It shows the open review findings and the integration Observations before anything closes. Suggest running it in a fresh session.
 - anything an agent listed as unsure, or any open review finding: the findings the Re-check left open, and every "Not fixable" answer with its reason
