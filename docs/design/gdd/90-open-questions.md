@@ -21,7 +21,6 @@ Status: `open`, or `blocking` (stops other work now).
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | SH-02 | Slider min and max for gravity, the three thrusts, drag_x, fall_cap and scroll_base. | 04-ship.md, 03-world-and-camera.md | Tuning tool | open |
-| SH-03 | Ship hitbox: circle (graze uses a radius) or box? What size? | 04-ship.md | Collisions, graze | open |
 | SH-04 | Keep the ship at 32×32 px? | 04-ship.md | Art, wave_check gaps | open |
 | SH-05 | Confirm: no vertical drag and no cap on upward speed. | 04-ship.md | Physics | open |
 | SH-06 | Ship look: sprite style, colors, and animation. Does the flame show only while thrusting, and in the direction of each held arrow key? Does the ship tilt when moving sideways? | 04-ship.md | Ship art | open |
@@ -39,22 +38,18 @@ Status: `open`, or `blocking` (stops other work now).
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | SC-02 | The ship enters a graze zone while invulnerable and leaves after it ends. Does it pay? | 06-scoring.md | Graze | open |
-| SC-03 | Graze zone for hazards that aren't circles: slabs, arcs, walls. | 06-scoring.md | Graze | open |
+| SC-03 | Graze zone for line-shaped hazards (arcs). Circles and boxes are answered in 06-scoring.md rule 3. | 06-scoring.md | Graze | open |
 | SC-04 | A hazard leaves the screen while the ship is still in its zone. Does it pay? | 06-scoring.md | Graze | open |
 | SC-05 | Can an invulnerable ship collect coins? | 06-scoring.md | Coins | open |
 
 ## Objects, shared
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| OB-01 | Entry warning: how it looks and how long it shows, for top, side and corner entries. | 07-objects.md | Every hazard | open |
-| OB-02 | Does hazard speed per level also shorten timers (telegraphs, pulses, patrol periods)? | 07-objects.md, 08-difficulty.md | Every hazard | open |
-| OB-03 | When does a hazard despawn: off the sides, off the top, below the floor? | 07-objects.md | Every hazard | open |
 | OB-04 | Do hazards collide with each other or with the walls? | 07-objects.md | Every hazard | open |
 
 ## Objects, one per spec
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| OBJ-01 | Meteorite: size, hitbox, speed, telegraph. (1) Does it fall straight down, or drift sideways too? (2) One size, or several sizes? (3) Fall speed at Level 1. (4) Does it spin (look only)? | objects/01-meteorite.md | Priority 1 object | open |
 | OBJ-02 | Satellite: size, hitbox, speed, telegraph. (1) Pattern shape: straight line across, back and forth, or a wave (sine)? (2) Does it leave the screen after crossing, or keep patrolling? (3) Is the pattern set per satellite in the wave file, or one fixed pattern for all? | objects/02-satellite.md | Priority 2 object | open |
 | OBJ-03 | Chain lightning: size, hitbox, speed, telegraph. (1) How many nodes per link (the art shows 2 and 3)? (2) Are the nodes themselves harmful, or only the arc? (3) Charge time and arc duration at Level 1. (4) Does it fire once or repeat? (5) Graze zone for a line-shaped hazard (see SC-03). | objects/03-chain-lightning.md | Priority 2 object | open |
 | OBJ-04 | Coin: size, pickup radius, speed. (1) Size and pickup radius. (2) Static in the world, or does it move? (3) Does it disappear if not collected (below the floor)? (4) How near danger counts as 'near' (see WV-07)? | objects/04-coin.md | Priority 2 object | open |

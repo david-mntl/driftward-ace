@@ -26,7 +26,11 @@ Priority 1 is built first. Priorities are a starting proposal, so the Director a
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
 | telegraph_min | 45 | ticks, at Level 8 | — | locked | Director |
-| entry_warning | TBD | look and ticks | — | TBD | OB-01 |
+| entry_warning_look | a copy of the object at half its size, inside a shooting-star glow with random spikes | — | — | guess | Director (placeholder look) |
+| entry_warning_glow | (255, 220, 120), warm yellow-white | RGB | — | guess | Director |
+| entry_warning_spikes | 6 to 9 thin spikes (1 px) out of the glow, random per object and steady while it shows | count, px | — | guess | Director |
+| entry_warning_size | the whole warning (copy, glow and spikes) fits inside the object's own width; the copy is half that size | px | — | guess | Director |
+| entry_warning_ticks | set per object in its spec | ticks | — | — | — |
 
 ## Rules shared by every hazard
 1. **Warn first.** Every hazard shows a warning before it can hit, including side and corner entries. Source: [01-vision.md](01-vision.md), Pillar 2.
@@ -34,15 +38,20 @@ Priority 1 is built first. Priorities are a starting proposal, so the Director a
 3. **No spawn on the ship.** No hazard may appear overlapping the ship. Source: [01-vision.md](01-vision.md), Pillar 2.
 4. **Touch = hit**, unless the spec says otherwise. What a hit does is in [05-lives-and-damage.md](05-lives-and-damage.md).
 5. **Graze** applies to every hazard except walls and lava ([06-scoring.md](06-scoring.md)).
-6. **Speed** is multiplied by the level's hazard speed ([08-difficulty.md](08-difficulty.md)). Whether timers scale too is OB-02.
+6. **Level scaling.** An object's speed is multiplied by the level's hazard speed, and its timers by the level's timer factor ([08-difficulty.md](08-difficulty.md)). Both are set once, when the object appears, and kept for its whole life.
 7. A wave never gains objects as the level rises. Source: Director.
+8. **Hitbox.** One or more circles and boxes, set per object (and per variant). Never bigger than what the player sees. Source: [01-vision.md](01-vision.md), Pillar 2.
+9. **Entry warning.** Before an object appears, its entry warning shows for its spec's `entry_warning_ticks`, at the spot where it will appear. If that spot is off screen, the warning shows just inside the nearest screen edge, in line with it (for a top entry: at the object's x, against the top edge). When the warning ends, the object appears and can hit. Entry warnings never shorten with level. An entry warning is not a telegraph: a telegraph warns before a strike ([14-glossary.md](14-glossary.md)).
+10. **Variants.** An object may have named variants, such as small, medium and big. A variant changes values only (size, hitbox, speed), never behavior. Each object names a default variant. A new behavior is a new object.
+11. **Specialty.** An object may have one extra behavior on top of its movement, such as a pull, a lunge or a pulse. A specialty can be switched on or off. Its default is in the object's spec; a placement may switch it. An object without one just moves.
+12. **Leaving.** An object that has appeared is removed once it is fully off screen at a side or the bottom. Never at the top, where objects enter.
+13. **Placing an object** names the object, its position and, if wanted, a variant, a level to use instead of the current one (rule 6, [08-difficulty.md](08-difficulty.md) rule 3) and a specialty switch.
 
 ## Edge cases
-- When a hazard leaves the screen or falls below the floor: OB-03.
 - Hazards touching each other or the walls: OB-04.
 
 ## Open
-- OB-01, OB-02, OB-03, OB-04.
+- OB-04.
 
 ## How to extend
 1. Get the Director's approval for the new object first.

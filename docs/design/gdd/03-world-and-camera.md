@@ -41,7 +41,10 @@ The screen is a fixed 640×480 view. It never follows the ship. The world scroll
 6. **Side walls.** At x = 0 and x = `screen_w`. Solid: the ship's edge is clamped to the wall and `vx` becomes 0. No bounce. Source: [01-vision.md](01-vision.md), Locked decisions.
 7. **Lava walls.** In some waves from Level 4 on, the walls turn to lava for a while, and touching them is a hit. When lava is off, rule 6 applies. See [objects/11-lava-walls.md](objects/11-lava-walls.md).
 8. **Distance** is how far the world has scrolled in this run, in meters. It starts at `distance_start` when play starts and grows only through the scroll. Where the ship is on screen doesn't change it. Scoring is in [06-scoring.md](06-scoring.md).
-9. **Objects in the world** (hazards, coins) move down the screen with the scroll. An object that also moves on its own adds that movement on top, scaled by the level's hazard speed ([08-difficulty.md](08-difficulty.md)).
+9. **Objects and the scroll.** Two kinds:
+   - **Parked objects** sit still in the world (coins, floating islands). They move down the screen with the scroll.
+   - **Moving objects** move on their own (meteorite, fireball, satellite). Their speed is their speed on screen, scaled by the level's hazard speed ([08-difficulty.md](08-difficulty.md)). The scroll doesn't add to it.
+   Each object's spec says which kind it is.
 
 ## Edge cases
 - Until WC-07 is answered, every rule here assumes the play area is the whole window. If a HUD strip or side margins are added, walls, floor, top line and fall distance move with the play area.
