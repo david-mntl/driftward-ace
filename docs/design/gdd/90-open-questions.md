@@ -29,8 +29,6 @@ Status: `open`, or `blocking` (stops other work now).
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | LD-04 | Blink speed while invulnerable. | 05-lives-and-damage.md | UI | open |
-| LD-06 | What happens to the hazard that hit the ship: stays, vanishes, or passes through? If it stays and the ship is still inside it when invulnerability ends, is that a new hit? | 05-lives-and-damage.md | Hit handling | open |
-| LD-07 | Fall respawn at screen center lands on a hazard. Is invulnerability enough, or must the spot be cleared? | 05-lives-and-damage.md | Falls | open |
 | LD-08 | Life-lost feedback look: flash color and length, how the HUD life breaks, particle count, how long burst and rebuild take (rebuild must end within 30 ticks). Add screen shake too? | 05-lives-and-damage.md, 10-ui.md | UI, art | open |
 | LD-09 | On the last life: play the feedback first, then the game-over screen? How long between them? | 05-lives-and-damage.md, 02-game-flow.md | Game over | open |
 
@@ -38,27 +36,12 @@ Status: `open`, or `blocking` (stops other work now).
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | SC-02 | The ship enters a graze zone while invulnerable and leaves after it ends. Does it pay? | 06-scoring.md | Graze | open |
-| SC-03 | Graze zone for line-shaped hazards (arcs). Circles and boxes are answered in 06-scoring.md rule 3. | 06-scoring.md | Graze | open |
 | SC-04 | A hazard leaves the screen while the ship is still in its zone. Does it pay? | 06-scoring.md | Graze | open |
-| SC-05 | Can an invulnerable ship collect coins? | 06-scoring.md | Coins | open |
-
-## Drifters, shared
-| ID | Question | File | Blocks | Status |
-|---|---|---|---|---|
-| OB-04 | Do hazards collide with each other or with the walls? | 07-drifters.md | Every hazard | open |
 
 ## Drifters, one per spec
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| OBJ-02 | Satellite: size, hitbox, speed, telegraph. (1) Pattern shape: straight line across, back and forth, or a wave (sine)? (2) Does it leave the screen after crossing, or keep patrolling? (3) Is the pattern set per satellite in the wave file, or one fixed pattern for all? | drifters/02-satellite.md | Priority 2 drifter | open |
-| OBJ-03 | Chain lightning: size, hitbox, speed, telegraph. (1) How many nodes per link (the art shows 2 and 3)? (2) Are the nodes themselves harmful, or only the arc? (3) Charge time and arc duration at Level 1. (4) Does it fire once or repeat? (5) Graze zone for a line-shaped hazard (see SC-03). | drifters/03-chain-lightning.md | Priority 2 drifter | open |
-| OBJ-04 | Coin: size, pickup radius, speed. (1) Size and pickup radius. (2) Static in the world, or does it move? (3) Does it disappear if not collected (below the floor)? (4) How near danger counts as 'near' (see WV-07)? | drifters/04-coin.md | Priority 2 drifter | open |
-| OBJ-05 | Floating islands: size, hitbox, speed, telegraph. (1) Touching a slab: a hit, or solid ground the ship bumps against like a wall? (2) Slab thickness. (3) Static in the world (moves down with the scroll), or does it also move on its own? (4) How does graze work for a long slab (see SC-03)? | drifters/05-floating-islands.md | Priority 2 drifter | open |
-| OBJ-06 | Fireball: size, hitbox, speed, telegraph. (1) Speed at Level 1. (2) Is the angle set per fireball in the wave file, or fixed? (3) How long does its entry warning show before it enters? | drifters/06-fireball.md | Priority 2 drifter | open |
-| OBJ-07 | UFO: size, hitbox, speed, telegraph. (1) What patterns can it choose from? (2) What makes it readable: a tell before each move? How long? (3) Is the beam under it a hazard (a heat zone)? (4) Random every run, or seeded so the same wave plays the same way? | drifters/07-ufo.md | Priority 3 drifter | open |
-| OBJ-08 | Planet: size, hitbox, speed, telegraph. (1) Is touching the planet's body a hit? (2) Pull radius and pull strength. (3) Is the pull constant inside the radius, or stronger near the center? (4) Is the radius shown on screen (the rings)? (5) Does it move down, or stay static in the world? | drifters/08-planet.md | Priority 3 drifter | open |
 | OBJ-09 | Carnivore plant: size, hitbox, speed, telegraph. (1) Trigger range: how near is 'near'? (2) Charge time (the telegraph) and how it looks. (3) Lunge direction: straight out from the wall, or aimed at where the ship was? (4) Does it retract and lunge again? Cooldown? | drifters/09-carnivore-plant.md | Priority 4 drifter | open |
-| OBJ-10 | Electric ball: size, hitbox, speed, telegraph. (1) Is the ball harmful between pulses? (2) Pulse period, radius and how long a pulse lasts. (3) The warning before each pulse: how it looks, how long. (4) Float path: straight, wandering, or patrol? | drifters/10-electric-ball.md | Priority 4 drifter | open |
 | OBJ-11 | Lava walls: width, hitbox, telegraph. (1) Both walls at once, or one side at a time? The whole screen height? (2) What is random, and in what range: start time, time on, time off, how many times it comes back, chance to stay on the whole wave? (3) Is the range set in each wave file, or one range for all waves? (4) Same random result every time a wave plays (seeded), or new each time? (5) The warning before lava turns on: how it looks and how long. Does it also warn before turning off? (6) Is the wall still solid while it's lava? (7) Does lava take width away from play? | drifters/11-lava-walls.md | Priority 3 drifter | open |
 
 ## Difficulty
@@ -78,7 +61,6 @@ Status: `open`, or `blocking` (stops other work now).
 | WV-03 | How many waves for the MVP? | 09-waves.md | Wave work | open |
 | WV-04 | Are wave coordinates and trigger distances relative to the wave's start, or absolute? | 09-waves.md | Wave schema | open |
 | WV-05 | Wave 0: how many meteorites, where, and how long it lasts. | 09-waves.md | Wave 0 | open || WV-06 | Confirm "120 px clear seams": 120 px of empty world between the end of one wave and the start of the next? | 09-waves.md | wave_check | open |
-| WV-07 | Coins: how many per wave, and how close to a hazard counts as "near"? | 09-waves.md | Wave work | open |
 
 ## UI
 | ID | Question | File | Blocks | Status |

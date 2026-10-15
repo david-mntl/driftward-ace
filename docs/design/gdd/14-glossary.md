@@ -11,11 +11,12 @@ None. Terms only.
 ## Rules
 | Term | Meaning |
 |---|---|
-| Archetype | A hazard's behavior class (falling blocker, patrol mover...). It defines the drifter, not its looks. See [07-drifters.md](07-drifters.md). |
+| Archetype | A drifter's behavior class (falling blocker, side crosser...). It defines the drifter, not its looks. See [07-drifters.md](07-drifters.md). |
+| Blocker | A drifter that neither hurts nor pays: it blocks the ship like ground. The floating islands. See [07-drifters.md](07-drifters.md). |
 | Camera | The fixed 640×480 view. It never moves; the world scrolls down past it. See [03-world-and-camera.md](03-world-and-camera.md). |
 | Distance | How far the world has scrolled in this run, in px or m. Hovering still adds to it. See [03-world-and-camera.md](03-world-and-camera.md). |
 | Drift | The ship keeps moving after a key is released, because only drag and gravity change its speed. |
-| Drifter | Anything that appears in the ship's path during a run, good or bad: a hazard or a pickup. It names a role, not a movement; some drifters never move. See [07-drifters.md](07-drifters.md). |
+| Drifter | Anything that appears in the ship's path during a run, good or bad: a hazard, a pickup or a blocker. It names a role, not a movement; some drifters never move. See [07-drifters.md](07-drifters.md). |
 | Entry warning | The marker that shows where a hazard will enter, before it does. See [07-drifters.md](07-drifters.md). |
 | Fall | Dropping off the floor. Costs a life; the ship respawns at the screen center. See [05-lives-and-damage.md](05-lives-and-damage.md). |
 | Floor | The bottom edge of the screen. |

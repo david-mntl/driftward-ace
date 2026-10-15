@@ -17,7 +17,7 @@ A rock that falls straight down from the top. It has no logic: it just falls. It
 | hitbox | one circle as wide as the rock: radius 10, 14, 20 | px | — | guess | Director |
 | speed_ratio | 0.375 × the ship's top sideways speed ([../04-ship.md](../04-ship.md), derived values) | — | — | guess | Director |
 | speed | ≈ 2.5 at Level 1, from `speed_ratio` and the current ship guesses | px/tick | — | guess | derived |
-| entry_warning_ticks | 60 (1.0 s) | ticks | — | guess | Director |
+| entry_warning_ticks | the shared value ([../07-drifters.md](../07-drifters.md)) | ticks | — | — | 07-drifters.md |
 | telegraph | none. It never strikes; it only falls | — | — | locked | Director |
 | specialty | none | — | — | locked | Director |
 | graze | yes | — | — | locked | 06-scoring.md |
@@ -37,11 +37,11 @@ A rock that falls straight down from the top. It has no logic: it just falls. It
 
 ## Edge cases
 - The ship is invulnerable when it touches the rock: no hit, the rock keeps falling.
-- The ship is still inside the rock that hit it when invulnerability ends: LD-06.
-- Two meteorites overlap: OB-04.
+- The ship is still inside the rock that hit it when invulnerability ends: no hit until its re-hit cooldown ends ([../05-lives-and-damage.md](../05-lives-and-damage.md) rule 1.5).
+- Two meteorites overlap: they pass through each other ([../07-drifters.md](../07-drifters.md) rule 15).
 
 ## Open
-- OB-04, LD-06.
+- None.
 
 ## How to extend
 A new size or speed is a new variant in Values. Sideways drift or spin would be a specialty, added later with the Director's approval.
