@@ -1,6 +1,6 @@
 # Planet
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 A planet that blocks the way and pulls the ship toward it when the ship is inside a fixed radius. The player must spend thrust to escape.
@@ -10,7 +10,7 @@ A planet that blocks the way and pulls the ship toward it when the ship is insid
 |---|---|---|---|---|---|
 | archetype | Blocker + gravity well | — | — | locked | Director |
 | enters_from | Top | — | — | locked | Director |
-| priority | 3 | — | — | guess | 07-objects.md |
+| priority | 3 | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | OBJ-08 |
 | hitbox | TBD | shape, px | — | TBD | OBJ-08 |
 | speed | TBD | px/tick at Level 1 | — | TBD | OBJ-08 |
@@ -22,7 +22,7 @@ A planet that blocks the way and pulls the ship toward it when the ship is insid
 
 ## Rules
 1. **Behavior:** Extra pull inside a fixed radius.
-2. Shared hazard rules apply ([../07-objects.md](../07-objects.md)).
+2. Shared hazard rules apply ([../07-drifters.md](../07-drifters.md)).
 3. Appears, telegraph, moves, hits, leaves, scales: TBD, see OBJ-08.
 
 ## Edge cases

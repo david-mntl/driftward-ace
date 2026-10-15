@@ -1,24 +1,24 @@
 """The meteorite: a falling blocker that drops straight down at its speed.
 
-Source: docs/contracts/systems/objects.md, Rules, Meteorite; objects/01-meteorite.md.
+Source: docs/contracts/systems/drifters.md, Rules, Meteorite; drifters/01-meteorite.md.
 """
 
 import logging
 from dataclasses import dataclass, replace
 from typing import ClassVar, Self
 
-from core.objects.base import GameObject, ObjectType, Phase, TickContext, TouchEffect, tick_warning
-from core.objects.registry import register_object
+from core.drifters.base import Drifter, DrifterType, Phase, TickContext, TouchEffect, tick_warning
+from core.drifters.registry import register_drifter
 
 log = logging.getLogger(__name__)
 
 
-@register_object
+@register_drifter
 @dataclass(frozen=True, slots=True, kw_only=True)
-class Meteorite(GameObject):
+class Meteorite(Drifter):
     """Falling blocker. Falls straight down at its speed. No drift, no spin, no specialty."""
 
-    object_type: ClassVar[ObjectType] = ObjectType.METEORITE
+    drifter_type: ClassVar[DrifterType] = DrifterType.METEORITE
 
     @classmethod
     def default_y(cls, height: float) -> float:

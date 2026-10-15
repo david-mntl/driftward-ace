@@ -1,23 +1,23 @@
-# Run: lives, falls, hits, objects, respawn wait, game over and retry
+# Run: lives, falls, hits, drifters, respawn wait, game over and retry
 Version: 2
 Status: frozen
 Features: DRA-23, DRA-29
 Created by: architect
 
 ## Purpose
-One run of the game, from play start to game over, as one core state. It holds the ship, the world scroll, the objects on the field, the lives, the invulnerability timer, the respawn wait and the Game Over state, and steps them all once per tick. It applies the fall rule and, from DRA-29, the hit rule: the ship step reports where the ship is, the objects report where they are and what a touch does, and the run decides what it costs. It also starts a new run when the player retries.
+One run of the game, from play start to game over, as one core state. It holds the ship, the world scroll, the drifters on the field, the lives, the invulnerability timer, the respawn wait and the Game Over state, and steps them all once per tick. It applies the fall rule and, from DRA-29, the hit rule: the ship step reports where the ship is, the drifters report where they are and what a touch does, and the run decides what it costs. It also starts a new run when the player retries.
 
-The app holds one `Run` and calls one step per tick. From DRA-29 it may also hand the run new objects through `add_objects`, the only way an object enters a run.
+The app holds one `Run` and calls one step per tick. From DRA-29 it may also hand the run new drifters through `add_drifters`, the only way a drifter enters a run.
 
 DRA-29 adds hazards, so a life can be lost by a fall or by a hit. No life-lost feedback plays: the blink is the only effect (scope report DRA-23, Limits; scope report DRA-29, Out; LD-08 stays open).
 
 Who builds what:
-- `game/core/run.py`: the Gameplay Implementer, task `DRA-23-01-gameplay-implementer`. Objects, `add_objects`, hits and drops in DRA-29: task `DRA-29-03-gameplay-implementer`.
+- `game/core/run.py`: the Gameplay Implementer, task `DRA-23-01-gameplay-implementer`. Drifters, `add_drifters`, hits and drops in DRA-29: task `DRA-29-03-gameplay-implementer`.
 - `game/ui/game_over.py`, the Game Over box: the UI Developer, task `DRA-23-03-ui-developer`.
-- `game/tests/core/test_run.py`: the QA Engineer, task `DRA-23-04-qa-engineer`. Objects in the run: `game/tests/core/test_run_objects.py`, task `DRA-29-08-qa-engineer`.
+- `game/tests/core/test_run.py`: the QA Engineer, task `DRA-23-04-qa-engineer`. Drifters in the run: `game/tests/core/test_run_drifters.py`, task `DRA-29-08-qa-engineer`.
 - The hearts that show `lives`: `docs/contracts/systems/hud.md`.
-- The objects themselves, the spawner and their views: `docs/contracts/systems/objects.md`.
-- Calling `start_run` before the first frame, `step_run` once per tick, `add_objects` for the debug test spawn list, drawing the objects, the ship only while `ship_visible`, and the Game Over box while `game_over`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`.
+- The drifters themselves, the spawner and their views: `docs/contracts/systems/drifters.md`.
+- Calling `start_run` before the first frame, `step_run` once per tick, `add_drifters` for the debug test spawn list, drawing the drifters, the ship only while `ship_visible`, and the Game Over box while `game_over`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`.
 
 ## Diagram
 ```mermaid
@@ -39,13 +39,13 @@ One tick, `step_run(run, thrust)`:
 flowchart TD
   IN["Run + Thrust"] --> GO{"game_over?"}
   GO -- yes --> G1{"any arrow held?"}
-  G1 -- no --> G2["retry_armed = True"] --> GOUT["same ship, scroll, objects, lives<br/>held = thrust"]
+  G1 -- no --> G2["retry_armed = True"] --> GOUT["same ship, scroll, drifters, lives<br/>held = thrust"]
   G1 -- yes --> G3{"retry_armed?"}
   G3 -- no --> GOUT
   G3 -- yes --> NEW["start_run(), held = thrust<br/>log INFO new run"]
   GO -- no --> P1["1 press = an arrow held now<br/>that was not held last tick"]
   P1 --> P2["2 protected = invuln_ticks_left > 0<br/>left = max(invuln_ticks_left - 1, 0)"]
-  P2 --> P3["3 objects: each obj.update(TickContext(run.ship))"]
+  P2 --> P3["3 drifters: each obj.update(TickContext(run.ship))"]
   P3 --> P4{"4 waiting and not press?"}
   P4 -- yes --> STAY["ship unchanged"]
   P4 -- no --> STEP["waiting = False<br/>ship = core.ship.step(ship, thrust)"]
@@ -53,13 +53,13 @@ flowchart TD
   STEP --> P5
   P5 --> P6{"6 is_below_floor(ship)?"}
   P6 -- yes --> FALL["fall rules 6.1 to 6.3<br/>(no hit test this tick)"]
-  P6 -- no --> P7{"7 touching = active HIT objects,<br/>may_hit_ship(), overlapping ship_hitbox(ship)<br/>any, and not protected?"}
+  P6 -- no --> P7{"7 touching = active HIT drifters,<br/>may_hit_ship(), overlapping ship_hitbox(ship)<br/>any, and not protected?"}
   P7 -- no --> P8
   P7 -- yes --> H1["every touching obj: hit_ship = True<br/>lives - 1"]
   H1 --> H2{"lives > 0?"}
   H2 -- yes --> HI["invuln_ticks_left = INVULN_TICKS<br/>ship and waiting unchanged"]
   H2 -- no --> HG["game_over = True, lives 0<br/>ship stays where it was hit<br/>retry_armed = no arrow held"]
-  FALL --> P8["8 drop objects that are GONE or off screen"]
+  FALL --> P8["8 drop drifters that are GONE or off screen"]
   HI --> P8
   HG --> P8
   P8 --> OUT["new Run, held = thrust"]
@@ -73,18 +73,18 @@ ship_visible       yes  yes        no          yes          no           yes    
 protected on tick       T+1 .......................................................... T+30
 ```
 
-Objects entering, with the app's call after the tick (`docs/contracts/systems/app.md`):
+Drifters entering, with the app's call after the tick (`docs/contracts/systems/app.md`):
 ```mermaid
 flowchart LR
   T["run = step_run(run, thrust)"] --> D{"debug mode?"}
-  D -- yes --> A["run = add_objects(run, debug_spawns_due(run.scroll.ticks), tuning)"]
+  D -- yes --> A["run = add_drifters(run, debug_spawns_due(run.scroll.ticks), tuning)"]
   D -- no --> X["nothing spawns in DRA-29"]
 ```
 
 ## Interface
 ```python
 # game/core/run.py
-# Imports: stdlib, core.ship, core.scroll, core.collision, core.levels, core.objects (DRA-29).
+# Imports: stdlib, core.ship, core.scroll, core.collision, core.levels, core.drifters (DRA-29).
 # Never pygame, ui or app. Every module-level constant is typing.Final.
 
 LIVES_START: Final[int] = 3          # 05-lives-and-damage.md, lives_start (locked)
@@ -104,8 +104,8 @@ class Run:
     game_over: bool = False          # the Game Over box shows and everything is frozen
     held: Thrust = field(default_factory=Thrust)  # the arrow keys held on the last tick
     retry_armed: bool = False        # game over only: every arrow has been released since the box appeared
-    objects: tuple[GameObject, ...] = ()   # DRA-29. Objects on the field, oldest first
-    next_uid: int = 1                # DRA-29. The uid the next added object gets
+    drifters: tuple[Drifter, ...] = ()   # DRA-29. Drifters on the field, oldest first
+    next_uid: int = 1                # DRA-29. The uid the next added drifter gets
 
     @property
     def invulnerable(self) -> bool: ...
@@ -119,17 +119,17 @@ class Run:
         # core.levels.level_at(scroll.meters). 1 while Levels 2 to 8 have no start (DF-05).
 
 def start_run() -> Run: ...
-    # Run(ship=spawn(), scroll=start_scroll()). Every other field at its default: no objects, next_uid 1.
+    # Run(ship=spawn(), scroll=start_scroll()). Every other field at its default: no drifters, next_uid 1.
 
 def step_run(run: Run, thrust: Thrust) -> Run: ...
     # One 60 Hz tick. Pure apart from event logging. Never mutates its input.
 
-def add_objects(run: Run, placements: Sequence[Placement], tuning: ObjectTuning) -> Run: ...   # DRA-29
-    # The only way objects enter a run. Spawns each placement, in order, at run.level
+def add_drifters(run: Run, placements: Sequence[Placement], tuning: DrifterTuning) -> Run: ...   # DRA-29
+    # The only way drifters enter a run. Spawns each placement, in order, at run.level
     # (or its as_level), gives it the next uid, and appends it. Pure apart from event logging.
-    # Raises what spawn_object raises (unknown variant, level out of range, ...).
+    # Raises what spawn_drifter raises (unknown variant, level out of range, ...).
 ```
-The code documents each `Run` field with the comment above. `GameObject`, `TickContext`, `Phase`, `TouchEffect` (`core.objects.base`), `Placement`, `spawn_object` (`core.objects.spawner`) and `ObjectTuning` (`core.objects.tuning`) are in `docs/contracts/systems/objects.md`. `ship_hitbox` is in `docs/contracts/systems/ship.md`; `hitboxes_overlap` in `objects.md`.
+The code documents each `Run` field with the comment above. `Drifter`, `TickContext`, `Phase`, `TouchEffect` (`core.drifters.base`), `Placement`, `spawn_drifter` (`core.drifters.spawner`) and `DrifterTuning` (`core.drifters.tuning`) are in `docs/contracts/systems/drifters.md`. `ship_hitbox` is in `docs/contracts/systems/ship.md`; `hitboxes_overlap` in `drifters.md`.
 
 ```python
 # game/ui/game_over.py. Unchanged in DRA-29.
@@ -151,7 +151,7 @@ The run's fields reach the screen in these places. Every fact shown is a core fi
 | Core field | Shown as |
 |---|---|
 | `run.ship_visible` | the app calls `draw_ship(surface, run.ship)` only on frames where it is True. So the ship blinks while invulnerable, after a fall or a hit. Source: 05-lives-and-damage.md, invuln_blink (locked), rules 1.3 and 2.4; 10-ui.md, rule 3 |
-| `run.objects` | the app calls `render_object(surface, obj)` for each, in order (`docs/contracts/systems/objects.md`, Presentation). The debug overlay outlines and labels them (`docs/contracts/systems/debug-overlay.md`). From DRA-29 |
+| `run.drifters` | the app calls `render_drifter(surface, obj)` for each, in order (`docs/contracts/systems/drifters.md`, Presentation). The debug overlay outlines and labels them (`docs/contracts/systems/debug-overlay.md`). From DRA-29 |
 | `run.game_over` | the app calls `draw_game_over(surface)` only on frames where it is True. Source: 02-game-flow.md, rule 5 |
 | `run.lives` | the hearts at the top right. See `docs/contracts/systems/hud.md` |
 | `run.ship`, `run.scroll` | as before: the ship view, the debug overlay, the starfield and the meters readout read them |
@@ -162,7 +162,7 @@ The run's fields reach the screen in these places. Every fact shown is a core fi
 - **Prompt.** `PROMPT_TEXT` in the default font at 16 px, antialiased, `TEXT_COLOR`, centered horizontally, its top one title line-height (`get_linesize()`) below the title's top. Source: same; 10-ui.md, error_layout.
 - **Vertical place.** The two-line block (title `get_linesize()` + prompt font `get_height()`) is centered vertically in the box.
 - The box surface, both fonts and both texts are built once, on the first draw. The view only draws; it never fills the background, flips, logs per frame, catches an error, or reads the run mode or a key. Source: 15-tech-constraints.md, rule 5; 10-ui.md, rule 5.
-- At game over after a hit, the ship shows under the box where it was hit; after a fall, it is below the floor and doesn't show. Objects show frozen where they were.
+- At game over after a hit, the ship shows under the box where it was hit; after a fall, it is below the floor and doesn't show. Drifters show frozen where they were.
 
 ## Rules
 Values: every constant above has its value and source on its line. `lives_start` and `invuln_ticks` are locked. The blink and the box are temporary stand-ins the Director approved in chat (scope report DRA-23).
@@ -172,7 +172,7 @@ Step numbers changed in DRA-29: the DRA-23 steps 3 (wait), 4 (scroll), 5 (fall) 
 A playing tick (`game_over` False), in this order:
 1. **Press.** `press` is True when an arrow is held in `thrust` and was not held in `run.held`. Source: 05-lives-and-damage.md, rule 2.5.
 2. **Invulnerability.** `protected = run.invuln_ticks_left > 0`, the state going into this tick. Then `left = max(run.invuln_ticks_left - 1, 0)`. It counts down every playing tick, waiting or not. Source: 05-lives-and-damage.md, invuln_ticks, rules 1.3, 2.4 and 4.
-3. **Objects.** `ctx = TickContext(ship=run.ship)`, then `objects = tuple(obj.update(ctx) for obj in run.objects)`, in order. Every playing tick, the wait included: the world keeps going. An object that turns ACTIVE on this tick can touch the ship on this tick. Source: objects.md, Rules; 07-objects.md, rule 9 ("When the warning ends, the object appears and can hit"); 05-lives-and-damage.md, rule 2.5. From DRA-29.
+3. **Drifters.** `ctx = TickContext(ship=run.ship)`, then `drifters = tuple(obj.update(ctx) for obj in run.drifters)`, in order. Every playing tick, the wait included: the world keeps going. A drifter that turns ACTIVE on this tick can touch the ship on this tick. Source: drifters.md, Rules; 07-drifters.md, rule 9 ("When the warning ends, the drifter appears and can hit"); 05-lives-and-damage.md, rule 2.5. From DRA-29.
 4. **Wait.** If `run.waiting` and not `press`: the ship is not stepped. Otherwise `waiting = False` and `ship = core.ship.step(run.ship, thrust)`. Source: 05-lives-and-damage.md, rule 2.5; 91-decision-log.md, rows 27 and 28.
 5. **Scroll.** `scroll = step_scroll(run.scroll)`. Source: 03-world-and-camera.md, rule 4.
 6. **Fall.** If `is_below_floor(ship)`:
@@ -181,83 +181,83 @@ A playing tick (`game_over` False), in this order:
    3. Not protected and `lives - 1 == 0`: `lives = 0`, `game_over = True`, `invuln_ticks_left = 0`, `waiting = False`. The ship stays where it fell. `retry_armed` is True only if no arrow is held in `thrust`. Source: 05-lives-and-damage.md, rule 5; 02-game-flow.md, rules 5 and 6.
    On a tick with a fall, step 7 is skipped: no hit is tested. From DRA-29. Source: scope report DRA-29, Decision log (Director, 2026-10-15: "a fall and a touch on one tick cost only the fall"); see Rationale.
 7. **Hit** (DRA-29), only when step 6 found no fall:
-   1. `touching` = every object in `objects` with phase ACTIVE, `effect_on_touch()` HIT and `may_hit_ship()` True, whose `current_hitbox()` overlaps `ship_hitbox(ship)` (`hitboxes_overlap`, strict: edge-only contact doesn't count). The run never decides on its own whether an object that hit before can hit again; it asks the object (`docs/contracts/systems/objects.md`, Rules). Source: 05-lives-and-damage.md, rule 1; 07-objects.md, rule 4; objects/01-meteorite.md, rule 4; scope report DRA-29, Stand-ins and Decision log (2026-10-15).
-   2. If `touching` is empty, or `protected`: nothing happens. Hazards pass through an invulnerable ship and `hit_ship` is not set; one still overlapping when invulnerability ends can hit then. Source: 05-lives-and-damage.md, rule 4; objects/01-meteorite.md, Edge cases.
-   3. Otherwise one hit, whatever the number of touching objects: every object in `touching` gets `hit_ship = True` (the fact; each object's `may_hit_ship` decides what it means), and `lives -= 1`. Source: 05-lives-and-damage.md, rule 1.1 and Edge cases ("Two hazards touch the ship in the same tick: one hit, one life lost"); scope report DRA-29, Decision log (2026-10-15).
+   1. `touching` = every drifter in `drifters` with phase ACTIVE, `effect_on_touch()` HIT and `may_hit_ship()` True, whose `current_hitbox()` overlaps `ship_hitbox(ship)` (`hitboxes_overlap`, strict: edge-only contact doesn't count). The run never decides on its own whether a drifter that hit before can hit again; it asks the drifter (`docs/contracts/systems/drifters.md`, Rules). Source: 05-lives-and-damage.md, rule 1; 07-drifters.md, rule 4; drifters/01-meteorite.md, rule 4; scope report DRA-29, Stand-ins and Decision log (2026-10-15).
+   2. If `touching` is empty, or `protected`: nothing happens. Hazards pass through an invulnerable ship and `hit_ship` is not set; one still overlapping when invulnerability ends can hit then. Source: 05-lives-and-damage.md, rule 4; drifters/01-meteorite.md, Edge cases.
+   3. Otherwise one hit, whatever the number of touching drifters: every drifter in `touching` gets `hit_ship = True` (the fact; each drifter's `may_hit_ship` decides what it means), and `lives -= 1`. Source: 05-lives-and-damage.md, rule 1.1 and Edge cases ("Two hazards touch the ship in the same tick: one hit, one life lost"); scope report DRA-29, Decision log (2026-10-15).
    4. Lives left (`lives > 0`): `invuln_ticks_left = INVULN_TICKS`. Nothing else changes: the ship keeps its position and speed, and `waiting` stays as it was. No stun. Source: 05-lives-and-damage.md, rules 1.3 and 1.4; 01-vision.md, locked decision 5; scope report DRA-29, Decision log (2026-10-15: "a hit during the respawn wait keeps the wait").
    5. Last life (`lives == 0`): `game_over = True`, `invuln_ticks_left = 0`, `waiting = False`, `retry_armed` True only if no arrow is held. The ship stays where it was hit. Source: 05-lives-and-damage.md, rule 5; 02-game-flow.md, rule 5.
-   6. Objects that hit stay and keep moving. The run never removes an object for hitting. Source: scope report DRA-29, Stand-ins ("It stays and keeps falling").
-8. **Drop** (DRA-29). Remove every object whose phase is GONE or whose `is_off_screen()` is True. The rest keep their order. Source: 07-objects.md, rule 12; objects/01-meteorite.md, rule 5.
+   6. Drifters that hit stay and keep moving. The run never removes a drifter for hitting. Source: scope report DRA-29, Stand-ins ("It stays and keeps falling").
+8. **Drop** (DRA-29). Remove every drifter whose phase is GONE or whose `is_off_screen()` is True. The rest keep their order. Source: 07-drifters.md, rule 12; drifters/01-meteorite.md, rule 5.
 9. `held = thrust` in the returned run.
 
-If nothing happened, the returned run has the new ship, scroll and objects, `invuln_ticks_left = left`, the `waiting` from step 4 and the same `lives`.
+If nothing happened, the returned run has the new ship, scroll and drifters, `invuln_ticks_left = left`, the `waiting` from step 4 and the same `lives`.
 
 A game-over tick (`game_over` True):
-- The ship, the scroll, the objects, the lives and the timer don't change. Nothing is updated or dropped. Source: 02-game-flow.md, rule 5; 91-decision-log.md, row 30.
-- If no arrow is held: `retry_armed = True`. Else, if `run.retry_armed`: return `start_run()` with `held = thrust`: a new run with no objects and `next_uid` 1. Else nothing changes but `held`. Source: 02-game-flow.md, rules 3 and 6; 91-decision-log.md, rows 30 and 31.
+- The ship, the scroll, the drifters, the lives and the timer don't change. Nothing is updated or dropped. Source: 02-game-flow.md, rule 5; 91-decision-log.md, row 30.
+- If no arrow is held: `retry_armed = True`. Else, if `run.retry_armed`: return `start_run()` with `held = thrust`: a new run with no drifters and `next_uid` 1. Else nothing changes but `held`. Source: 02-game-flow.md, rules 3 and 6; 91-decision-log.md, rows 30 and 31.
 
-`add_objects(run, placements, tuning)` (DRA-29):
+`add_drifters(run, placements, tuning)` (DRA-29):
 - If `run.game_over` or `placements` is empty, return `run` unchanged. Nothing enters a frozen run. Source: 02-game-flow.md, rule 5.
-- Otherwise, for each placement in order: `obj = spawn_object(placement, run.level, tuning)`; then `replace(obj, uid=next_uid)` and `next_uid += 1`. Append the new objects after the existing ones. Return the run with the new `objects` and `next_uid`. Nothing else changes. Source: objects.md, Rules, Spawner; scope report DRA-29, Limits ("a spawner is the only way an object is created").
-- New objects are in WARNING with `ticks_in_phase` 0. They are first updated on the next `step_run`. So an object added after tick T shows its warning on the states after ticks T to T + `warning_ticks` − 1.
+- Otherwise, for each placement in order: `obj = spawn_drifter(placement, run.level, tuning)`; then `replace(obj, uid=next_uid)` and `next_uid += 1`. Append the new drifters after the existing ones. Return the run with the new `drifters` and `next_uid`. Nothing else changes. Source: drifters.md, Rules, Spawner; scope report DRA-29, Limits ("a spawner is the only way a drifter is created").
+- New drifters are in WARNING with `ticks_in_phase` 0. They are first updated on the next `step_run`. So a drifter added after tick T shows its warning on the states after ticks T to T + `warning_ticks` − 1.
 - It works the same during the respawn wait. It never reads the run mode. The app decides what to add (`docs/contracts/systems/app.md`).
-- An error from `spawn_object` rises. Core never catches it. Source: game/CONTEXT.md, Error handling.
+- An error from `spawn_drifter` rises. Core never catches it. Source: game/CONTEXT.md, Error handling.
 
 Other rules:
-- Game over happens on the tick lives reach 0. That tick runs in full (objects, ship, scroll, drops); the freeze starts on the next tick. Source: 05-lives-and-damage.md, rule 5.
-- A run starts with no invulnerability, no wait and no objects. Source: 02-game-flow.md, rule 3.
+- Game over happens on the tick lives reach 0. That tick runs in full (drifters, ship, scroll, drops); the freeze starts on the next tick. Source: 05-lives-and-damage.md, rule 5.
+- A run starts with no invulnerability, no wait and no drifters. Source: 02-game-flow.md, rule 3.
 - No life-lost feedback plays: no flash, no breaking heart, no burst. The blink is the only effect, after a fall or a hit. Source: scope report DRA-29, Out; LD-08.
 - No way to gain a life. Source: 05-lives-and-damage.md, rule 6.
-- Objects never touch each other or the walls. Source: scope report DRA-29, Out (OB-04 stays open).
+- Drifters never touch each other or the walls. Source: scope report DRA-29, Out (OB-04 stays open).
 - Grazes are not counted or paid. Source: scope report DRA-29, Out (graze scoring).
-- `step_run` and `add_objects` use no frame time and no randomness. Same input, same output. Source: 15-tech-constraints.md, rule 2.
+- `step_run` and `add_drifters` use no frame time and no randomness. Same input, same output. Source: 15-tech-constraints.md, rule 2.
 - Core behaves the same in normal and debug mode. It never reads the run mode. Source: game/CONTEXT.md, Run modes.
 - Core never imports pygame, `ui` or `app`. Source: game/CONTEXT.md, Layout.
 
 Logging (logger `core.run`, by event, never by tick). Source: game/CONTEXT.md, Logging; 15-tech-constraints.md, rule 9:
-- DEBUG `object active id=%d type=%s x=%.2f y=%.2f`: on the tick an object turns from WARNING to ACTIVE, with its uid, `object_type.value` and position. DRA-29.
+- DEBUG `drifter active id=%d type=%s x=%.2f y=%.2f`: on the tick a drifter turns from WARNING to ACTIVE, with its uid, `drifter_type.value` and position. DRA-29.
 - DEBUG `respawn wait end`: on the tick a press ends the wait.
 - DEBUG `invulnerable end`: on the tick the timer goes from 1 to 0.
-- DEBUG `object touch id=%d type=%s effect=%s`: on a hit, once for each object in `touching`, with `effect_on_touch().value` (`hit`). DRA-29.
+- DEBUG `drifter touch id=%d type=%s effect=%s`: on a hit, once for each drifter in `touching`, with `effect_on_touch().value` (`hit`). DRA-29.
 - DEBUG `life lost lives=%d`: on every fall or hit that costs a life, with the lives left after it.
 - DEBUG `respawn from x=%.2f y=%.2f wait=%s`: on every respawn after a fall. Never on the last life.
 - INFO `game over meters=%d`: on the tick lives reach 0, by a fall or a hit.
-- DEBUG `object gone id=%d type=%s x=%.2f y=%.2f`: once for each object dropped, with its last position. DRA-29.
+- DEBUG `drifter gone id=%d type=%s x=%.2f y=%.2f`: once for each drifter dropped, with its last position. DRA-29.
 - INFO `new run`: on the retry tick.
-- DEBUG `object spawn id=%d type=%s variant=%s x=%.2f y=%.2f speed=%.2f level=%d`: from `add_objects`, once per object, with the level used (the placement's `as_level`, else `run.level`). DRA-29.
-- Order inside one tick: `object active`, `respawn wait end`, the ship's own lines, the scroll's line, `invulnerable end`, then either the fall's `life lost` and `respawn from` or `game over`, or the hit's `object touch` lines, `life lost` and `game over`, then `object gone`. `object spawn` lines come from the app's `add_objects` call after the tick.
-- Nothing else. A hazard passing through an invulnerable ship logs nothing. A meteorite's life logs exactly three lines: `object spawn`, `object active`, `object gone`, plus `object touch` if it hits.
+- DEBUG `drifter spawn id=%d type=%s variant=%s x=%.2f y=%.2f speed=%.2f level=%d`: from `add_drifters`, once per drifter, with the level used (the placement's `as_level`, else `run.level`). DRA-29.
+- Order inside one tick: `drifter active`, `respawn wait end`, the ship's own lines, the scroll's line, `invulnerable end`, then either the fall's `life lost` and `respawn from` or `game over`, or the hit's `drifter touch` lines, `life lost` and `game over`, then `drifter gone`. `drifter spawn` lines come from the app's `add_drifters` call after the tick.
+- Nothing else. A hazard passing through an invulnerable ship logs nothing. A meteorite's life logs exactly three lines: `drifter spawn`, `drifter active`, `drifter gone`, plus `drifter touch` if it hits.
 
 ## Impact
-DRA-29 changes this frozen contract (v1). `Run` gains `objects`, `next_uid` and `level`. `step_run` gains step 3 (objects update), step 7 (hits) and step 8 (drops); steps 1, 2 and 4 to 6 keep their rules. `add_objects` is new. No existing field, default, constant or log line changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.run`, `Run(`, `start_run`, `step_run`, `run.` and `replace(`:
+DRA-29 changes this frozen contract (v1). `Run` gains `drifters`, `next_uid` and `level`. `step_run` gains step 3 (drifters update), step 7 (hits) and step 8 (drops); steps 1, 2 and 4 to 6 keep their rules. `add_drifters` is new. No existing field, default, constant or log line changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.run`, `Run(`, `start_run`, `step_run`, `run.` and `replace(`:
 
 | File | Change needed |
 |---|---|
-| `game/core/run.py` | the two fields, `level`, steps 3, 7 and 8, `add_objects` and the new log lines. Task `DRA-29-03-gameplay-implementer`. |
+| `game/core/run.py` | the two fields, `level`, steps 3, 7 and 8, `add_drifters` and the new log lines. Task `DRA-29-03-gameplay-implementer`. |
 | `game/ui/hud.py` | none. It reads `run.lives` and `run.scroll.meters`. |
-| `game/ui/debug_overlay.py` | the new `draw_debug_hitboxes(surface, run)` reads `run.ship` and `run.objects`. Task `DRA-29-06-ui-developer`. |
-| `game/app/frame.py` | loads the tuning, calls `add_objects` in debug mode, draws the objects and the debug outlines. Integration Engineer, from `systems/app.md`. |
-| `game/tests/core/test_run.py` | none breaks. Its runs have no objects, so no new line is logged and every exact log list stays the same. New fields have defaults, so `Run(ship=..., scroll=..., ...)` still builds. Must still pass unchanged. |
+| `game/ui/debug_overlay.py` | the new `draw_debug_hitboxes(surface, run)` reads `run.ship` and `run.drifters`. Task `DRA-29-06-ui-developer`. |
+| `game/app/frame.py` | loads the tuning, calls `add_drifters` in debug mode, draws the drifters and the debug outlines. Integration Engineer, from `systems/app.md`. |
+| `game/tests/core/test_run.py` | none breaks. Its runs have no drifters, so no new line is logged and every exact log list stays the same. New fields have defaults, so `Run(ship=..., scroll=..., ...)` still builds. Must still pass unchanged. |
 | `game/tests/ui/test_hud.py` | none. `Run(ship=spawn(), scroll=SCROLL, lives=...)` still builds. |
-| `game/tests/core/test_run_objects.py` (new) | task `DRA-29-08-qa-engineer`. |
+| `game/tests/core/test_run_drifters.py` (new) | task `DRA-29-08-qa-engineer`. |
 
 ## Rationale
-- **A run state that holds the ship, the scroll and the objects.** Game over freezes them together and a retry resets them together. Core owns rules, so core holds them together.
-- **The ship step stops at step 7, and the run applies falls and hits.** What a fall or a hit costs depends on lives and invulnerability, which neither the ship nor an object knows.
+- **A run state that holds the ship, the scroll and the drifters.** Game over freezes them together and a retry resets them together. Core owns rules, so core holds them together.
+- **The ship step stops at step 7, and the run applies falls and hits.** What a fall or a hit costs depends on lives and invulnerability, which neither the ship nor a drifter knows.
 - **A press is an arrow that wasn't held on the last tick.** Rule 2.5 says the wait lasts until "the first arrow key press". A key held through the fall was pressed before the respawn.
 - **Retry is stricter than the wait.** Rule 6 asks for all arrows released first, then one pressed.
 - **Protection uses the timer going into the tick.** The ship is protected on the 30 ticks after its respawn or hit, and blinks over the 30 states drawn from it.
 - **The blink starts visible, 0.1 s is 6 ticks, the last life doesn't respawn, the retry returns the tick-0 state, the scroll steps during the wait.** As in DRA-23; unchanged.
-- **Objects update before the ship (DRA-29).** The Director set the order: update objects, step the ship, test overlaps, apply the touch effect, drop. Objects read the ship as the player last saw it.
+- **Drifters update before the ship (DRA-29).** The Director set the order: update drifters, step the ship, test overlaps, apply the touch effect, drop. Drifters read the ship as the player last saw it.
 - **No hit test on a tick with a fall (DRA-29).** The GDD doesn't cover a hit and a fall on one tick; the Director accepted "the fall only" (scope report DRA-29, Decision log, 2026-10-15). A fallen ship is fully below the floor: the player sees a fall, not a touch. After the fall the ship is either respawned with fresh invulnerability, already protected, or the run is over, so a hit test could only cost a second life on the same tick. The floor check is step 8 of the ship's tick order (04-ship.md, rule 2), right after the move, so it goes first.
-- **Every touching hazard gets `hit_ship` on a hit (DRA-29).** Two hazards touching on one tick are one hit (05, Edge cases; accepted by the Director, scope report Decision log, 2026-10-15). Recording the fact on each lets each object's own rule apply to it: every meteorite among them gets its stand-in mark.
-- **The run asks `may_hit_ship()`, it doesn't decide (DRA-29).** Whether an object that hit can hit again is open (LD-06). The Director undid the shared rule and expects a later slow object may hit again if the player flies back into it. So the run records the fact and each object answers; for DRA-29 only the meteorite answers "no more" (scope report DRA-29, Stand-ins).
+- **Every touching hazard gets `hit_ship` on a hit (DRA-29).** Two hazards touching on one tick are one hit (05, Edge cases; accepted by the Director, scope report Decision log, 2026-10-15). Recording the fact on each lets each drifter's own rule apply to it: every meteorite among them gets its stand-in mark.
+- **The run asks `may_hit_ship()`, it doesn't decide (DRA-29).** Whether a drifter that hit can hit again is open (LD-06). The Director undid the shared rule and expects a later slow drifter may hit again if the player flies back into it. So the run records the fact and each drifter answers; for DRA-29 only the meteorite answers "no more" (scope report DRA-29, Stand-ins).
 - **Hazards that touch an invulnerable ship get no `hit_ship` (DRA-29).** It didn't hit: rule 4 says hazards pass through. The meteorite spec says an invulnerable touch is no hit and the rock keeps falling.
 - **A hit during the wait keeps the wait (DRA-29).** Rule 1.4: "Nothing else changes." Accepted by the Director (scope report Decision log, 2026-10-15).
-- **`add_objects` is a separate call, made after `step_run` (DRA-29).** The Director asked for one way in that the app calls, and core never reads the run mode. Adding after the tick means a new object's birth state is drawn, and its warning shows on exactly `warning_ticks` drawn states.
-- **`add_objects` does nothing at game over (DRA-29).** Everything is frozen. It also keeps the app's debug list simple: it can call `add_objects` every tick, and the frozen tick count never adds the same object twice.
-- **`uid` comes from the run (DRA-29).** Only the run sees every object enter. A counter in the run keeps `step_run` and `add_objects` pure.
-- **`level` is a property (DRA-29).** It is a fact about the run (08-difficulty.md, rule 1), computed from the meters. The spawner gets it from `add_objects` and is the only reader.
-- **Lifecycle logs in `core.run` (DRA-29).** The run sees each object's phase before and after the tick and owns the drop, so it can log each event once. The objects stay pure.
+- **`add_drifters` is a separate call, made after `step_run` (DRA-29).** The Director asked for one way in that the app calls, and core never reads the run mode. Adding after the tick means a new drifter's birth state is drawn, and its warning shows on exactly `warning_ticks` drawn states.
+- **`add_drifters` does nothing at game over (DRA-29).** Everything is frozen. It also keeps the app's debug list simple: it can call `add_drifters` every tick, and the frozen tick count never adds the same drifter twice.
+- **`uid` comes from the run (DRA-29).** Only the run sees every drifter enter. A counter in the run keeps `step_run` and `add_drifters` pure.
+- **`level` is a property (DRA-29).** It is a fact about the run (08-difficulty.md, rule 1), computed from the meters. The spawner gets it from `add_drifters` and is the only reader.
+- **Lifecycle logs in `core.run` (DRA-29).** The run sees each drifter's phase before and after the tick and owns the drop, so it can log each event once. The drifters stay pure.
 - **INFO for game over and a new run.** game/CONTEXT.md puts screen changes at INFO.
-- **No schema in this contract.** The tuning files' schemas are owned by `docs/contracts/systems/objects.md`.
+- **No schema in this contract.** The tuning files' schemas are owned by `docs/contracts/systems/drifters.md`.

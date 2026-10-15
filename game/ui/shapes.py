@@ -1,6 +1,6 @@
 """Draws placed hitbox shapes: the shared helper for the ship view and the debug outlines.
 
-Source: docs/contracts/systems/objects.md, ui/shapes.py. It only draws. It never fills the
+Source: docs/contracts/systems/drifters.md, ui/shapes.py. It only draws. It never fills the
 background, never flips the display, never logs per frame and never catches an error.
 """
 

@@ -45,8 +45,8 @@ Derived from the guesses above. Recompute when a value changes:
 5. **Up beats gravity.** `thrust_up` must stay greater than `gravity`, or the ship can't climb. Every slider range must keep this true.
 6. **Fall cap bound.** A fall from the top line (y 168) to the floor (y 480) is 312 px and must take at least `min_fall_ticks`. So `fall_cap` must be ≤ 312 / 54 ≈ 5.77 px/tick.
 7. **No vertical drag and no upward speed cap**, unless SH-05 says otherwise.
-8. **Hitbox.** The ship never rotates, so its boxes stay upright. The hitbox is never bigger than what the player sees ([07-objects.md](07-objects.md), rule 8).
-9. **Looks.** The ship's look lives in this file, like every object's look lives in its spec. Until `look` is set, draw `placeholder_look`. Thrust flame, blink and burst-and-rebuild must all stay readable at `ship_w` × `ship_h`. Blink and burst: [05-lives-and-damage.md](05-lives-and-damage.md). Global style and palette: [12-art-and-audio.md](12-art-and-audio.md).
+8. **Hitbox.** The ship never rotates, so its boxes stay upright. The hitbox is never bigger than what the player sees ([07-drifters.md](07-drifters.md), rule 8).
+9. **Looks.** The ship's look lives in this file, like every drifter's look lives in its spec. Until `look` is set, draw `placeholder_look`. Thrust flame, blink and burst-and-rebuild must all stay readable at `ship_w` × `ship_h`. Blink and burst: [05-lives-and-damage.md](05-lives-and-damage.md). Global style and palette: [12-art-and-audio.md](12-art-and-audio.md).
 
 ## Edge cases
 - Left and right held together: they cancel, and drag still slows the ship.

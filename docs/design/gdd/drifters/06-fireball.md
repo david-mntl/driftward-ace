@@ -1,6 +1,6 @@
 # Fireball
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 A fast fireball that crosses the screen on a straight diagonal from a corner or side. It never targets the ship. The entry warning is what makes it fair.
@@ -10,7 +10,7 @@ A fast fireball that crosses the screen on a straight diagonal from a corner or 
 |---|---|---|---|---|---|
 | archetype | Fast linear hazard | — | — | locked | Director |
 | enters_from | Corners, sides | — | — | locked | Director |
-| priority | 2 | — | — | guess | 07-objects.md |
+| priority | 2 | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | OBJ-06 |
 | hitbox | TBD | shape, px | — | TBD | OBJ-06 |
 | speed | TBD | px/tick at Level 1 | — | TBD | OBJ-06 |
@@ -21,7 +21,7 @@ A fast fireball that crosses the screen on a straight diagonal from a corner or 
 
 ## Rules
 1. **Behavior:** Fast straight diagonal; no targeting.
-2. Shared hazard rules apply ([../07-objects.md](../07-objects.md)).
+2. Shared hazard rules apply ([../07-drifters.md](../07-drifters.md)).
 3. Appears, telegraph, moves, hits, leaves, scales: TBD, see OBJ-06.
 
 ## Edge cases

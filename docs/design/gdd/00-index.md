@@ -32,8 +32,8 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 | Ship size, hitbox, gravity, thrust, drag, fall cap, tick order | [04-ship.md](04-ship.md) |
 | Lives, hits, falls, invulnerability, life-lost feedback, respawn | [05-lives-and-damage.md](05-lives-and-damage.md) |
 | Score, meters, coins, graze | [06-scoring.md](06-scoring.md) |
-| Which objects exist, their priority, rules shared by all hazards | [07-objects.md](07-objects.md) |
-| How one object behaves | the file [07-objects.md](07-objects.md) routes to, in `objects/` |
+| Which drifters exist, their priority, rules shared by all hazards | [07-drifters.md](07-drifters.md) |
+| How one drifter behaves | the file [07-drifters.md](07-drifters.md) routes to, in `drifters/` |
 | Levels, speed multipliers, rest gap, tier unlocks | [08-difficulty.md](08-difficulty.md) |
 | Waves, Wave 0, wave order, wave_check rules | [09-waves.md](09-waves.md) |
 | HUD, control card, game over screen | [10-ui.md](10-ui.md) |
@@ -54,7 +54,7 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 | 04-ship.md | draft |
 | 05-lives-and-damage.md | draft |
 | 06-scoring.md | draft |
-| 07-objects.md | draft |
+| 07-drifters.md | draft |
 | 08-difficulty.md | draft |
 | 09-waves.md | draft |
 | 10-ui.md | draft |
@@ -77,6 +77,6 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 - **Independent of the team.** Never name a team member, role, tool or repo path outside the game itself. The only role is the Director, who owns the design.
 
 ## How to extend
-- **New object:** copy [objects/_template.md](objects/_template.md), fill it in, then add a row to [07-objects.md](07-objects.md).
+- **New drifter:** copy [drifters/_template.md](drifters/_template.md), fill it in, then add a row to [07-drifters.md](07-drifters.md).
 - **New system:** add a numbered file using the skeleton above, then add a row to Routing and File status.
 - **New gap found:** add a row to [90-open-questions.md](90-open-questions.md) and link its ID from the file's `## Open`.

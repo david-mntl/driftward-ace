@@ -1,11 +1,11 @@
 """The async frame loop on the fixed 60 Hz tick. Imported only by app.loop.start, inside the guard.
 
-Before the first frame it loads and checks the object tuning (both modes). Each frame: read
+Before the first frame it loads and checks the drifter tuning (both modes). Each frame: read
 events, build the thrust from the held arrow keys, run up to MAX_TICKS_PER_FRAME ticks (one
-core.run.step_run each, then in debug mode the debug test spawn list's due objects through
-core.run.add_objects), draw the starfield, the objects, the ship while the run shows it, the
+core.run.step_run each, then in debug mode the debug test spawn list's due drifters through
+core.run.add_drifters), draw the starfield, the drifters, the ship while the run shows it, the
 debug outlines and overlay if visible, the Game Over box at game over and the HUD, flip, then
-yield to the browser. The app holds one Run; core does the ship, the scroll, the objects, the
+yield to the browser. The app holds one Run; core does the ship, the scroll, the drifters, the
 lives, the respawn wait, game over and retry.
 Source: docs/contracts/systems/app.md, Rules, Frame loop. 15-tech-constraints.md, rules 1 and 2.
 """
@@ -20,15 +20,15 @@ from app.debug_spawns import debug_spawns_due
 from app.mode import RunMode
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
 from app.tuning import load_tuning
-from core.objects.tuning import ObjectTuning
-from core.run import Run, add_objects, start_run, step_run
+from core.drifters.tuning import DrifterTuning
+from core.run import Run, add_drifters, start_run, step_run
 from core.ship import Thrust
 from core.world import SCREEN_H, SCREEN_W
 from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay
+from ui.drifters.registry import render_drifter
 from ui.game_over import draw_game_over
 from ui.hud import draw_hud
 from ui.look import BACKGROUND
-from ui.objects.registry import render_object
 from ui.ship_view import draw_ship
 from ui.starfield import draw_starfield
 
@@ -50,7 +50,7 @@ async def frame_loop(mode: RunMode) -> None:
     pygame.init()
     surface: pygame.Surface = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     debug: bool = mode is RunMode.DEBUG
-    tuning: ObjectTuning = load_tuning()
+    tuning: DrifterTuning = load_tuning()
     run: Run = start_run()
     overlay_visible: bool = debug
     accumulator: float = 0.0
@@ -111,19 +111,19 @@ def _held_thrust() -> Thrust:
 
 
 def _run_ticks(
-    run: Run, thrust: Thrust, accumulator: float, debug: bool, tuning: ObjectTuning
+    run: Run, thrust: Thrust, accumulator: float, debug: bool, tuning: DrifterTuning
 ) -> tuple[Run, float]:
     """Run one tick per whole TICK_SECONDS in the accumulator, at most MAX_TICKS_PER_FRAME.
 
     Each tick is one step_run call. In debug mode only, right after it, the debug test spawn
-    list's due placements go in through add_objects. Returns (run, accumulator left).
+    list's due placements go in through add_drifters. Returns (run, accumulator left).
     Source: 15-tech-constraints.md, rules 2 and 7; systems/app.md, Rules, Tick.
     """
     ticks: int = 0
     while accumulator >= TICK_SECONDS and ticks < MAX_TICKS_PER_FRAME:
         run = step_run(run, thrust)
         if debug:
-            run = add_objects(run, debug_spawns_due(run.scroll.ticks), tuning)
+            run = add_drifters(run, debug_spawns_due(run.scroll.ticks), tuning)
         accumulator -= TICK_SECONDS
         ticks += 1
     return run, accumulator
@@ -142,17 +142,17 @@ def _apply_cap(accumulator: float, was_capped: bool) -> bool:
 
 
 def _draw(surface: pygame.Surface, run: Run, overlay_visible: bool, debug: bool) -> None:
-    """Fill the background, then draw the starfield, the objects, the ship while shown, the
+    """Fill the background, then draw the starfield, the drifters, the ship while shown, the
     debug outlines and overlay if visible, the Game Over box at game over, and the HUD last.
 
-    Objects sit behind the ship. The HUD sits below the overlay's place for the whole run in
-    debug mode, even while F3 hides the overlay. Source: systems/app.md, Rules, Draw, Objects
+    Drifters sit behind the ship. The HUD sits below the overlay's place for the whole run in
+    debug mode, even while F3 hides the overlay. Source: systems/app.md, Rules, Draw, Drifters
     behind the ship and below_overlay.
     """
     surface.fill(BACKGROUND)
     draw_starfield(surface, run.scroll)
-    for obj in run.objects:
-        render_object(surface, obj)
+    for drifter in run.drifters:
+        render_drifter(surface, drifter)
     if run.ship_visible:
         draw_ship(surface, run.ship)
     if overlay_visible:

@@ -1,6 +1,6 @@
 # Lava walls
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules), [../08-difficulty.md](../08-difficulty.md), [../09-waves.md](../09-waves.md)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules), [../08-difficulty.md](../08-difficulty.md), [../09-waves.md](../09-waves.md)
 
 ## Summary
 A wave hazard that turns the side walls to lava for a while. It can show up in waves from Level 4 on. It is not always on: in a wave it may switch on for a few seconds, switch off, come back, or stay on for the whole wave. The timing is random for each wave. While it's on, touching a wall is a hit. It takes away the safe wall-hug.
@@ -11,7 +11,7 @@ A wave hazard that turns the side walls to lava for a while. It can show up in w
 | archetype | Boundary hazard | — | — | locked | Director |
 | enters_from | Sides | — | — | locked | Director |
 | available_from | Level 4 | level | — | locked | Director, [../08-difficulty.md](../08-difficulty.md) |
-| priority | 3 | — | — | guess | 07-objects.md |
+| priority | 3 | — | — | guess | 07-drifters.md |
 | activation | random per wave: on for a while, maybe again, maybe the whole wave | — | — | locked | Director |
 | random_ranges | TBD | ticks, count | — | TBD | OBJ-11 |
 | lava_width | TBD | px | — | TBD | OBJ-11 |
@@ -24,7 +24,7 @@ A wave hazard that turns the side walls to lava for a while. It can show up in w
 1. **Part of a wave.** Lava is placed in a wave like any other hazard. A wave without lava has plain solid walls the whole time.
 2. **Available from Level 4.** A wave played below Level 4 never turns on lava ([../08-difficulty.md](../08-difficulty.md)).
 3. **Random timing.** In a wave that has lava, these are random each time the wave plays: when lava turns on, how long it stays on, and whether it comes back. It may also stay on until the wave ends. Ranges: OBJ-11.
-4. **Warn first.** Every switch to lava shows a warning first, at least `telegraph_min` ticks at Level 8 ([../07-objects.md](../07-objects.md)).
+4. **Warn first.** Every switch to lava shows a warning first, at least `telegraph_min` ticks at Level 8 ([../07-drifters.md](../07-drifters.md)).
 5. **While on:** touching the lava is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)). Invulnerability protects as usual.
 6. **While off:** the walls are plain solid walls ([../03-world-and-camera.md](../03-world-and-camera.md)).
 7. **wave_check** must pass for every outcome the random ranges allow, including lava on for the whole wave.

@@ -2,7 +2,7 @@
 
 Debug mode only; normal mode spawns nothing yet. A temporary stand-in kept in scope report
 DRA-29 only, not in the GDD. Not a wave: no wave file, no wave clock, no picker. Waves replace it.
-Not a startup module: it imports core.objects, so only app.frame imports it, inside the guard.
+Not a startup module: it imports core.drifters, so only app.frame imports it, inside the guard.
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Debug test spawn list;
 scope report DRA-29, Test spawn list.
@@ -10,8 +10,8 @@ scope report DRA-29, Test spawn list.
 
 import logging
 
-from core.objects.base import ObjectType
-from core.objects.spawner import Placement
+from core.drifters.base import DrifterType
+from core.drifters.spawner import Placement
 
 log = logging.getLogger(__name__)
 
@@ -19,9 +19,9 @@ DEBUG_SPAWN_PERIOD: int = 180
 """Ticks. The list repeats every 3 s. Source: scope report DRA-29, Test spawn list."""
 
 DEBUG_SPAWNS: tuple[tuple[int, Placement], ...] = (
-    (0, Placement(ObjectType.METEORITE, x=160.0, variant="small")),
-    (60, Placement(ObjectType.METEORITE, x=320.0, variant="medium")),
-    (120, Placement(ObjectType.METEORITE, x=480.0, variant="big")),
+    (0, Placement(DrifterType.METEORITE, x=160.0, variant="small")),
+    (60, Placement(DrifterType.METEORITE, x=320.0, variant="medium")),
+    (120, Placement(DrifterType.METEORITE, x=480.0, variant="big")),
 )
 """(offset in ticks within the period, placement). Small, medium, big at x 160, 320, 480, each
 at its default start y, one second (60 ticks) apart, in that order.

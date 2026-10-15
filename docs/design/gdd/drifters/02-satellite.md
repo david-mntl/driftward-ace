@@ -1,6 +1,6 @@
 # Satellite
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 A satellite that crosses the screen from the side in a fixed pattern that repeats. The player learns the pattern and threads past it.
@@ -10,7 +10,7 @@ A satellite that crosses the screen from the side in a fixed pattern that repeat
 |---|---|---|---|---|---|
 | archetype | Patrol mover | — | — | locked | Director |
 | enters_from | Sides | — | — | locked | Director |
-| priority | 2 | — | — | guess | 07-objects.md |
+| priority | 2 | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | OBJ-02 |
 | hitbox | TBD | shape, px | — | TBD | OBJ-02 |
 | speed | TBD | px/tick at Level 1 | — | TBD | OBJ-02 |
@@ -22,7 +22,7 @@ A satellite that crosses the screen from the side in a fixed pattern that repeat
 
 ## Rules
 1. **Behavior:** Crosses in a fixed, repeating pattern.
-2. Shared hazard rules apply ([../07-objects.md](../07-objects.md)).
+2. Shared hazard rules apply ([../07-drifters.md](../07-drifters.md)).
 3. Appears, telegraph, moves, hits, leaves, scales: TBD, see OBJ-02.
 
 ## Edge cases

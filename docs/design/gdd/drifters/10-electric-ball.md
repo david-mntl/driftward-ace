@@ -1,6 +1,6 @@
 # Electric ball
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 An electric ball that floats slowly and sends out a pulse on a timer. The pulse briefly makes its danger zone much bigger.
@@ -10,7 +10,7 @@ An electric ball that floats slowly and sends out a pulse on a timer. The pulse 
 |---|---|---|---|---|---|
 | archetype | Slow patrol + pulse | — | — | locked | Director |
 | enters_from | Mid-screen | — | — | locked | Director |
-| priority | 4 | — | — | guess | 07-objects.md |
+| priority | 4 | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | OBJ-10 |
 | hitbox | TBD | shape, px | — | TBD | OBJ-10 |
 | speed | TBD | px/tick at Level 1 | — | TBD | OBJ-10 |
@@ -23,7 +23,7 @@ An electric ball that floats slowly and sends out a pulse on a timer. The pulse 
 
 ## Rules
 1. **Behavior:** Floats slowly; pulses on a timer.
-2. Shared hazard rules apply ([../07-objects.md](../07-objects.md)).
+2. Shared hazard rules apply ([../07-drifters.md](../07-drifters.md)).
 3. Appears, telegraph, moves, hits, leaves, scales: TBD, see OBJ-10.
 
 ## Edge cases

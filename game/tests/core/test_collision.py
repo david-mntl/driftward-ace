@@ -1,6 +1,6 @@
 """Hitbox overlap, growth and the ship's hitbox tests.
 
-Contract: docs/contracts/systems/objects.md, Rules, Collision; docs/contracts/systems/ship.md,
+Contract: docs/contracts/systems/drifters.md, Rules, Collision; docs/contracts/systems/ship.md,
 Rules, Hitbox. Task: docs/contracts/DRA-29/tasks/DRA-29-07-qa-engineer.md. One test per
 behavior it lists. Every expected number is computed from the GDD values below, never read
 from the code under test.

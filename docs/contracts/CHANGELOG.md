@@ -69,3 +69,12 @@
   - The labels of the two test constants in `game/tests/core/test_objects.py` and `test_run_objects.py` now say "fixed test value, not the live tuning file". The numbers are unchanged.
   - `game/tests/check.sh` ends `QA: pass`.
   - The browser build was not re-run for the hotfix, at the Director's request. The integration report's browser timings are from before it.
+
+## Rename: objects are drifters, 2026-10-15
+- The Director renamed "object" to **drifter** everywhere: anything that appears in the ship's path, good or bad. Two kinds: hazards (touching costs a life) and pickups (touching pays). GDD: `07-drifters.md`, `14-glossary.md`, `91-decision-log.md` row 41.
+- Applied by the main session outside the pipeline, at the Director's request. Names and wording only; no rule, value or behavior changed, so no contract version changed.
+- Renamed files: `systems/objects.md` to `systems/drifters.md`; `schemas/object-tuning.schema.json` to `schemas/drifter-tuning.schema.json`; `game/core/objects/`, `game/ui/objects/` and `game/tuning/objects/` to `drifters/`; the three test files to `test_drifters.py`, `test_run_drifters.py`, `test_drifter_registry.py`; GDD `07-objects.md` to `07-drifters.md` and `objects/` to `drifters/`.
+- Renamed names: `GameObject` to `Drifter`, `ObjectType` to `DrifterType`, `ObjectTuning` to `DrifterTuning`, `ObjectTypeTuning` to `DrifterTypeTuning`, `ObjectView` to `DrifterView`, `object_type` to `drifter_type`, `spawn_object`, `register_object`, `available_objects`, `object_class`, `add_objects`, `render_object` to their `drifter` forms, `run.objects` to `run.drifters`, local `obj` to `drifter`. Log lines `object spawn|active|touch|gone` are now `drifter ...`; the tuning line reads `tuning loaded drifters=...`.
+- Python's `object` type and JSON "object" (schemas, loader messages) are unchanged.
+- Earlier changelog entries, task files and reports keep the old word as history. Their links to `07-objects.md` and `objects/` now point to renamed files.
+- `game/tests/check.sh` ends `QA: pass`. A headless run loads the tuning and a meteorite drifter spawns, warns, turns active and falls. The browser build was not re-run.

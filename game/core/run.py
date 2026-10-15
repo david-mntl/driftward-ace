@@ -1,9 +1,9 @@
-"""One run of the game: lives, falls, hits, objects, the respawn wait, game over, retry.
+"""One run of the game: lives, falls, hits, drifters, the respawn wait, game over, retry.
 
-`Run` holds the ship, the world scroll, the objects and the lives, and `step_run` advances all
+`Run` holds the ship, the world scroll, the drifters and the lives, and `step_run` advances all
 of them one fixed 60 Hz tick. The ship step reports where the ship is (`is_below_floor`), the
-objects report where they are and what a touch does; the run decides what a fall or a hit
-costs. `add_objects` is the only way an object enters a run. No frame time, no randomness, no
+drifters report where they are and what a touch does; the run decides what a fall or a hit
+costs. `add_drifters` is the only way a drifter enters a run. No frame time, no randomness, no
 run mode. Stdlib and `core` only.
 
 Source: docs/contracts/systems/run.md, Interface, Rules and Logging.
@@ -15,10 +15,10 @@ from dataclasses import dataclass, field, replace
 from typing import Final
 
 from core.collision import Hitbox, hitboxes_overlap
+from core.drifters.base import Drifter, Phase, TickContext, TouchEffect
+from core.drifters.spawner import Placement, spawn_drifter
+from core.drifters.tuning import DrifterTuning
 from core.levels import level_at
-from core.objects.base import GameObject, Phase, TickContext, TouchEffect
-from core.objects.spawner import Placement, spawn_object
-from core.objects.tuning import ObjectTuning
 from core.scroll import Scroll, start_scroll, step_scroll
 from core.ship import Ship, Thrust, is_below_floor, ship_hitbox, spawn, step
 
@@ -69,11 +69,11 @@ class Run:
     retry_armed: bool = False
     """Game over only: every arrow has been released since the box appeared."""
 
-    objects: tuple[GameObject, ...] = ()
-    """Objects on the field, oldest first. Source: systems/run.md, Interface (DRA-29)."""
+    drifters: tuple[Drifter, ...] = ()
+    """Drifters on the field, oldest first. Source: systems/run.md, Interface (DRA-29)."""
 
     next_uid: int = 1
-    """The uid the next added object gets. Source: systems/run.md, Interface (DRA-29)."""
+    """The uid the next added drifter gets. Source: systems/run.md, Interface (DRA-29)."""
 
     @property
     def invulnerable(self) -> bool:
@@ -107,32 +107,32 @@ def start_run() -> Run:
     return Run(ship=spawn(), scroll=start_scroll())
 
 
-def add_objects(run: Run, placements: Sequence[Placement], tuning: ObjectTuning) -> Run:
+def add_drifters(run: Run, placements: Sequence[Placement], tuning: DrifterTuning) -> Run:
     """Spawn each placement in order and append it to the run, each with the next uid.
 
-    Returns `run` unchanged at game over or with no placements. New objects are in WARNING and
-    first update on the next `step_run`. Errors from `spawn_object` rise, and the run is not
-    changed. Source: systems/run.md, Rules, add_objects.
+    Returns `run` unchanged at game over or with no placements. New drifters are in WARNING and
+    first update on the next `step_run`. Errors from `spawn_drifter` rise, and the run is not
+    changed. Source: systems/run.md, Rules, add_drifters.
     """
     if run.game_over or not placements:
         return run
-    added: list[GameObject] = []
+    added: list[Drifter] = []
     for offset, placement in enumerate(placements):
-        spawned: GameObject = spawn_object(placement, run.level, tuning)
+        spawned: Drifter = spawn_drifter(placement, run.level, tuning)
         added.append(replace(spawned, uid=run.next_uid + offset))
-    for obj, placement in zip(added, placements, strict=True):
+    for drifter, placement in zip(added, placements, strict=True):
         level: int = run.level if placement.as_level is None else placement.as_level
         log.debug(
-            "object spawn id=%d type=%s variant=%s x=%.2f y=%.2f speed=%.2f level=%d",
-            obj.uid,
-            obj.object_type.value,
-            obj.variant,
-            obj.x,
-            obj.y,
-            obj.speed,
+            "drifter spawn id=%d type=%s variant=%s x=%.2f y=%.2f speed=%.2f level=%d",
+            drifter.uid,
+            drifter.drifter_type.value,
+            drifter.variant,
+            drifter.x,
+            drifter.y,
+            drifter.speed,
             level,
         )
-    return replace(run, objects=run.objects + tuple(added), next_uid=run.next_uid + len(added))
+    return replace(run, drifters=run.drifters + tuple(added), next_uid=run.next_uid + len(added))
 
 
 def step_run(run: Run, thrust: Thrust) -> Run:
@@ -166,7 +166,7 @@ def _is_press(thrust: Thrust, held: Thrust) -> bool:
 
 
 def _step_playing(run: Run, thrust: Thrust) -> Run:
-    """A playing tick: press, timer, objects, wait, ship, scroll, then a fall or a hit, then drops.
+    """A playing tick: press, timer, drifters, wait, ship, scroll, then a fall or a hit, then drops.
 
     A hit is tested only when the ship did not fall. Source: systems/run.md, Rules, a playing
     tick, steps 1 to 9.
@@ -174,7 +174,7 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
     press: bool = _is_press(thrust, run.held)
     protected: bool = run.invulnerable
     left: int = max(run.invuln_ticks_left - 1, 0)
-    objects: tuple[GameObject, ...] = _update_objects(run)
+    drifters: tuple[Drifter, ...] = _update_drifters(run)
     ended_wait: bool = run.waiting and press
     if ended_wait:
         log.debug("respawn wait end")
@@ -187,29 +187,29 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
         run,
         ship=ship,
         scroll=scroll,
-        objects=objects,
+        drifters=drifters,
         invuln_ticks_left=left,
         waiting=stands,
         held=thrust,
     )
     if is_below_floor(ship):
-        return _drop_objects(_apply_fall(stepped, protected, thrust))
-    return _drop_objects(_apply_hit(stepped, protected, thrust))
+        return _drop_drifters(_apply_fall(stepped, protected, thrust))
+    return _drop_drifters(_apply_hit(stepped, protected, thrust))
 
 
-def _update_objects(run: Run) -> tuple[GameObject, ...]:
-    """Update every object once with the ship as it was at the start of the tick (step 3).
+def _update_drifters(run: Run) -> tuple[Drifter, ...]:
+    """Update every drifter once with the ship as it was at the start of the tick (step 3).
 
-    Logs each object that turns from WARNING to ACTIVE.
+    Logs each drifter that turns from WARNING to ACTIVE.
     """
     ctx = TickContext(ship=run.ship)
-    updated: tuple[GameObject, ...] = tuple(obj.update(ctx) for obj in run.objects)
-    for before, after in zip(run.objects, updated, strict=True):
+    updated: tuple[Drifter, ...] = tuple(drifter.update(ctx) for drifter in run.drifters)
+    for before, after in zip(run.drifters, updated, strict=True):
         if before.phase is Phase.WARNING and after.phase is Phase.ACTIVE:
             log.debug(
-                "object active id=%d type=%s x=%.2f y=%.2f",
+                "drifter active id=%d type=%s x=%.2f y=%.2f",
                 after.uid,
-                after.object_type.value,
+                after.drifter_type.value,
                 after.x,
                 after.y,
             )
@@ -254,71 +254,73 @@ def _end_run(stepped: Run, thrust: Thrust) -> Run:
     )
 
 
-def _touches_ship(obj: GameObject, ship_box: Hitbox) -> bool:
-    """True when `obj` is ACTIVE, a HIT on touch, able to hit now, and overlaps `ship_box`.
+def _touches_ship(drifter: Drifter, ship_box: Hitbox) -> bool:
+    """True when `drifter` is ACTIVE, a HIT on touch, able to hit now, and overlaps `ship_box`.
 
-    The object decides whether it can hit again (`may_hit_ship`), not the run.
+    The drifter decides whether it can hit again (`may_hit_ship`), not the run.
     """
     return (
-        obj.phase is Phase.ACTIVE
-        and obj.effect_on_touch() is TouchEffect.HIT
-        and obj.may_hit_ship()
-        and hitboxes_overlap(obj.current_hitbox(), ship_box)
+        drifter.phase is Phase.ACTIVE
+        and drifter.effect_on_touch() is TouchEffect.HIT
+        and drifter.may_hit_ship()
+        and hitboxes_overlap(drifter.current_hitbox(), ship_box)
     )
 
 
 def _apply_hit(stepped: Run, protected: bool, thrust: Thrust) -> Run:
-    """Apply a hit to the run after its ship, scroll and objects stepped (step 7).
+    """Apply a hit to the run after its ship, scroll and drifters stepped (step 7).
 
-    Nothing happens with no touching object, or while protected. Otherwise one life is lost
-    whatever the number of touching objects, each gets `hit_ship = True`, and the run is
+    Nothing happens with no touching drifter, or while protected. Otherwise one life is lost
+    whatever the number of touching drifters, each gets `hit_ship = True`, and the run is
     invulnerable again or over. The ship and the wait stay as they were.
     Source: 05-lives-and-damage.md, rules 1 and 4; systems/run.md, Rules, step 7.
     """
     ship_box: Hitbox = ship_hitbox(stepped.ship)
-    touching: tuple[bool, ...] = tuple(_touches_ship(obj, ship_box) for obj in stepped.objects)
+    touching: tuple[bool, ...] = tuple(
+        _touches_ship(drifter, ship_box) for drifter in stepped.drifters
+    )
     if protected or not any(touching):
         return stepped
-    objects: list[GameObject] = []
-    for obj, touched in zip(stepped.objects, touching, strict=True):
+    drifters: list[Drifter] = []
+    for drifter, touched in zip(stepped.drifters, touching, strict=True):
         if not touched:
-            objects.append(obj)
+            drifters.append(drifter)
             continue
         log.debug(
-            "object touch id=%d type=%s effect=%s",
-            obj.uid,
-            obj.object_type.value,
-            obj.effect_on_touch().value,
+            "drifter touch id=%d type=%s effect=%s",
+            drifter.uid,
+            drifter.drifter_type.value,
+            drifter.effect_on_touch().value,
         )
-        objects.append(replace(obj, hit_ship=True))
+        drifters.append(replace(drifter, hit_ship=True))
     lives: int = stepped.lives - 1
     log.debug("life lost lives=%d", lives)
-    hit = replace(stepped, objects=tuple(objects), lives=lives)
+    hit = replace(stepped, drifters=tuple(drifters), lives=lives)
     if lives > 0:
         return replace(hit, invuln_ticks_left=INVULN_TICKS)
     return _end_run(hit, thrust)
 
 
-def _drop_objects(run: Run) -> Run:
-    """Remove every GONE or off-screen object, keeping the order of the rest (step 8).
+def _drop_drifters(run: Run) -> Run:
+    """Remove every GONE or off-screen drifter, keeping the order of the rest (step 8).
 
-    Logs each dropped object with its last position.
+    Logs each dropped drifter with its last position.
     """
-    kept: list[GameObject] = []
-    for obj in run.objects:
-        if obj.phase is not Phase.GONE and not obj.is_off_screen():
-            kept.append(obj)
+    kept: list[Drifter] = []
+    for drifter in run.drifters:
+        if drifter.phase is not Phase.GONE and not drifter.is_off_screen():
+            kept.append(drifter)
             continue
         log.debug(
-            "object gone id=%d type=%s x=%.2f y=%.2f",
-            obj.uid,
-            obj.object_type.value,
-            obj.x,
-            obj.y,
+            "drifter gone id=%d type=%s x=%.2f y=%.2f",
+            drifter.uid,
+            drifter.drifter_type.value,
+            drifter.x,
+            drifter.y,
         )
-    if len(kept) == len(run.objects):
+    if len(kept) == len(run.drifters):
         return run
-    return replace(run, objects=tuple(kept))
+    return replace(run, drifters=tuple(kept))
 
 
 def _log_respawn(fell_from: Ship, *, waits: bool) -> None:

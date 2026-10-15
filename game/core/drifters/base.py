@@ -1,9 +1,9 @@
-"""The shared object base: phases, birth facts, the abstract object and its specialty slot.
+"""The shared drifter base: phases, birth facts, the abstract drifter and its specialty slot.
 
-An object carries final numbers only. It never knows the level. Screen px, y down, x and y at
-the object's center. Stdlib and `core` only, no frame time, no randomness.
+A drifter carries final numbers only. It never knows the level. Screen px, y down, x and y at
+the drifter's center. Stdlib and `core` only, no frame time, no randomness.
 
-Source: docs/contracts/systems/objects.md, Interface and Rules, The base.
+Source: docs/contracts/systems/drifters.md, Interface and Rules, The base.
 """
 
 from __future__ import annotations
@@ -24,34 +24,34 @@ GRAZE_MARGIN: Final[int] = 14
 """Graze zone margin around a hazard's hitbox, px. Source: 06-scoring.md, graze_margin (locked)."""
 
 
-class ObjectType(Enum):
-    """Every object the game knows. One member per built object spec in 07-objects.md."""
+class DrifterType(Enum):
+    """Every drifter the game knows. One member per built drifter spec in 07-drifters.md."""
 
     METEORITE = "meteorite"
-    """Source: objects/01-meteorite.md."""
+    """Source: drifters/01-meteorite.md."""
 
 
 class Phase(Enum):
-    """Where an object is in its life."""
+    """Where a drifter is in its life."""
 
     WARNING = "warning"
-    """The entry warning shows. The object can't touch anything."""
+    """The entry warning shows. The drifter can't touch anything."""
 
     ACTIVE = "active"
-    """The object is on the field and can touch the ship."""
+    """The drifter is on the field and can touch the ship."""
 
     GONE = "gone"
-    """The object is finished. The run drops it this tick."""
+    """The drifter is finished. The run drops it this tick."""
 
 
 class TouchEffect(Enum):
-    """What touching an object does."""
+    """What touching a drifter does."""
 
     HIT = "hit"
     """A hit. Source: 05-lives-and-damage.md, rule 1."""
 
     COLLECT = "collect"
-    """Reserved for coins. No object returns it yet."""
+    """Reserved for coins. No drifter returns it yet."""
 
     NONE = "none"
     """Nothing happens."""
@@ -59,7 +59,7 @@ class TouchEffect(Enum):
 
 @dataclass(frozen=True, slots=True)
 class TickContext:
-    """Per-tick facts an object may read in `update`. Never the level."""
+    """Per-tick facts a drifter may read in `update`. Never the level."""
 
     ship: Ship
     """The ship as it was at the start of this tick."""
@@ -67,7 +67,7 @@ class TickContext:
 
 @dataclass(frozen=True, slots=True)
 class Birth:
-    """Everything the spawner settled for one new object. Final numbers only."""
+    """Everything the spawner settled for one new drifter. Final numbers only."""
 
     x: float
     """Center x, screen px."""
@@ -94,37 +94,37 @@ class Birth:
     """Entry warning length, ticks. Never scaled."""
 
     timer_mult: float
-    """The Timer multiplier for the object's own timers. An object without timers ignores it."""
+    """The Timer multiplier for the drifter's own timers. A drifter without timers ignores it."""
 
     specialty_enabled: bool | None
-    """The placement's specialty switch. None means the object's default."""
+    """The placement's specialty switch. None means the drifter's default."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Specialty(ABC):
-    """An optional extra behavior on top of an object's movement. Only the interface exists."""
+    """An optional extra behavior on top of a drifter's movement. Only the interface exists."""
 
     enabled: bool
-    """Switched on or off for this object."""
+    """Switched on or off for this drifter."""
 
     @abstractmethod
-    def update(self, owner: GameObject, ctx: TickContext) -> Self:
+    def update(self, owner: Drifter, ctx: TickContext) -> Self:
         """Advance the specialty one 60 Hz tick and return the new one."""
 
-    def effect_on_ship(self, owner: GameObject, ship: Ship) -> Ship | None:
+    def effect_on_ship(self, owner: Drifter, ship: Ship) -> Ship | None:
         """Return the ship after this specialty acts on it, or None for no effect."""
         return None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class GameObject(ABC):
-    """One object on the field after a tick. Screen px, y down, x and y at its center."""
+class Drifter(ABC):
+    """One drifter on the field after a tick. Screen px, y down, x and y at its center."""
 
-    object_type: ClassVar[ObjectType]
+    drifter_type: ClassVar[DrifterType]
     """Set by each subclass."""
 
     uid: int = 0
-    """Unique within a run, from 1. Set by `core.run.add_objects`. 0 before that."""
+    """Unique within a run, from 1. Set by `core.run.add_drifters`. 0 before that."""
 
     x: float
     """Center x, screen px."""
@@ -151,18 +151,18 @@ class GameObject(ABC):
     """Entry warning length, ticks."""
 
     phase: Phase = Phase.WARNING
-    """Where the object is in its life."""
+    """Where the drifter is in its life."""
 
     ticks_in_phase: int = 0
     """Ticks spent in the current phase. 0 on the state where it starts."""
 
     specialty: Specialty | None = None
-    """The optional extra behavior. None when the object has none."""
+    """The optional extra behavior. None when the drifter has none."""
 
     hit_ship: bool = False
-    """A fact: this object has hit the ship at least once. Set by the run.
+    """A fact: this drifter has hit the ship at least once. Set by the run.
 
-    What it means for later touches is the object's own rule (`may_hit_ship`).
+    What it means for later touches is the drifter's own rule (`may_hit_ship`).
     """
 
     def current_hitbox(self) -> Hitbox:
@@ -183,7 +183,7 @@ class GameObject(ABC):
     def is_off_screen(self) -> bool:
         """Return True only in ACTIVE, when fully past a side wall or fully below the floor.
 
-        Never true at the top, where objects enter. Source: 07-objects.md, rule 12.
+        Never true at the top, where drifters enter. Source: 07-drifters.md, rule 12.
         """
         if self.phase is not Phase.ACTIVE:
             return False
@@ -192,9 +192,9 @@ class GameObject(ABC):
         return self.x + half_w <= 0 or self.x - half_w >= SCREEN_W or self.y - half_h >= SCREEN_H
 
     def warning_center(self) -> tuple[float, float]:
-        """Return (x, y) moved just inside the screen, px: the object's footprint stays on it.
+        """Return (x, y) moved just inside the screen, px: the drifter's footprint stays on it.
 
-        Source: 07-objects.md, rule 9; 91-decision-log.md, row 39.
+        Source: 07-drifters.md, rule 9; 91-decision-log.md, row 39.
         """
         half_w: float = self.width / 2
         half_h: float = self.height / 2
@@ -205,13 +205,13 @@ class GameObject(ABC):
 
     @classmethod
     def born(cls, birth: Birth) -> Self:
-        """Build the object in WARNING from `birth`.
+        """Build the drifter in WARNING from `birth`.
 
         Raises ValueError when the placement switches a specialty on: the base has none.
-        An object with a specialty or its own timers overrides this.
+        A drifter with a specialty or its own timers overrides this.
         """
         if birth.specialty_enabled is True:
-            raise ValueError(f"{cls.object_type.value} has no specialty")
+            raise ValueError(f"{cls.drifter_type.value} has no specialty")
         return cls(
             x=birth.x,
             y=birth.y,
@@ -230,27 +230,27 @@ class GameObject(ABC):
 
     @abstractmethod
     def update(self, ctx: TickContext) -> Self:
-        """Advance one 60 Hz tick and return a new object. Never mutates self."""
+        """Advance one 60 Hz tick and return a new drifter. Never mutates self."""
 
     @abstractmethod
     def effect_on_touch(self) -> TouchEffect:
-        """Return what touching this object does."""
+        """Return what touching this drifter does."""
 
     @abstractmethod
     def may_hit_ship(self) -> bool:
-        """Return whether this object, in its current state, can hit the ship.
+        """Return whether this drifter, in its current state, can hit the ship.
 
-        Each object decides, for example from `hit_ship`. The base has no default (LD-06).
+        Each drifter decides, for example from `hit_ship`. The base has no default (LD-06).
         """
 
 
-def tick_warning[T: GameObject](obj: T) -> T:
-    """Return `obj` after one WARNING tick, position unchanged.
+def tick_warning[T: Drifter](drifter: T) -> T:
+    """Return `drifter` after one WARNING tick, position unchanged.
 
-    Once ticks_in_phase + 1 reaches warning_ticks the object turns ACTIVE with
-    ticks_in_phase 0. Source: 07-objects.md, rules 1 and 9.
+    Once ticks_in_phase + 1 reaches warning_ticks the drifter turns ACTIVE with
+    ticks_in_phase 0. Source: 07-drifters.md, rules 1 and 9.
     """
-    ticks: int = obj.ticks_in_phase + 1
-    if ticks >= obj.warning_ticks:
-        return replace(obj, phase=Phase.ACTIVE, ticks_in_phase=0)
-    return replace(obj, ticks_in_phase=ticks)
+    ticks: int = drifter.ticks_in_phase + 1
+    if ticks >= drifter.warning_ticks:
+        return replace(drifter, phase=Phase.ACTIVE, ticks_in_phase=0)
+    return replace(drifter, ticks_in_phase=ticks)

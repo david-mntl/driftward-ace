@@ -1,6 +1,6 @@
 # Lives and damage
 Status: draft
-Depends on: [03-world-and-camera.md](03-world-and-camera.md), [04-ship.md](04-ship.md), [07-objects.md](07-objects.md), [10-ui.md](10-ui.md)
+Depends on: [03-world-and-camera.md](03-world-and-camera.md), [04-ship.md](04-ship.md), [07-drifters.md](07-drifters.md), [10-ui.md](10-ui.md)
 
 ## Summary
 The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor is a **fall**. Both cost a life. There is no stun: the ship keeps its momentum and the player keeps control, because Pillar 1 rules out an instant stop. Instead the game makes the loss impossible to miss (flash, breaking life icon, ship bursting and rebuilding) and gives half a second of invulnerability to recover. No lives left means game over.
@@ -47,4 +47,4 @@ The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor i
 - LD-04, LD-06, LD-07, LD-08, LD-09.
 
 ## How to extend
-A new way to lose a life must say where the ship ends up, whether invulnerability blocks it, and that it plays the life-lost feedback. Add it as a numbered rule here and link it from the object's spec.
+A new way to lose a life must say where the ship ends up, whether invulnerability blocks it, and that it plays the life-lost feedback. Add it as a numbered rule here and link it from the drifter's spec.

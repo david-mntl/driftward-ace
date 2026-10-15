@@ -33,7 +33,7 @@ The game is Python built for the browser. These limits are hard: breaking one br
 4. **No server.** No server code, no paid services, no online features.
 5. **Browser performance.** Python in WebAssembly is slow. Glow is pre-rendered and particles are capped ([12-art-and-audio.md](12-art-and-audio.md)).
 6. **Done means it runs in a real browser.** A desktop run doesn't count.
-7. **Run modes.** Normal by default. Debug is chosen once, at launch, by one of the debug switches. Game rules are the same in both modes; debug only adds logs, the debug overlay ([10-ui.md](10-ui.md)) and a test spawn list that places objects for testing.
+7. **Run modes.** Normal by default. Debug is chosen once, at launch, by one of the debug switches. Game rules are the same in both modes; debug only adds logs, the debug overlay ([10-ui.md](10-ui.md)) and a test spawn list that places drifters for testing.
 8. **Errors never freeze the page.** An unexpected error is logged with its full trace and shows the error screen ([10-ui.md](10-ui.md)).
 9. **Logging.** Log by event, never by tick: a line every tick floods the console and slows the game (rule 5).
 

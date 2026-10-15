@@ -1,18 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "driftward-ace/object-tuning.schema.json",
-  "title": "Object tuning file",
-  "description": "One file per object type: game/tuning/objects/<object_type value>.json, e.g. meteorite.json. Values only, never behavior (07-objects.md, rule 10). Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Owner of the schema: architect. Contract: docs/contracts/systems/objects.md. Two rules this schema can't express are also enforced by the loader: default_variant must be one of the keys of variants, and every hitbox shape must lie inside its variant's width x height footprint, centered on the object (07-objects.md, rule 8).",
+  "$id": "driftward-ace/drifter-tuning.schema.json",
+  "title": "Drifter tuning file",
+  "description": "One file per drifter type: game/tuning/drifters/<drifter_type value>.json, e.g. meteorite.json. Values only, never behavior (07-drifters.md, rule 10). Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md. Two rules this schema can't express are also enforced by the loader: default_variant must be one of the keys of variants, and every hitbox shape must lie inside its variant's width x height footprint, centered on the drifter (07-drifters.md, rule 8).",
   "type": "object",
   "additionalProperties": false,
   "required": ["default_variant", "variants", "speed_ratio", "entry_warning_ticks"],
   "properties": {
     "default_variant": {
-      "description": "The variant a placement gets when it names none (07-objects.md, rule 10). Must be a key of variants.",
+      "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants.",
       "$ref": "#/$defs/variant_name"
     },
     "variants": {
-      "description": "Named variants (07-objects.md, rule 10). A new variant is a new entry here and needs no code.",
+      "description": "Named variants (07-drifters.md, rule 10). A new variant is a new entry here and needs no code.",
       "type": "object",
       "minProperties": 1,
       "propertyNames": { "$ref": "#/$defs/variant_name" },
@@ -24,7 +24,7 @@
       "minimum": 0
     },
     "entry_warning_ticks": {
-      "description": "Ticks the entry warning shows before the object appears (07-objects.md, rule 9). Never scaled by level. At least 1: every hazard warns first (07-objects.md, rule 1).",
+      "description": "Ticks the entry warning shows before the drifter appears (07-drifters.md, rule 9). Never scaled by level. At least 1: every hazard warns first (07-drifters.md, rule 1).",
       "type": "integer",
       "minimum": 1
     }
@@ -50,7 +50,7 @@
           "exclusiveMinimum": 0
         },
         "hitbox": {
-          "description": "One or more shapes, each placed by an offset from the object's center (07-objects.md, rule 8). Never bigger than the look.",
+          "description": "One or more shapes, each placed by an offset from the drifter's center (07-drifters.md, rule 8). Never bigger than the look.",
           "type": "array",
           "minItems": 1,
           "items": {
@@ -68,8 +68,8 @@
       "required": ["shape", "cx", "cy", "r"],
       "properties": {
         "shape": { "const": "circle" },
-        "cx": { "description": "Center x offset from the object's center, px.", "type": "number" },
-        "cy": { "description": "Center y offset from the object's center, px, y down.", "type": "number" },
+        "cx": { "description": "Center x offset from the drifter's center, px.", "type": "number" },
+        "cy": { "description": "Center y offset from the drifter's center, px, y down.", "type": "number" },
         "r": { "description": "Radius, px.", "type": "number", "exclusiveMinimum": 0 }
       }
     },
@@ -79,8 +79,8 @@
       "required": ["shape", "cx", "cy", "w", "h"],
       "properties": {
         "shape": { "const": "box" },
-        "cx": { "description": "Center x offset from the object's center, px.", "type": "number" },
-        "cy": { "description": "Center y offset from the object's center, px, y down.", "type": "number" },
+        "cx": { "description": "Center x offset from the drifter's center, px.", "type": "number" },
+        "cy": { "description": "Center y offset from the drifter's center, px, y down.", "type": "number" },
         "w": { "description": "Full width, px. Boxes are upright.", "type": "number", "exclusiveMinimum": 0 },
         "h": { "description": "Full height, px.", "type": "number", "exclusiveMinimum": 0 }
       }

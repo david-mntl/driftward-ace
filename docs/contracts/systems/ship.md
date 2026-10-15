@@ -11,7 +11,7 @@ From DRA-13 the top-line stop is the real rule, not a stand-in: the screen is fi
 
 From DRA-23 the step no longer respawns the ship. The step ends after the top line, and `is_below_floor` tells the run whether the ship has fallen. What a fall costs (a life, the respawn, the wait, game over) is the run's rule: `docs/contracts/systems/run.md`.
 
-From DRA-29 the ship has a hitbox: an inverted T of two boxes, used by the run to test touches with objects (`docs/contracts/systems/objects.md`, `docs/contracts/systems/run.md`). The placeholder ship is drawn as that same inverted T, so what the player sees is exactly what can be hit. The ship also names its top sideways speed, which the meteorite's speed is set from. Physics, walls, top line and floor don't change.
+From DRA-29 the ship has a hitbox: an inverted T of two boxes, used by the run to test touches with drifters (`docs/contracts/systems/drifters.md`, `docs/contracts/systems/run.md`). The placeholder ship is drawn as that same inverted T, so what the player sees is exactly what can be hit. The ship also names its top sideways speed, which the meteorite's speed is set from. Physics, walls, top line and floor don't change.
 
 Who builds what:
 - `game/core/ship.py`: the Gameplay Implementer, task `DRA-6-01-gameplay-implementer`. Field docs, `Final` and `slots` in DRA-19: task `DRA-19-01-gameplay-implementer`. The step without the respawn, and `is_below_floor`, in DRA-23: task `DRA-23-01-gameplay-implementer`. The hitbox and `TOP_SIDE_SPEED` in DRA-29: task `DRA-29-01-gameplay-implementer`.
@@ -123,7 +123,7 @@ def ship_hitbox(ship: Ship) -> Hitbox: ...      # DRA-29
     # place_hitbox(SHIP_HITBOX, ship.x, ship.y): the two boxes at screen positions.
     # Pure, no logging.
 ```
-`Hitbox`, `Box` and `place_hitbox` come from `core.collision` (`docs/contracts/systems/objects.md`, Interface). Derived edges, used by the rules below: left edge `x - SHIP_W / 2`, right edge `x + SHIP_W / 2`, top edge `y - SHIP_H / 2`.
+`Hitbox`, `Box` and `place_hitbox` come from `core.collision` (`docs/contracts/systems/drifters.md`, Interface). Derived edges, used by the rules below: left edge `x - SHIP_W / 2`, right edge `x + SHIP_W / 2`, top edge `y - SHIP_H / 2`.
 
 The code carries each `Ship` field's comment above (what it is, its unit, its sign) as that field's documentation, together with the class docstring's "Screen px, y down". From DRA-19. Source: scope report DRA-19, item 1; review DRA-6-01-gameplay-implementer, finding 1.
 
@@ -134,7 +134,7 @@ SHIP_COLOR: tuple[int, int, int] = (255, 255, 255)   # 04-ship.md, placeholder_l
 
 def draw_ship(surface: pygame.Surface, ship: Ship) -> None: ...
 ```
-The signature doesn't change in DRA-29. `ui.shapes` is in `docs/contracts/systems/objects.md`, Interface.
+The signature doesn't change in DRA-29. `ui.shapes` is in `docs/contracts/systems/drifters.md`, Interface.
 
 ## Presentation
 `draw_ship` reads only these core fields and functions. It draws on top of what is there and never fills the background.
@@ -172,8 +172,8 @@ Then `step` returns the ship. It never respawns it, even when the ship is past t
 Hitbox (DRA-29):
 - An inverted T of two upright boxes: a bar `HITBOX_BAR_W` (12) px wide and `SHIP_H` (32) tall, centered on the ship; and a foot `SHIP_W` (32) wide and `HITBOX_FOOT_H` (12) tall, along the bottom (its bottom edge on the ship's bottom edge). Source: 04-ship.md, hitbox (guess); 91-decision-log.md, row 35.
 - The ship never rotates, so the boxes stay upright. Source: 04-ship.md, rule 8.
-- The hitbox is never bigger than what the player sees: the ship is drawn as exactly these two boxes. Source: 04-ship.md, rule 8 and placeholder_look; 07-objects.md, rule 8.
-- `ship_hitbox(ship)` places it at the ship's center. The run tests it against each object's hitbox (`systems/run.md`). The ship's hitbox is the same during the blink and the respawn wait: the blink is a look, not a state. Source: 05-lives-and-damage.md, Edge cases.
+- The hitbox is never bigger than what the player sees: the ship is drawn as exactly these two boxes. Source: 04-ship.md, rule 8 and placeholder_look; 07-drifters.md, rule 8.
+- `ship_hitbox(ship)` places it at the ship's center. The run tests it against each drifter's hitbox (`systems/run.md`). The ship's hitbox is the same during the blink and the respawn wait: the blink is a look, not a state. Source: 05-lives-and-damage.md, Edge cases.
 - The ship has no graze zone. Graze zones belong to hazards. Source: 06-scoring.md, rule 3.
 
 Other rules:
@@ -218,7 +218,7 @@ DRA-29 changes this frozen contract (v4). `core/ship.py` gains `TOP_SIDE_SPEED`,
 - **The view draws the hitbox (DRA-29).** 04-ship.md says the placeholder is "the same inverted T as `hitbox`". Drawing from `ship_hitbox` makes that true by construction: there is one shape, not two copies that could drift.
 - **The T's bounding box is the 32 × 32 square (DRA-29).** The bar spans the full height and the foot the full width. So the wall, top-line and floor rules, which use the square's edges, still match the T's outer edges, and no physics rule changes.
 - **`TOP_SIDE_SPEED` lives here (DRA-29).** It is the ship's own derived value (04-ship.md, derived values). The meteorite's speed is a ratio of it, and the spawner reads it here, so a tuning change to the ship carries through.
-- **Physics constants stay in `core/ship.py`.** DRA-29 adds tuning files for objects and the playtest switches only (scope report DRA-29, Limits). Moving the ship's physics to a tuning file is a later contract change.
+- **Physics constants stay in `core/ship.py`.** DRA-29 adds tuning files for drifters and the playtest switches only (scope report DRA-29, Limits). Moving the ship's physics to a tuning file is a later contract change.
 - **No art task.** Sprite art is out of scope. The placeholder T needs no asset.
 - **The view rounds each box's corner.** pygame draws on whole pixels. Even offsets make both boxes round the same way.
 - **The ship color lives in `ship_view.py`, not `ui/look.py`.** Only the ship view uses it.

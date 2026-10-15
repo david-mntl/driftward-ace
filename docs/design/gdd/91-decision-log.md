@@ -3,7 +3,7 @@ Why the GDD says what it says. Newest at the bottom. When a decision changes an 
 
 | # | Date | Decision | Why | Replaces |
 |---|---|---|---|---|
-| 1 | 2026-10-09 | The GDD is a folder of atomic files with a routing index. Objects get one spec each, routed from `07-objects.md`. This folder is the only design source. | Readers open only what they need. Every gap is visible. | — |
+| 1 | 2026-10-09 | The GDD is a folder of atomic files with a routing index. Objects get one spec each, routed from `07-drifters.md`. This folder is the only design source. | Readers open only what they need. Every gap is visible. | — |
 | 2 | 2026-10-09 | Screen is 640×480, landscape. | Director's starting size. | — |
 | 3 | 2026-10-09 | Thrust is three tuning keys, `thrust_side`, `thrust_up` and `thrust_down`, all starting at 0.42. | Splitting one key later is a schema change. Three keys from the start cost nothing. | — |
 | 4 | 2026-10-09 | Physics values live as default + slider range + status in the GDD. The live value lives in the tuning file. The Director copies tuned values back. | Feel needs playtesting, not guessing. | — |
@@ -43,3 +43,4 @@ Why the GDD says what it says. Newest at the bottom. When a decision changes an 
 | 38 | 2026-10-14 | Debug mode may also play a test spawn list that places objects for testing. Game rules stay the same. | Director: objects must be testable at any position before waves exist. | — |
 | 39 | 2026-10-14 | An entry warning for an off-screen spot shows just inside the nearest screen edge. Placeholder looks: meteorite grey (140, 140, 140); warning at half size, glow (255, 220, 120), 6 to 9 thin spikes; the whole warning fits inside the object's own width (guesses, corrected 2026-10-15). The meteorite starts with its bottom edge on the top edge unless placed elsewhere. | Director: every warning must be visible. | — |
 | 40 | 2026-10-15 | Meteorite hotfix: speed halved, `speed_ratio` 0.375 × the ship's top sideways speed (≈ 2.5 px/tick at Level 1), and its entry warning 0.5 s longer, 60 ticks (1.0 s). | Director: the first build felt too fast, with too little warning. | Row 37 (0.75 × speed, 30-tick warning) and row 36 (0.5 s for the meteorite) |
+| 41 | 2026-10-15 | "Object" is renamed **drifter** everywhere in the design: anything that appears in the ship's path, good or bad. Drifters come in two kinds: hazards (touching costs a life) and pickups (touching pays). Earlier rows that say "object" mean drifter. | Director: "object" was confusing next to the programming term; "drifter" ties to the game's name. | The word "object" in rows 1 to 40 |

@@ -1,6 +1,6 @@
-# <Object name>
+# <Drifter name>
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 <2–3 plain sentences: what it is, what it does, why the player fears or wants it.>
@@ -8,9 +8,9 @@ Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
 ## Values
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
-| archetype | <from the routing table> | — | — | locked | 07-objects.md |
-| enters_from | <top / sides / corners / mid-screen> | — | — | locked | 07-objects.md |
-| priority | <1–4> | — | — | guess | 07-objects.md |
+| archetype | <from the routing table> | — | — | locked | 07-drifters.md |
+| enters_from | <top / sides / corners / mid-screen> | — | — | locked | 07-drifters.md |
+| priority | <1–4> | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | <ID> |
 | hitbox | TBD | shape, px | — | TBD | <ID> |
 | speed | TBD | px/tick at Level 1 | — | TBD | <ID> |
@@ -27,7 +27,7 @@ Add one row per extra value (pull strength, pulse period, lunge range...).
 5. **Leaves:** when it despawns.
 6. **Scales:** which values the level's hazard speed multiplies ([../08-difficulty.md](../08-difficulty.md)).
 7. **Looks and sounds:** sprite notes, animation, sound cue.
-8. **wave_check notes:** anything the checker must test for this object.
+8. **wave_check notes:** anything the checker must test for this drifter.
 
 ## Edge cases
 <the ship touches it while invulnerable; it meets a wall; it leaves the screen; two overlap...>
@@ -36,4 +36,4 @@ Add one row per extra value (pull strength, pulse period, lunge range...).
 <IDs from ../90-open-questions.md>
 
 ## How to extend
-A variant with the same archetype changes values only and stays in this file. A new behavior is a new object: copy the template.
+A variant with the same archetype changes values only and stays in this file. A new behavior is a new drifter: copy the template.

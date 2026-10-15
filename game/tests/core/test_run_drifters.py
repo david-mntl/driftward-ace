@@ -1,4 +1,4 @@
-"""Objects inside the run: how they enter, when they hit, one hit per hazard, when they leave.
+"""Drifters inside the run: how they enter, when they hit, one hit per hazard, when they leave.
 
 Contract: docs/contracts/systems/run.md, Rules. Task:
 docs/contracts/DRA-29/tasks/DRA-29-08-qa-engineer.md. One test per behavior it lists.
@@ -12,11 +12,11 @@ from dataclasses import replace
 import pytest
 
 from core.collision import Circle, hitboxes_overlap, place_hitbox
-from core.objects.base import GameObject, ObjectType, Phase
-from core.objects.meteorite import Meteorite
-from core.objects.spawner import Placement
-from core.objects.tuning import ObjectTuning, ObjectTypeTuning, PlaytestSwitches, VariantTuning
-from core.run import Run, add_objects, start_run, step_run
+from core.drifters.base import Drifter, DrifterType, Phase
+from core.drifters.meteorite import Meteorite
+from core.drifters.spawner import Placement
+from core.drifters.tuning import DrifterTuning, DrifterTypeTuning, PlaytestSwitches, VariantTuning
+from core.run import Run, add_drifters, start_run, step_run
 from core.scroll import Scroll, start_scroll
 from core.ship import Ship, Thrust, ship_hitbox, spawn
 
@@ -54,18 +54,19 @@ WARNING_TICKS: int = 30
 """Fixed test value for the warning length, not the live tuning file."""
 
 MEDIUM_SIZE: float = 28.0
-"""Visible width and height of a medium meteorite, px. Source: objects/01-meteorite.md,
+"""Visible width and height of a medium meteorite, px. Source: drifters/01-meteorite.md,
 variants (guess)."""
 
 MEDIUM_RADIUS: float = 14.0
-"""Hitbox radius of a medium meteorite, px. Source: objects/01-meteorite.md, variants (guess)."""
+"""Hitbox radius of a medium meteorite, px. Source: drifters/01-meteorite.md, variants (guess)."""
 
 SIZES: dict[str, tuple[float, float]] = {
     "small": (20, 10),
     "medium": (MEDIUM_SIZE, MEDIUM_RADIUS),
     "big": (40, 20),
 }
-"""Variant name to (width, hitbox radius), px. Source: objects/01-meteorite.md, variants (guess)."""
+"""Variant name to (width, hitbox radius), px. Source: drifters/01-meteorite.md, variants
+(guess)."""
 
 RUN_LOGGER = "core.run"
 """Logger name. Source: systems/run.md, Logging."""
@@ -80,15 +81,15 @@ AT_FLOOR_Y: float = SCREEN_H + SHIP_H / 2 - FALL_CAP
 """A ship at fall_cap here moves exactly FALL_CAP next tick and its top edge lands on the floor."""
 
 
-def make_tuning() -> ObjectTuning:
+def make_tuning() -> DrifterTuning:
     """Build the meteorite tuning from the GDD values above."""
     variants: dict[str, VariantTuning] = {
         name: VariantTuning(width=width, height=width, hitbox=(Circle(0, 0, radius),))
         for name, (width, radius) in SIZES.items()
     }
-    return ObjectTuning(
-        objects={
-            ObjectType.METEORITE: ObjectTypeTuning(
+    return DrifterTuning(
+        drifters={
+            DrifterType.METEORITE: DrifterTypeTuning(
                 variants=variants,
                 default_variant="medium",
                 speed_ratio=SPEED_RATIO,
@@ -99,10 +100,10 @@ def make_tuning() -> ObjectTuning:
     )
 
 
-TUNING: ObjectTuning = make_tuning()
+TUNING: DrifterTuning = make_tuning()
 LEVEL_1_SPEED: float = SPEED_RATIO * TOP_SIDE_SPEED
 """Level 1 meteorite speed, px/tick (hazard speed x 1.00 at Level 1). Source: 08-difficulty.md,
-level table (locked); objects/01-meteorite.md, speed_ratio."""
+level table (locked); drifters/01-meteorite.md, speed_ratio."""
 
 
 def rock(
@@ -138,16 +139,16 @@ def home_ship() -> Ship:
 
 
 def run_with(
-    *objects: GameObject,
+    *drifters: Drifter,
     ship: Ship | None = None,
     lives: int = LIVES_START,
     invuln_ticks_left: int = 0,
     waiting: bool = False,
     game_over: bool = False,
 ) -> Run:
-    """A run with the given objects, uids set in order from 1, the ship at home by default."""
-    numbered: tuple[GameObject, ...] = tuple(
-        replace(obj, uid=index + 1) for index, obj in enumerate(objects)
+    """A run with the given drifters, uids set in order from 1, the ship at home by default."""
+    numbered: tuple[Drifter, ...] = tuple(
+        replace(drifter, uid=index + 1) for index, drifter in enumerate(drifters)
     )
     return Run(
         ship=home_ship() if ship is None else ship,
@@ -156,20 +157,20 @@ def run_with(
         invuln_ticks_left=invuln_ticks_left,
         waiting=waiting,
         game_over=game_over,
-        objects=numbered,
+        drifters=numbered,
         next_uid=len(numbered) + 1,
     )
 
 
 def hold_ship(run: Run) -> Run:
-    """Put the ship back at home, so a test can keep it under a falling object."""
+    """Put the ship back at home, so a test can keep it under a falling drifter."""
     return replace(run, ship=home_ship())
 
 
-def only(run: Run) -> GameObject:
-    """The single object on the field."""
-    assert len(run.objects) == 1
-    return run.objects[0]
+def only(run: Run) -> Drifter:
+    """The single drifter on the field."""
+    assert len(run.drifters) == 1
+    return run.drifters[0]
 
 
 def lines(caplog: pytest.LogCaptureFixture) -> list[str]:
@@ -180,48 +181,50 @@ def count(log_lines: list[str], prefix: str) -> int:
     return sum(1 for line in log_lines if line.startswith(prefix))
 
 
-def test_add_objects_spawns_in_order_with_uids() -> None:
+def test_add_drifters_spawns_in_order_with_uids() -> None:
     run: Run = start_run()
     placements: list[Placement] = [
-        Placement(ObjectType.METEORITE, 100.0, y=50.0, variant="small"),
-        Placement(ObjectType.METEORITE, 200.0, y=60.0),
-        Placement(ObjectType.METEORITE, 300.0, y=70.0, variant="big"),
+        Placement(DrifterType.METEORITE, 100.0, y=50.0, variant="small"),
+        Placement(DrifterType.METEORITE, 200.0, y=60.0),
+        Placement(DrifterType.METEORITE, 300.0, y=70.0, variant="big"),
     ]
 
-    added: Run = add_objects(run, placements, TUNING)
+    added: Run = add_drifters(run, placements, TUNING)
 
-    assert [obj.uid for obj in added.objects] == [1, 2, 3]
-    assert [obj.x for obj in added.objects] == [100.0, 200.0, 300.0]
-    assert [obj.y for obj in added.objects] == [50.0, 60.0, 70.0]
-    assert [obj.variant for obj in added.objects] == ["small", "medium", "big"]
+    assert [drifter.uid for drifter in added.drifters] == [1, 2, 3]
+    assert [drifter.x for drifter in added.drifters] == [100.0, 200.0, 300.0]
+    assert [drifter.y for drifter in added.drifters] == [50.0, 60.0, 70.0]
+    assert [drifter.variant for drifter in added.drifters] == ["small", "medium", "big"]
     assert added.next_uid == 4
-    for obj in added.objects:
-        assert obj.phase is Phase.WARNING
-        assert obj.ticks_in_phase == 0
-        assert obj.speed == pytest.approx(LEVEL_1_SPEED)
-        assert obj.warning_ticks == WARNING_TICKS
+    for drifter in added.drifters:
+        assert drifter.phase is Phase.WARNING
+        assert drifter.ticks_in_phase == 0
+        assert drifter.speed == pytest.approx(LEVEL_1_SPEED)
+        assert drifter.warning_ticks == WARNING_TICKS
     # Nothing else in the run changes, and the input run is not touched.
-    assert replace(added, objects=(), next_uid=1) == run
-    assert run.objects == ()
+    assert replace(added, drifters=(), next_uid=1) == run
+    assert run.drifters == ()
     assert run.next_uid == 1
 
     # A second call appends after the first, and the uids carry on.
-    more: Run = add_objects(added, [Placement(ObjectType.METEORITE, 400.0, y=80.0)], TUNING)
-    assert [obj.uid for obj in more.objects] == [1, 2, 3, 4]
-    assert more.objects[:3] == added.objects
+    more: Run = add_drifters(added, [Placement(DrifterType.METEORITE, 400.0, y=80.0)], TUNING)
+    assert [drifter.uid for drifter in more.drifters] == [1, 2, 3, 4]
+    assert more.drifters[:3] == added.drifters
     assert more.next_uid == 5
 
     # No placements, or a run at game over: the run comes back unchanged.
-    assert add_objects(run, [], TUNING) == run
-    assert add_objects(added, [], TUNING) == added
+    assert add_drifters(run, [], TUNING) == run
+    assert add_drifters(added, [], TUNING) == added
     over: Run = run_with(game_over=True)
-    assert add_objects(over, placements, TUNING) == over
-    assert over.objects == ()
+    assert add_drifters(over, placements, TUNING) == over
+    assert over.drifters == ()
     assert over.next_uid == 1
 
 
 def test_a_warning_never_hits_and_ends_after_the_30th_step() -> None:
-    run: Run = add_objects(start_run(), [Placement(ObjectType.METEORITE, HOME_X, y=HOME_Y)], TUNING)
+    run: Run = add_drifters(
+        start_run(), [Placement(DrifterType.METEORITE, HOME_X, y=HOME_Y)], TUNING
+    )
     states: list[Run] = [run]
     for _ in range(WARNING_TICKS - 1):
         run = step_run(run, NO_KEY)
@@ -255,8 +258,8 @@ def test_a_warning_never_hits_and_ends_after_the_30th_step() -> None:
 def test_a_hit_costs_a_life_and_starts_invulnerability() -> None:
     before: Run = run_with(rock())
     assert not before.invulnerable
-    # The ship's tick with no object at all.
-    expected: Run = step_run(replace(before, objects=()), NO_KEY)
+    # The ship's tick with no drifter at all.
+    expected: Run = step_run(replace(before, drifters=()), NO_KEY)
 
     run: Run = step_run(before, NO_KEY)
 
@@ -267,7 +270,7 @@ def test_a_hit_costs_a_life_and_starts_invulnerability() -> None:
     assert only(run).phase is Phase.ACTIVE
     assert not run.game_over
     assert not run.waiting
-    # No stun, no bounce: the ship is exactly where a tick with no object puts it.
+    # No stun, no bounce: the ship is exactly where a tick with no drifter puts it.
     assert run.ship == expected.ship
     assert (run.ship.x, run.ship.y, run.ship.vx, run.ship.vy) == pytest.approx(
         (HOME_X, HOME_Y + GRAVITY, 0.0, GRAVITY)
@@ -327,8 +330,8 @@ def test_two_meteorites_on_one_tick_cost_one_life() -> None:
 
     assert run.lives == LIVES_START - 1
     assert run.invuln_ticks_left == INVULN_TICKS
-    assert [obj.hit_ship for obj in run.objects] == [True, True, False]
-    assert len(run.objects) == 3
+    assert [drifter.hit_ship for drifter in run.drifters] == [True, True, False]
+    assert len(run.drifters) == 3
     assert not run.game_over
 
 
@@ -349,7 +352,7 @@ def test_a_graze_zone_overlap_is_not_a_hit() -> None:
 def test_a_hit_on_the_last_life_ends_the_run() -> None:
     speed: float = 0.5
     before: Run = run_with(rock(speed=speed), lives=1)
-    expected: Run = step_run(replace(before, objects=()), NO_KEY)
+    expected: Run = step_run(replace(before, drifters=()), NO_KEY)
 
     over: Run = step_run(before, NO_KEY)
 
@@ -362,16 +365,16 @@ def test_a_hit_on_the_last_life_ends_the_run() -> None:
     assert only(over).hit_ship
     assert only(over).y == pytest.approx(HOME_Y + speed)
 
-    # Everything freezes on the next ticks. Objects don't move, and nothing is added.
+    # Everything freezes on the next ticks. Drifters don't move, and nothing is added.
     run: Run = over
     for _ in range(100):
         run = step_run(run, NO_KEY)
         assert run.game_over
-        assert run.objects == over.objects
+        assert run.drifters == over.drifters
         assert run.ship == over.ship
         assert run.scroll == over.scroll
         assert run.lives == 0
-        assert add_objects(run, [Placement(ObjectType.METEORITE, 10.0)], TUNING) == run
+        assert add_drifters(run, [Placement(DrifterType.METEORITE, 10.0)], TUNING) == run
         assert run.next_uid == over.next_uid
 
 
@@ -418,7 +421,7 @@ def test_a_fall_and_a_touch_on_one_tick_cost_only_the_fall() -> None:
     assert not only(over).hit_ship
 
 
-def test_an_object_is_dropped_when_its_top_edge_reaches_the_floor() -> None:
+def test_an_drifter_is_dropped_when_its_top_edge_reaches_the_floor() -> None:
     speed: float = 2.0
     start_y: float = SCREEN_H + MEDIUM_SIZE / 2 - 4 * speed
     run: Run = run_with(rock(x=100.0, y=start_y, speed=speed))
@@ -429,72 +432,72 @@ def test_an_object_is_dropped_when_its_top_edge_reaches_the_floor() -> None:
         assert only(run).y == pytest.approx(start_y + speed * tick)
 
     run = step_run(run, NO_KEY)
-    assert run.objects == ()
+    assert run.drifters == ()
     assert run.next_uid == 2
 
-    # Above the top of the screen, an object is never dropped.
+    # Above the top of the screen, a drifter is never dropped.
     high: Run = run_with(rock(x=100.0, y=-200.0, speed=0.0))
     for _ in range(300):
         high = hold_ship(step_run(high, NO_KEY))
-        assert len(high.objects) == 1
+        assert len(high.drifters) == 1
     assert only(high).y == -200.0
     falling: Run = run_with(rock(x=100.0, y=-MEDIUM_SIZE * 3, speed=LEVEL_1_SPEED))
     for _ in range(20):
         falling = hold_ship(step_run(falling, NO_KEY))
-        assert len(falling.objects) == 1
+        assert len(falling.drifters) == 1
 
 
-def test_a_retry_starts_with_no_objects() -> None:
+def test_a_retry_starts_with_no_drifters() -> None:
     over: Run = step_run(run_with(rock(), rock(x=50.0, y=100.0), lives=1), NO_KEY)
     assert over.game_over
-    assert len(over.objects) == 2
+    assert len(over.drifters) == 2
     assert over.next_uid == 3
 
     armed: Run = step_run(over, NO_KEY)
-    assert armed.objects == over.objects
+    assert armed.drifters == over.drifters
     run: Run = step_run(armed, Thrust(up=True))
 
     assert not run.game_over
-    assert run.objects == ()
+    assert run.drifters == ()
     assert run.next_uid == 1
     assert run == replace(start_run(), held=Thrust(up=True))
 
-    # The first object of the new run is uid 1 again.
-    again: Run = add_objects(run, [Placement(ObjectType.METEORITE, 10.0)], TUNING)
-    assert [obj.uid for obj in again.objects] == [1]
+    # The first drifter of the new run is uid 1 again.
+    again: Run = add_drifters(run, [Placement(DrifterType.METEORITE, 10.0)], TUNING)
+    assert [drifter.uid for drifter in again.drifters] == [1]
     assert again.scroll == start_scroll()
 
 
-def test_object_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -> None:
+def test_drifter_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.DEBUG, logger=RUN_LOGGER)
 
     # A meteorite that never hits logs exactly three lines.
     run: Run = start_run()
-    run = add_objects(run, [Placement(ObjectType.METEORITE, 100.0)], TUNING)
+    run = add_drifters(run, [Placement(DrifterType.METEORITE, 100.0)], TUNING)
     assert len(lines(caplog)) == 1
-    assert lines(caplog)[0].startswith("object spawn id=1 type=meteorite variant=medium")
+    assert lines(caplog)[0].startswith("drifter spawn id=1 type=meteorite variant=medium")
     for _ in range(150):
         run = hold_ship(step_run(run, NO_KEY))
     seen: list[str] = lines(caplog)
-    assert run.objects == ()
+    assert run.drifters == ()
     assert len(seen) == 3
-    assert seen[0].startswith("object spawn id=1 ")
-    assert seen[1].startswith("object active id=1 type=meteorite ")
-    assert seen[2].startswith("object gone id=1 type=meteorite ")
+    assert seen[0].startswith("drifter spawn id=1 ")
+    assert seen[1].startswith("drifter active id=1 type=meteorite ")
+    assert seen[2].startswith("drifter gone id=1 type=meteorite ")
     caplog.clear()
 
     # Two meteorites placed on the ship: one hit, two touch lines, one life lost. They then
     # fall through the invulnerable ship and log nothing more until they are dropped.
     run = start_run()
-    run = add_objects(
+    run = add_drifters(
         run,
         [
-            Placement(ObjectType.METEORITE, HOME_X - 5.0, y=HOME_Y),
-            Placement(ObjectType.METEORITE, HOME_X + 5.0, y=HOME_Y),
+            Placement(DrifterType.METEORITE, HOME_X - 5.0, y=HOME_Y),
+            Placement(DrifterType.METEORITE, HOME_X + 5.0, y=HOME_Y),
         ],
         TUNING,
     )
-    assert count(lines(caplog), "object spawn") == 2
+    assert count(lines(caplog), "drifter spawn") == 2
     caplog.clear()
     for _ in range(WARNING_TICKS - 1):
         run = hold_ship(step_run(run, NO_KEY))
@@ -509,18 +512,18 @@ def test_object_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) ->
         "touch",
         "lost",
     ]
-    assert hit_lines[2] == "object touch id=1 type=meteorite effect=hit"
-    assert hit_lines[3] == "object touch id=2 type=meteorite effect=hit"
+    assert hit_lines[2] == "drifter touch id=1 type=meteorite effect=hit"
+    assert hit_lines[3] == "drifter touch id=2 type=meteorite effect=hit"
     assert hit_lines[4] == "life lost lives=2"
     caplog.clear()
     for _ in range(100):
         run = hold_ship(step_run(run, NO_KEY))
     later: list[str] = lines(caplog)
-    assert run.objects == ()
-    assert count(later, "object touch") == 0
+    assert run.drifters == ()
+    assert count(later, "drifter touch") == 0
     assert count(later, "life lost") == 0
     assert count(later, "invulnerable end") == 1
-    assert count(later, "object gone") == 2
+    assert count(later, "drifter gone") == 2
     assert len(later) == 3
     caplog.clear()
 
@@ -528,10 +531,10 @@ def test_object_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) ->
     run = run_with(rock(y=HOME_Y - 10.0, speed=LEVEL_1_SPEED), invuln_ticks_left=INVULN_TICKS)
     for _ in range(100):
         run = hold_ship(step_run(run, NO_KEY))
-        if run.objects:
+        if run.drifters:
             assert not only(run).hit_ship
     through: list[str] = lines(caplog)
-    assert run.objects == ()
+    assert run.drifters == ()
     assert run.lives == LIVES_START
-    assert [line.split(" ")[0] for line in through] == ["invulnerable", "object"]
-    assert through[1].startswith("object gone id=1 ")
+    assert [line.split(" ")[0] for line in through] == ["invulnerable", "drifter"]
+    assert through[1].startswith("drifter gone id=1 ")

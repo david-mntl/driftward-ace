@@ -5,7 +5,7 @@ center until `place_hitbox` moves them to screen positions. Overlap is strict: s
 only touch at an edge or a point don't overlap. Stdlib only, pure, no frame time, no
 randomness.
 
-Source: docs/contracts/systems/objects.md, Interface and Rules, Collision.
+Source: docs/contracts/systems/drifters.md, Interface and Rules, Collision.
 """
 
 import logging
@@ -63,7 +63,7 @@ def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool:
     """Return True when any shape of `a` overlaps any shape of `b`. Both must be placed.
 
     Shapes that only touch at an edge or a point don't overlap. An empty hitbox overlaps
-    nothing. Source: objects.md, Rules, Collision.
+    nothing. Source: drifters.md, Rules, Collision.
     """
     return any(_shapes_overlap(sa, sb) for sa in a for sb in b)
 

@@ -1,6 +1,6 @@
 # UFO
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 A UFO that moves in random but readable patterns. It's the one hazard the player can't fully memorize.
@@ -10,7 +10,7 @@ A UFO that moves in random but readable patterns. It's the one hazard the player
 |---|---|---|---|---|---|
 | archetype | Wildcard mover | — | — | locked | Director |
 | enters_from | Sides | — | — | locked | Director |
-| priority | 3 | — | — | guess | 07-objects.md |
+| priority | 3 | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | OBJ-07 |
 | hitbox | TBD | shape, px | — | TBD | OBJ-07 |
 | speed | TBD | px/tick at Level 1 | — | TBD | OBJ-07 |
@@ -21,7 +21,7 @@ A UFO that moves in random but readable patterns. It's the one hazard the player
 
 ## Rules
 1. **Behavior:** Random but readable patterns.
-2. Shared hazard rules apply ([../07-objects.md](../07-objects.md)).
+2. Shared hazard rules apply ([../07-drifters.md](../07-drifters.md)).
 3. Appears, telegraph, moves, hits, leaves, scales: TBD, see OBJ-07.
 
 ## Edge cases

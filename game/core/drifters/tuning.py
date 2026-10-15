@@ -1,8 +1,8 @@
-"""Checked object tuning values the app hands to core. Records only.
+"""Checked drifter tuning values the app hands to core. Records only.
 
 The app checks the tuning files and builds these. Core trusts them.
 
-Source: docs/contracts/systems/objects.md, Interface, tuning.py.
+Source: docs/contracts/systems/drifters.md, Interface, tuning.py.
 """
 
 import logging
@@ -10,14 +10,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from core.collision import Hitbox
-from core.objects.base import ObjectType
+from core.drifters.base import DrifterType
 
 log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class VariantTuning:
-    """One size variant of an object."""
+    """One size variant of a drifter."""
 
     width: float
     """Visible width, px."""
@@ -30,8 +30,8 @@ class VariantTuning:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class ObjectTypeTuning:
-    """The tuning of one object type."""
+class DrifterTypeTuning:
+    """The tuning of one drifter type."""
 
     variants: Mapping[str, VariantTuning]
     """The variants by name."""
@@ -58,11 +58,11 @@ class PlaytestSwitches:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class ObjectTuning:
-    """All object tuning for a run."""
+class DrifterTuning:
+    """All drifter tuning for a run."""
 
-    objects: Mapping[ObjectType, ObjectTypeTuning]
-    """The tuning of each object type."""
+    drifters: Mapping[DrifterType, DrifterTypeTuning]
+    """The tuning of each drifter type."""
 
     switches: PlaytestSwitches
     """The playtest switches."""

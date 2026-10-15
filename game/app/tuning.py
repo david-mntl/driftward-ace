@@ -1,13 +1,13 @@
-"""Load and check the object tuning files and the playtest switches, once, at startup.
+"""Load and check the drifter tuning files and the playtest switches, once, at startup.
 
-Reads `tuning/playtest.json` and one `tuning/objects/<object_type value>.json` per ObjectType,
+Reads `tuning/playtest.json` and one `tuning/drifters/<drifter_type value>.json` per DrifterType,
 checks every rule of their schemas by hand (pygbag has no schema library), and builds the core
 records. Core trusts what this returns. Any bad file raises ValueError naming the file and the
 field; a missing file raises FileNotFoundError as it is. Never falls back to a default.
-Not a startup module: it imports core.objects, so only app.frame imports it, inside the guard.
+Not a startup module: it imports core.drifters, so only app.frame imports it, inside the guard.
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Tuning loader;
-docs/contracts/schemas/object-tuning.schema.json;
+docs/contracts/schemas/drifter-tuning.schema.json;
 docs/contracts/schemas/playtest-switches.schema.json.
 """
 
@@ -19,8 +19,8 @@ from pathlib import Path
 from typing import TypeGuard
 
 from core.collision import Box, Circle, Shape
-from core.objects.base import ObjectType
-from core.objects.tuning import ObjectTuning, ObjectTypeTuning, PlaytestSwitches, VariantTuning
+from core.drifters.base import DrifterType
+from core.drifters.tuning import DrifterTuning, DrifterTypeTuning, PlaytestSwitches, VariantTuning
 
 log = logging.getLogger(__name__)
 
@@ -30,14 +30,14 @@ TUNING_DIR: Path = Path(__file__).resolve().parent.parent / "tuning"
 PLAYTEST_FILE: str = "playtest.json"
 """The playtest switches file, in TUNING_DIR."""
 
-OBJECTS_DIR: str = "objects"
-"""The object tuning folder, in TUNING_DIR. One `<object_type value>.json` per ObjectType."""
+DRIFTERS_DIR: str = "drifters"
+"""The drifter tuning folder, in TUNING_DIR. One `<drifter_type value>.json` per DrifterType."""
 
 _VARIANT_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
-"""Variant names. Source: object-tuning.schema.json, $defs.variant_name."""
+"""Variant names. Source: drifter-tuning.schema.json, $defs.variant_name."""
 
 _SWITCH_FIELDS: frozenset[str] = frozenset({"hazard_speed_scaling", "timer_scaling"})
-_OBJECT_FIELDS: frozenset[str] = frozenset(
+_DRIFTER_FIELDS: frozenset[str] = frozenset(
     {"default_variant", "variants", "speed_ratio", "entry_warning_ticks"}
 )
 _VARIANT_FIELDS: frozenset[str] = frozenset({"width", "height", "hitbox"})
@@ -45,20 +45,20 @@ _CIRCLE_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "r"})
 _BOX_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "w", "h"})
 
 
-def load_tuning() -> ObjectTuning:
-    """Read and check the playtest switches and every object's tuning file, then build them."""
+def load_tuning() -> DrifterTuning:
+    """Read and check the playtest switches and every drifter's tuning file, then build them."""
     switches: PlaytestSwitches = _load_switches(Path(PLAYTEST_FILE))
-    objects: dict[ObjectType, ObjectTypeTuning] = {
-        object_type: _load_object(Path(OBJECTS_DIR) / f"{object_type.value}.json")
-        for object_type in ObjectType
+    drifters: dict[DrifterType, DrifterTypeTuning] = {
+        drifter_type: _load_drifter(Path(DRIFTERS_DIR) / f"{drifter_type.value}.json")
+        for drifter_type in DrifterType
     }
     log.info(
-        "tuning loaded objects=%s hazard_speed_scaling=%s timer_scaling=%s",
-        ",".join(object_type.value for object_type in objects),
+        "tuning loaded drifters=%s hazard_speed_scaling=%s timer_scaling=%s",
+        ",".join(drifter_type.value for drifter_type in drifters),
         switches.hazard_speed_scaling,
         switches.timer_scaling,
     )
-    return ObjectTuning(objects=objects, switches=switches)
+    return DrifterTuning(drifters=drifters, switches=switches)
 
 
 def _read_json(relative: Path) -> tuple[str, object]:
@@ -85,10 +85,10 @@ def _load_switches(relative: Path) -> PlaytestSwitches:
     )
 
 
-def _load_object(relative: Path) -> ObjectTypeTuning:
-    """Check one object tuning file and build its record."""
+def _load_drifter(relative: Path) -> DrifterTypeTuning:
+    """Check one drifter tuning file and build its record."""
     name, data = _read_json(relative)
-    fields: dict[str, object] = _fields(name, "", data, _OBJECT_FIELDS)
+    fields: dict[str, object] = _fields(name, "", data, _DRIFTER_FIELDS)
     variants: dict[str, VariantTuning] = _variants(name, fields["variants"])
     default_variant: str = _variant_name(name, "default_variant", fields["default_variant"])
     if default_variant not in variants:
@@ -96,7 +96,7 @@ def _load_object(relative: Path) -> ObjectTypeTuning:
     speed_ratio: float = _number(name, "speed_ratio", fields["speed_ratio"])
     if speed_ratio < 0:
         raise ValueError(f"{name}: speed_ratio must be a number >= 0")
-    return ObjectTypeTuning(
+    return DrifterTypeTuning(
         variants=variants,
         default_variant=default_variant,
         speed_ratio=speed_ratio,
@@ -162,7 +162,7 @@ def _shape(name: str, path: str, data: object) -> Shape:
 def _check_inside(name: str, path: str, shape: Shape, width: float, height: float) -> None:
     """Raise unless the shape lies inside the variant's width x height footprint, centered.
 
-    Source: 07-objects.md, rule 8 (a hitbox is never bigger than what the player sees).
+    Source: 07-drifters.md, rule 8 (a hitbox is never bigger than what the player sees).
     """
     if isinstance(shape, Circle):
         half_w, half_h = shape.r, shape.r

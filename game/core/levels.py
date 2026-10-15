@@ -2,7 +2,7 @@
 
 Levels are 1 to 8. Stdlib only, pure, no frame time, no randomness.
 
-Source: docs/contracts/systems/objects.md, Interface and Rules, Levels; 08-difficulty.md.
+Source: docs/contracts/systems/drifters.md, Interface and Rules, Levels; 08-difficulty.md.
 """
 
 import logging

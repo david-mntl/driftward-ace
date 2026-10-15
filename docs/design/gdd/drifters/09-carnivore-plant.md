@@ -1,6 +1,6 @@
 # Carnivore plant
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 A plant fixed to a side wall. When the ship comes near, it charges, then lunges. It punishes hugging the walls.
@@ -10,7 +10,7 @@ A plant fixed to a side wall. When the ship comes near, it charges, then lunges.
 |---|---|---|---|---|---|
 | archetype | Static + lunge attack | — | — | locked | Director |
 | enters_from | Sides | — | — | locked | Director |
-| priority | 4 | — | — | guess | 07-objects.md |
+| priority | 4 | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | OBJ-09 |
 | hitbox | TBD | shape, px | — | TBD | OBJ-09 |
 | speed | TBD | px/tick at Level 1 | — | TBD | OBJ-09 |
@@ -23,7 +23,7 @@ A plant fixed to a side wall. When the ship comes near, it charges, then lunges.
 
 ## Rules
 1. **Behavior:** Charges when you're near, then lunges.
-2. Shared hazard rules apply ([../07-objects.md](../07-objects.md)).
+2. Shared hazard rules apply ([../07-drifters.md](../07-drifters.md)).
 3. Appears, telegraph, moves, hits, leaves, scales: TBD, see OBJ-09.
 
 ## Edge cases

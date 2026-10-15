@@ -1,6 +1,6 @@
 """Level table, spawner, registry and meteorite tests.
 
-Contract: docs/contracts/systems/objects.md, Rules. Task:
+Contract: docs/contracts/systems/drifters.md, Rules. Task:
 docs/contracts/DRA-29/tasks/DRA-29-07-qa-engineer.md. One test per behavior it lists. The
 tuning records are built here from the GDD values below, never read from game/tuning/, and
 no expected number is imported from the code under test.
@@ -12,18 +12,18 @@ from typing import ClassVar, cast
 import pytest
 
 from core.collision import Circle
-from core.levels import check_level, hazard_speed_mult, level_at, timer_mult
-from core.objects.base import (
-    GameObject,
-    ObjectType,
+from core.drifters.base import (
+    Drifter,
+    DrifterType,
     Phase,
     TickContext,
     TouchEffect,
 )
-from core.objects.meteorite import Meteorite
-from core.objects.registry import available_objects, object_class, register_object
-from core.objects.spawner import Placement, spawn_object
-from core.objects.tuning import ObjectTuning, ObjectTypeTuning, PlaytestSwitches, VariantTuning
+from core.drifters.meteorite import Meteorite
+from core.drifters.registry import available_drifters, drifter_class, register_drifter
+from core.drifters.spawner import Placement, spawn_drifter
+from core.drifters.tuning import DrifterTuning, DrifterTypeTuning, PlaytestSwitches, VariantTuning
+from core.levels import check_level, hazard_speed_mult, level_at, timer_mult
 from core.ship import Ship, spawn
 
 THRUST_SIDE: float = 0.42
@@ -62,21 +62,22 @@ SIZES: dict[str, tuple[float, float]] = {
     "medium": (28, 14),
     "big": (40, 20),
 }
-"""Variant name to (width, hitbox radius), px. Source: objects/01-meteorite.md, variants (guess)."""
+"""Variant name to (width, hitbox radius), px. Source: drifters/01-meteorite.md, variants
+(guess)."""
 
 START_Y: dict[str, float] = {"small": -10, "medium": -14, "big": -20}
-"""Start y by variant, px: -width / 2. Source: objects/01-meteorite.md, start_y (guess)."""
+"""Start y by variant, px: -width / 2. Source: drifters/01-meteorite.md, start_y (guess)."""
 
 
-def make_tuning(*, hazard_scaling: bool = True, timer_scaling: bool = True) -> ObjectTuning:
+def make_tuning(*, hazard_scaling: bool = True, timer_scaling: bool = True) -> DrifterTuning:
     """Build the meteorite tuning from the GDD values above."""
     variants: dict[str, VariantTuning] = {
         name: VariantTuning(width=width, height=width, hitbox=(Circle(0, 0, radius),))
         for name, (width, radius) in SIZES.items()
     }
-    return ObjectTuning(
-        objects={
-            ObjectType.METEORITE: ObjectTypeTuning(
+    return DrifterTuning(
+        drifters={
+            DrifterType.METEORITE: DrifterTypeTuning(
                 variants=variants,
                 default_variant="medium",
                 speed_ratio=SPEED_RATIO,
@@ -87,7 +88,7 @@ def make_tuning(*, hazard_scaling: bool = True, timer_scaling: bool = True) -> O
     )
 
 
-TUNING: ObjectTuning = make_tuning()
+TUNING: DrifterTuning = make_tuning()
 CTX: TickContext = TickContext(ship=spawn())
 
 
@@ -98,27 +99,27 @@ def place(
     variant: str | None = None,
     as_level: int | None = None,
     level: int = 1,
-    tuning: ObjectTuning = TUNING,
-) -> GameObject:
+    tuning: DrifterTuning = TUNING,
+) -> Drifter:
     """Spawn a meteorite through the spawner."""
     placement: Placement = Placement(
-        ObjectType.METEORITE, x, y=y, variant=variant, as_level=as_level
+        DrifterType.METEORITE, x, y=y, variant=variant, as_level=as_level
     )
-    return spawn_object(placement, level, tuning)
+    return spawn_drifter(placement, level, tuning)
 
 
-def advance(obj: GameObject, ticks: int, ctx: TickContext = CTX) -> GameObject:
-    """Update the object `ticks` times."""
+def advance(drifter: Drifter, ticks: int, ctx: TickContext = CTX) -> Drifter:
+    """Update the drifter `ticks` times."""
     for _ in range(ticks):
-        obj = obj.update(ctx)
-    return obj
+        drifter = drifter.update(ctx)
+    return drifter
 
 
-def active(x: float = 300.0, *, y: float | None = None, variant: str | None = None) -> GameObject:
+def active(x: float = 300.0, *, y: float | None = None, variant: str | None = None) -> Drifter:
     """A meteorite that has just turned ACTIVE at (x, y)."""
-    obj: GameObject = advance(place(x, y=y, variant=variant), WARNING_TICKS)
-    assert obj.phase is Phase.ACTIVE
-    return obj
+    drifter: Drifter = advance(place(x, y=y, variant=variant), WARNING_TICKS)
+    assert drifter.phase is Phase.ACTIVE
+    return drifter
 
 
 def test_level_table_matches_the_gdd() -> None:
@@ -139,16 +140,16 @@ def test_level_table_matches_the_gdd() -> None:
 
 
 def test_default_placement_gets_default_variant_and_start_y() -> None:
-    obj: GameObject = place()
-    assert obj.variant == "medium"
-    assert obj.y == -14
-    assert obj.x == 300
-    assert (obj.width, obj.height) == (28, 28)
-    assert obj.hitbox == (Circle(0, 0, 14),)
-    assert obj.uid == 0
-    assert not obj.hit_ship
+    drifter: Drifter = place()
+    assert drifter.variant == "medium"
+    assert drifter.y == -14
+    assert drifter.x == 300
+    assert (drifter.width, drifter.height) == (28, 28)
+    assert drifter.hitbox == (Circle(0, 0, 14),)
+    assert drifter.uid == 0
+    assert not drifter.hit_ship
     for name, (width, radius) in SIZES.items():
-        sized: GameObject = place(variant=name)
+        sized: Drifter = place(variant=name)
         assert sized.variant == name
         assert sized.y == START_Y[name]
         assert (sized.width, sized.height) == (width, width)
@@ -172,7 +173,7 @@ def test_speed_is_ratio_times_top_side_speed_times_hazard_speed() -> None:
     for name in SIZES:
         assert place(variant=name, level=4).speed == pytest.approx(level_one * 1.18)
     # With the switch off, Level 1 speed at every level and every as_level.
-    off: ObjectTuning = make_tuning(hazard_scaling=False)
+    off: DrifterTuning = make_tuning(hazard_scaling=False)
     for level in range(1, 9):
         assert place(level=level, tuning=off).speed == pytest.approx(level_one)
         assert place(as_level=level, tuning=off).speed == pytest.approx(level_one)
@@ -185,9 +186,9 @@ def test_entry_warning_is_30_ticks_at_every_level() -> None:
             assert place(level=level, tuning=tuning).warning_ticks == WARNING_TICKS
             assert place(as_level=level, tuning=tuning).warning_ticks == WARNING_TICKS
     # Playing it out: 30 updates at Level 8 and 29 still warning.
-    obj: GameObject = place(level=8)
-    assert advance(obj, WARNING_TICKS - 1).phase is Phase.WARNING
-    assert advance(obj, WARNING_TICKS).phase is Phase.ACTIVE
+    drifter: Drifter = place(level=8)
+    assert advance(drifter, WARNING_TICKS - 1).phase is Phase.WARNING
+    assert advance(drifter, WARNING_TICKS).phase is Phase.ACTIVE
 
 
 def test_bad_placements_raise_value_error() -> None:
@@ -200,36 +201,36 @@ def test_bad_placements_raise_value_error() -> None:
         with pytest.raises(ValueError, match=str(bad)):
             place(level=bad)
     with pytest.raises(ValueError, match="specialty"):
-        spawn_object(Placement(ObjectType.METEORITE, 300, specialty_enabled=True), 1, TUNING)
+        spawn_drifter(Placement(DrifterType.METEORITE, 300, specialty_enabled=True), 1, TUNING)
     for switch in (False, None):
-        obj: GameObject = spawn_object(
-            Placement(ObjectType.METEORITE, 300, specialty_enabled=switch), 1, TUNING
+        drifter: Drifter = spawn_drifter(
+            Placement(DrifterType.METEORITE, 300, specialty_enabled=switch), 1, TUNING
         )
-        assert obj.specialty is None
+        assert drifter.specialty is None
 
 
 def test_new_meteorite_warns_for_30_states_then_turns_active_in_place() -> None:
-    obj: GameObject = place(250.0, y=-14.0)
+    drifter: Drifter = place(250.0, y=-14.0)
     for count in range(WARNING_TICKS):
         # State after `count` updates: the born state, then the next 29.
-        assert obj.phase is Phase.WARNING
-        assert obj.ticks_in_phase == count
-        assert obj.current_hitbox() == ()
-        assert obj.graze_zone() == ()
-        assert (obj.x, obj.y) == (250.0, -14.0)
-        obj = obj.update(CTX)
+        assert drifter.phase is Phase.WARNING
+        assert drifter.ticks_in_phase == count
+        assert drifter.current_hitbox() == ()
+        assert drifter.graze_zone() == ()
+        assert (drifter.x, drifter.y) == (250.0, -14.0)
+        drifter = drifter.update(CTX)
     # The 30th update.
-    assert obj.phase is Phase.ACTIVE
-    assert obj.ticks_in_phase == 0
-    assert (obj.x, obj.y) == (250.0, -14.0)
-    assert obj.current_hitbox() == (Circle(250.0, -14.0, 14),)
+    assert drifter.phase is Phase.ACTIVE
+    assert drifter.ticks_in_phase == 0
+    assert (drifter.x, drifter.y) == (250.0, -14.0)
+    assert drifter.current_hitbox() == (Circle(250.0, -14.0, 14),)
     for name, (_, radius) in SIZES.items():
-        living: GameObject = advance(place(250.0, variant=name), WARNING_TICKS)
+        living: Drifter = advance(place(250.0, variant=name), WARNING_TICKS)
         assert living.current_hitbox() == (Circle(250.0, START_Y[name], radius),)
 
 
 def test_active_meteorite_falls_straight_down_at_its_speed() -> None:
-    start: GameObject = active(222.0, y=-14.0)
+    start: Drifter = active(222.0, y=-14.0)
     speed: float = SPEED_RATIO * TOP_SIDE_SPEED
     assert start.speed == pytest.approx(speed)
     ships: list[Ship] = [
@@ -238,13 +239,13 @@ def test_active_meteorite_falls_straight_down_at_its_speed() -> None:
         Ship(x=600.0, y=470.0, vx=6.0, vy=5.5),
         Ship(x=222.0, y=-14.0, vx=0.0, vy=0.0),
     ]
-    obj: GameObject = start
+    drifter: Drifter = start
     for n in range(1, 61):
-        obj = obj.update(TickContext(ship=ships[n % len(ships)]))
-        assert obj.phase is Phase.ACTIVE
-        assert obj.ticks_in_phase == n
-        assert obj.x == 222.0
-        assert obj.y == pytest.approx(-14.0 + n * speed)
+        drifter = drifter.update(TickContext(ship=ships[n % len(ships)]))
+        assert drifter.phase is Phase.ACTIVE
+        assert drifter.ticks_in_phase == n
+        assert drifter.x == 222.0
+        assert drifter.y == pytest.approx(-14.0 + n * speed)
     # The input is never mutated.
     assert (start.y, start.ticks_in_phase) == (-14.0, 0)
 
@@ -270,10 +271,10 @@ def test_is_off_screen_rules() -> None:
     assert not active(-19.0, y=200.0, variant="big").is_off_screen()
     assert active(-20.0, y=200.0, variant="big").is_off_screen()
     # It falls off the floor after a run of ticks: 103 active updates from -14 at Level 1.
-    obj: GameObject = active(300.0, y=-14.0)
+    drifter: Drifter = active(300.0, y=-14.0)
     ticks: int = 0
-    while not obj.is_off_screen():
-        obj = obj.update(CTX)
+    while not drifter.is_off_screen():
+        drifter = drifter.update(CTX)
         ticks += 1
     assert ticks == 103
 
@@ -293,19 +294,19 @@ def test_warning_center_moves_just_inside_the_screen() -> None:
 
 
 def test_graze_zone_is_the_hitbox_grown_by_14_and_touch_is_a_hit() -> None:
-    obj: GameObject = active(300.0, y=100.0)
-    assert obj.effect_on_touch() is TouchEffect.HIT
-    assert obj.graze_zone() == (Circle(300.0, 100.0, 14 + GRAZE_MARGIN),)
-    big: GameObject = active(300.0, y=100.0, variant="big")
+    drifter: Drifter = active(300.0, y=100.0)
+    assert drifter.effect_on_touch() is TouchEffect.HIT
+    assert drifter.graze_zone() == (Circle(300.0, 100.0, 14 + GRAZE_MARGIN),)
+    big: Drifter = active(300.0, y=100.0, variant="big")
     assert big.graze_zone() == (Circle(300.0, 100.0, 20 + GRAZE_MARGIN),)
     assert place().effect_on_touch() is TouchEffect.HIT
 
 
 def test_meteorite_hits_once() -> None:
-    obj: GameObject = place()
-    assert obj.may_hit_ship()
+    drifter: Drifter = place()
+    assert drifter.may_hit_ship()
     assert active().may_hit_ship()
-    hit: GameObject = replace(active(), hit_ship=True)
+    hit: Drifter = replace(active(), hit_ship=True)
     assert not hit.may_hit_ship()
     # It keeps falling and stays a meteorite that can't hit again.
     assert not hit.update(CTX).may_hit_ship()
@@ -313,13 +314,13 @@ def test_meteorite_hits_once() -> None:
 
 
 def test_registry_holds_the_meteorite_and_refuses_duplicates_and_abstract_classes() -> None:
-    assert ObjectType.METEORITE in available_objects()
-    assert object_class(ObjectType.METEORITE) is Meteorite
-    before: frozenset[ObjectType] = available_objects()
+    assert DrifterType.METEORITE in available_drifters()
+    assert drifter_class(DrifterType.METEORITE) is Meteorite
+    before: frozenset[DrifterType] = available_drifters()
 
     @dataclass(frozen=True, slots=True, kw_only=True)
-    class SecondMeteorite(GameObject):
-        object_type: ClassVar[ObjectType] = ObjectType.METEORITE
+    class SecondMeteorite(Drifter):
+        drifter_type: ClassVar[DrifterType] = DrifterType.METEORITE
 
         @classmethod
         def default_y(cls, height: float) -> float:
@@ -335,11 +336,11 @@ def test_registry_holds_the_meteorite_and_refuses_duplicates_and_abstract_classe
             return True
 
     with pytest.raises(ValueError, match="meteorite"):
-        register_object(SecondMeteorite)
+        register_drifter(SecondMeteorite)
 
     @dataclass(frozen=True, slots=True, kw_only=True)
-    class HalfBuilt(GameObject):
-        object_type: ClassVar[ObjectType] = ObjectType.METEORITE
+    class HalfBuilt(Drifter):
+        drifter_type: ClassVar[DrifterType] = DrifterType.METEORITE
 
         @classmethod
         def default_y(cls, height: float) -> float:
@@ -352,7 +353,7 @@ def test_registry_holds_the_meteorite_and_refuses_duplicates_and_abstract_classe
             return TouchEffect.NONE
 
     with pytest.raises(TypeError):
-        register_object(cast(type[GameObject], HalfBuilt))
+        register_drifter(cast(type[Drifter], HalfBuilt))
 
-    assert available_objects() == before
-    assert object_class(ObjectType.METEORITE) is Meteorite
+    assert available_drifters() == before
+    assert drifter_class(DrifterType.METEORITE) is Meteorite

@@ -1,6 +1,6 @@
 # Chain lightning
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 Glowing nodes appear mid-screen. A charge line shows between them, then an arc fires along that line. The warning is the whole point: the player sees exactly where the strike will land.
@@ -10,7 +10,7 @@ Glowing nodes appear mid-screen. A charge line shows between them, then an arc f
 |---|---|---|---|---|---|
 | archetype | Telegraphed link | — | — | locked | Director |
 | enters_from | Mid-screen | — | — | locked | Director |
-| priority | 2 | — | — | guess | 07-objects.md |
+| priority | 2 | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | OBJ-03 |
 | hitbox | TBD | shape, px | — | TBD | OBJ-03 |
 | speed | TBD | px/tick at Level 1 | — | TBD | OBJ-03 |
@@ -24,7 +24,7 @@ Glowing nodes appear mid-screen. A charge line shows between them, then an arc f
 
 ## Rules
 1. **Behavior:** Charge line shows, then an arc fires.
-2. Shared hazard rules apply ([../07-objects.md](../07-objects.md)).
+2. Shared hazard rules apply ([../07-drifters.md](../07-drifters.md)).
 3. Appears, telegraph, moves, hits, leaves, scales: TBD, see OBJ-03.
 
 ## Edge cases

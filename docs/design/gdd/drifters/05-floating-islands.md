@@ -1,6 +1,6 @@
 # Floating islands
 Status: draft
-Depends on: [../07-objects.md](../07-objects.md) (shared hazard rules)
+Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules)
 
 ## Summary
 Static slabs of floating ground span the screen, leaving one gap to fly through. They force the player to a single path.
@@ -10,7 +10,7 @@ Static slabs of floating ground span the screen, leaving one gap to fly through.
 |---|---|---|---|---|---|
 | archetype | Forced-path blocker | — | — | locked | Director |
 | enters_from | Top | — | — | locked | Director |
-| priority | 2 | — | — | guess | 07-objects.md |
+| priority | 2 | — | — | guess | 07-drifters.md |
 | size | TBD | px | — | TBD | OBJ-05 |
 | hitbox | TBD | shape, px | — | TBD | OBJ-05 |
 | speed | TBD | px/tick at Level 1 | — | TBD | OBJ-05 |
@@ -22,7 +22,7 @@ Static slabs of floating ground span the screen, leaving one gap to fly through.
 
 ## Rules
 1. **Behavior:** Static slabs span the screen, leaving one gap.
-2. Shared hazard rules apply ([../07-objects.md](../07-objects.md)).
+2. Shared hazard rules apply ([../07-drifters.md](../07-drifters.md)).
 3. Appears, telegraph, moves, hits, leaves, scales: TBD, see OBJ-05.
 
 ## Edge cases
