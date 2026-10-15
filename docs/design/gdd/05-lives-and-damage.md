@@ -25,13 +25,15 @@ The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor i
    2. Play the **life-lost feedback** (rule 3).
    3. Respawn at `fall_respawn`: x 320, y 240, `vx = vy = 0`.
    4. Become invulnerable for `invuln_ticks`, blinking.
+   5. The ship stands at `fall_respawn`, at rest, until the first arrow key press. An arrow held through the fall does not count; the player releases it and presses again. The respawn completes at that press. That press also thrusts the ship on the same tick. Gravity and drag apply from then on. The world keeps scrolling during the wait. The wait has no time limit.
+   6. **Fall while invulnerable.** The fall costs no life. The ship respawns at `fall_respawn`, at rest, and does not wait for a key. The invulnerability timer keeps running. No life-lost feedback plays.
 3. **Life-lost feedback.** On every lost life, all three play at once. They are looks only: none of them changes physics, control or the camera.
    1. **Screen flash.** A brief full-screen flash.
    2. **HUD life breaks.** The lost life in the top-right visibly breaks.
    3. **Ship burst and rebuild.** The ship bursts into particles, which then pull back together into the ship while it blinks. The rebuild ends by the time invulnerability ends.
 
    Look, colors and timings: [10-ui.md](10-ui.md), LD-08.
-4. **Invulnerable** means hazards pass through the ship with no hit. Lava walls count as hazards. Whether falls still count is LD-05.
+4. **Invulnerable** means hazards pass through the ship with no hit. Lava walls count as hazards. A fall while invulnerable follows rule 2.6.
 5. **Game over** happens the tick lives reach 0. See [02-game-flow.md](02-game-flow.md). Whether the last life plays the feedback before the game-over screen is LD-09.
 6. The GDD has no way to gain a life. Adding one is a new feature and needs the Director's approval.
 
@@ -42,7 +44,7 @@ The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor i
 - The ship's hitbox while it is drawn as particles: unchanged. The burst is a look, not a state.
 
 ## Open
-- LD-04, LD-05, LD-06, LD-07, LD-08, LD-09.
+- LD-04, LD-06, LD-07, LD-08, LD-09.
 
 ## How to extend
 A new way to lose a life must say where the ship ends up, whether invulnerability blocks it, and that it plays the life-lost feedback. Add it as a numbered rule here and link it from the object's spec.

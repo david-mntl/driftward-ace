@@ -31,7 +31,11 @@ flowchart TD
     D -->|bug from play| QA
     GI --> IR
     UI --> IR
+    IR -->|changes requested| GI
+    IR -->|changes requested| UI
     IR -->|reviewed| QA
+    GI -.->|round 2 review fix| QA
+    UI -.->|round 2 review fix| QA
     QA -->|bug report| GI
     QA -->|bug report| UI
     QA -->|pass| IE
@@ -63,23 +67,25 @@ Diamonds block work until they pass. Pink nodes are critics.
 | 1 | Trainer | `.claude/agents/` | Director asks to create or revise an agent, or reports an ownership gap | Builder | a finished game, because no work fell between two agents |
 | 2 | Scope Guardian | `docs/reports/scope/`; Linear feature issues and their task statuses | the Director opens a chat with a feature or idea | Gate, blocks; the Director's assistant for Linear | one finished game instead of three half-built systems |
 | 3 | Architect | `docs/contracts/`; Linear task sub-issues (create, close at close-out) | Scope Guardian approves a feature, or asks for technical advice | Generator | new features land without breaking what already worked |
-| 4 | Gameplay Implementer | `game/core/`, `game/requirements.txt`, `game/ruff.toml`, `docs/reports/implementation/gameplay/` | Architect issues a gameplay task | Generator | the ship thrusts, drifts, falls, and dies on contact |
-| 5 | UI Developer | `game/ui/`, `docs/reports/implementation/ui/` | Architect issues a presentation task | Generator | height, score, and death state shown clearly on screen |
+| 4 | Gameplay Implementer | `game/core/`, `game/requirements.txt`, `game/ruff.toml`, `docs/reports/implementation/gameplay/` | Architect issues a gameplay task, or the Implementation Reviewer requests changes | Generator | the ship thrusts, drifts, falls, and dies on contact |
+| 5 | UI Developer | `game/ui/`, `docs/reports/implementation/ui/` | Architect issues a presentation task, or the Implementation Reviewer requests changes | Generator | height, score, and death state shown clearly on screen |
 | 6 | Tuning Engineer | `game/tuning/` | physics loop first runs, or Director calls a tuning session | Generator | controls that feel tight instead of floaty or leaden |
 | 7 | Wave Designer | `game/waves/` | Director requests a new wave | Generator | a hand-shaped gauntlet instead of random noise |
 | 8 | Wave Critic | `docs/reports/waves/` | Wave Designer submits a wave file | Critic, blocks | waves that are punishing but always survivable |
 | 9 | Art & Audio Engineer | `game/assets/`, `staging/assets/`, `tools/art/` | Architect registers a new entity type, or the Director asks directly | Generator | a coherent world instead of colored rectangles |
-| 10 | Implementation Reviewer | `docs/reports/review/` | Gameplay Implementer or UI Developer finishes a task | Critic, advises | a game that stays stable as features pile up |
-| 11 | QA Engineer | `game/tests/`, `docs/reports/qa/` | Implementation Reviewer finishes a task, an implementer submits a fix, Architect issues a test task, or the Director reports a bug | Critic, blocks | collisions, scoring, and wave loading correct on every run |
+| 10 | Implementation Reviewer | `docs/reports/review/` | Gameplay Implementer or UI Developer finishes a task, or answers its findings (Re-check, once) | Critic, advises; sends findings back for one fix round before QA | a game that stays stable as features pile up |
+| 11 | QA Engineer | `game/tests/`, `docs/reports/qa/` | the review reads `reviewed`, or an implementer's round 2 review fix lands, an implementer submits a fix, Architect issues a test task, or the Director reports a bug | Critic, blocks | collisions, scoring, and wave loading correct on every run |
 | 12 | Integration Engineer | `game/main.py`, `game/app/`, `game/scripts/`, `pygbag.ini`, `docs/reports/integration/` | work from two or more agents needs to merge | Generator | the game launches and runs in the browser |
 
 ## Work lanes
 
 **Structural:** the work changes a contract. Scope Guardian → Architect → implementer → Implementation Reviewer → QA Engineer → Integration Engineer → Architect (close-out). Close-out reads the open review findings first and asks the Director before closing.
 
+**Review fixes:** inside the structural lane. If the review asks for any change, the implementer fixes every finding it can (round 1) → the Reviewer re-checks once → if a must-fix or should-fix is still open, the implementer fixes only those (round 2) → QA. Notes left open stay open. The Reviewer runs at most twice per task.
+
 **Content:** the work fills an existing contract (waves, tuning values, assets). It skips the Architect. The producer follows the schema exactly; if the schema doesn't fit, it stops and reports, and the work moves to the structural lane.
 
-**Fixes:** a QA bug report goes straight to the agent that owns the broken file, then back through QA.
+**Fixes:** a QA bug report goes straight to the agent that owns the broken file, then back through QA. QA bug fixes skip review.
 
 ## Rules
 - No two agents write the same path. Any agent may read anything.

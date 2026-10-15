@@ -1,8 +1,9 @@
 """Ship state and its one-tick physics step.
 
 The step runs on the fixed 60 Hz tick: thrust, gravity, drag, fall cap, move, side walls,
-the top-line ceiling, then the floor respawn, a TEMPORARY DRA-6 stand-in. It never
-mutates its input, never reads frame time, randomness or the run mode.
+the top-line ceiling. It never respawns the ship. The floor check is `is_below_floor`, used
+by `core.run`, which decides what a fall costs. It never mutates its input, never reads
+frame time, randomness or the run mode.
 
 Source: docs/contracts/systems/ship.md, Interface and Rules.
 """
@@ -95,7 +96,8 @@ def step(ship: Ship, thrust: Thrust) -> Ship:
     """Advance the ship one 60 Hz tick and return the new ship. Never mutates the input.
 
     Pure apart from DEBUG event logging on `core.ship`: a line when wall or top-line
-    contact starts, and one on each respawn. No line on a tick where nothing happened.
+    contact starts. No line on a tick where nothing happened. Never respawns the ship, even
+    past the floor: `is_below_floor` reports that and `core.run` applies the fall.
     Source: 04-ship.md, rule 2 (tick order); systems/ship.md, Rules and Logging.
     """
     vx, vy = _accelerate(ship.vx, ship.vy, thrust)
@@ -105,9 +107,6 @@ def step(ship: Ship, thrust: Thrust) -> Ship:
     y, vy, at_top_line = _stop_at_top_line(y, vy)
     moved = Ship(x=x, y=y, vx=vx, vy=vy, wall=wall, at_top_line=at_top_line)
     _log_contact_starts(ship, moved)
-    if _is_below_floor(moved):
-        log.debug("respawn from x=%.2f y=%.2f", moved.x, moved.y)
-        return spawn()
     return moved
 
 
@@ -156,10 +155,11 @@ def _stop_at_top_line(y: float, vy: float) -> tuple[float, float, bool]:
     return y, vy, False
 
 
-def _is_below_floor(ship: Ship) -> bool:
-    """Step 8 check, TEMPORARY for DRA-6 until lives exist: the top edge is at or past the floor.
+def is_below_floor(ship: Ship) -> bool:
+    """Step 8 check: True when the ship's top edge is at or past the floor. Pure, no logging.
 
-    Source: scope report DRA-6, Limits; 03-world-and-camera.md, rule 5.
+    Used by `core.run` right after `step` to apply the fall.
+    Source: 04-ship.md, rule 2.8; 03-world-and-camera.md, rule 5; systems/ship.md, Rules.
     """
     return ship.y - SHIP_H / 2 >= SCREEN_H
 

@@ -6,7 +6,7 @@ The Architect's folder. It holds two different things: **specs** for the code, o
 contracts/
   CHANGELOG.md                 every version change, by feature
   systems/                     one spec per part of the code, always current
-    app.md  ship.md  world.md  debug-overlay.md  scroll.md  hud.md
+    app.md  ship.md  world.md  debug-overlay.md  scroll.md  hud.md  run.md
   schemas/                     JSON schemas for data files (when they exist)
   <feature-id>/tasks/          the tickets for that feature
     <feature-id>-<nn>-<assignee>.md
