@@ -1,6 +1,6 @@
 # Waves
 Status: draft
-Depends on: [07-objects.md](07-objects.md), [08-difficulty.md](08-difficulty.md), [04-ship.md](04-ship.md)
+Depends on: [07-drifters.md](07-drifters.md), [08-difficulty.md](08-difficulty.md), [04-ship.md](04-ship.md)
 
 ## Summary
 Waves are hand-authored JSON files that place hazards and coins. Every run opens with the same meteorites-only Wave 0. A wave must pass `wave_check` before it counts as done. `wave_check` runs the real physics headless at Level 8 and proves the wave is hard but fair.
@@ -9,17 +9,17 @@ Waves are hand-authored JSON files that place hazards and coins. Every run opens
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
 | check_level | 8 | level | — | locked | Director |
-| telegraph_min | see [07-objects.md](07-objects.md#values) | — | — | locked | — |
+| telegraph_min | see [07-drifters.md](07-drifters.md#values) | — | — | locked | — |
 | gap_min | 2.5 | × ship_w | — | locked | Director |
 | seam_clear | 120 | px | — | locked | Director |
 | wave_count_mvp | TBD | waves | — | TBD | WV-03 |
 
 ## Rules
-1. **Format.** JSON. Each object entry has world coordinates (x, y up), an entry side and a trigger distance ([03-world-and-camera.md](03-world-and-camera.md) rule 8). Source: Director. The exact field names and types are the wave schema's job, not the GDD's. Never add, rename or drop a field without a schema change.
+1. **Format.** JSON. Each drifter entry has world coordinates (x, y up), an entry side and a trigger distance ([03-world-and-camera.md](03-world-and-camera.md) rule 8). Source: Director. The exact field names and types are the wave schema's job, not the GDD's. Never add, rename or drop a field without a schema change.
 2. Coordinates are relative to the wave's start or absolute: WV-04.
 3. **Wave 0** holds meteorites only, is the same every run, and always comes first. Source: [01-vision.md](01-vision.md), Locked decisions. Its content is WV-05.
 4. **Order after Wave 0:** WV-01. **After the last wave:** WV-02. Procedural levels are out of scope ([01-vision.md](01-vision.md)).
-5. Only objects whose tier is unlocked at the current level may appear ([08-difficulty.md](08-difficulty.md)).
+5. Only drifters whose tier is unlocked at the current level may appear ([08-difficulty.md](08-difficulty.md)).
 6. **Coins** go near hazards, never in safe spots. Source: [01-vision.md](01-vision.md), Pillar 3. How many and how near: WV-07.
 7. **wave_check** runs at `check_level` and fails the wave unless all of these hold:
    1. Every telegraph lasts ≥ `telegraph_min` ticks.

@@ -11,7 +11,7 @@ The Director (the human) makes every final call. A crew of AI agents builds the 
 The GDD in `docs/design/gdd/` is the only source of truth for the game. This file holds only what every agent needs on every task, and points into the GDD for the rest.
 
 - Start at `docs/design/gdd/00-index.md`. Open only the file its routing table names.
-- Check the GDD before using any number, schema, or object behavior.
+- Check the GDD before using any number, schema, or drifter behavior.
 - A value marked `guess` may be used; say so in your report. A value marked `TBD` is missing: ask the Director. Never fill it in.
 - If the GDD doesn't answer it, ask the Director. Do not guess a value.
 - If the GDD contradicts this file, the GDD wins. Stop and flag it anyway.

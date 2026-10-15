@@ -10,10 +10,10 @@ The ship has no weapon and no brake. Arrow keys add thrust, gravity always pulls
 |---|---|---|---|---|---|
 | ship_w | 32 | px | — | guess | starting placeholder |
 | ship_h | 32 | px | — | guess | starting placeholder |
-| hitbox | TBD | — | — | TBD | SH-03 |
+| hitbox | an inverted T of two boxes: a bar 12 px wide, `ship_h` tall, centered; and a foot `ship_w` wide, 12 px tall, along the bottom | px | — | guess | Director (inverted T); sizes are a starting placeholder |
 | look | TBD | sprite, colors, animation | — | TBD | SH-06 |
 | look_reference | Small rocket with an orange flame | — | — | guess | Director |
-| placeholder_look | white (255, 255, 255) filled rectangle, `ship_w` × `ship_h` | RGB | — | guess | starting placeholder |
+| placeholder_look | white (255, 255, 255), filled, the same inverted T as `hitbox` | RGB | — | guess | Director: what you see matches what can be hit |
 | gravity | 0.16 | px/tick² | TBD | guess | Director tuning guess |
 | thrust_side | 0.42 | px/tick² | TBD | guess | Director tuning guess |
 | thrust_up | 0.42 | px/tick² | TBD | guess | Director tuning guess |
@@ -45,14 +45,15 @@ Derived from the guesses above. Recompute when a value changes:
 5. **Up beats gravity.** `thrust_up` must stay greater than `gravity`, or the ship can't climb. Every slider range must keep this true.
 6. **Fall cap bound.** A fall from the top line (y 168) to the floor (y 480) is 312 px and must take at least `min_fall_ticks`. So `fall_cap` must be ≤ 312 / 54 ≈ 5.77 px/tick.
 7. **No vertical drag and no upward speed cap**, unless SH-05 says otherwise.
-8. **Looks.** The ship's look lives in this file, like every object's look lives in its spec. Until `look` is set, draw `placeholder_look`. Thrust flame, blink and burst-and-rebuild must all stay readable at `ship_w` × `ship_h`. Blink and burst: [05-lives-and-damage.md](05-lives-and-damage.md). Global style and palette: [12-art-and-audio.md](12-art-and-audio.md).
+8. **Hitbox.** The ship never rotates, so its boxes stay upright. The hitbox is never bigger than what the player sees ([07-drifters.md](07-drifters.md), rule 8).
+9. **Looks.** The ship's look lives in this file, like every drifter's look lives in its spec. Until `look` is set, draw `placeholder_look`. Thrust flame, blink and burst-and-rebuild must all stay readable at `ship_w` × `ship_h`. Blink and burst: [05-lives-and-damage.md](05-lives-and-damage.md). Global style and palette: [12-art-and-audio.md](12-art-and-audio.md).
 
 ## Edge cases
 - Left and right held together: they cancel, and drag still slows the ship.
 - Up and down held together: they cancel, and gravity still pulls.
 
 ## Open
-- SH-02, SH-03, SH-04, SH-05, SH-06.
+- SH-02, SH-04, SH-05, SH-06.
 
 ## How to extend
 A new physics value: add a row with unit, range and status, and place it in the tick order. If it's live-tunable, the tuning file needs a matching key, which is a schema change.

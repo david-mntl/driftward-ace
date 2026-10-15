@@ -1,6 +1,6 @@
 # Scoring
 Status: draft
-Depends on: [03-world-and-camera.md](03-world-and-camera.md), [05-lives-and-damage.md](05-lives-and-damage.md), [07-objects.md](07-objects.md)
+Depends on: [03-world-and-camera.md](03-world-and-camera.md), [05-lives-and-damage.md](05-lives-and-damage.md), [07-drifters.md](07-drifters.md)
 
 ## Summary
 `score = meters + 50 × coins + 25 × grazes`. Meters count distance flown, so surviving earns them. Coins and grazes pay extra for going near danger, so taking risks always beats just surviving. Coins sit near danger. Grazes pay for flying close to a hazard and getting away clean. Grazes should add about 20–30% to a good run.
@@ -11,14 +11,14 @@ Depends on: [03-world-and-camera.md](03-world-and-camera.md), [05-lives-and-dama
 | points_per_meter | 1 | points/m | — | locked | Director |
 | coin_points | 50 | points | — | locked | Director |
 | graze_points | 25 | points | — | locked | Director |
-| graze_margin | 14 | px added to hitbox radius | — | locked | Director |
+| graze_margin | 14 | px added around each hitbox shape | — | locked | Director |
 | graze_share_target | 20–30 | % of a good run's score | — | locked | Director. A tuning target, not a rule in code |
 | meters_rounding | whole meters, rounded down | — | — | locked | Director |
 
 ## Rules
 1. **Meters** = distance ÷ `px_per_meter` ([03-world-and-camera.md](03-world-and-camera.md) rule 8), rounded per `meters_rounding`. It never goes down.
-2. **Coins.** Touching a coin collects it: +`coin_points`, and the coin disappears. Coins are placed near hazards ([objects/04-coin.md](objects/04-coin.md)). Whether an invulnerable ship can collect is SC-05.
-3. **Graze zone** = the hazard's hitbox radius + `graze_margin`. See SC-03 for hazards that aren't circles.
+2. **Coins.** Touching a coin collects it: +`coin_points`, and the coin disappears. Coins are placed near hazards ([drifters/04-coin.md](drifters/04-coin.md)). Whether an invulnerable ship can collect is SC-05.
+3. **Graze zone** = each shape of the hazard's hitbox, grown by `graze_margin` on every side: a circle's radius grows by it, a box grows by it on all four sides. Line-shaped hazards (arcs): SC-03.
 4. **Graze pays** `graze_points` once per hazard, on the tick the ship leaves that hazard's zone without having touched the hazard.
 5. **Graze never pays** while the ship is invulnerable, for walls or lava, or for coins. See SC-02 for a ship that enters while invulnerable and leaves after.
 6. A hazard that hits the ship pays no graze.

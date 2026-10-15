@@ -1,86 +1,120 @@
 # Debug overlay
-Version: 3
+Version: 4
 Status: frozen
-Features: DRA-6, DRA-13, DRA-19
+Features: DRA-6, DRA-13, DRA-19, DRA-29
 Created by: architect
 
 ## Purpose
-In debug mode, show the ship's numbers and the lines the rules use, so the drift can be read and tuned. The view only reads core state. Whether it shows is decided by the app.
+In debug mode, show the ship's numbers and the lines the rules use, so the drift can be read and tuned. From DRA-29 it also outlines every hitbox (the ship's and each drifter's) and every hazard's graze zone, and labels each drifter with its name, variant, x, y and phase, so start positions and touches can be checked before waves exist. The view only reads core state. Whether it shows is decided by the app.
 
-From DRA-13 the overlay also tells the HUD where its text ends, so the HUD can sit below it with no overlap (`docs/contracts/systems/hud.md`). What the overlay shows doesn't change.
+From DRA-13 the overlay also tells the HUD where its text ends, so the HUD can sit below it with no overlap (`docs/contracts/systems/hud.md`).
 
 Who builds what:
-- `game/ui/debug_overlay.py`: the UI Developer, task `DRA-6-04-ui-developer`. `overlay_text_bottom()`: task `DRA-13-03-ui-developer`. No `-0.00` in DRA-19: task `DRA-19-02-ui-developer`.
-- `overlay_visible` and the F3 toggle: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
+- `game/ui/debug_overlay.py`: the UI Developer, task `DRA-6-04-ui-developer`. `overlay_text_bottom()`: task `DRA-13-03-ui-developer`. No `-0.00` in DRA-19: task `DRA-19-02-ui-developer`. `draw_debug_hitboxes()` in DRA-29: task `DRA-29-06-ui-developer`.
+- `overlay_visible` and the F3 toggle, and calling both draw functions: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
 
 ## Diagram
 ```mermaid
 flowchart LR
   S["core.ship.Ship<br/>x, y, vx, vy"] --> O["ui.debug_overlay<br/>draw_debug_overlay"]
   W["core.world<br/>SCREEN_W, SCREEN_H, TOP_LINE_Y"] --> O
-  A["app.frame<br/>overlay_visible"] -- "calls only when True" --> O
+  R["core.run.Run<br/>ship, drifters"] --> H["ui.debug_overlay<br/>draw_debug_hitboxes"]
+  SH["core.ship.ship_hitbox"] --> H
+  OB["core.drifters Drifter<br/>current_hitbox, graze_zone,<br/>drifter_type, variant, x, y, phase"] --> H
+  A["app.frame<br/>overlay_visible"] -- "calls both only when True:<br/>hitboxes first, then the overlay" --> H
+  A --> O
+```
+
+```
+   meteorite warning: glow at the top edge        active: outlines follow the rock
+   +-----------------------------------------+     .--.  graze zone (r + 14)
+   |                 (*)                     |    ( () )  hitbox (r)
+   |meteorite medium x 320.00 y -14.00 warning|    '--'
+   |                                         |    meteorite medium x 320.00 y 120.00 active
 ```
 
 ## Interface
 ```python
 # game/ui/debug_overlay.py
-# Imports: pygame, core.ship, core.world. Never app. Never reads the run mode.
+# Imports: pygame, core.ship, core.world, core.run, core.drifters.base, ui.shapes (DRA-29).
+# Never app. Never reads the run mode.
 OVERLAY_COLOR: tuple[int, int, int] = (0, 255, 0)   # 10-ui.md, debug_overlay_color (guess)
 OVERLAY_FONT_SIZE: int = 16                         # 10-ui.md, debug_text_font: default font, 16 (guess)
 OVERLAY_MARGIN: int = 4                             # 10-ui.md, debug_overlay_layout: text 4 px from left and top (guess)
 
-def draw_debug_overlay(surface: pygame.Surface, ship: Ship) -> None: ...
+def draw_debug_overlay(surface: pygame.Surface, ship: Ship) -> None: ...   # unchanged
 
-def overlay_text_bottom() -> int: ...       # DRA-13
+def overlay_text_bottom() -> int: ...       # DRA-13, unchanged
     # The first screen row below every pixel the four text lines can cover:
     # OVERLAY_MARGIN + 3 * linesize + max(linesize, font height), from the overlay's own font.
-    # Draws nothing. Needs pygame.font initialized. Uses the same cached font as the draw.
+
+def draw_debug_hitboxes(surface: pygame.Surface, run: Run) -> None: ...   # DRA-29
+    # Outlines every hitbox and graze zone, and labels every drifter.
 ```
 
 ## Presentation
-`draw_debug_overlay` reads only these core fields and constants. It draws on top of what is there.
+`draw_debug_overlay` reads only these core fields and constants. Unchanged in DRA-29.
 
 | Core field | Shown as |
 |---|---|
 | `ship.x` | text line 1, `x <value>` with two decimals, e.g. `x 320.00`. Source: 10-ui.md, debug_overlay, debug_overlay_layout (guess) |
-| `ship.y` | text line 2, `y <value>`, e.g. `y 240.00`. Source: same |
-| `ship.vx` | text line 3, `vx <value>`, e.g. `vx 0.00`. Source: same |
-| `ship.vy` | text line 4, `vy <value>`, e.g. `vy 0.00`. Source: same |
-| `TOP_LINE_Y` | a 1 px horizontal line, the full surface width, on row `TOP_LINE_Y` (168). Source: 10-ui.md, debug_overlay, debug_overlay_layout; 03-world-and-camera.md, rule 2 |
-| `SCREEN_H` (the floor) | a 1 px horizontal line, the full surface width, on row `SCREEN_H - 1` (479), the last visible row. Source: 10-ui.md, debug_overlay_layout; 03-world-and-camera.md, rule 5 |
+| `ship.y` | text line 2, `y <value>`, e.g. `y 240.00` |
+| `ship.vx` | text line 3, `vx <value>`, e.g. `vx 0.00` |
+| `ship.vy` | text line 4, `vy <value>`, e.g. `vy 0.00` |
+| `TOP_LINE_Y` | a 1 px horizontal line, the full surface width, on row `TOP_LINE_Y` (168). Source: 10-ui.md, debug_overlay_layout; 03-world-and-camera.md, rule 2 |
+| `SCREEN_H` (the floor) | a 1 px horizontal line, the full surface width, on row `SCREEN_H - 1` (479). Source: 10-ui.md, debug_overlay_layout; 03-world-and-camera.md, rule 5 |
 
-- Text layout: line 1's top-left corner sits at (`OVERLAY_MARGIN`, `OVERLAY_MARGIN`), (4, 4). Each next line's top is one `font.get_linesize()` below the one before. Source: 10-ui.md, debug_overlay_layout (guess).
-- Numbers use Python's `f"{value:z.2f}"`: two decimals, and negatives show a minus sign, e.g. `vy -0.26`. A value that rounds to zero at two decimals shows `0.00`, never `-0.00`, e.g. vx -0.001 shows `vx 0.00`. The `z` option (Python 3.11+) turns a negative zero after rounding into `0.00`. From DRA-19. Source: 10-ui.md, debug_overlay_layout (two decimals, guess); scope report DRA-19, item 3; review DRA-6-04-ui-developer, finding 1.
-- All text and lines in `OVERLAY_COLOR`, (0, 255, 0). Text in the default font at 16 px (`pygame.font.Font(None, 16)`), antialiased. Source: 10-ui.md, debug_overlay_color, debug_text_font (guess).
-- Line width uses `surface.get_width()`, never a hard-coded 640.
-- Draw order inside the view: the two lines, then the text, so the text stays readable where they cross.
-- The font is created once, on the first draw, and kept. Never once per frame. Source: 15-tech-constraints.md, rule 5 (Python in WebAssembly is slow).
-- The view only draws. It never flips, never logs per frame, never catches an error, never changes the ship, never reads the run mode.
-- `overlay_text_bottom()` is in screen px. With the text layout above, line 4's top is `OVERLAY_MARGIN + 3 × linesize`, so the value is that plus the larger of the line size and the font height. It is the same whether the overlay is shown or hidden. Source: scope report DRA-13, HUD layout (debug mode).
+- Text layout: line 1's top-left at (`OVERLAY_MARGIN`, `OVERLAY_MARGIN`), (4, 4). Each next line's top is one `font.get_linesize()` lower. Source: 10-ui.md, debug_overlay_layout (guess).
+- Numbers use `f"{value:z.2f}"`: two decimals, a minus sign for negatives, and never `-0.00`. Source: 10-ui.md, debug_overlay_layout; scope report DRA-19, item 3.
+- All text and lines in `OVERLAY_COLOR`, (0, 255, 0). Text in the default font at 16 px, antialiased. Source: 10-ui.md, debug_overlay_color, debug_text_font (guess).
+- Line width uses `surface.get_width()`. Draw order: the two lines, then the text.
+- `overlay_text_bottom()` is in screen px and the same whether the overlay is shown or hidden. Source: scope report DRA-13, HUD layout.
+
+`draw_debug_hitboxes` (DRA-29) reads only these core fields and methods:
+
+| Core field or method | Shown as |
+|---|---|
+| `ship_hitbox(run.ship)` | the ship's two boxes, outlined 1 px. Drawn whether or not the ship is visible this frame: the blink is a look, the hitbox stays. Source: 10-ui.md, debug_overlay ("the outline of every hitbox (ship and drifters)", guess); 05-lives-and-damage.md, Edge cases |
+| `obj.current_hitbox()`, each obj in `run.drifters` | each shape outlined 1 px. Empty while the warning shows, so nothing is drawn then. Source: 10-ui.md, debug_overlay; drifters.md, Rules (no hitbox in WARNING) |
+| `obj.graze_zone()` | each shape outlined 1 px. Only hazards have one. Source: 10-ui.md, debug_overlay ("and graze zone"); 06-scoring.md, rule 3 |
+| `obj.drifter_type.value`, `obj.variant`, `obj.x`, `obj.y`, `obj.phase.value` | one text label per drifter: `<type> <variant> x <x> y <y> <phase>`, e.g. `meteorite medium x 320.00 y -14.00 warning`. Source: 10-ui.md, debug_overlay ("a label on each drifter: its name, variant, x, y and phase (warning or active)", guess) |
+| `obj.width`, `obj.height` | where the label goes (below) |
+
+- Outlines: `ui.shapes.draw_hitbox(surface, OVERLAY_COLOR, hitbox, 1)`: a 1 px outline, the same place and rounding as the ship view's filled boxes, so the ship's outline sits exactly on its white edge. Same color and thickness as the overlay's lines. Source: 10-ui.md, debug_overlay_color (guess); debug_overlay_layout (1 px lines).
+- Label text: the overlay's own cached font (16 px), antialiased, `OVERLAY_COLOR`. Numbers in `z.2f`, like the four text lines. The phase as its lowercase value, `warning` or `active`.
+- Label place: its top-left at the drifter's footprint's bottom-left, `(round(obj.x - obj.width / 2), round(obj.y + obj.height / 2))`, then moved just enough to lie fully on the surface: left into `[0, surface width - label width]`, top into `[0, surface height - label height]` (0 when the label is bigger). So a meteorite still above the screen gets its label against the top edge, next to its warning.
+- Draw order inside the view: every graze outline, then every hitbox outline (the ship's first, then each drifter's), then every label. The app then draws `draw_debug_overlay` on top, so the four text lines stay readable.
+- Nothing is cached per frame but the font. Labels are rendered each frame, like the four text lines.
+- The view only draws. It never flips, never logs per frame, never catches an error, never changes the run, never reads the run mode.
 
 ## Rules
 - Exists only in debug mode. In normal mode it never shows. Source: 10-ui.md, rule 7 and debug_overlay_toggle.
-- Shown from the first frame in debug mode. F3 hides or shows it, in debug mode only. In normal mode F3 does nothing. The app owns this flag and calls the view only while it is True. Source: 10-ui.md, debug_overlay_toggle (guess); scope report DRA-6, Decision log.
+- Shown from the first frame in debug mode. F3 hides or shows it, in debug mode only, both draw functions together. The app owns this flag. Source: 10-ui.md, debug_overlay_toggle (guess).
 - The overlay only reads game state. It never changes it. Source: 10-ui.md, rules 5 and 7.
-- Layout as in Presentation. Source: 10-ui.md, debug_overlay_layout (guess); 91-decision-log.md, row 20.
-- DRA-13 adds no content: no distance line, no scroll value. The overlay shows exactly what DRA-6 built. Source: scope report DRA-13, Limits and Decision log (Director: "Leave it simple as before").
-- The overlay sits above the HUD on screen and never overlaps it. The HUD moves; the overlay stays where it is. Source: scope report DRA-13, Decision log; systems/hud.md.
+- Text layout as in Presentation. Source: 10-ui.md, debug_overlay_layout (guess); 91-decision-log.md, row 20.
+- From DRA-29 the overlay shows the hitbox and graze outlines and the drifter labels the GDD lists. Nothing else is added: no graze count, no hit marker. Source: 10-ui.md, debug_overlay; scope report DRA-29, Limits.
+- The four text lines sit above the HUD and never overlap it (`systems/hud.md`). Labels follow their drifter and may cross the HUD or the text for a moment; the HUD is drawn last and stays on top, and the text lines are drawn after the labels. Source: 10-ui.md, rule 1; scope report DRA-13, Decision log.
 
 ## Impact
-DRA-19 changes this frozen contract (v2). One display rule changes: a number that rounds to zero shows `0.00`, never `-0.00`. No signature, constant, layout or color changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `debug_overlay`, `draw_debug_overlay`, `overlay_text_bottom`, `OVERLAY_` and `-0.00`:
+DRA-29 changes this frozen contract (v3). `draw_debug_hitboxes` is new. `draw_debug_overlay` and `overlay_text_bottom` don't change: no signature, text, line, color or layout changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `debug_overlay`, `draw_debug_overlay`, `overlay_text_bottom` and `OVERLAY_`:
 
 | File | Change needed |
 |---|---|
-| `game/ui/debug_overlay.py` | the number format in `_draw_text` becomes `f"{value:z.2f}"`, and the docstrings that name the format follow. Task `DRA-19-02-ui-developer`. |
+| `game/ui/debug_overlay.py` | `draw_debug_hitboxes`, its imports, and the module docstring names it. Task `DRA-29-06-ui-developer`. |
 | `game/ui/hud.py` | none. `overlay_text_bottom()` doesn't change. |
-| `game/app/frame.py` | none. |
-| `game/tests/ui/test_hud.py` | none. It draws the overlay for `spawn()`, whose values are all positive or zero, and checks pixel rows, not text. No test expects `-0.00`. |
+| `game/app/frame.py` | calls `draw_debug_hitboxes(surface, run)` right before `draw_debug_overlay` when `overlay_visible`. Integration Engineer, from `systems/app.md`. |
+| `game/tests/ui/test_hud.py` | none. It calls only `draw_debug_overlay` and `overlay_text_bottom`, which draw exactly what they drew before. |
 
 ## Rationale
-- **The app passes nothing about the mode.** game/CONTEXT.md lets the debug overlay read the run mode, but it doesn't need to. The app decides whether to call it, so the view stays a pure function of the ship.
-- **A separate contract.** The overlay is its own system in 10-ui.md. Later features (hazards) will add fields to it without touching the ship contract.
-- **`overlay_text_bottom()` lives here.** Only the overlay owns its font, and the line size is a font metric, not a fixed number. The HUD asks the overlay instead of rebuilding the overlay's font and repeating its layout.
-- **The floor line is on row 479, not 480.** The floor is the screen's bottom edge, y 480, one row past the last visible row. Row 479 is the closest row that can be seen. The Director chose this (decision-log row 20).
-- **`0.00`, not `-0.00` (DRA-19).** Drag shrinks vx toward 0 but never reaches it, so after the player lets go of Left the old format showed `vx -0.00` for a long time, while letting go of Right showed `vx 0.00`. The Director chose `0.00`. It is still two decimals, as debug_overlay_layout asks.
-- **The `z` format option, not a special case in code.** `z` is Python's own rule for exactly this (PEP 682): it changes only a negative zero after rounding, and every other value prints as before. The game runs on Python 3.12 in the browser and on desktop (`.devcontainer/Dockerfile`, `game/tests/check.sh`), and `z` needs 3.11. The core value stays as it is; this is display only.
-- **Every fact the overlay shows is a core field or a core constant.** Ship numbers come from `core.ship.Ship`. Line positions come from `core.world`. The view computes nothing but pixel positions.
+- **The app passes nothing about the mode.** The app decides whether to call the overlay, so the view stays a pure function of what it is given.
+- **A separate contract.** The overlay is its own system in 10-ui.md, and later features add to it without touching the ship contract.
+- **`overlay_text_bottom()` lives here.** Only the overlay owns its font.
+- **The floor line is on row 479, not 480.** Row 479 is the closest row that can be seen (decision-log row 20).
+- **`0.00`, not `-0.00` (DRA-19).** The `z` format option changes only a negative zero after rounding.
+- **A second function, not a new argument (DRA-29).** `draw_debug_overlay(surface, ship)` and its pixels stay exactly as they were, so the HUD's no-overlap tests, which measure the overlay's ink, keep working. The new outlines and labels take the run, because they need the ship and the drifters, the same way the HUD takes the run.
+- **Outlines before the text (DRA-29).** The DRA-6 rule keeps the four text lines readable where something crosses them. Drawing the outlines and labels first, and the old overlay after, keeps that true.
+- **Graze outlines before hitbox outlines (DRA-29).** A graze zone surrounds its hitbox, so drawing the inner outline last keeps it whole where the two are close.
+- **The ship has hitbox outlines but no graze outline (DRA-29).** 10-ui.md asks for "the outline of every hitbox (ship and drifters) and graze zone". Graze zones belong to hazards only (06-scoring.md, rule 3), so the ship has none to draw.
+- **Labels go under the drifter (DRA-29).** 10-ui.md gives the label's content but not its place. Under the footprint uses only the drifter's own size, keeps the label off the drifter, and the clamp keeps it on the screen for a drifter that is still above the top edge. No new number is needed. The Director may move it.
+- **One color for everything (DRA-29).** 10-ui.md gives one overlay color. The graze ring is 14 px wider than the hitbox, so the two read apart without a second color.
+- **Every fact the overlay shows is a core field or a core method.** Ship numbers from `core.ship`, line positions from `core.world`, hitboxes, graze zones and labels from the drifters. The view computes only pixel positions.

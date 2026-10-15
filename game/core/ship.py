@@ -5,6 +5,10 @@ the top-line ceiling. It never respawns the ship. The floor check is `is_below_f
 by `core.run`, which decides what a fall costs. It never mutates its input, never reads
 frame time, randomness or the run mode.
 
+The ship's hitbox is an inverted T of two upright boxes, a bar and a foot, that fits the
+SHIP_W by SHIP_H square. `ship_hitbox` places it at the ship's center. `TOP_SIDE_SPEED` is
+the top sideways speed with a side key held.
+
 Source: docs/contracts/systems/ship.md, Interface and Rules.
 """
 
@@ -12,6 +16,7 @@ import logging
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from core.collision import Box, Hitbox, place_hitbox
 from core.world import SCREEN_H, SCREEN_W, TOP_LINE_Y
 
 log = logging.getLogger(__name__)
@@ -47,6 +52,23 @@ SPAWN_X: Final[float] = 320.0
 SPAWN_Y: Final[float] = 240.0
 """Spawn center y, px. Source: 03-world-and-camera.md, ship_start (guess);
 05-lives-and-damage.md, fall_respawn (locked)."""
+
+TOP_SIDE_SPEED: Final[float] = THRUST_SIDE * DRAG_X / (1 - DRAG_X)
+"""Top sideways speed with a side key held, px/tick (about 6.58). Source: 04-ship.md,
+derived values. Recompute when THRUST_SIDE or DRAG_X changes."""
+
+HITBOX_BAR_W: Final[int] = 12
+"""Width of the hitbox bar, px. The bar is SHIP_H tall. Source: 04-ship.md, hitbox (guess)."""
+
+HITBOX_FOOT_H: Final[int] = 12
+"""Height of the hitbox foot, px. The foot is SHIP_W wide. Source: 04-ship.md, hitbox (guess)."""
+
+SHIP_HITBOX: Final[Hitbox] = (
+    Box(cx=0, cy=0, w=HITBOX_BAR_W, h=SHIP_H),
+    Box(cx=0, cy=SHIP_H / 2 - HITBOX_FOOT_H / 2, w=SHIP_W, h=HITBOX_FOOT_H),
+)
+"""The ship's inverted T, as offsets from its center, px: the bar, then the foot along the
+bottom. Source: 04-ship.md, hitbox (guess); 91-decision-log.md, row 35."""
 
 Wall = Literal["left", "right"]
 
@@ -162,6 +184,14 @@ def is_below_floor(ship: Ship) -> bool:
     Source: 04-ship.md, rule 2.8; 03-world-and-camera.md, rule 5; systems/ship.md, Rules.
     """
     return ship.y - SHIP_H / 2 >= SCREEN_H
+
+
+def ship_hitbox(ship: Ship) -> Hitbox:
+    """Return the ship's inverted-T hitbox placed at its center, screen px. Pure, no logging.
+
+    Source: systems/ship.md, Rules, Hitbox.
+    """
+    return place_hitbox(SHIP_HITBOX, ship.x, ship.y)
 
 
 def _log_contact_starts(before: Ship, after: Ship) -> None:
