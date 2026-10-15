@@ -1,0 +1,22 @@
+{
+  "default_variant": "medium",
+  "variants": {
+    "small": {
+      "width": 20,
+      "height": 20,
+      "hitbox": [{ "shape": "circle", "cx": 0, "cy": 0, "r": 10 }]
+    },
+    "medium": {
+      "width": 28,
+      "height": 28,
+      "hitbox": [{ "shape": "circle", "cx": 0, "cy": 0, "r": 14 }]
+    },
+    "big": {
+      "width": 40,
+      "height": 40,
+      "hitbox": [{ "shape": "circle", "cx": 0, "cy": 0, "r": 20 }]
+    }
+  },
+  "speed_ratio": 0.375,
+  "entry_warning_ticks": 60
+}
