@@ -1,4 +1,7 @@
-"""Debug overlay: the ship's numbers and the lines the rules use, drawn on top of the frame.
+"""Debug overlay: the ship's numbers, the lines the rules use, hitboxes and labels.
+
+`draw_debug_overlay` draws the lines and the four text lines. `draw_debug_hitboxes` outlines
+every hitbox and graze zone and labels every object. Both draw on top of the frame.
 
 Source: docs/contracts/systems/debug-overlay.md, Interface and Presentation;
 10-ui.md, debug_overlay, debug_overlay_layout, debug_text_font, debug_overlay_color.
@@ -11,8 +14,11 @@ from functools import cache
 
 import pygame
 
-from core.ship import Ship
+from core.objects.base import GameObject
+from core.run import Run
+from core.ship import Ship, ship_hitbox
 from core.world import SCREEN_H, TOP_LINE_Y
+from ui.shapes import draw_hitbox
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +57,51 @@ def overlay_text_bottom() -> int:
     font: pygame.font.Font = _overlay_font()
     linesize: int = font.get_linesize()
     return OVERLAY_MARGIN + 3 * linesize + max(linesize, font.get_height())
+
+
+def draw_debug_hitboxes(surface: pygame.Surface, run: Run) -> None:
+    """Outline every hitbox and graze zone and label every object, on ``surface``.
+
+    Order: every graze zone, the ship's hitbox, every object's hitbox, then every label.
+    Outlines are 1 px in OVERLAY_COLOR. The ship's hitbox is drawn even while it blinks.
+    Needs ``pygame.font`` initialized. Source: systems/debug-overlay.md, Presentation (DRA-29).
+    """
+    for obj in run.objects:
+        draw_hitbox(surface, OVERLAY_COLOR, obj.graze_zone(), 1)
+    draw_hitbox(surface, OVERLAY_COLOR, ship_hitbox(run.ship), 1)
+    for obj in run.objects:
+        draw_hitbox(surface, OVERLAY_COLOR, obj.current_hitbox(), 1)
+    for obj in run.objects:
+        _draw_label(surface, obj)
+
+
+def _draw_label(surface: pygame.Surface, obj: GameObject) -> None:
+    """Draw ``<type> <variant> x <x> y <y> <phase>`` under the object's footprint.
+
+    Numbers use ``z.2f``. The label stays fully on the surface.
+    Source: systems/debug-overlay.md, Presentation, label place (DRA-29).
+    """
+    font: pygame.font.Font = _overlay_font()
+    text: str = (
+        f"{obj.object_type.value} {obj.variant} x {obj.x:z.2f} y {obj.y:z.2f} {obj.phase.value}"
+    )
+    label: pygame.Surface = font.render(text, True, OVERLAY_COLOR)
+    wanted: tuple[int, int] = (
+        round(obj.x - obj.width / 2),
+        round(obj.y + obj.height / 2),
+    )
+    surface.blit(label, _clamp_inside(surface, label, wanted))
+
+
+def _clamp_inside(
+    surface: pygame.Surface,
+    label: pygame.Surface,
+    top_left: tuple[int, int],
+) -> tuple[int, int]:
+    """Move ``top_left`` just enough for ``label`` to lie on ``surface``; 0 if it is bigger."""
+    left: int = max(0, min(top_left[0], surface.get_width() - label.get_width()))
+    top: int = max(0, min(top_left[1], surface.get_height() - label.get_height()))
+    return left, top
 
 
 def _draw_lines(surface: pygame.Surface) -> None:
