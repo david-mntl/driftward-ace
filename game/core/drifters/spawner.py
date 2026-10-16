@@ -29,11 +29,11 @@ class Placement:
     drifter_type: DrifterType
     """Which drifter to place."""
 
-    x: float
-    """Center x, screen px."""
+    x: float | None = None
+    """Center x, screen px. None: the drifter's default x (`start_position`)."""
 
     y: float | None = None
-    """Center y, screen px. None: the drifter's `default_y` for its variant."""
+    """Center y, screen px. None: the drifter's default y (`start_position`)."""
 
     variant: str | None = None
     """The variant's name. None: the drifter's default variant."""
@@ -44,12 +44,22 @@ class Placement:
     specialty_enabled: bool | None = None
     """Specialty switch. None: the drifter's default."""
 
+    invert: bool = False
+    """The spec's invert. A drifter without one refuses True."""
+
+    speed: float | None = None
+    """Level 1 speed, px/tick along the path, replacing the default. None: the default.
+
+    Hazard speed multiplier still applies. Debug test spawn list only (scope report DRA-39).
+    """
+
 
 def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Drifter:
     """Create one drifter in WARNING from `placement`, at `level`.
 
-    Raises ValueError for a drifter type with no class or no tuning, an unknown variant, or
-    a level outside 1 to 8. The playtest switches beat `as_level`. Entry warnings never scale.
+    Raises ValueError for a drifter type with no class or no tuning, an unknown variant, a
+    level outside 1 to 8, or a coordinate, specialty or invert the drifter refuses. The
+    playtest switches beat `as_level`. Entry warnings and the re-hit cooldown never scale.
     """
     cls: type[Drifter] = drifter_class(placement.drifter_type)
     type_name: str = placement.drifter_type.value
@@ -66,18 +76,27 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
     check_level(use_level)
     speed_level: int = use_level if tuning.switches.hazard_speed_scaling else BASE_LEVEL
     timer_level: int = use_level if tuning.switches.timer_scaling else BASE_LEVEL
-    y: float = cls.default_y(variant.height) if placement.y is None else placement.y
+    base_speed: float = (
+        type_tuning.speed_ratio * TOP_SIDE_SPEED if placement.speed is None else placement.speed
+    )
+    x, y = cls.start_position(
+        placement.x, placement.y, variant.width, variant.height, placement.invert
+    )
     return cls.born(
         Birth(
-            x=placement.x,
+            x=x,
             y=y,
             variant=variant_name,
             width=variant.width,
             height=variant.height,
             hitbox=variant.hitbox,
-            speed=type_tuning.speed_ratio * TOP_SIDE_SPEED * hazard_speed_mult(speed_level),
+            speed=base_speed * hazard_speed_mult(speed_level),
             warning_ticks=type_tuning.entry_warning_ticks,
             timer_mult=timer_mult(timer_level),
             specialty_enabled=placement.specialty_enabled,
+            invert=placement.invert,
+            variant_extra=variant.extra,
+            rehit_cooldown_ticks=tuning.hazards.rehit_cooldown_ticks,
+            rehit_dim=tuning.hazards.rehit_dim,
         )
     )

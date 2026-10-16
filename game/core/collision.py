@@ -54,7 +54,8 @@ Hitbox = tuple[Shape, ...]
 def place_hitbox(hitbox: Hitbox, x: float, y: float) -> Hitbox:
     """Return the hitbox with every shape moved by (x, y), px.
 
-    Offsets from the owner's center become screen positions.
+    Offsets from the owner's center become screen positions. Raises TypeError for a shape
+    that is not a Circle or a Box.
     """
     return tuple(_move_shape(shape, x, y) for shape in hitbox)
 
@@ -63,8 +64,11 @@ def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool:
     """Return True when any shape of `a` overlaps any shape of `b`. Both must be placed.
 
     Shapes that only touch at an edge or a point don't overlap. An empty hitbox overlaps
-    nothing. Source: drifters.md, Rules, Collision.
+    nothing. Raises TypeError for a shape that is not a Circle or a Box, even when the other
+    hitbox is empty. Source: drifters.md, Rules, Collision.
     """
+    _require_known_shapes(a)
+    _require_known_shapes(b)
     return any(_shapes_overlap(sa, sb) for sa in a for sb in b)
 
 
@@ -72,23 +76,43 @@ def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox:
     """Return the hitbox with every shape grown by `margin` px on every side.
 
     A circle's radius grows by the margin. A box's w and h grow by twice the margin.
-    Centers don't move. Source: 06-scoring.md, rule 3.
+    Centers don't move. Raises TypeError for a shape that is not a Circle or a Box.
+    Source: 06-scoring.md, rule 3.
     """
     return tuple(_grow_shape(shape, margin) for shape in hitbox)
+
+
+def _unknown_shape(shape: object) -> TypeError:
+    """Return the error for an object that is not a Circle or a Box.
+
+    Nothing is treated as a box by default. Source: drifters.md, Rules, Collision.
+    """
+    return TypeError(f"unknown shape kind '{type(shape).__name__}'")
+
+
+def _require_known_shapes(hitbox: Hitbox) -> None:
+    """Raise TypeError when any shape of `hitbox` is not a Circle or a Box."""
+    for shape in hitbox:
+        if not isinstance(shape, Circle | Box):
+            raise _unknown_shape(shape)
 
 
 def _move_shape(shape: Shape, x: float, y: float) -> Shape:
     """Return `shape` with its center moved by (x, y), px."""
     if isinstance(shape, Circle):
         return Circle(shape.cx + x, shape.cy + y, shape.r)
-    return Box(shape.cx + x, shape.cy + y, shape.w, shape.h)
+    if isinstance(shape, Box):
+        return Box(shape.cx + x, shape.cy + y, shape.w, shape.h)
+    raise _unknown_shape(shape)
 
 
 def _grow_shape(shape: Shape, margin: float) -> Shape:
     """Return `shape` grown by `margin` px on every side."""
     if isinstance(shape, Circle):
         return Circle(shape.cx, shape.cy, shape.r + margin)
-    return Box(shape.cx, shape.cy, shape.w + 2 * margin, shape.h + 2 * margin)
+    if isinstance(shape, Box):
+        return Box(shape.cx, shape.cy, shape.w + 2 * margin, shape.h + 2 * margin)
+    raise _unknown_shape(shape)
 
 
 def _shapes_overlap(a: Shape, b: Shape) -> bool:

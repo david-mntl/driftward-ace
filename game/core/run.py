@@ -166,10 +166,10 @@ def _is_press(thrust: Thrust, held: Thrust) -> bool:
 
 
 def _step_playing(run: Run, thrust: Thrust) -> Run:
-    """A playing tick: press, timer, drifters, wait, ship, scroll, then a fall or a hit, then drops.
+    """A playing tick: press, timer, drifters, wait, ship, scroll, fall or hit, cooldowns, drops.
 
     A hit is tested only when the ship did not fall. Source: systems/run.md, Rules, a playing
-    tick, steps 1 to 9.
+    tick, steps 1 to 10.
     """
     press: bool = _is_press(thrust, run.held)
     protected: bool = run.invulnerable
@@ -193,17 +193,22 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
         held=thrust,
     )
     if is_below_floor(ship):
-        return _drop_drifters(_apply_fall(stepped, protected, thrust))
-    return _drop_drifters(_apply_hit(stepped, protected, thrust))
+        outcome: Run = _apply_fall(stepped, protected, thrust)
+    else:
+        outcome = _apply_hit(stepped, protected, thrust)
+    return _drop_drifters(_cool_down(outcome, stepped.drifters))
 
 
 def _update_drifters(run: Run) -> tuple[Drifter, ...]:
     """Update every drifter once with the ship as it was at the start of the tick (step 3).
 
-    Logs each drifter that turns from WARNING to ACTIVE.
+    Each updated drifter is then marked entered when it is on screen. Logs each drifter that
+    turns from WARNING to ACTIVE.
     """
     ctx = TickContext(ship=run.ship)
-    updated: tuple[Drifter, ...] = tuple(drifter.update(ctx) for drifter in run.drifters)
+    updated: tuple[Drifter, ...] = tuple(
+        drifter.update(ctx).mark_entered() for drifter in run.drifters
+    )
     for before, after in zip(run.drifters, updated, strict=True):
         if before.phase is Phase.WARNING and after.phase is Phase.ACTIVE:
             log.debug(
@@ -271,7 +276,7 @@ def _apply_hit(stepped: Run, protected: bool, thrust: Thrust) -> Run:
     """Apply a hit to the run after its ship, scroll and drifters stepped (step 7).
 
     Nothing happens with no touching drifter, or while protected. Otherwise one life is lost
-    whatever the number of touching drifters, each gets `hit_ship = True`, and the run is
+    whatever the number of touching drifters, each starts its re-hit cooldown, and the run is
     invulnerable again or over. The ship and the wait stay as they were.
     Source: 05-lives-and-damage.md, rules 1 and 4; systems/run.md, Rules, step 7.
     """
@@ -292,7 +297,7 @@ def _apply_hit(stepped: Run, protected: bool, thrust: Thrust) -> Run:
             drifter.drifter_type.value,
             drifter.effect_on_touch().value,
         )
-        drifters.append(replace(drifter, hit_ship=True))
+        drifters.append(replace(drifter, rehit_ticks_left=drifter.rehit_cooldown_ticks))
     lives: int = stepped.lives - 1
     log.debug("life lost lives=%d", lives)
     hit = replace(stepped, drifters=tuple(drifters), lives=lives)
@@ -301,8 +306,24 @@ def _apply_hit(stepped: Run, protected: bool, thrust: Thrust) -> Run:
     return _end_run(hit, thrust)
 
 
+def _cool_down(run: Run, before_hit: tuple[Drifter, ...]) -> Run:
+    """Count every running re-hit cooldown down by 1, except one that started this tick (step 8).
+
+    `before_hit` is the drifters as they went into step 7, in the same order as `run.drifters`.
+    A cooldown that started this tick was 0 going in, so only drifters that were above 0 count
+    down. Source: systems/run.md, Rules, step 8.
+    """
+    if not any(was.rehit_ticks_left > 0 for was in before_hit):
+        return run
+    drifters: tuple[Drifter, ...] = tuple(
+        replace(now, rehit_ticks_left=now.rehit_ticks_left - 1) if was.rehit_ticks_left > 0 else now
+        for was, now in zip(before_hit, run.drifters, strict=True)
+    )
+    return replace(run, drifters=drifters)
+
+
 def _drop_drifters(run: Run) -> Run:
-    """Remove every GONE or off-screen drifter, keeping the order of the rest (step 8).
+    """Remove every GONE or off-screen drifter, keeping the order of the rest (step 9).
 
     Logs each dropped drifter with its last position.
     """

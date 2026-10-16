@@ -1,0 +1,25 @@
+{
+  "default_variant": "flat",
+  "variants": {
+    "flat": {
+      "width": 36,
+      "height": 12,
+      "angle_degrees": 0,
+      "hitbox": [
+        { "shape": "box", "cx": 0, "cy": 0, "w": 12, "h": 12 },
+        { "shape": "box", "cx": 0, "cy": 0, "w": 36, "h": 6 }
+      ]
+    },
+    "angled": {
+      "width": 36,
+      "height": 12,
+      "angle_degrees": 20,
+      "hitbox": [
+        { "shape": "box", "cx": 0, "cy": 0, "w": 12, "h": 12 },
+        { "shape": "box", "cx": 0, "cy": 0, "w": 36, "h": 6 }
+      ]
+    }
+  },
+  "speed_ratio": 0.375,
+  "entry_warning_ticks": 60
+}
