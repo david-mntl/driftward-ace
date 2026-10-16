@@ -5,3 +5,4 @@ A new drifter adds one import line here.
 """
 
 from ui.drifters import meteorite_view as meteorite_view
+from ui.drifters import satellite_view as satellite_view

@@ -42,7 +42,7 @@ GLOW_RATIO: Final[float] = 0.75
 """Glow radius as a share of the warning's radius, 0..1. A placeholder choice, not in the GDD:
 drifters.md, Rationale."""
 
-type _Key = tuple[int, DrifterType, str]
+type _Key = tuple[int, DrifterType, str, float]
 
 _IMAGES: dict[_Key, pygame.Surface] = {}
 """Built warning images, one per drifter. Dropped when the drifter turns ACTIVE."""
@@ -68,12 +68,14 @@ def drop_entry_warning(drifter: Drifter) -> None:
 
 
 def _key(drifter: Drifter) -> _Key:
-    """Return the cache key: the image depends only on these three facts."""
-    return (drifter.uid, drifter.drifter_type, drifter.variant)
+    """Return the cache key: the image depends only on these four facts."""
+    return (drifter.uid, drifter.drifter_type, drifter.variant, drifter.warning_tilt_degrees())
 
 
 def _build_image(drifter: Drifter, view: DrifterView) -> pygame.Surface:
     """Return the warning image: glow, spikes, then the drifter's copy on top.
+
+    The copy is drawn at full brightness, turned by `drifter.warning_tilt_degrees()`.
 
     Square, side 2 * ceil(R) + 1, with the warning's center on its middle pixel, so nothing
     lies more than R from the center, where R = WARNING_SIZE_RATIO * width / 2, px.
@@ -84,8 +86,24 @@ def _build_image(drifter: Drifter, view: DrifterView) -> pygame.Surface:
     center: tuple[int, int] = (half, half)
     pygame.draw.circle(image, ENTRY_WARNING_GLOW, center, GLOW_RATIO * radius)
     _draw_spikes(image, center, drifter.uid, radius)
-    view(image, drifter, (float(half), float(half)), ENTRY_WARNING_SCALE)
+    _draw_copy(image, drifter, view)
     return image
+
+
+def _draw_copy(image: pygame.Surface, drifter: Drifter, view: DrifterView) -> None:
+    """Draw the half-size copy centered on `image`, turned counterclockwise by the drifter's tilt.
+
+    A turned copy is drawn on its own transparent surface first, so turning never touches the glow.
+    """
+    center: tuple[float, float] = (image.get_width() // 2, image.get_height() // 2)
+    tilt: float = drifter.warning_tilt_degrees()
+    if tilt == 0.0:
+        view(image, drifter, center, ENTRY_WARNING_SCALE, 1.0)
+        return
+    copy: pygame.Surface = pygame.Surface(image.get_size(), pygame.SRCALPHA)
+    view(copy, drifter, center, ENTRY_WARNING_SCALE, 1.0)
+    turned: pygame.Surface = pygame.transform.rotate(copy, tilt)
+    image.blit(turned, turned.get_rect(center=(round(center[0]), round(center[1]))))
 
 
 def _draw_spikes(

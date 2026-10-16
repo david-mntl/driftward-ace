@@ -10,7 +10,7 @@ from typing import Final
 import pygame
 
 from core.drifters.base import Drifter, DrifterType
-from ui.drifters.registry import register_view
+from ui.drifters.registry import dim_color, register_view
 
 log = logging.getLogger(__name__)
 
@@ -24,11 +24,15 @@ def render_meteorite(
     drifter: Drifter,
     center: tuple[float, float],
     scale: float,
+    brightness: float,
 ) -> None:
-    """Draw a filled disc of diameter `drifter.width * scale` px at `center`, rounded to px."""
+    """Draw a disc of diameter `drifter.width * scale` px at `center`, rounded to px.
+
+    The color is `METEORITE_COLOR` times `brightness`.
+    """
     pygame.draw.circle(
         surface,
-        METEORITE_COLOR,
+        dim_color(METEORITE_COLOR, brightness),
         (round(center[0]), round(center[1])),
         round(drifter.width * scale / 2),
     )
