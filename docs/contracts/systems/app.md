@@ -1,21 +1,15 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
 Version: 6
-Status: frozen
-Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29
+Status: draft
+Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39
 Created by: architect
 
 ## Purpose
 Start the game, set up logging once, read the run mode once, run the async loop on the fixed 60 Hz tick, and catch any unexpected error so the page shows the error screen instead of freezing. That includes an error raised while importing pygame, core, the views or the frame loop. Build a release package that holds only runtime files.
 
-From DRA-6, each tick steps the ship, each frame draws the ship and, in debug mode, the debug overlay. The arrow-key log lines carry the ship's x and y. F3 toggles the overlay in debug mode.
+Before the first frame the app loads and checks the tuning files once (the drifter files, the playtest switches and the shared hazard values) in both modes, and the debug test spawn list in debug mode only, and hands the checked values to core. It holds one `Run` (`docs/contracts/systems/run.md`). Play starts when the ship first appears. Each tick it calls `step_run` once; core does the ship, the scroll, the drifters, the lives, the respawn wait, game over and retry. In debug mode only, after each tick it hands the run the drifters the spawn list says are due, through `core.run.add_drifters`. Normal mode spawns nothing yet.
 
-From DRA-13, play starts when the ship first appears: the app starts the world scroll right after it spawns the ship. Each tick also steps the scroll. Each frame draws the starfield behind the ship and the HUD on top of everything.
-
-From DRA-19, the guard also removes null characters from the debug-mode detail line, so an error message holding one still shows the error screen.
-
-From DRA-23, the app holds one `Run` (`docs/contracts/systems/run.md`) instead of a ship and a scroll. Each tick it calls `step_run` once; core does the ship, the scroll, the lives, the respawn wait, game over and retry. Each frame it draws the ship only while `run.ship_visible` (the blink), the Game Over box while `run.game_over`, and the HUD with the hearts.
-
-From DRA-29, the app loads the drifter tuning files and the playtest switches once, before the first frame, checks them, and hands the checked values to core. In debug mode only, after each tick it hands the run the drifters the debug test spawn list says are due, through `core.run.add_drifters`. Normal mode spawns nothing yet. Each frame draws the drifters (warnings and meteorites) behind the ship, and in debug mode the hitbox and graze outlines and the drifter labels. Source: scope report DRA-29, Limits; `docs/contracts/systems/drifters.md`.
+Each frame draws the starfield, the drifters (entry warnings, meteorites and satellites) behind the ship, the ship while `run.ship_visible` (the blink), in debug mode the hitbox and graze outlines, drifter labels and the debug overlay (F3 toggles them), the Game Over box while `run.game_over`, and the HUD on top. The arrow-key log lines carry the ship's x and y. The guard removes null characters from the debug-mode detail line, so an error message holding one still shows the error screen. Source: scope reports DRA-5 to DRA-39; `docs/contracts/systems/drifters.md`.
 
 Who builds what:
 - `game/main.py`, `game/app/`, `game/scripts/`, `pygbag.ini` (repo root): the Integration Engineer, during integration, from this contract. No task file.
@@ -26,9 +20,9 @@ Who builds what:
 - `game/core/scroll.py`, `game/ui/starfield.py`: DRA-13, see `docs/contracts/systems/scroll.md`.
 - `game/ui/hud.py`: DRA-13, see `docs/contracts/systems/hud.md`.
 - `game/core/run.py`, `game/ui/game_over.py`: DRA-23, see `docs/contracts/systems/run.md`.
-- `game/core/collision.py`, `game/core/levels.py`, `game/core/drifters/`, `game/ui/shapes.py`, `game/ui/drifters/`: DRA-29, see `docs/contracts/systems/drifters.md`.
-- `game/app/tuning.py`, `game/app/debug_spawns.py`: the Integration Engineer, during DRA-29 integration, from this contract. No task file.
-- `game/tuning/drifters/meteorite.json`, `game/tuning/playtest.json`: the main session, by Director decision (scope report DRA-29), to `docs/contracts/schemas/drifter-tuning.schema.json` and `docs/contracts/schemas/playtest-switches.schema.json`.
+- `game/core/collision.py`, `game/core/levels.py`, `game/core/drifters/`, `game/ui/shapes.py`, `game/ui/drifters/`: DRA-29 and DRA-39, see `docs/contracts/systems/drifters.md`.
+- `game/app/tuning.py`, `game/app/debug_spawns.py`: the Integration Engineer, during DRA-29 integration, from this contract. The hazards file, the satellite's own fields and the editable spawn list: during DRA-39 integration. No task file.
+- The data files are content, filled to their schemas by whoever the Director names (DRA-29: the main session, by Director decision): `game/tuning/drifters/meteorite.json` (`docs/contracts/schemas/drifter-tuning.schema.json`), `game/tuning/drifters/satellite.json` (`satellite-tuning.schema.json`), `game/tuning/playtest.json` (`playtest-switches.schema.json`), `game/tuning/hazards.json` (`hazards.schema.json`) and `game/tuning/debug_spawns.json` (`debug-spawn-list.schema.json`), all schemas in `docs/contracts/schemas/`.
 
 ## Diagram
 ```mermaid
@@ -89,7 +83,7 @@ flowchart LR
   EV --> HK["thrust = held arrow keys"]
   HK --> AC["add frame time<br/>to accumulator"]
   AC --> T{"acc >= 1/60 s<br/>and ticks < 5?"}
-  T -- yes --> TK["one tick:<br/>run = step_run(run, thrust)<br/>debug mode: run = add_drifters(run,<br/>debug_spawns_due(run.scroll.ticks), tuning)"] --> T
+  T -- yes --> TK["one tick:<br/>run = step_run(run, thrust)<br/>debug mode: run = add_drifters(run,<br/>debug_spawns_due(spawn_list, run.scroll.ticks), tuning)"] --> T
   T -- no --> CAP{"acc still >= 1/60 s?"}
   CAP -- yes --> DROP["acc = 0<br/>(owed time dropped)"] --> D
   CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, render_drifter for each drifter,<br/>draw_ship if run.ship_visible,<br/>draw_debug_hitboxes and draw_debug_overlay if overlay_visible,<br/>draw_game_over if run.game_over,<br/>then draw_hud"]
@@ -181,9 +175,11 @@ async def frame_loop(mode: RunMode) -> None: ...
 ```
 Imports pygame, `app.settings`, `app.mode`, `app.tuning` and `app.debug_spawns` (DRA-29), `core.world`, `core.ship` (for `Thrust`), `core.run`, `ui.look`, `ui.starfield`, `ui.drifters.registry` (DRA-29, for `render_drifter`), `ui.ship_view`, `ui.debug_overlay`, `ui.game_over` and `ui.hud`. From DRA-23 it no longer imports `core.scroll`, `spawn` or `step`. Only `start()` imports this module, inside the guard.
 
-App-owned state in `frame_loop` (DRA-23, DRA-29):
+App-owned state in `frame_loop` (DRA-23, DRA-29, DRA-39):
 ```python
 tuning: DrifterTuning    # DRA-29. app.tuning.load_tuning() once, before start_run(). Never reloaded
+spawn_list: DebugSpawnList | None   # DRA-39. Debug mode: app.debug_spawns.load_debug_spawns(tuning) once,
+                                    # right after load_tuning(). Normal mode: None, the file is never read
 run: Run                # core.run.start_run() before the first frame; replaced by step_run() every tick,
                         # and by add_drifters() after a tick in debug mode
 thrust: Thrust          # rebuilt once per frame from the held arrow keys
@@ -196,30 +192,43 @@ The ship, the scroll and the drifters are `run.ship`, `run.scroll` and `run.drif
 ```python
 TUNING_DIR: Path        # the game's tuning folder: Path(__file__).resolve().parent.parent / "tuning"
 PLAYTEST_FILE: str = "playtest.json"        # in TUNING_DIR
+HAZARDS_FILE: str = "hazards.json"          # in TUNING_DIR. DRA-39
 DRIFTERS_DIR: str = "drifters"                # in TUNING_DIR; one "<drifter_type value>.json" per DrifterType
 
 def load_tuning() -> DrifterTuning: ...
-    # Reads and checks the playtest switches and one file per DrifterType, then builds the
-    # core dataclasses (docs/contracts/systems/drifters.md, Interface, core/drifters/tuning.py).
+    # Reads and checks the playtest switches, the shared hazard values (DRA-39) and one file per
+    # DrifterType, then builds the core dataclasses (docs/contracts/systems/drifters.md, Interface,
+    # core/drifters/tuning.py, and SatelliteVariantExtra in core/drifters/satellite.py).
     # Reads the module-level TUNING_DIR at call time. Raises on any bad file.
 ```
 Not a startup module: it imports `core.drifters`, so only `app.frame` imports it, inside the guard.
 
-### game/app/debug_spawns.py (Integration Engineer, DRA-29)
-The debug test spawn list, a temporary stand-in kept in scope report DRA-29 only, not in the GDD. Debug mode only.
+### game/app/debug_spawns.py (Integration Engineer, DRA-29; editable list DRA-39)
+The debug test spawn list, a file the Director edits by hand: `game/tuning/debug_spawns.json`, to `docs/contracts/schemas/debug-spawn-list.schema.json`. A temporary stand-in kept in the scope reports, not in the GDD. Debug mode only.
 ```python
-DEBUG_SPAWN_PERIOD: int = 180               # ticks. Scope report DRA-29, Test spawn list: repeats every 3 s
-DEBUG_SPAWNS: tuple[tuple[int, Placement], ...] = (
-    (0,   Placement(DrifterType.METEORITE, x=160.0, variant="small")),    # each at its default start_y
-    (60,  Placement(DrifterType.METEORITE, x=320.0, variant="medium")),   # one second (60 ticks) apart
-    (120, Placement(DrifterType.METEORITE, x=480.0, variant="big")),      # in that order
-)                                           # (offset in ticks within the period, placement)
+SPAWN_LIST_FILE: str = "debug_spawns.json"  # in app.tuning.TUNING_DIR, read at call time
+ALL_ROWS: str = "all"                       # the mode that plays every row
+DEFAULT_MODE: str = ALL_ROWS                # scope report DRA-39, Values needed (stand-in): mode left out
+DEFAULT_LOOP_TICKS: int = 180               # scope report DRA-39, Values needed (stand-in, kept from DRA-29):
+                                            # loop_ticks left out. 3 s
 
-def debug_spawns_due(ticks: int) -> tuple[Placement, ...]: ...
-    # () when ticks < 1. Otherwise every placement whose offset == (ticks - 1) % DEBUG_SPAWN_PERIOD.
+@dataclass(frozen=True, slots=True)
+class DebugSpawnList:
+    """The checked list, ready to play."""
+    mode: str                                    # "all" or a DrifterType value
+    loop_ticks: int                              # ticks, >= 1
+    schedule: tuple[tuple[int, Placement], ...]  # (offset within the loop, placement) for each row in
+                                                 # play, in file order. Offsets from 0 to loop_ticks - 1
+
+def load_debug_spawns(tuning: DrifterTuning) -> DebugSpawnList: ...
+    # Reads and checks the file, then every row by spawning it once with spawn_drifter(placement, 1,
+    # tuning). Builds the schedule for the rows in play. Raises on any problem.
+def debug_spawns_due(spawn_list: DebugSpawnList, ticks: int) -> tuple[Placement, ...]: ...
+    # () when ticks < 1. Otherwise every placement in the schedule whose offset ==
+    # (ticks - 1) % spawn_list.loop_ticks, in schedule order.
     # ticks is run.scroll.ticks after the tick: 1 on the first tick of play.
 ```
-Not a startup module: it imports `core.drifters`.
+Not a startup module: it imports `core.drifters`. DRA-39 removes `DEBUG_SPAWN_PERIOD` and `DEBUG_SPAWNS`; their three meteorite rows move into the file.
 
 ### pygbag.ini (repo root, Integration Engineer)
 ```ini
@@ -309,6 +318,18 @@ if run.game_over:
 draw_hud(surface, run, below_overlay=debug)
 ```
 
+DRA-39 calls, all made by `frame_loop`. They change the DRA-29 block above only before the first frame and in the tick. The draw order is unchanged: `render_drifter(surface, obj)` keeps its signature (the brightness and the tilt come from the drifter itself).
+```python
+# before the first frame:
+tuning = load_tuning()                          # app.tuning, both modes: drifter files, playtest.json, hazards.json
+spawn_list = load_debug_spawns(tuning) if debug else None   # app.debug_spawns, debug mode only
+run = start_run()
+# per tick, inside the accumulator loop:
+run = step_run(run, thrust)
+if debug:
+    run = add_drifters(run, debug_spawns_due(spawn_list, run.scroll.ticks), tuning)
+```
+
 ### game/ui/look.py (UI Developer)
 ```python
 BACKGROUND: tuple[int, int, int]   # 12-art-and-audio.md, placeholder_bg
@@ -376,38 +397,48 @@ Logging (`setup_logging`):
 Frame loop (`app/frame.py`, `frame_loop(mode)`):
 - Inside the guard: `pygame.init()`, then `pygame.display.set_mode((SCREEN_W, SCREEN_H))` from `core.world`. Source: 03-world-and-camera.md, screen_w, screen_h (guess). systems/world.md.
 - Before the first frame (DRA-29): `tuning = load_tuning()`, in both modes, before `start_run()`. A bad or missing tuning file raises inside the guard, so the page shows the error screen and the log holds the file and field. Source: game/CONTEXT.md, Error handling (validate at the edge); 15-tech-constraints.md, rule 8; scope report DRA-29, Limits ("The app loads and validates them once at startup").
+- Before the first frame, debug mode only (DRA-39): `spawn_list = load_debug_spawns(tuning)`, right after `load_tuning()`. A bad or missing list raises inside the guard the same way. Normal mode never reads the file, so a broken list can't break normal play. Source: 15-tech-constraints.md, rule 7 (debug only adds the test spawn list); scope report DRA-39, Limits.
 - Before the first frame: `run = start_run()`, and `overlay_visible = mode is RunMode.DEBUG`. Play starts here: the ship first appears at screen center on the first frame drawn after this. Source: 03-world-and-camera.md, ship_start; 10-ui.md, debug_overlay_toggle (shown from the first frame); scope report DRA-13, Values needed (play start); systems/run.md (DRA-23).
 - The app never calls `spawn`, `step`, `start_scroll` or `step_scroll` itself, and never calls `start_run()` again. A respawn, the wait, game over and a retry all happen inside `step_run`. Source: systems/run.md (DRA-23).
 - **Game over.** While `run.game_over` is True the frame loop carries on as always: it reads events, builds `thrust`, runs ticks (`step_run` keeps the run frozen and watches for the retry) and draws. Nothing in the app changes. Source: 02-game-flow.md, rules 5 and 6; systems/run.md.
 - Each frame, in order: read all events, build `thrust` from the held keys, add the frame time to the accumulator, run one tick per whole 1/60 s in the accumulator, draw, `pygame.display.flip()`, `await asyncio.sleep(0)`. Source: 15-tech-constraints.md, rules 1 and 2.
 - Frame time comes from a monotonic clock (`time.perf_counter`). Ticks never use frame time. Source: 15-tech-constraints.md, rule 2.
 - **Held keys.** After the events, read `pygame.key.get_pressed()` once and build `Thrust(up=pressed[K_UP], down=pressed[K_DOWN], left=pressed[K_LEFT], right=pressed[K_RIGHT])`. Every tick in that frame uses the same `thrust`. Only the four arrow keys move the ship. Source: 01-vision.md, locked decision 1; 04-ship.md, rule 2.1.
-- **Tick.** `run = step_run(run, thrust)`. One `step_run` call per tick. From DRA-29, in debug mode only, right after it: `run = add_drifters(run, debug_spawns_due(run.scroll.ticks), tuning)`. In normal mode nothing is added. The app never builds a drifter itself and never changes `run.drifters`. Source: 04-ship.md, rule 1; 15-tech-constraints.md, rules 2 and 7; systems/run.md; scope report DRA-29, Limits ("Normal mode spawns nothing yet").
+- **Tick.** `run = step_run(run, thrust)`. One `step_run` call per tick. In debug mode only, right after it: `run = add_drifters(run, debug_spawns_due(spawn_list, run.scroll.ticks), tuning)`. In normal mode nothing is added. The app never builds a drifter itself and never changes `run.drifters`. Source: 04-ship.md, rule 1; 15-tech-constraints.md, rules 2 and 7; systems/run.md; scope report DRA-29, Limits ("Normal mode spawns nothing yet").
 - **Draw.** In this order: fill with `ui.look.BACKGROUND`; `draw_starfield(surface, run.scroll)`; `render_drifter(surface, obj)` for each `obj` in `run.drifters`, in order (DRA-29); `draw_ship(surface, run.ship)` only if `run.ship_visible`; only if `overlay_visible`, `draw_debug_hitboxes(surface, run)` (DRA-29) then `draw_debug_overlay(surface, run.ship)`; `draw_game_over(surface)` only if `run.game_over`; `draw_hud(surface, run, below_overlay=debug)` last, on top of everything. Source: systems/ship.md, systems/drifters.md, systems/debug-overlay.md, systems/scroll.md, systems/run.md and systems/hud.md, Presentation; 10-ui.md, rules 1 (the HUD on top) and 3 (the blink); 12-art-and-audio.md, rule 2 (the background stays behind).
 - **Drifters behind the ship (DRA-29).** Warnings and meteorites are drawn after the starfield and before the ship, so the player's ship stays on top where they cross.
 - **`below_overlay`** is `mode is RunMode.DEBUG`, fixed for the run. Never `overlay_visible`: in debug mode the HUD stays below the overlay's place while F3 hides it, so the readout never jumps. Source: scope report DRA-13, HUD layout.
 - `pygame.QUIT`: log INFO `quit` and leave the loop. That only happens on desktop.
 - **Arrow keys** (Up, Down, Left, Right): on `KEYDOWN` log DEBUG `key down key=%s x=%.2f y=%.2f`, on `KEYUP` log DEBUG `key up key=%s x=%.2f y=%.2f`, with names `up`, `down`, `left`, `right` and the ship's `x` and `y` (`run.ship.x`, `run.ship.y` from DRA-23) at the moment the event is read (before this frame's ticks). Example: `key down key=up x=320.00 y=240.00`. No other arrow event is logged. Source: game/CONTEXT.md, Logging (a key pressed or released is an event). 01-vision.md, locked decision 1. Director decision (DRA-6: the integration check compares y between key-down and key-up).
 - **F3.** In debug mode, on `KEYDOWN` of `pygame.K_F3`: flip `overlay_visible` and log DEBUG `overlay visible=%s`. `KEYUP` of F3 does nothing. In normal mode F3 does nothing and logs nothing. F3 never retries: only `thrust`, built from the four arrows, reaches `step_run` (02-game-flow.md, retry_key, locked). Source: 10-ui.md, debug_overlay_toggle (guess) and rule 7.
-- **Log by event.** The frame loop logs only on the events in these rules: quit, arrow keys, F3 and the cap. Never a line per tick or per frame. Ship events (wall hit, top-line stop) are logged by `core.ship`, the scroll start by `core.scroll`, and the run's events (life lost, respawn, wait end, invulnerable end, game over, new run, and from DRA-29 drifter spawn, active, touch and gone) by `core.run`, not by the app. The app's only DRA-29 line is the one `tuning loaded` line at startup. Source for the run's lines: systems/run.md, Logging (DRA-23). Source: 15-tech-constraints.md, rule 9; systems/ship.md, Rules, Logging.
+- **Log by event.** The frame loop logs only on the events in these rules: quit, arrow keys, F3 and the cap. Never a line per tick or per frame. Ship events (wall hit, top-line stop) are logged by `core.ship`, the scroll start by `core.scroll`, and the run's events (life lost, respawn, wait end, invulnerable end, game over, new run, and from DRA-29 drifter spawn, active, touch and gone) by `core.run`, not by the app. The app's only drifter lines are the one `tuning loaded` line at startup and, in debug mode, the one `debug spawns loaded` line after it (DRA-39). Source for the run's lines: systems/run.md, Logging (DRA-23). Source: 15-tech-constraints.md, rule 9; systems/ship.md, Rules, Logging.
 - **Catch-up cap.** One frame runs at most `MAX_TICKS_PER_FRAME` (5) ticks. If, after the 5th tick, the accumulator still holds one tick or more, set it to 0.0: the owed time is dropped, never run later. The game carries on from where it was. Source: 15-tech-constraints.md, max_ticks_per_frame (guess) and rule 2; 91-decision-log.md, row 21.
 - **Cap log, by event.** Log DEBUG `tick cap hit, dropped %.3f s` (the seconds dropped) on a frame where the cap drops time and the frame before didn't. While frames keep hitting the cap, log nothing more. The next capped frame after an uncapped one logs again. Source: 15-tech-constraints.md, rule 9.
 - No `time.sleep`, no thread, no blocking call. Source: 15-tech-constraints.md, rule 1.
 
 Tuning loader (`app/tuning.py`, DRA-29). Source: scope report DRA-29, Limits; game/CONTEXT.md, Error handling ("Validate at the edge ... raise with a message that says what was wrong and where"); CLAUDE.md, Rules for every agent (no silent schema drift):
-- Reads `TUNING_DIR / PLAYTEST_FILE`, then `TUNING_DIR / DRIFTERS_DIR / f"{drifter_type.value}.json"` for every `DrifterType`, in enum order. UTF-8, `json.loads`. Once, at startup. Read with plain `open`/`Path.read_text`: no blocking beyond a small local file, no network.
-- Checks every rule of `docs/contracts/schemas/playtest-switches.schema.json` and `docs/contracts/schemas/drifter-tuning.schema.json` by hand (no schema library: pygbag has none). Every field required; no unknown field; types exact. A number is an `int` or a `float`, never a `bool`. `entry_warning_ticks` is an `int` ≥ 1. `speed_ratio` ≥ 0. `width`, `height`, `r`, `w`, `h` > 0. Variant names match `^[a-z][a-z0-9_]*$`, at least one variant, each with at least one shape.
+- Reads `TUNING_DIR / PLAYTEST_FILE`, then `TUNING_DIR / HAZARDS_FILE` (DRA-39), then `TUNING_DIR / DRIFTERS_DIR / f"{drifter_type.value}.json"` for every `DrifterType`, in enum order. UTF-8, `json.loads`. Once, at startup. Read with plain `open`/`Path.read_text`: no blocking beyond a small local file, no network.
+- Checks every rule of `docs/contracts/schemas/playtest-switches.schema.json`, `hazards.schema.json`, `drifter-tuning.schema.json` and `satellite-tuning.schema.json` by hand (no schema library: pygbag has none). No unknown field; types exact. A number is an `int` or a `float`, never a `bool`. In the playtest and drifter files every field is required. `entry_warning_ticks` is an `int` ≥ 1. `speed_ratio` ≥ 0. `width`, `height`, `r`, `w`, `h` > 0. Variant names match `^[a-z][a-z0-9_]*$`, at least one variant, each with at least one shape.
+- **Hazards file** (DRA-39). Both fields optional; `{}` is valid. `rehit_cooldown` is an `int` ≥ 0 (never a `bool`); `rehit_dim` a number from 0 to 1. A field left out takes its default from `core.drifters.base` (`DEFAULT_REHIT_COOLDOWN_TICKS`, `DEFAULT_REHIT_DIM`); the loader holds no copy of those numbers. The file itself must exist. Builds `HazardRules(rehit_cooldown_ticks=..., rehit_dim=...)`. Source: scope report DRA-39, Limits; 05-lives-and-damage.md, Values.
+- **A drifter's own fields** (DRA-39). A drifter type with its own schema is checked against it instead of `drifter-tuning.schema.json`. The satellite: every variant also requires `angle_degrees`, a number ≥ 0 and < 90, and its `hitbox` is exactly two boxes. The loader builds `SatelliteVariantExtra(angle_degrees=...)` (`core.drifters.satellite`) into each `VariantTuning.extra`. The meteorite's variants have no `extra` (None). Error messages name the field the same way, e.g. `tuning/drifters/satellite.json: variants.angled.angle_degrees must be a number >= 0 and < 90`.
 - Two rules the schema can't express, also checked: `default_variant` is one of the variant names; and every hitbox shape lies inside its variant's `width × height` footprint, centered on the drifter (circle: `|cx| + r <= width / 2` and `|cy| + r <= height / 2`; box: `|cx| + w / 2 <= width / 2` and `|cy| + h / 2 <= height / 2`). Source: 07-drifters.md, rule 8 (a hitbox is never bigger than what the player sees).
-- On any problem: raise `ValueError` with the file and the field, the file named from the tuning folder down, e.g. `tuning/drifters/meteorite.json: variants.small.hitbox[0].r must be a number > 0`. Invalid JSON: `ValueError("tuning/playtest.json: not valid JSON: <decoder message>")`, raised `from` the decode error. A missing file: the `FileNotFoundError` rises as it is (it names the path). Never fall back to a default. The guard shows the error screen.
-- Builds `DrifterTuning(drifters={...}, switches=PlaytestSwitches(...))` with plain dicts, `Circle` and `Box` from `core.collision`. Core trusts these values.
+- On any problem: raise `ValueError` with the file and the field, the file named from the tuning folder down, e.g. `tuning/drifters/meteorite.json: variants.small.hitbox[0].r must be a number > 0`. Invalid JSON: `ValueError("tuning/playtest.json: not valid JSON: <decoder message>")`, raised `from` the decode error. A missing file: the `FileNotFoundError` rises as it is (it names the path). Never fall back to a default for a missing file. The guard shows the error screen.
+- Builds `DrifterTuning(drifters={...}, switches=PlaytestSwitches(...), hazards=HazardRules(...))` with plain dicts, `Circle` and `Box` from `core.collision`. Core trusts these values.
 - Extra files in `drifters/` that match no `DrifterType` are not read. Test task DRA-29-09 fails on them.
-- Logs one INFO line after a good load: `tuning loaded drifters=%s hazard_speed_scaling=%s timer_scaling=%s`, the drifter types as a comma-separated list of values. INFO because it is startup. Nothing else.
+- Logs one INFO line after a good load: `tuning loaded drifters=%s hazard_speed_scaling=%s timer_scaling=%s rehit_cooldown=%d rehit_dim=%.2f`, the drifter types as a comma-separated list of values, and the cooldown and dim in use (DRA-39 adds the last two). INFO because it is startup. Nothing else.
 
-Debug test spawn list (`app/debug_spawns.py`, DRA-29). Source: scope report DRA-29, Test spawn list (temporary stand-in, debug mode only, not in the GDD); 15-tech-constraints.md, rule 7:
-- Small meteorite at x 160, medium at x 320, big at x 480, each at its default start y (`Placement.y` None). One second (60 ticks) apart, in that order. The list repeats every 180 ticks (3 s).
-- The first small meteorite is placed on the first tick of play (`run.scroll.ticks == 1`), the medium on tick 61, the big on tick 121, then again from tick 181. The list counts the run's own ticks, so it freezes at game over and starts again with a retry.
+Debug test spawn list (`app/debug_spawns.py`). Source: scope report DRA-39, Feature, Limits and Values needed (temporary stand-ins, debug mode only, not in the GDD); 15-tech-constraints.md, rule 7; 91-decision-log.md, row 38:
+- **File.** `app.tuning.TUNING_DIR / SPAWN_LIST_FILE` (`game/tuning/debug_spawns.json`), read once at startup in debug mode, UTF-8, `json.loads`. The Director edits it by hand; a change shows on the next page load.
+- **Checks**, by hand, every rule of `docs/contracts/schemas/debug-spawn-list.schema.json`: `rows` required, a list (may be empty); `mode` and `loop_ticks` optional; no unknown field anywhere; types exact, never a `bool` for a number. Each row: `type` required; at least one of `x`, `y`; `x`, `y` numbers; `variant` a string matching `^[a-z][a-z0-9_]*$`; `invert` a boolean; `speed` a number > 0. `loop_ticks` an `int` ≥ 1.
+- **Checks the schema can't express.** `mode` is `"all"` or a `DrifterType` value. Each row's `type` is a `DrifterType` value. Then every row, in or out of play, is turned into a `Placement(drifter_type, x=..., y=..., variant=..., invert=..., speed=...)`, absent fields left at their `Placement` defaults, and spawned once with `spawn_drifter(placement, 1, tuning)`, and the result thrown away. Whatever that raises (a missing coordinate the drifter needs, an unknown variant, an invert the drifter lacks) is raised again as `ValueError` naming the row, e.g. `tuning/debug_spawns.json: rows[2]: satellite placement needs y`, `from` the original.
+- **Errors** name the file and the field like the tuning loader: `tuning/debug_spawns.json: mode must be "all" or a drifter type (meteorite, satellite)`, `tuning/debug_spawns.json: rows[0].speed must be a number > 0`. Invalid JSON and a missing file as in the tuning loader. Never a default for a missing file.
+- **Defaults.** `mode` left out: `DEFAULT_MODE`, `"all"`. `loop_ticks` left out: `DEFAULT_LOOP_TICKS`, 180. A row field left out: the drifter's default (`Placement`'s None or False). Source: scope report DRA-39, Values needed.
+- **Rows in play.** With mode `"all"`, every row. With a drifter type, only the rows of that type. File order is kept.
+- **Timing.** The `n` rows in play are spread evenly over one loop: row `i` (from 0) has offset `(i × loop_ticks) // n`. `debug_spawns_due` places a row on every tick where `(run.scroll.ticks - 1) % loop_ticks` equals its offset. So the first row in play is placed on the first tick of play (`run.scroll.ticks == 1`), and the loop repeats every `loop_ticks` ticks. Rows that share an offset (more rows than ticks) are placed on the same tick, in file order. With the three DRA-29 meteorite rows in play and `loop_ticks` 180, they are placed on ticks 1, 61 and 121, then again from 181, exactly as in DRA-29. Source: scope report DRA-39, Feature ("The list loops"), Decision log (rows need only type and position); this contract, Rationale.
+- The list counts the run's own ticks, so it freezes at game over and starts again with a retry.
+- **Log.** One INFO line after a good load: `debug spawns loaded mode=%s rows=%d loop_ticks=%d`, with the number of rows in play. INFO because it is startup. Nothing else, and nothing per tick.
 - Called only in debug mode. Never in normal mode. Game rules stay the same in both modes; the list only places drifters.
-- Not a wave. No wave file, no wave clock, no wave picker. Waves replace it later. Source: scope report DRA-29, Out.
+- Not a wave. No wave file, no wave clock, no wave picker. Waves replace it later. Source: scope report DRA-39, Out.
 
 Error guard (`app/guard.py`):
 - The only `except Exception` in the game. Source: game/CONTEXT.md, Error handling.
@@ -509,21 +540,39 @@ New checks:
 - **Bad tuning file (desktop, headless, `SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`):** no code change. Copy `game/tuning/` to a scratch folder and set `"speed_ratio": "fast"` in its `drifters/meteorite.json`. From the command line, import `app.tuning`, set `app.tuning.TUNING_DIR` to the scratch folder, then call `run()`. The log shows the start line, then ERROR `unexpected error, showing the error screen` with a `ValueError` whose message names `tuning/drifters/meteorite.json` and `speed_ratio`. No `error screen failed` line. The error screen is drawn and the process idles until it is stopped. Source: this contract, Rules, Tuning loader; 15-tech-constraints.md, rule 8.
 - **Package contents:** as for DRA-23, and `core/collision.py`, `core/levels.py`, every file in `core/drifters/`, `ui/shapes.py`, every file in `ui/drifters/`, `app/tuning.py`, `app/debug_spawns.py`, `tuning/drifters/meteorite.json` and `tuning/playtest.json` must be in `game.apk`.
 
+Integration checks for DRA-39, on top of the required browser checks and every earlier check above, as reworded below (all must still pass). Each check starts in a fresh page unless it says otherwise. Background: the committed `game/tuning/debug_spawns.json` holds the three DRA-29 meteorite rows (small x 160, medium x 320, big x 480, in that order) and some satellite rows, with `"mode": "meteorite"`, so in debug mode the three rocks fall on their DRA-29 ticks (1, 61, 121, then every 180 ticks) and every DRA-29 debug check keeps its numbers. Checks marked **(satellite mode)** need `"mode": "satellite"` in that file: the Director switches it, or allows the Integration Engineer to switch it for the run and put it back after. Positions are on the 640 × 480 canvas. Satellite numbers at Level 1: flat 2.4675 px a tick across (148 px a second); angled about 2.3187 across and 0.8439 down.
+
+Earlier checks, reworded for DRA-39:
+- **DRA-29, Tuning loaded:** the line now reads `tuning loaded drifters=meteorite,satellite hazard_speed_scaling=True timer_scaling=True rehit_cooldown=180 rehit_dim=0.75` with the committed `hazards.json` (whether it sets both values or leaves them out). Still after the start line and before the first `scroll start`.
+- **DRA-29, A hit costs one life, once:** id 2 still never logs a second `drifter touch`, now because it leaves the screen (about 2.3 s after the touch) before its 3 s re-hit cooldown ends, not because of the DRA-29 stand-in.
+- **DRA-29, Normal mode spawns nothing:** also no (240, 240, 240) and no (60, 110, 220) pixel anywhere for 5 s.
+- Every other DRA-29 check stands as written.
+
+New checks:
+- **Spawn list loaded (`?debug=1`):** one INFO line `debug spawns loaded mode=meteorite rows=3 loop_ticks=180` (or the committed `loop_ticks` if the file sets it), after `tuning loaded` and before the first `scroll start`. In `/` there is no such line. Source: this contract, Rules, Debug test spawn list.
+- **Dim after a hit (`?debug=1`, hold ArrowUp from play start):** about 1 s after `drifter touch id=2 type=meteorite effect=hit` (so about 4.2 s after play start), in columns 306 to 334 between rows 250 and 479 there are (105, 105, 105) pixels (the medium rock at 0.75 brightness) and no (140, 140, 140) pixel. At the same moment the small rocks near x 160 show (140, 140, 140) and no (105, 105, 105): only the hazard that hit is dim. Source: 05-lives-and-damage.md, rule 1.5, rehit_dim (guess); systems/drifters.md, Presentation, Brightness.
+- **Satellite warning (satellite mode, `?debug=1`):** for the first row in play, if it is flat, has no `invert` and no `x`, with y `Y`: within its first 1 s, glow pixels (255, 220, 120) lie within 18 px of (18, Y) and none farther from it than 18 px in x or y; white (240, 240, 240) pixels lie within 3 px of (18, Y) (the 6 × 6 half-size body) and blue (60, 110, 220) pixels in columns 9 to 26, within 2 rows of Y (the 18 × 3 half-size bar). The log shows `drifter spawn id=1 type=satellite variant=flat x=-18.00 y=<Y> speed=2.47 level=1`, then about 1 s later `drifter active id=1 type=satellite x=-18.00 y=<Y>`. Source: drifters/02-satellite.md, rules 1 and 7, start, placeholder_look; systems/drifters.md, Presentation, Entry warning.
+- **Satellite crosses and leaves (satellite mode, `?debug=1`):** after that `drifter active` line, white body pixels appear at the left edge in rows Y − 6 to Y + 5 (it was not removed while it sat outside the wall). Two canvas reads 0.5 s apart while it crosses show the white body about 74 px further right in the same rows, and the blue bar 36 px wide behind it. About 4.6 s after `drifter active` (274 ticks), `drifter gone id=1 type=satellite x=<x> y=<Y>` with x at least 658.00. Source: drifters/02-satellite.md, rules 3 and 5; 07-drifters.md, rule 12; 91-decision-log.md, row 58.
+- **Angled and inverted (satellite mode, `?debug=1`):** for a row in play with `"variant": "angled"` and `"invert": true` and no `x`, with y `Y`: its warning glow sits within 18 px of (622, Y); the blue pixels of its half-size copy run down to the left (the leftmost blue column's lowest blue pixel is lower than the rightmost column's). Once active, two reads 0.5 s apart show the white body about 70 px further left and about 25 px lower, and its boxes stay upright (the body's white pixels form a square). Source: drifters/02-satellite.md, rules 1, 3 and 8; variants (guess).
+- **Shared hazard values (desktop, headless, `SDL_VIDEODRIVER=dummy`):** no code change. Copy `game/tuning/` to a scratch folder and write `{"rehit_cooldown": 5}` to its `hazards.json`. Import `app.tuning`, set `app.tuning.TUNING_DIR` to the scratch folder, then call `run()`. The log's `tuning loaded` line ends `rehit_cooldown=5 rehit_dim=0.75`: the field left out keeps its default. Source: scope report DRA-39, Limits.
+- **Bad spawn list (desktop, headless, `SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`):** no code change. In a scratch copy of `game/tuning/`, add the row `{"type": "satellite", "x": 100}` to `debug_spawns.json`. Point `app.tuning.TUNING_DIR` at it and call `run()`. The log shows ERROR `unexpected error, showing the error screen` with a `ValueError` whose message names `tuning/debug_spawns.json`, the row as `rows[<i>]` and `satellite placement needs y`. No `error screen failed` line. The error screen is drawn and the process idles until it is stopped. Repeat with the rows as committed and `"mode": "ufo"`: the message names `mode`. Source: this contract, Rules, Debug test spawn list; 15-tech-constraints.md, rule 8.
+- **Normal mode ignores the list (desktop, headless, `SDL_VIDEODRIVER=dummy`, no `DRIFTWARD_DEBUG`):** with the broken scratch list from the check above, `run()` logs `start mode=normal` and `tuning loaded ...`, no `debug spawns loaded`, no ERROR, and runs frames until stopped. Source: 15-tech-constraints.md, rule 7.
+- **Package contents:** as for DRA-29, and `core/drifters/satellite.py`, `ui/drifters/satellite_view.py`, `tuning/drifters/satellite.json`, `tuning/hazards.json` and `tuning/debug_spawns.json` must be in `game.apk`.
+
 ## Impact
-DRA-29 changes this frozen contract (v5). The frame loop loads the tuning once, adds the debug test spawn list's drifters after each tick in debug mode, and draws the drifters and the debug outlines. Two new app modules. Several DRA-6, DRA-13 and DRA-23 debug-mode checks are reworded, because meteorites now fall in debug mode. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `frame_loop`, `start_run`, `step_run`, `draw_ship`, `draw_debug_overlay`, `draw_hud`, `pygbag` and `tuning`:
+DRA-39 changes this frozen contract (v6). The tuning loader reads `hazards.json` and the satellite's own fields; the debug test spawn list moves from code into `game/tuning/debug_spawns.json`, with two modes and an editable loop length; `debug_spawns_due` takes the loaded list. The DRA-29 "Tuning loaded" check is reworded for the longer log line. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `load_tuning`, `debug_spawns`, `DEBUG_SPAWN`, `TUNING_DIR`, `frame_loop`, `add_drifters` and `pygbag`:
 
 | File | Change needed |
 |---|---|
-| `game/app/frame.py` | `tuning = load_tuning()` before `start_run()`; `add_drifters` after `step_run` in debug mode; the DRA-29 draw order; imports `app.tuning`, `app.debug_spawns`, `core.run.add_drifters`, `ui.drifters.registry.render_drifter` (the `ui.drifters` package doesn't re-export it) and `ui.debug_overlay.draw_debug_hitboxes`. Integration Engineer, during DRA-29 integration. |
-| `game/app/tuning.py` (new) | the tuning loader. Integration Engineer. |
-| `game/app/debug_spawns.py` (new) | the debug test spawn list. Integration Engineer. |
-| `game/app/loop.py`, `game/app/guard.py`, `game/app/mode.py`, `game/app/log.py`, `game/app/settings.py` | none. Loading happens inside `frame_loop`, inside the guard. |
-| `game/main.py` | none. |
-| `game/scripts/start-driftward-ace.sh` | none. |
-| `pygbag.ini` | none expected: `tuning/`, `core/drifters/` and `ui/drifters/` are not in `ignoreDirs`, and `.json` is not in `ignoreFiles`. The DRA-29 package check confirms it. If pygbag leaves the JSON out, that is a blocked report. |
+| `game/app/tuning.py` | `HAZARDS_FILE`, the hazards checks and `HazardRules`, the satellite schema and `SatelliteVariantExtra`, the longer log line. Integration Engineer. |
+| `game/app/debug_spawns.py` | rewritten: `SPAWN_LIST_FILE`, `ALL_ROWS`, `DEFAULT_MODE`, `DEFAULT_LOOP_TICKS`, `DebugSpawnList`, `load_debug_spawns`, the new `debug_spawns_due`; `DEBUG_SPAWN_PERIOD` and `DEBUG_SPAWNS` go. Integration Engineer. |
+| `game/app/frame.py` | `spawn_list = load_debug_spawns(tuning)` in debug mode before `start_run()`; `debug_spawns_due(spawn_list, ...)` in the tick. Integration Engineer. |
+| `game/app/loop.py`, `game/app/guard.py`, `game/app/mode.py`, `game/app/log.py`, `game/app/settings.py`, `game/main.py`, `game/scripts/start-driftward-ace.sh` | none. |
+| `pygbag.ini` | none expected: `tuning/` and `.json` files are already packed. The DRA-39 package check confirms it. |
 | `game/ui/look.py`, `game/ui/error_screen.py`, `game/tests/ui/test_error_screen.py` | none. |
+| `game/tests/` | none: `check.sh` runs no `app` tests. |
 
-All app changes are the Integration Engineer's, during DRA-29 integration. No task file.
+All app changes are the Integration Engineer's, during DRA-39 integration. No task file. Until then, once `DrifterType.SATELLITE` exists (task DRA-39-03), the game stops at startup with the error screen, because the DRA-29 loader rejects `satellite.json`. Tests are not affected.
 
 ## Rationale
 - **`choose_mode` is pure and returns the rejected value.** The WARNING for a bad switch must go out after logging is configured, and logging needs the mode first. Returning the rejected value lets `run()` set up logging and then warn, with one config call.
@@ -559,6 +608,13 @@ All app changes are the Integration Engineer's, during DRA-29 integration. No ta
 - **`TUNING_DIR` from `__file__` (DRA-29).** pygbag runs the game from its own folder in the browser; a path built from the module's own place works the same on desktop and in the browser. It is a module constant read at call time so the bad-file check can point it at a scratch folder without a code change.
 - **The debug list counts `run.scroll.ticks` (DRA-29).** It is the run's own play time: it freezes at game over and restarts at 0 on a retry, so the list does both with no state of its own. `add_drifters` does nothing at game over, so calling it on frozen ticks never adds a drifter twice.
 - **The first test meteorite on tick 1 (DRA-29).** The scope gives the order, the spacing and the repeat, not the first tick. Tick 1 is the first tick of play, so the list starts when play starts. It is a debug stand-in; the Director may shift it.
+- **The spawn list is a file in `game/tuning/` (DRA-39).** The Director edits it by hand, and the folder is already packed into the build and read through `TUNING_DIR`, so the bad-file checks can point it at a scratch copy. It is still not a tuning value or a wave: only debug mode reads it.
+- **Rows carry no time; they are spread evenly over the loop (DRA-39).** The Director asked for rows with only a type and a position, and a loop whose length can be changed. Spreading the rows in play evenly over one loop needs no time field, keeps the DRA-29 meteorite timing exactly (three rows in 180 ticks: 0, 60, 120), and still works when a mode leaves only some rows in play. A row that needs its own time would be a new field for the Director to approve.
+- **Every row is spawned once at load (DRA-39).** Only the drifter knows which coordinate it needs, which variants it has and whether it takes `invert`. Spawning each row once through the real spawner checks all of that with core's own rules and fails at startup, naming the row, instead of mid-run. The spawner is pure, so the throw-away drifters change nothing.
+- **Rows out of play are checked too (DRA-39).** Switching the mode should never reveal a broken row that was hidden before.
+- **Normal mode never reads the list (DRA-39).** Debug mode adds the list and nothing else (15-tech-constraints.md, rule 7). A hand-edited debug file must not be able to stop the game for players.
+- **`hazards.json` must exist, its fields may be left out (DRA-39).** The scope asks that none of the values be required. A missing file still raises, like every other data file, so a broken package shows at once instead of silently using defaults. `{}` is a valid file.
+- **The defaults live in core, not in the loader (DRA-39).** `core.drifters.base` holds `DEFAULT_REHIT_COOLDOWN_TICKS` and `DEFAULT_REHIT_DIM` with their GDD sources. The loader fills left-out fields from them, so the numbers have one home.
 - **The earlier debug checks are reworded, not dropped (DRA-29).** The test spawn list drops a medium meteorite on the respawn column every 3 s, so a waiting ship gets hit in debug mode. The rules the old checks test still hold; only what else shows up in the log, and how long a wait can last before a hit, changes. Normal-mode checks are untouched.
 - **Idle after the error, don't exit.** Ending `run()` hands control back to pygbag in a state we haven't tested. Idling keeps the canvas showing the error screen and keeps the page responsive.
 - **The error screen is tested headless.** A browser run can't trigger an unexpected error without a debug-only trigger, and that would be new scope. Task DRA-5-02 proves the screen draws right in both modes.
