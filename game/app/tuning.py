@@ -1,26 +1,41 @@
-"""Load and check the drifter tuning files and the playtest switches, once, at startup.
+"""Load and check the drifter tuning files, the playtest switches and the shared hazard values.
 
-Reads `tuning/playtest.json` and one `tuning/drifters/<drifter_type value>.json` per DrifterType,
-checks every rule of their schemas by hand (pygbag has no schema library), and builds the core
-records. Core trusts what this returns. Any bad file raises ValueError naming the file and the
-field; a missing file raises FileNotFoundError as it is. Never falls back to a default.
+Reads `tuning/playtest.json`, `tuning/hazards.json` and one
+`tuning/drifters/<drifter_type value>.json` per DrifterType, once, at startup. Checks every rule of
+their schemas by hand (pygbag has no schema library) and builds the core records. Core trusts what
+this returns. Any bad file raises ValueError naming the file and the field; a missing file raises
+FileNotFoundError as it is. Never falls back to a default for a missing file. A hazards field left
+out keeps its default from core.drifters.base.
 Not a startup module: it imports core.drifters, so only app.frame imports it, inside the guard.
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Tuning loader;
-docs/contracts/schemas/drifter-tuning.schema.json;
-docs/contracts/schemas/playtest-switches.schema.json.
+docs/contracts/schemas/drifter-tuning.schema.json, satellite-tuning.schema.json,
+playtest-switches.schema.json and hazards.schema.json.
 """
 
 import json
 import logging
 import math
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import TypeGuard
 
-from core.collision import Box, Circle, Shape
-from core.drifters.base import DrifterType
-from core.drifters.tuning import DrifterTuning, DrifterTypeTuning, PlaytestSwitches, VariantTuning
+from core.collision import Box, Circle, Hitbox, Shape
+from core.drifters.base import (
+    DEFAULT_REHIT_COOLDOWN_TICKS,
+    DEFAULT_REHIT_DIM,
+    DrifterType,
+    VariantExtra,
+)
+from core.drifters.satellite import SatelliteVariantExtra
+from core.drifters.tuning import (
+    DrifterTuning,
+    DrifterTypeTuning,
+    HazardRules,
+    PlaytestSwitches,
+    VariantTuning,
+)
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +45,9 @@ TUNING_DIR: Path = Path(__file__).resolve().parent.parent / "tuning"
 PLAYTEST_FILE: str = "playtest.json"
 """The playtest switches file, in TUNING_DIR."""
 
+HAZARDS_FILE: str = "hazards.json"
+"""The shared hazard values file, in TUNING_DIR. Every field optional; the file must exist."""
+
 DRIFTERS_DIR: str = "drifters"
 """The drifter tuning folder, in TUNING_DIR. One `<drifter_type value>.json` per DrifterType."""
 
@@ -37,6 +55,7 @@ _VARIANT_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 """Variant names. Source: drifter-tuning.schema.json, $defs.variant_name."""
 
 _SWITCH_FIELDS: frozenset[str] = frozenset({"hazard_speed_scaling", "timer_scaling"})
+_HAZARD_FIELDS: frozenset[str] = frozenset({"rehit_cooldown", "rehit_dim"})
 _DRIFTER_FIELDS: frozenset[str] = frozenset(
     {"default_variant", "variants", "speed_ratio", "entry_warning_ticks"}
 )
@@ -45,20 +64,31 @@ _CIRCLE_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "r"})
 _BOX_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "w", "h"})
 
 
+type _ExtraBuilder = Callable[[str, str, dict[str, object], Hitbox], VariantExtra]
+"""Checks a variant's own fields and hitbox, then builds its VariantExtra.
+
+Called with (file name, variant path, the variant's fields, its checked hitbox).
+"""
+
+
 def load_tuning() -> DrifterTuning:
-    """Read and check the playtest switches and every drifter's tuning file, then build them."""
+    """Read and check the playtest switches, the hazard values and every drifter's file."""
     switches: PlaytestSwitches = _load_switches(Path(PLAYTEST_FILE))
+    hazards: HazardRules = _load_hazards(Path(HAZARDS_FILE))
     drifters: dict[DrifterType, DrifterTypeTuning] = {
-        drifter_type: _load_drifter(Path(DRIFTERS_DIR) / f"{drifter_type.value}.json")
+        drifter_type: _load_drifter(Path(DRIFTERS_DIR) / f"{drifter_type.value}.json", drifter_type)
         for drifter_type in DrifterType
     }
     log.info(
-        "tuning loaded drifters=%s hazard_speed_scaling=%s timer_scaling=%s",
+        "tuning loaded drifters=%s hazard_speed_scaling=%s timer_scaling=%s "
+        "rehit_cooldown=%d rehit_dim=%.2f",
         ",".join(drifter_type.value for drifter_type in drifters),
         switches.hazard_speed_scaling,
         switches.timer_scaling,
+        hazards.rehit_cooldown_ticks,
+        hazards.rehit_dim,
     )
-    return DrifterTuning(drifters=drifters, switches=switches)
+    return DrifterTuning(drifters=drifters, switches=switches, hazards=hazards)
 
 
 def _read_json(relative: Path) -> tuple[str, object]:
@@ -85,11 +115,30 @@ def _load_switches(relative: Path) -> PlaytestSwitches:
     )
 
 
-def _load_drifter(relative: Path) -> DrifterTypeTuning:
-    """Check one drifter tuning file and build its record."""
+def _load_hazards(relative: Path) -> HazardRules:
+    """Check the shared hazard values file and build its record. `{}` is valid.
+
+    A field left out keeps its default from core.drifters.base. Source: hazards.schema.json.
+    """
+    name, data = _read_json(relative)
+    fields: dict[str, object] = _fields(name, "", data, _HAZARD_FIELDS, optional=_HAZARD_FIELDS)
+    cooldown: object = fields.get("rehit_cooldown", DEFAULT_REHIT_COOLDOWN_TICKS)
+    if isinstance(cooldown, bool) or not isinstance(cooldown, int) or cooldown < 0:
+        raise ValueError(f"{name}: rehit_cooldown must be an integer >= 0")
+    dim: object = fields.get("rehit_dim", DEFAULT_REHIT_DIM)
+    if not _is_number(dim) or not 0 <= dim <= 1:
+        raise ValueError(f"{name}: rehit_dim must be a number from 0 to 1")
+    return HazardRules(rehit_cooldown_ticks=cooldown, rehit_dim=dim)
+
+
+def _load_drifter(relative: Path, drifter_type: DrifterType) -> DrifterTypeTuning:
+    """Check one drifter tuning file and build its record.
+
+    A drifter type with fields of its own (in _OWN_FIELDS) is checked against its own schema.
+    """
     name, data = _read_json(relative)
     fields: dict[str, object] = _fields(name, "", data, _DRIFTER_FIELDS)
-    variants: dict[str, VariantTuning] = _variants(name, fields["variants"])
+    variants: dict[str, VariantTuning] = _variants(name, fields["variants"], drifter_type)
     default_variant: str = _variant_name(name, "default_variant", fields["default_variant"])
     if default_variant not in variants:
         raise ValueError(f"{name}: default_variant must be one of the variant names")
@@ -104,7 +153,7 @@ def _load_drifter(relative: Path) -> DrifterTypeTuning:
     )
 
 
-def _variants(name: str, data: object) -> dict[str, VariantTuning]:
+def _variants(name: str, data: object, drifter_type: DrifterType) -> dict[str, VariantTuning]:
     """Check the `variants` object: at least one, each name valid, each variant valid."""
     if not isinstance(data, dict):
         raise ValueError(f"{name}: variants must be an object")
@@ -113,13 +162,18 @@ def _variants(name: str, data: object) -> dict[str, VariantTuning]:
     variants: dict[str, VariantTuning] = {}
     for key, value in data.items():
         variant: str = _variant_name(name, f"variants.{key}", key)
-        variants[variant] = _variant(name, f"variants.{variant}", value)
+        variants[variant] = _variant(name, f"variants.{variant}", value, drifter_type)
     return variants
 
 
-def _variant(name: str, path: str, data: object) -> VariantTuning:
-    """Check one variant: width and height > 0, at least one shape, each inside the footprint."""
-    fields: dict[str, object] = _fields(name, path, data, _VARIANT_FIELDS)
+def _variant(name: str, path: str, data: object, drifter_type: DrifterType) -> VariantTuning:
+    """Check one variant: width and height > 0, at least one shape, each inside the footprint.
+
+    A drifter type with fields of its own also gets those checked and its VariantExtra built.
+    """
+    own: tuple[frozenset[str], _ExtraBuilder] | None = _OWN_FIELDS.get(drifter_type)
+    allowed: frozenset[str] = _VARIANT_FIELDS if own is None else _VARIANT_FIELDS | own[0]
+    fields: dict[str, object] = _fields(name, path, data, allowed)
     width: float = _positive(name, f"{path}.width", fields["width"])
     height: float = _positive(name, f"{path}.height", fields["height"])
     shapes: object = fields["hitbox"]
@@ -133,7 +187,33 @@ def _variant(name: str, path: str, data: object) -> VariantTuning:
         shape: Shape = _shape(name, shape_path, item)
         _check_inside(name, shape_path, shape, width, height)
         hitbox.append(shape)
-    return VariantTuning(width=width, height=height, hitbox=tuple(hitbox))
+    extra: VariantExtra | None = None if own is None else own[1](name, path, fields, tuple(hitbox))
+    return VariantTuning(width=width, height=height, hitbox=tuple(hitbox), extra=extra)
+
+
+def _satellite_extra(
+    name: str, path: str, fields: dict[str, object], hitbox: Hitbox
+) -> SatelliteVariantExtra:
+    """Check a satellite variant: exactly two boxes (body, then panel bar) and its angle.
+
+    Source: satellite-tuning.schema.json; drifters/02-satellite.md, variants.
+    """
+    if len(hitbox) != 2 or not all(isinstance(shape, Box) for shape in hitbox):
+        raise ValueError(f"{name}: {path}.hitbox must be exactly two boxes")
+    angle: object = fields["angle_degrees"]
+    if not _is_number(angle) or not 0 <= angle < 90:
+        raise ValueError(f"{name}: {path}.angle_degrees must be a number >= 0 and < 90")
+    return SatelliteVariantExtra(angle_degrees=angle)
+
+
+_OWN_FIELDS: dict[DrifterType, tuple[frozenset[str], _ExtraBuilder]] = {
+    DrifterType.SATELLITE: (frozenset({"angle_degrees"}), _satellite_extra),
+}
+"""Drifter types with fields of their own: the extra variant fields and their checker.
+
+A drifter type not listed here follows drifter-tuning.schema.json and has no VariantExtra.
+Source: docs/contracts/systems/app.md, Rules, Tuning loader (A drifter's own fields).
+"""
 
 
 def _shape(name: str, path: str, data: object) -> Shape:
@@ -172,13 +252,22 @@ def _check_inside(name: str, path: str, shape: Shape, width: float, height: floa
         raise ValueError(f"{name}: {path} must lie inside the variant's width x height")
 
 
-def _fields(name: str, path: str, data: object, allowed: frozenset[str]) -> dict[str, object]:
-    """Check that data is an object with exactly the allowed fields, and return it."""
+def _fields(
+    name: str,
+    path: str,
+    data: object,
+    allowed: frozenset[str],
+    optional: frozenset[str] = frozenset(),
+) -> dict[str, object]:
+    """Check that data is an object with only the allowed fields, every non-optional one there.
+
+    Returns its fields.
+    """
     where: str = path or "the file"
     if not isinstance(data, dict):
         raise ValueError(f"{name}: {where} must be an object")
     prefix: str = f"{path}." if path else ""
-    missing: list[str] = sorted(allowed - data.keys())
+    missing: list[str] = sorted(allowed - optional - data.keys())
     if missing:
         raise ValueError(f"{name}: {prefix}{missing[0]} is missing")
     unknown: list[str] = sorted(str(key) for key in data.keys() - allowed)

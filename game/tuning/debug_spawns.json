@@ -1,0 +1,41 @@
+{
+  "mode": "satellite",
+  "loop_ticks": 180,
+  "rows": [
+    {
+      "type": "meteorite",
+      "x": 160,
+      "variant": "small"
+    },
+    {
+      "type": "meteorite",
+      "x": 320,
+      "variant": "medium"
+    },
+    {
+      "type": "meteorite",
+      "x": 480,
+      "variant": "big"
+    },
+    {
+      "type": "satellite",
+      "y": 120
+    },
+    {
+      "type": "satellite",
+      "y": 60,
+      "variant": "angled"
+    },
+    {
+      "type": "satellite",
+      "y": 300,
+      "invert": true
+    },
+    {
+      "type": "satellite",
+      "y": 180,
+      "variant": "angled",
+      "invert": true
+    }
+  ]
+}
