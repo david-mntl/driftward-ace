@@ -9,6 +9,7 @@ Source: docs/contracts/systems/drifters.md, Interface and Rules, The base.
 from __future__ import annotations
 
 import logging
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from enum import Enum
@@ -31,6 +32,12 @@ DEFAULT_REHIT_DIM: Final[float] = 0.75
 """Brightness share of a hazard during its re-hit cooldown, 0..1. Source:
 05-lives-and-damage.md, rehit_dim (guess)."""
 
+DEFAULT_TELEGRAPH_MIN_TICKS: Final[int] = 45
+"""Shortest a scaled telegraph may get, ticks. Source: 07-drifters.md, telegraph_min (locked)."""
+
+TIMER_ROUND_DIGITS: Final[int] = 6
+"""Decimals a scaled timer is rounded to before it is rounded up, so float error adds no tick."""
+
 
 class DrifterType(Enum):
     """Every drifter the game knows. One member per built drifter spec in 07-drifters.md."""
@@ -40,6 +47,9 @@ class DrifterType(Enum):
 
     SATELLITE = "satellite"
     """Source: drifters/02-satellite.md."""
+
+    CHAIN_LIGHTNING = "chain_lightning"
+    """Source: drifters/03-chain-lightning.md."""
 
 
 class Phase(Enum):
@@ -79,6 +89,14 @@ class TickContext:
 @dataclass(frozen=True, slots=True)
 class VariantExtra:
     """Base of a drifter's own per-variant values. Empty.
+
+    A drifter that needs some subclasses it in its own module.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class DrifterTypeExtra:
+    """Base of a drifter's own values that hold for every variant. Empty.
 
     A drifter that needs some subclasses it in its own module.
     """
@@ -129,6 +147,12 @@ class Birth:
 
     rehit_dim: float
     """Brightness during the re-hit cooldown, 0..1."""
+
+    type_extra: DrifterTypeExtra | None
+    """The drifter type's own values. None for a drifter with none."""
+
+    telegraph_min_ticks: int
+    """The shortest a scaled telegraph may get, ticks."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -272,6 +296,21 @@ class Drifter(ABC):
         """
         return 0.0
 
+    def warning_copy(self) -> Self:
+        """Return the drifter the entry warning shows at half size. The drifter itself here.
+
+        Its width also sizes the warning. Source: 07-drifters.md, entry_warning_size.
+        """
+        return self
+
+    def settle_warning(self, ctx: TickContext) -> Self:
+        """Return the drifter with its entry warning fixed from the ship in `ctx`.
+
+        Called once, by `core.run.add_drifters`. Never moves the drifter or changes its phase or
+        timers. The drifter unchanged here. Source: drifters/03-chain-lightning.md, rule 2.
+        """
+        return self
+
     def may_hit_ship(self) -> bool:
         """Return True while no re-hit cooldown runs: the one rule every hazard shares.
 
@@ -352,3 +391,20 @@ def tick_warning[T: Drifter](drifter: T) -> T:
     if ticks >= drifter.warning_ticks:
         return replace(drifter, phase=Phase.ACTIVE, ticks_in_phase=0)
     return replace(drifter, ticks_in_phase=ticks)
+
+
+def scale_timer(ticks: int, timer_mult: float) -> int:
+    """Return `ticks` x `timer_mult` rounded up to a whole tick.
+
+    Rounded to 6 decimals first, so a float error never adds a tick: 120 x 0.85 is 102.
+    Source: 08-difficulty.md, rules 4 and 5.
+    """
+    return math.ceil(round(ticks * timer_mult, TIMER_ROUND_DIGITS))
+
+
+def scale_telegraph(ticks: int, timer_mult: float, telegraph_min_ticks: int) -> int:
+    """Return a telegraph at its level: never shorter than `telegraph_min_ticks`.
+
+    Source: 08-difficulty.md, rules 4 and 5; 07-drifters.md, telegraph_min (locked).
+    """
+    return max(scale_timer(ticks, timer_mult), telegraph_min_ticks)

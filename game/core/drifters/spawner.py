@@ -98,5 +98,7 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
             variant_extra=variant.extra,
             rehit_cooldown_ticks=tuning.hazards.rehit_cooldown_ticks,
             rehit_dim=tuning.hazards.rehit_dim,
+            type_extra=type_tuning.extra,
+            telegraph_min_ticks=tuning.hazards.telegraph_min_ticks,
         )
     )

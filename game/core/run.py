@@ -112,14 +112,16 @@ def add_drifters(run: Run, placements: Sequence[Placement], tuning: DrifterTunin
 
     Returns `run` unchanged at game over or with no placements. New drifters are in WARNING and
     first update on the next `step_run`. Errors from `spawn_drifter` rise, and the run is not
-    changed. Source: systems/run.md, Rules, add_drifters.
+    changed. Each one settles its entry warning from the ship as it is now. Source: systems/run.md,
+    Rules, add_drifters.
     """
     if run.game_over or not placements:
         return run
     added: list[Drifter] = []
     for offset, placement in enumerate(placements):
         spawned: Drifter = spawn_drifter(placement, run.level, tuning)
-        added.append(replace(spawned, uid=run.next_uid + offset))
+        numbered: Drifter = replace(spawned, uid=run.next_uid + offset)
+        added.append(numbered.settle_warning(TickContext(ship=run.ship)))
     for drifter, placement in zip(added, placements, strict=True):
         level: int = run.level if placement.as_level is None else placement.as_level
         log.debug(
