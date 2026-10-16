@@ -1,5 +1,5 @@
 {
-  "mode": "satellite",
+  "mode": "chain_lightning",
   "loop_ticks": 180,
   "rows": [
     {
@@ -35,6 +35,49 @@
       "type": "satellite",
       "y": 180,
       "variant": "angled",
+      "invert": true
+    },
+    {
+      "type": "chain_lightning",
+      "x": 320,
+      "speed": 2.0
+    },
+    {
+      "type": "chain_lightning",
+      "x": 120,
+      "variant": "pair_diagonal"
+    },
+    {
+      "type": "chain_lightning",
+      "x": 580,
+      "variant": "pair_vertical"
+    },
+    {
+      "type": "chain_lightning",
+      "x": 160,
+      "variant": "trio_line"
+    },
+    {
+      "type": "chain_lightning",
+      "x": 520,
+      "variant": "trio_diagonal",
+      "invert": true
+    },
+    {
+      "type": "chain_lightning",
+      "x": 120,
+      "variant": "trio_l",
+      "invert": true
+    },
+    {
+      "type": "chain_lightning",
+      "x": 520,
+      "variant": "trio_triangle"
+    },
+    {
+      "type": "chain_lightning",
+      "x": 520,
+      "variant": "trio_triangle",
       "invert": true
     }
   ]

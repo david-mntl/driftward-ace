@@ -1,0 +1,185 @@
+{
+  "default_variant": "pair_flat",
+  "variants": {
+    "pair_flat": {
+      "nodes": [
+        [
+          -0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ]
+      ],
+      "arcs": [
+        [
+          0,
+          1
+        ]
+      ],
+      "invert_mirror": "left_right"
+    },
+    "pair_diagonal": {
+      "nodes": [
+        [
+          -0.35355339,
+          -0.35355339
+        ],
+        [
+          0.35355339,
+          0.35355339
+        ]
+      ],
+      "arcs": [
+        [
+          0,
+          1
+        ]
+      ],
+      "invert_mirror": "left_right"
+    },
+    "pair_vertical": {
+      "nodes": [
+        [
+          0,
+          -0.5
+        ],
+        [
+          0,
+          0.5
+        ]
+      ],
+      "arcs": [
+        [
+          0,
+          1
+        ]
+      ],
+      "invert_mirror": "left_right"
+    },
+    "trio_line": {
+      "nodes": [
+        [
+          -1,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "invert_mirror": "left_right"
+    },
+    "trio_diagonal": {
+      "nodes": [
+        [
+          -0.70710678,
+          -0.70710678
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0.70710678,
+          0.70710678
+        ]
+      ],
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "invert_mirror": "left_right"
+    },
+    "trio_l": {
+      "nodes": [
+        [
+          -0.5,
+          -0.5
+        ],
+        [
+          -0.5,
+          0.5
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ],
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "invert_mirror": "left_right"
+    },
+    "trio_triangle": {
+      "nodes": [
+        [
+          -0.5,
+          0.4330127
+        ],
+        [
+          0,
+          -0.4330127
+        ],
+        [
+          0.5,
+          0.4330127
+        ]
+      ],
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "invert_mirror": "top_bottom"
+    }
+  },
+  "speed_ratio": 0.375,
+  "entry_warning_ticks": 60,
+  "node_spacing": 128,
+  "node_size": 12,
+  "arc_width": 6,
+  "charge_ticks": 120,
+  "fire_ticks": 120,
+  "charge_rays": 4,
+  "ray_length": 6,
+  "ray_width": 1,
+  "entry_warning_icon": "trio_triangle"
+}
