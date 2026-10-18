@@ -3,7 +3,7 @@ Created by: architect
 Assignee: qa-engineer
 Writes to: game/tests/
 Contract: docs/contracts/systems/hud.md
-Status: open
+Status: done
 Linear: DRA-69
 
 ## Read in the contract

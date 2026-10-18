@@ -103,3 +103,10 @@
 - `systems/app.md`: 8 to 9, frozen.
 - `systems/drifters.md`: 3 to 4, frozen.
 - Fireballs: a new drifter with a head and a trailing tail that flies across the screen, hits on head or tail, and leaves only when both are off. The app loads fireball tuning and the debug spawn list has fireball rows.
+
+## DRA-61, 2026-10-18
+- `systems/app.md`: 9 to 10, frozen.
+- `systems/hud.md`: 2 to 3, frozen.
+- `systems/run.md`: 4 to 5, frozen.
+- `systems/scroll.md`: 3 to 4, frozen.
+- Run score, score text on the HUD, and the game-over screen with score.

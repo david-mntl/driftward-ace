@@ -3,7 +3,7 @@ Created by: architect
 Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/run.md, docs/contracts/systems/hud.md
-Status: open
+Status: done
 Linear: DRA-65
 
 ## Read in the contract
