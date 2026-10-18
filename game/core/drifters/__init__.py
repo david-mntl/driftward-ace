@@ -5,5 +5,6 @@ A new drifter adds one import line here.
 """
 
 from core.drifters import chain_lightning as chain_lightning
+from core.drifters import fireball as fireball
 from core.drifters import meteorite as meteorite
 from core.drifters import satellite as satellite

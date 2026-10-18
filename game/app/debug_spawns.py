@@ -132,13 +132,15 @@ def _loop_ticks(name: str, value: object) -> int:
 
 
 def _row(name: str, path: str, data: object, tuning: DrifterTuning) -> Placement:
-    """Check one row against the schema, build its Placement and spawn it once to check it."""
+    """Check one row against the schema, build its Placement and spawn it once to check it.
+
+    x and y are both optional: the drifter's own start position refuses a missing coordinate it
+    needs, through the load-time spawn. Source: app.md, Rules, Debug test spawn list (DRA-56).
+    """
     fields: dict[str, object] = _fields(name, path, data, _ROW_FIELDS, optional=_ROW_OPTIONAL)
     drifter_type: DrifterType | None = _drifter_type(fields["type"])
     if drifter_type is None:
         raise ValueError(f"{name}: {path}.type must be a drifter type ({_type_names()})")
-    if "x" not in fields and "y" not in fields:
-        raise ValueError(f"{name}: {path} needs x or y")
     placement = Placement(
         drifter_type,
         x=_coordinate(name, path, fields, "x"),

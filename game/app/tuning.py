@@ -7,12 +7,14 @@ this returns. Any bad file raises ValueError naming the file and the field; a mi
 FileNotFoundError as it is. Never falls back to a default for a missing file. A hazards field left
 out keeps its default from core.drifters.base. The chain lightning's file has a schema of its own:
 its layouts become ChainLayout records, and its width, height and hitbox are worked out by
-core.drifters.chain_lightning, so that rule has one home.
+core.drifters.chain_lightning, so that rule has one home. The fireball's file has one too: each
+variant gives its head width, and its hitbox is worked out by core.drifters.fireball.
 Not a startup module: it imports core.drifters, so only app.frame imports it, inside the guard.
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Tuning loader;
 docs/contracts/schemas/drifter-tuning.schema.json, satellite-tuning.schema.json,
-chain-lightning-tuning.schema.json, playtest-switches.schema.json and hazards.schema.json.
+chain-lightning-tuning.schema.json, fireball-tuning.schema.json, playtest-switches.schema.json and
+hazards.schema.json.
 """
 
 import json
@@ -41,6 +43,7 @@ from core.drifters.chain_lightning import (
     chain_hitbox,
     layout_size,
 )
+from core.drifters.fireball import FireballTypeExtra, fireball_hitbox
 from core.drifters.satellite import SatelliteVariantExtra
 from core.drifters.tuning import (
     DrifterTuning,
@@ -92,6 +95,9 @@ Source: chain-lightning-tuning.schema.json.
 _CHAIN_VARIANT_FIELDS: frozenset[str] = frozenset({"nodes", "arcs", "invert_mirror"})
 _CHAIN_TOLERANCE: float = 1e-6
 """Units. Arc length and layout centering. Source: chain-lightning-tuning.schema.json."""
+_FIREBALL_FIELDS: frozenset[str] = _DRIFTER_FIELDS | frozenset({"angle_degrees", "tail_ratio"})
+"""Every field of the fireball's file, all required. Source: fireball-tuning.schema.json."""
+_FIREBALL_VARIANT_FIELDS: frozenset[str] = frozenset({"head_width"})
 _VARIANT_FIELDS: frozenset[str] = frozenset({"width", "height", "hitbox"})
 _CIRCLE_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "r"})
 _BOX_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "w", "h"})
@@ -174,11 +180,14 @@ def _load_drifter(relative: Path, drifter_type: DrifterType) -> DrifterTypeTunin
     """Check one drifter tuning file and build its record.
 
     A drifter type with fields of its own (in _OWN_FIELDS) is checked against its own schema.
-    The chain lightning's file has a schema of its own throughout (_load_chain_lightning).
+    The chain lightning's and the fireball's files have schemas of their own throughout
+    (_load_chain_lightning, _load_fireball).
     """
     name, data = _read_json(relative)
     if drifter_type is DrifterType.CHAIN_LIGHTNING:
         return _load_chain_lightning(name, data)
+    if drifter_type is DrifterType.FIREBALL:
+        return _load_fireball(name, data)
     fields: dict[str, object] = _fields(name, "", data, _DRIFTER_FIELDS)
     variants: dict[str, VariantTuning] = _variants(name, fields["variants"], drifter_type)
     default_variant: str = _variant_name(name, "default_variant", fields["default_variant"])
@@ -383,6 +392,61 @@ def _chain_layout(name: str, path: str, data: object, node_spacing: float) -> Ch
         arcs=tuple(arcs),
         invert_mirror=InvertMirror(mirror),
     )
+
+
+def _load_fireball(name: str, data: object) -> DrifterTypeTuning:
+    """Check the fireball's file and build its record.
+
+    Each variant's width and height are its head width; its hitbox, head then tail, comes from
+    core.drifters.fireball.fireball_hitbox, not inverted. The footprint check of the other files
+    is not run: the tail lies outside the head's footprint by design.
+    Source: docs/contracts/systems/app.md, Rules, Tuning loader (The fireball's file, What the
+    loader builds for the fireball); fireball-tuning.schema.json.
+    """
+    fields: dict[str, object] = _fields(name, "", data, _FIREBALL_FIELDS)
+    speed_ratio: float = _number(name, "speed_ratio", fields["speed_ratio"])
+    if speed_ratio < 0:
+        raise ValueError(f"{name}: speed_ratio must be a number >= 0")
+    warning_ticks: int = _warning_ticks(name, fields["entry_warning_ticks"])
+    angle: object = fields["angle_degrees"]
+    if not _is_number(angle) or not 0 <= angle < 90:
+        raise ValueError(f"{name}: angle_degrees must be a number >= 0 and < 90")
+    tail_ratio: float = _positive(name, "tail_ratio", fields["tail_ratio"])
+    head_widths: dict[str, float] = _fireball_head_widths(name, fields["variants"])
+    default_variant: str = _variant_name(name, "default_variant", fields["default_variant"])
+    if default_variant not in head_widths:
+        raise ValueError(f"{name}: default_variant must be one of the variant names")
+    variants: dict[str, VariantTuning] = {
+        variant: VariantTuning(
+            width=head_width,
+            height=head_width,
+            hitbox=fireball_hitbox(head_width, tail_ratio, angle, False),
+            extra=None,
+        )
+        for variant, head_width in head_widths.items()
+    }
+    return DrifterTypeTuning(
+        variants=variants,
+        default_variant=default_variant,
+        speed_ratio=speed_ratio,
+        entry_warning_ticks=warning_ticks,
+        extra=FireballTypeExtra(angle_degrees=angle, tail_ratio=tail_ratio),
+    )
+
+
+def _fireball_head_widths(name: str, data: object) -> dict[str, float]:
+    """Check the fireball's `variants` object and return each variant's head width, px."""
+    if not isinstance(data, dict):
+        raise ValueError(f"{name}: variants must be an object")
+    if not data:
+        raise ValueError(f"{name}: variants must have at least one variant")
+    head_widths: dict[str, float] = {}
+    for key, value in data.items():
+        variant: str = _variant_name(name, f"variants.{key}", key)
+        path: str = f"variants.{variant}"
+        fields: dict[str, object] = _fields(name, path, value, _FIREBALL_VARIANT_FIELDS)
+        head_widths[variant] = _positive(name, f"{path}.head_width", fields["head_width"])
+    return head_widths
 
 
 def _shape(name: str, path: str, data: object) -> Circle | Box:

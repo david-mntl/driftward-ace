@@ -14,7 +14,7 @@ A comet that dives across the screen on a straight, steep diagonal. By default i
 | priority | 2 | — | — | guess | 07-drifters.md |
 | variants | small 21, big 32 (head width) | px | — | guess | Director |
 | default_variant | small | — | — | guess | Director |
-| size | the ball (the head): 21 small, 32 big. It sets when the fireball counts as off screen. The tail doesn't count | px | — | guess | Director |
+| size | the ball (the head): 21 small, 32 big. The fireball counts as off screen only when the head and the tail are both fully off screen ([../07-drifters.md](../07-drifters.md) rule 12) | px | — | guess | Director |
 | hitbox | two circles: the head, radius = head width ÷ 2 (10.5, 16); the tail, half the head's radius (5.25, 8), touching the head from behind, along its path | px | — | guess | Director |
 | speed_ratio | 0.47 × the ship's top sideways speed ([../04-ship.md](../04-ship.md), derived values), measured along its path | — | — | guess | Director |
 | speed | ≈ 3.1 at Level 1, along its path, from `speed_ratio` and the current ship guesses. Both variants share it | px/tick | — | guess | derived |
@@ -35,7 +35,7 @@ At Level 1 the 35° path splits into about 2.5 px/tick down and 1.8 px/tick side
 2. **Telegraph:** none. The entry warning is its only warning.
 3. **Moves:** in a straight line at `speed` along its path, at `angle` from straight down, every tick. Down and to the right; down and to the left with `invert`. A side entry from the left wall flies right; with `invert` it enters from the right wall and flies left. No targeting, no turning. The scroll doesn't add to it ([../03-world-and-camera.md](../03-world-and-camera.md) rule 9).
 4. **Hits:** touching the head or the tail is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)).
-5. **Leaves:** once fully off screen at a side or the bottom ([../07-drifters.md](../07-drifters.md) rule 12). It flies through the walls ([../07-drifters.md](../07-drifters.md) rule 15).
+5. **Leaves:** once the head and the tail are both fully off screen at a side or the bottom, so nothing of it is still visible when it goes ([../07-drifters.md](../07-drifters.md) rule 12). It flies through the walls ([../07-drifters.md](../07-drifters.md) rule 15).
 6. **Scales:** `speed` × the level's hazard speed, set when it appears ([../08-difficulty.md](../08-difficulty.md)). The angle never scales.
 7. **Looks and sounds:** placeholder circles until the look is drawn. Sound: none yet.
 8. **wave_check notes:** none beyond the shared rules.
