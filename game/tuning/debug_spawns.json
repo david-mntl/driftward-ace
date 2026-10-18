@@ -1,5 +1,5 @@
 {
-  "mode": "chain_lightning",
+  "mode": "fireball",
   "loop_ticks": 180,
   "rows": [
     {
@@ -79,6 +79,34 @@
       "x": 520,
       "variant": "trio_triangle",
       "invert": true
+    },
+    {
+      "type": "fireball",
+      "x": 125
+    },
+    {
+      "type": "fireball"
+    },
+    {
+      "type": "fireball",
+      "variant": "big",
+      "invert": true
+    },
+    {
+      "type": "fireball",
+      "y": 120
+    },
+    {
+      "type": "fireball",
+      "y": 200,
+      "variant": "big",
+      "invert": true
+    },
+    {
+      "type": "fireball",
+      "x": 560,
+      "invert": true,
+      "speed": 2.0
     }
   ]
 }

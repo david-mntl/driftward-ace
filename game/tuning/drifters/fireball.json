@@ -1,0 +1,11 @@
+{
+  "default_variant": "small",
+  "variants": {
+    "small": { "head_width": 21 },
+    "big": { "head_width": 32 }
+  },
+  "speed_ratio": 0.47,
+  "entry_warning_ticks": 60,
+  "angle_degrees": 35,
+  "tail_ratio": 0.5
+}
