@@ -1,0 +1,17 @@
+{
+  "default_variant": "common",
+  "variants": {
+    "common": { "points": 50, "glint": false },
+    "rare": { "points": 100, "glint": true }
+  },
+  "crystal_width": 12,
+  "crystal_height": 20,
+  "body_height": 10,
+  "ring_width": 22,
+  "ring_height": 8,
+  "glint_size": 2,
+  "glint_left": 3,
+  "glint_top": 3,
+  "popup_ticks": 60,
+  "popup_rise_per_tick": 0.5
+}

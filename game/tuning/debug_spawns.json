@@ -1,5 +1,5 @@
 {
-  "mode": "fireball",
+  "mode": "coin",
   "loop_ticks": 180,
   "rows": [
     {
@@ -107,6 +107,26 @@
       "x": 560,
       "invert": true,
       "speed": 2.0
+    },
+    {
+      "type": "coin",
+      "x": 320
+    },
+    {
+      "type": "coin",
+      "x": 200,
+      "variant": "rare"
+    },
+    {
+      "type": "coin",
+      "x": 440,
+      "y": 210
+    },
+    {
+      "type": "coin",
+      "x": 320,
+      "y": 230,
+      "variant": "rare"
     }
   ]
 }
