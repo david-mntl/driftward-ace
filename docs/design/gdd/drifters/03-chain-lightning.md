@@ -25,7 +25,7 @@ Two or three glowing nodes fall from the top in a fixed layout. They charge with
 | cycle | charge, fire, charge, fire… until it leaves. No pause besides the charge | — | — | locked | Director |
 | entry_warning_ticks | the shared value ([../07-drifters.md](../07-drifters.md)) | ticks | — | — | 07-drifters.md |
 | entry_warning_icon | always the `trio_triangle` layout, whatever the variant. The real layout is a surprise | — | — | locked | Director |
-| entry_warning_size | the shared size rule ([../07-drifters.md](../07-drifters.md), Values), measured on the `trio_triangle` layout's width for every variant, so the size doesn't give the layout away | px | — | guess | Director |
+| entry_warning_size | the shared size rule ([../07-drifters.md](../07-drifters.md), Values): the same fixed size as every warning. The `trio_triangle` icon is scaled to fit, for every variant, so the size doesn't give the layout away | px | — | guess | Director |
 | telegraph | the charge: small blue rays around each node, more of them and faster as the charge fills; at the end they become the lightning between the nodes | — | — | locked | Director |
 | charge_rays | 4 per node at most. The first ray shows when the charge starts, and one more every quarter of the charge: every 30 ticks (0.5 s) at Level 1. All 4 show for the last quarter, just before it fires | rays | — | guess | Director |
 | ray_length | 6, out from the node's edge, one per diagonal (45°, 135°, 225°, 315°), in that order | px | — | guess | Director (value proposed in chat) |
