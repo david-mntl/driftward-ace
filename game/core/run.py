@@ -40,6 +40,9 @@ RESPAWN_WAIT_LIMIT: Final[int | None] = None
 """Longest respawn wait, ticks. None means no limit. Nothing reads it in DRA-23.
 Source: 05-lives-and-damage.md, rule 2.5: the wait has no time limit."""
 
+POINTS_PER_METER: Final[int] = 1
+"""Points for each whole meter flown. Source: 06-scoring.md, points_per_meter (locked)."""
+
 
 @dataclass(frozen=True, slots=True)
 class Run:
@@ -75,6 +78,18 @@ class Run:
     next_uid: int = 1
     """The uid the next added drifter gets. Source: systems/run.md, Interface (DRA-29)."""
 
+    coin_points: int = 0
+    """Points from coins this run, >= 0. No rule adds to it yet. Source: systems/run.md, Score."""
+
+    @property
+    def score(self) -> int:
+        """The run's score in whole points: meters flown times POINTS_PER_METER plus coin points.
+
+        Worked out on each read, never stored. Source: systems/run.md, Rules, Score;
+        06-scoring.md, rules 1 and 2.
+        """
+        return self.scroll.meters * POINTS_PER_METER + self.coin_points
+
     @property
     def invulnerable(self) -> bool:
         """True while invulnerability has ticks left. Source: 05-lives-and-damage.md, rule 2.4."""
@@ -101,6 +116,8 @@ class Run:
 
 def start_run() -> Run:
     """Return a new run: the ship at spawn, the scroll at tick 0, every other field default.
+
+    No drifters, next_uid 1 and coin_points 0, so the score is 0.
 
     Source: 02-game-flow.md, rule 3; systems/run.md, Interface.
     """

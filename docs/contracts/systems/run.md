@@ -1,23 +1,24 @@
-# Run: lives, falls, hits, drifters, respawn wait, game over and retry
+# Run: lives, score, falls, hits, drifters, respawn wait, game over and retry
 Version: 4
-Status: frozen
-Features: DRA-23, DRA-29, DRA-39, DRA-47
+Status: draft
+Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61
 Created by: architect
 
 ## Purpose
-One run of the game, from play start to game over, as one core state. It holds the ship, the world scroll, the drifters on the field, the lives, the invulnerability timer, the respawn wait and the Game Over state, and steps them all once per tick. It applies the fall rule and the hit rule: the ship step reports where the ship is, the drifters report where they are and what a touch does, and the run decides what it costs. It marks when each drifter has entered the screen, starts and counts down each hazard's re-hit cooldown, and drops drifters that have left. It also starts a new run when the player retries.
+One run of the game, from play start to game over, as one core state. It holds the ship, the world scroll, the drifters on the field, the lives, the coin points, the invulnerability timer, the respawn wait and the Game Over state, and steps them all once per tick. It gives the run's score: the meters flown plus the coin points. No rule adds coin points yet, so the score equals the meters flown. The score starts at 0, never goes down, freezes at game over and is 0 again after a retry. It applies the fall rule and the hit rule: the ship step reports where the ship is, the drifters report where they are and what a touch does, and the run decides what it costs. It marks when each drifter has entered the screen, starts and counts down each hazard's re-hit cooldown, and drops drifters that have left. It also starts a new run when the player retries.
 
 The app holds one `Run` and calls one step per tick. It may also hand the run new drifters through `add_drifters`, the only way a drifter enters a run. Each new drifter settles its entry warning there, from the ship at that moment.
 
 A life is lost by a fall or by a hit. No life-lost feedback plays: the blink is the only effect (scope report DRA-23, Limits; LD-08 stays open).
 
 Who builds what:
-- `game/core/run.py`: the Gameplay Implementer, task `DRA-23-01-gameplay-implementer`. Drifters, `add_drifters`, hits and drops: task `DRA-29-03-gameplay-implementer`. Entering, the re-hit cooldown and the end of `hit_ship`: task `DRA-39-01-gameplay-implementer`. `settle_warning` in `add_drifters`: task `DRA-47-02-gameplay-implementer`.
-- `game/ui/game_over.py`, the Game Over box: the UI Developer, task `DRA-23-03-ui-developer`.
-- `game/tests/core/test_run.py`: the QA Engineer, task `DRA-23-04-qa-engineer`. Drifters in the run: `game/tests/core/test_run_drifters.py`, tasks `DRA-29-08-qa-engineer` and `DRA-39-07-qa-engineer`.
-- The hearts that show `lives`: `docs/contracts/systems/hud.md`.
+- `game/core/run.py`: the Gameplay Implementer, task `DRA-23-01-gameplay-implementer`. Drifters, `add_drifters`, hits and drops: task `DRA-29-03-gameplay-implementer`. Entering, the re-hit cooldown and the end of `hit_ship`: task `DRA-39-01-gameplay-implementer`. `settle_warning` in `add_drifters`: task `DRA-47-02-gameplay-implementer`. `POINTS_PER_METER`, `coin_points` and `score`: task `DRA-61-01-gameplay-implementer`.
+- `game/ui/game_over.py`, the Game Over box: the UI Developer, task `DRA-23-03-ui-developer`. The three-line layout and `draw_final_score`, the final score line: task `DRA-61-03-ui-developer`.
+- `game/tests/core/test_run.py`: the QA Engineer, task `DRA-23-04-qa-engineer`. Drifters in the run: `game/tests/core/test_run_drifters.py`, tasks `DRA-29-08-qa-engineer` and `DRA-39-07-qa-engineer`. The score: `game/tests/core/test_run_score.py`, task `DRA-61-04-qa-engineer`. The Game Over box: `game/tests/ui/test_game_over.py`, task `DRA-61-05-qa-engineer`.
+- The hearts that show `lives` and the SCORE line that shows `score`: `docs/contracts/systems/hud.md`. The score's text, `score_text`, is set there too.
+- The meters inside the score: `docs/contracts/systems/scroll.md`.
 - The drifters themselves, the spawner and their views: `docs/contracts/systems/drifters.md`.
-- Calling `start_run` before the first frame, `step_run` once per tick, `add_drifters` for the debug test spawn list, drawing the drifters, the ship only while `ship_visible`, and the Game Over box while `game_over`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`.
+- Calling `start_run` before the first frame, `step_run` once per tick, `add_drifters` for the debug test spawn list, drawing the drifters, the ship only while `ship_visible`, and the Game Over box and its final score line from `run.score` while `game_over`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`.
 
 ## Diagram
 ```mermaid
@@ -90,6 +91,21 @@ rehit_ticks_left    180    179 .. 1        0        0, or 180 if it hits on T+18
 can hit on tick            T+1 .. T+180: no                  T+181: yes
 ```
 
+The score (DRA-61). Game over on tick G, retry on tick R. `coin_points` stays 0 in DRA-61:
+```mermaid
+flowchart LR
+  M["scroll.meters"] -- "× POINTS_PER_METER" --> S["run.score"]
+  C["coin_points<br/>(0 until a rule adds to it)"] -- "+" --> S
+  S --> HUD["ui.hud: SCORE line"]
+  S -- "the app passes run.score" --> GO["ui.game_over.draw_final_score: final score"]
+```
+```
+state after tick   0 (start_run)   1..30   31        ...  G             G+1 .. R-1    R (retry)
+scroll.meters      0               0       0         ...  m             m (frozen)    0
+coin_points        0               0       0         ...  0             0             0
+score              0               0       0         ...  m             m (frozen)    0
+```
+
 ## Interface
 ```python
 # game/core/run.py
@@ -105,6 +121,7 @@ BLINK_SWAP_TICKS: Final[int] = (
 RESPAWN_WAIT_LIMIT: Final[int | None] = (
     None  # 05-lives-and-damage.md, rule 2.5: no time limit.
 )
+POINTS_PER_METER: Final[int] = 1  # DRA-61. 06-scoring.md, points_per_meter (locked)
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +142,12 @@ class Run:
     )
     drifters: tuple[Drifter, ...] = ()  # DRA-29. Drifters on the field, oldest first
     next_uid: int = 1  # DRA-29. The uid the next added drifter gets
+    coin_points: int = 0  # DRA-61. Points from coins this run, >= 0. No rule adds to it yet
+
+    @property
+    def score(self) -> int:
+        ...  # DRA-61
+        # scroll.meters * POINTS_PER_METER + coin_points. Whole points, >= 0.
 
     @property
     def invulnerable(self) -> bool:
@@ -145,7 +168,8 @@ class Run:
 
 def start_run() -> Run:
     ...
-    # Run(ship=spawn(), scroll=start_scroll()). Every other field at its default: no drifters, next_uid 1.
+    # Run(ship=spawn(), scroll=start_scroll()). Every other field at its default: no drifters,
+    # next_uid 1, coin_points 0, so score 0.
 
 
 def step_run(run: Run, thrust: Thrust) -> Run:
@@ -164,8 +188,8 @@ def add_drifters(
 The code documents each `Run` field with the comment above. `Drifter`, `TickContext`, `Phase`, `TouchEffect` (`core.drifters.base`), `Placement`, `spawn_drifter` (`core.drifters.spawner`) and `DrifterTuning` (`core.drifters.tuning`) are in `docs/contracts/systems/drifters.md`. `ship_hitbox` is in `docs/contracts/systems/ship.md`; `hitboxes_overlap` in `drifters.md`.
 
 ```python
-# game/ui/game_over.py. Unchanged in DRA-29.
-# Imports: pygame. Never core, never app. Never reads the run mode or a key.
+# game/ui/game_over.py
+# Imports: pygame, ui.score_text (DRA-61). Never core, never app. Never reads the run mode or a key.
 BOX_SIZE: tuple[int, int] = (
     320,
     120,
@@ -180,11 +204,20 @@ TEXT_COLOR: tuple[int, int, int] = (255, 255, 255)  # same: white
 TITLE_TEXT: str = "Game Over"  # same
 TITLE_FONT_SIZE: int = 32  # same: default font, 32 px
 PROMPT_TEXT: str = "Press any arrow to retry"  # same
-PROMPT_FONT_SIZE: int = 16  # same: 16 px, below the title
+PROMPT_FONT_SIZE: int = 16  # same: 16 px, below the score line
+SCORE_FONT_SIZE: int = 16  # DRA-61. scope report DRA-61, SCORE look: default font, 16 px
 
 
 def draw_game_over(surface: pygame.Surface) -> None: ...
+    # The box, the title and the prompt. Signature unchanged since DRA-23.
+    # From DRA-61 it leaves the score line's place empty.
+
+
+def draw_final_score(surface: pygame.Surface, score: int) -> None: ...  # DRA-61
+    # The score line only, in its place between the title and the prompt.
+    # score is a whole number >= 0, from the app; trusted, not checked.
 ```
+`score_text` (`game/ui/score_text.py`) is in `docs/contracts/systems/hud.md`, Interface.
 
 ## Presentation
 The run's fields reach the screen in these places. Every fact shown is a core field; no view works one out.
@@ -193,20 +226,23 @@ The run's fields reach the screen in these places. Every fact shown is a core fi
 |---|---|
 | `run.ship_visible` | the app calls `draw_ship(surface, run.ship)` only on frames where it is True. So the ship blinks while invulnerable, after a fall or a hit. Source: 05-lives-and-damage.md, invuln_blink (locked), rules 1.3 and 2.4; 10-ui.md, rule 3 |
 | `run.drifters` | the app calls `render_drifter(surface, obj)` for each, in order (`docs/contracts/systems/drifters.md`, Presentation). The debug overlay outlines and labels them (`docs/contracts/systems/debug-overlay.md`). From DRA-29 |
-| `run.game_over` | the app calls `draw_game_over(surface)` only on frames where it is True. Source: 02-game-flow.md, rule 5 |
+| `run.game_over` | the app calls `draw_game_over(surface)`, then `draw_final_score(surface, run.score)`, only on frames where it is True. Source: 02-game-flow.md, rule 5 |
+| `run.score` | the SCORE line at the top left, `score_text(run.score)`: see `docs/contracts/systems/hud.md`. At game over, also the score line on the Game Over box, through `draw_final_score`, below. From DRA-61. Source: 10-ui.md, hud_score (locked), rule 2; 02-game-flow.md, rule 5 ("Shows the final score") |
 | `run.lives` | the hearts at the top right. See `docs/contracts/systems/hud.md` |
-| `run.ship`, `run.scroll` | as before: the ship view, the debug overlay, the starfield and the meters readout read them |
+| `run.ship`, `run.scroll` | the ship view, the debug overlay and the starfield read them. The HUD reads the meters only through `run.score` |
 
-`draw_game_over` reads no core state. Unchanged in DRA-29. It draws, in this order:
+`draw_game_over` and `draw_final_score` read no core state and import no core module. `draw_final_score` gets the final score as a plain number from the app. `draw_game_over` draws the Box, the Title and the Prompt, in that order. `draw_final_score` draws only the Score line, over the box. Both place their lines by the same three-line layout (Vertical place), so the title and the prompt sit in the same place whether `draw_final_score` is called or not.
 - **Box.** A `BOX_SIZE` (320 × 120) rectangle filled with `BOX_COLOR`, black at alpha 90. No border. Its top-left corner is `((width - 320) // 2, (height - 120) // 2)` from `surface.get_size()`: (160, 180) on the 640 × 480 screen. Source: scope report DRA-23, Values needed (temporary stand-in; UI-04 is TBD).
 - **Title.** `TITLE_TEXT` in the default font at 32 px, antialiased, `TEXT_COLOR`, centered horizontally. Source: same.
-- **Prompt.** `PROMPT_TEXT` in the default font at 16 px, antialiased, `TEXT_COLOR`, centered horizontally, its top one title line-height (`get_linesize()`) below the title's top. Source: same; 10-ui.md, error_layout.
-- **Vertical place.** The two-line block (title `get_linesize()` + prompt font `get_height()`) is centered vertically in the box.
-- The box surface, both fonts and both texts are built once, on the first draw. The view only draws; it never fills the background, flips, logs per frame, catches an error, or reads the run mode or a key. Source: 15-tech-constraints.md, rule 5; 10-ui.md, rule 5.
+- **Score** (DRA-61), drawn by `draw_final_score`. `score_text(score)`, for example `SCORE 1 234`, in the default font at `SCORE_FONT_SIZE` (16 px), antialiased, `TEXT_COLOR` (255, 255, 255), centered horizontally. Its top is one title line-height (the title font's `get_linesize()`) below the title's top. So it reads exactly like the HUD's SCORE line. Source: scope report DRA-61, Limits ("The final score on the Game Over box. Text and place are left to the design"; Director: "Wherever"), and the SCORE format and look; 02-game-flow.md, rule 5.
+- **Prompt.** `PROMPT_TEXT` in the default font at 16 px, antialiased, `TEXT_COLOR`, centered horizontally. From DRA-61 its top is one score line-height (the score font's `get_linesize()`) below the score line's top. Source: scope report DRA-23, Values needed; 10-ui.md, error_layout.
+- **Vertical place.** The three-line block (title font `get_linesize()` + score font `get_linesize()` + prompt font `get_height()`) is centered vertically in the box: the title's top is `box_top + (120 - block height) // 2`. With the default font it is well under the box's 120 px. `draw_game_over` always uses this layout and leaves the score line's place empty. `draw_final_score` works out the same box and title top from `surface.get_size()`, so its line lands in that place.
+- **Width.** The score line has no digit limit (scope report DRA-61, Max digits: "score should be able to be infinite"). It stays centered however long it is. See Rationale for why it never reaches the box's sides in play.
+- The box surface, the three fonts, the title and the prompt are built once, on the first draw by either function. The score line is rendered again only when `score` differs from the score it was last rendered for; while the box shows, the score is frozen, so that is once per game over. Never a render per frame with the same score. The view only draws; it never fills the background, flips, logs per frame, catches an error, or reads the run mode or a key. Source: 15-tech-constraints.md, rule 5; 10-ui.md, rule 5.
 - At game over after a hit, the ship shows under the box where it was hit; after a fall, it is below the floor and doesn't show. Drifters show frozen where they were.
 
 ## Rules
-Values: every constant above has its value and source on its line. `lives_start` and `invuln_ticks` are locked. The blink and the box are temporary stand-ins the Director approved in chat (scope report DRA-23).
+Values: every constant above has its value and source on its line. `lives_start`, `invuln_ticks` and `points_per_meter` are locked. The blink and the box are temporary stand-ins the Director approved in chat (scope report DRA-23). The score line's text, look and place are the Director's (scope report DRA-61), not in the GDD (UI-01 and UI-04 are TBD).
 
 Step numbers changed in DRA-29: the DRA-23 steps 3 (wait), 4 (scroll), 5 (fall) and 6 (`held`) are now steps 4, 5, 6 and 10. Changed again in DRA-39: the DRA-29 steps 8 (drop) and 9 (`held`) are now steps 9 and 10, after the new step 8 (cool down). Closed task files and the earlier integration checks in `systems/app.md` use the old numbers.
 
@@ -245,6 +281,16 @@ A game-over tick (`game_over` True):
 - It works the same during the respawn wait. It never reads the run mode. The app decides what to add (`docs/contracts/systems/app.md`).
 - An error from `spawn_drifter` rises. Core never catches it. Source: game/CONTEXT.md, Error handling.
 
+Score (DRA-61):
+- **Formula.** `score = scroll.meters × POINTS_PER_METER + coin_points`. One whole number. `scroll.meters` is whole meters, rounded down (`docs/contracts/systems/scroll.md`, Distance). Source: 06-scoring.md, Summary, rule 1, points_per_meter and meters_rounding (locked); scope report DRA-61, Limits.
+- **Grazes are not in it.** The GDD formula adds `25 × grazes`; grazes don't pay yet (SC-02 and SC-04 are open). Source: scope report DRA-61, Out and Fit; scope report DRA-39, Decision log ("score = meters + coins for now").
+- **Coin points.** `coin_points` is 0 at the start of every run, and no step of `step_run` or `add_drifters` changes it. So the score equals the meters flown. The coin feature adds the rule that raises it; nothing may ever lower it. Source: scope report DRA-61, Limits ("Coin points stay 0 until the coin feature adds them. Leave room for coins; don't build them"); 06-scoring.md, rule 2.
+- **Start and retry.** `start_run()` gives `score` 0: the scroll is at 0 m and `coin_points` is 0. A retry returns `start_run()`, so the score is 0 again. Source: 02-game-flow.md, rules 3 and 6; 91-decision-log.md, row 30.
+- **Never goes down.** Meters never go down and nothing lowers `coin_points`. A fall, a hit, a respawn and the respawn wait don't change the score; the meters keep counting through all of them. Source: scope report DRA-61, Feature; 06-scoring.md, rule 1; 05-lives-and-damage.md, rule 2.5.
+- **Game over.** The score on the tick lives reach 0 is the final score. A game-over tick changes neither the scroll nor `coin_points`, so the score stays frozen while the box shows. Source: 02-game-flow.md, rule 5; 91-decision-log.md, row 30.
+- **Level** still reads `scroll.meters`, never the score. Source: 08-difficulty.md, rule 1.
+- The score is a property, worked out from the state each time it is read. It is never stored apart from the meters and the coin points.
+
 Other rules:
 - Game over happens on the tick lives reach 0. That tick runs in full (drifters, ship, scroll, cooldowns, drops); the freeze starts on the next tick. Cooldowns freeze with everything else and a retry starts with no drifters. Source: 05-lives-and-damage.md, rule 5; 02-game-flow.md, rule 5.
 - A run starts with no invulnerability, no wait and no drifters. Source: 02-game-flow.md, rule 3.
@@ -268,7 +314,7 @@ Logging (logger `core.run`, by event, never by tick). Source: game/CONTEXT.md, L
 - INFO `new run`: on the retry tick.
 - DEBUG `drifter spawn id=%d type=%s variant=%s x=%.2f y=%.2f speed=%.2f level=%d`: from `add_drifters`, once per drifter, with the level used (the placement's `as_level`, else `run.level`). DRA-29.
 - Order inside one tick: `drifter active`, `respawn wait end`, the ship's own lines, the scroll's line, `invulnerable end`, then either the fall's `life lost` and `respawn from` or `game over`, or the hit's `drifter touch` lines, `life lost` and `game over`, then `drifter gone`. `drifter spawn` lines come from the app's `add_drifters` call after the tick.
-- Nothing else. A hazard passing through an invulnerable ship logs nothing, and so does a cooldown starting or ending. A drifter's life logs exactly three lines, `drifter spawn`, `drifter active`, `drifter gone`, plus one `drifter touch` for each hit it takes part in. A drifter that never enters never logs `drifter gone` while the run lasts.
+- Nothing else. The score logs nothing: no line when it changes (DRA-61), and `game over meters=%d` keeps its text. A hazard passing through an invulnerable ship logs nothing, and so does a cooldown starting or ending. A drifter's life logs exactly three lines, `drifter spawn`, `drifter active`, `drifter gone`, plus one `drifter touch` for each hit it takes part in. A drifter that never enters never logs `drifter gone` while the run lasts.
 
 ## Impact
 DRA-39 changes this frozen contract (v2). No `Run` field, property, signature, constant or log line changes. `step_run` changes in step 3 (`mark_entered()` after each update), step 7.3 (a hit starts each touching drifter's cooldown instead of setting `hit_ship`), the new step 8 (cool down) and step 9 (drop, through the new `is_off_screen`); the old steps 8 and 9 become 9 and 10. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.run`, `Run(`, `start_run`, `step_run`, `add_drifters`, `hit_ship`, `may_hit_ship` and `is_off_screen`:
@@ -289,6 +335,19 @@ DRA-47 changes this contract on top of DRA-39 (not closed out, still `draft` at 
 | `game/core/run.py` | `add_drifters` calls `settle_warning`. Task `DRA-47-02-gameplay-implementer`. |
 | `game/app/frame.py` | none. |
 | `game/tests/core/test_run_drifters.py`, `game/tests/core/test_run.py` | none: the meteorite and the satellite come back unchanged from `settle_warning`. Chain lightnings in the run are tested by task `DRA-47-08-qa-engineer` in its own file. |
+
+DRA-61 changes this frozen contract (v4). `Run` gains the `coin_points` field (default 0) and the `score` property, and the module gains `POINTS_PER_METER`. No step of `step_run`, no `add_drifters` rule and no log line changes. The Game Over box gains the score line through the new `draw_final_score`; `draw_game_over` keeps its signature. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.run`, `Run(`, `start_run`, `draw_game_over`, `ui.game_over` and `.meters`:
+
+| File | Change needed |
+|---|---|
+| `game/core/run.py` | `POINTS_PER_METER`, `coin_points`, `score`. Task `DRA-61-01-gameplay-implementer`. |
+| `game/ui/game_over.py` | `SCORE_FONT_SIZE`, the three-line layout in `draw_game_over`, the new `draw_final_score`. Task `DRA-61-03-ui-developer`. |
+| `game/ui/hud.py` | reads `run.score`; see `docs/contracts/systems/hud.md`, Impact. Task `DRA-61-06-ui-developer`. |
+| `game/app/frame.py` | adds `draw_final_score(surface, run.score)` right after its `draw_game_over(surface)` call. Integration Engineer, from `systems/app.md`. Until then the existing call still type-checks and runs: at game over the box shows the title and the prompt with the score line's place empty. No error screen, and every `check.sh` step passes. |
+| `game/ui/debug_overlay.py`, `game/app/debug_spawns.py` | none. |
+| `game/tests/core/test_run.py`, `test_run_drifters.py`, `test_chain_lightning.py`, `test_fireball.py` | none: they build `Run` by keyword and the new field has a default. Must pass unchanged. |
+| `game/tests/core/test_run_score.py` (new) | the score rules. Task `DRA-61-04-qa-engineer`. |
+| `game/tests/ui/test_game_over.py` (new) | the Game Over box, with and without its score line. Task `DRA-61-05-qa-engineer`. |
 
 ## Rationale
 - **A run state that holds the ship, the scroll and the drifters.** Game over freezes them together and a retry resets them together. Core owns rules, so core holds them together.
@@ -313,4 +372,11 @@ DRA-47 changes this contract on top of DRA-39 (not closed out, still `draft` at 
 - **`level` is a property (DRA-29).** It is a fact about the run (08-difficulty.md, rule 1), computed from the meters. The spawner gets it from `add_drifters` and is the only reader.
 - **Lifecycle logs in `core.run` (DRA-29).** The run sees each drifter's phase before and after the tick and owns the drop, so it can log each event once. The drifters stay pure.
 - **INFO for game over and a new run.** game/CONTEXT.md puts screen changes at INFO.
+- **The score is a property of the run (DRA-61).** It is a fact the HUD and the Game Over box show, so it lives in core (10-ui.md, How to extend). Worked out from the meters and the coin points, it can't disagree with them, and it freezes and resets with them for free: game over already freezes the scroll and a retry already returns `start_run()`.
+- **`coin_points` exists now, at 0 (DRA-61).** The scope report builds the score as `meters + coin points` and asks to leave room for coins. A field that starts at 0 and that no rule changes keeps that seam open: the coin feature adds the one rule that raises it, and the score, the HUD and the Game Over box need no change then. It holds points, not a coin count, because coin variants pay different points (06-scoring.md, coin_points) and the score needs only the sum.
+- **`POINTS_PER_METER` is a constant, not a bare 1 (DRA-61).** It is a locked GDD value with a name; the code shows where the meters' share of the score comes from.
+- **No score log line (DRA-61).** The score changes about 6.6 times a second, which would be a line per meter (game/CONTEXT.md, Logging). `game over meters=%d` keeps its text, so no log check breaks; in DRA-61 that number is also the final score.
+- **The score line is its own call, `draw_final_score`, and takes the score as a number (DRA-61).** The view stays free of core, as it was in DRA-23, and the app already reads the run's fields to decide what to draw. `draw_game_over` keeps its DRA-23 signature, so the app's existing call stays valid while the box changes. Every QA run in the build then passes with a clean typecheck and no error screen before the Integration Engineer adds the second call (Director, DRA-61 revision: "keep QA clean"). A default value on a new `score` argument was not used. It would show a wrong score until integration, or leave a no-score branch that only the build window uses. The format comes from the HUD's `score_text`, so the two places always read the same.
+- **Score line between title and prompt (DRA-61).** The Director left text and place to the design ("Wherever"; the box is redesigned later, UI-04). Under the title it reads as the result, and the prompt stays last, as the next step. Same label, font and size as the HUD, so the player sees one number in one look.
+- **No digit limit on the box (DRA-61).** The Director chose no limit. At Level 1 the score grows by 6.6 a second from meters; coins add 50 or 100 each. The 320 px box holds well over 30 characters of 16 px text, a score no run can reach. The real limit stays open with UI-01 and UI-04.
 - **No schema in this contract.** The tuning files' schemas are owned by `docs/contracts/systems/drifters.md`.

@@ -1,7 +1,7 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
 Version: 9
-Status: frozen
-Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56
+Status: draft
+Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61
 Created by: architect
 
 ## Purpose
@@ -9,7 +9,7 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 
 Before the first frame the app loads and checks the tuning files once (the drifter files, the playtest switches and the shared hazard values) in both modes, and the debug test spawn list in debug mode only, and hands the checked values to core. It holds one `Run` (`docs/contracts/systems/run.md`). Play starts when the ship first appears. Each tick it calls `step_run` once; core does the ship, the scroll, the drifters, the lives, the respawn wait, game over and retry. In debug mode only, after each tick it hands the run the drifters the spawn list says are due, through `core.run.add_drifters`. Normal mode spawns nothing yet.
 
-Each frame draws the starfield, the drifters (entry warnings, meteorites, satellites, chain lightnings and fireballs) behind the ship, the ship while `run.ship_visible` (the blink), in debug mode the hitbox and graze outlines, drifter labels and the debug overlay (F3 toggles them), the Game Over box while `run.game_over`, and the HUD on top. The arrow-key log lines carry the ship's x and y. The guard removes null characters from the debug-mode detail line, so an error message holding one still shows the error screen. Source: scope reports DRA-5 to DRA-47; `docs/contracts/systems/drifters.md`.
+Each frame draws the starfield, the drifters (entry warnings, meteorites, satellites, chain lightnings and fireballs) behind the ship, the ship while `run.ship_visible` (the blink), in debug mode the hitbox and graze outlines, drifter labels and the debug overlay (F3 toggles them), the Game Over box with the final score while `run.game_over`, and the HUD with SCORE and the hearts on top. The arrow-key log lines carry the ship's x and y. The guard removes null characters from the debug-mode detail line, so an error message holding one still shows the error screen. Source: scope reports DRA-5 to DRA-47; `docs/contracts/systems/drifters.md`.
 
 Who builds what:
 - `game/main.py`, `game/app/`, `game/scripts/`, `pygbag.ini` (repo root): the Integration Engineer, during integration, from this contract. No task file.
@@ -18,7 +18,7 @@ Who builds what:
 - `game/core/world.py`, `game/core/ship.py`: DRA-6, see `docs/contracts/systems/world.md` and `docs/contracts/systems/ship.md`. Core is the same in both modes.
 - `game/ui/ship_view.py`, `game/ui/debug_overlay.py`: DRA-6, see `docs/contracts/systems/ship.md` and `docs/contracts/systems/debug-overlay.md`.
 - `game/core/scroll.py`, `game/ui/starfield.py`: DRA-13, see `docs/contracts/systems/scroll.md`.
-- `game/ui/hud.py`: DRA-13, see `docs/contracts/systems/hud.md`.
+- `game/ui/hud.py`: DRA-13, see `docs/contracts/systems/hud.md`. `game/ui/score_text.py`: DRA-61, same contract.
 - `game/core/run.py`, `game/ui/game_over.py`: DRA-23, see `docs/contracts/systems/run.md`.
 - `game/core/collision.py`, `game/core/levels.py`, `game/core/drifters/`, `game/ui/shapes.py`, `game/ui/drifters/`: DRA-29 and DRA-39, see `docs/contracts/systems/drifters.md`.
 - `game/app/tuning.py`, `game/app/debug_spawns.py`: the Integration Engineer, during DRA-29 integration, from this contract. The hazards file, the satellite's own fields and the editable spawn list: during DRA-39 integration. The chain lightning's file and `telegraph_min`: during DRA-47 integration. The fireball's file and spawn rows with no position: during DRA-56 integration. No task file.
@@ -86,7 +86,7 @@ flowchart LR
   T -- yes --> TK["one tick:<br/>run = step_run(run, thrust)<br/>debug mode: run = add_drifters(run,<br/>debug_spawns_due(spawn_list, run.scroll.ticks), tuning)"] --> T
   T -- no --> CAP{"acc still >= 1/60 s?"}
   CAP -- yes --> DROP["acc = 0<br/>(owed time dropped)"] --> D
-  CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, render_drifter for each drifter,<br/>draw_ship if run.ship_visible,<br/>draw_debug_hitboxes and draw_debug_overlay if overlay_visible,<br/>draw_game_over if run.game_over,<br/>then draw_hud"]
+  CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, render_drifter for each drifter,<br/>draw_ship if run.ship_visible,<br/>draw_debug_hitboxes and draw_debug_overlay if overlay_visible,<br/>draw_game_over(surface) then draw_final_score(surface, run.score)<br/>if run.game_over, then draw_hud"]
   D --> FL["display.flip()"]
   FL --> Y["await asyncio.sleep(0)"]
   Y --> F
@@ -383,6 +383,16 @@ if debug:
     run = add_drifters(run, debug_spawns_due(spawn_list, run.scroll.ticks), tuning)
 ```
 
+DRA-61 calls. They add one call to the DRA-29 draw block above: the final score line, right after the Game Over box. Its signature is set in `systems/run.md`. `draw_game_over(surface)` and `draw_hud(surface, run, below_overlay=debug)` don't change; the HUD reads `run.score` itself.
+```python
+# per frame, draw:
+if run.game_over:
+    draw_game_over(surface)  # systems/run.md, Presentation: box, title, prompt
+    draw_final_score(surface, run.score)  # systems/run.md, Presentation: the score line
+draw_hud(surface, run, below_overlay=debug)  # systems/hud.md, last
+```
+`app/frame.py` imports `draw_final_score` from `ui.game_over`, next to `draw_game_over`.
+
 ### game/ui/look.py (UI Developer)
 ```python
 BACKGROUND: tuple[int, int, int]  # 12-art-and-audio.md, placeholder_bg
@@ -458,7 +468,7 @@ Frame loop (`app/frame.py`, `frame_loop(mode)`):
 - Frame time comes from a monotonic clock (`time.perf_counter`). Ticks never use frame time. Source: 15-tech-constraints.md, rule 2.
 - **Held keys.** After the events, read `pygame.key.get_pressed()` once and build `Thrust(up=pressed[K_UP], down=pressed[K_DOWN], left=pressed[K_LEFT], right=pressed[K_RIGHT])`. Every tick in that frame uses the same `thrust`. Only the four arrow keys move the ship. Source: 01-vision.md, locked decision 1; 04-ship.md, rule 2.1.
 - **Tick.** `run = step_run(run, thrust)`. One `step_run` call per tick. In debug mode only, right after it: `run = add_drifters(run, debug_spawns_due(spawn_list, run.scroll.ticks), tuning)`. In normal mode nothing is added. The app never builds a drifter itself and never changes `run.drifters`. Source: 04-ship.md, rule 1; 15-tech-constraints.md, rules 2 and 7; systems/run.md; scope report DRA-29, Limits ("Normal mode spawns nothing yet").
-- **Draw.** In this order: fill with `ui.look.BACKGROUND`; `draw_starfield(surface, run.scroll)`; `render_drifter(surface, obj)` for each `obj` in `run.drifters`, in order (DRA-29); `draw_ship(surface, run.ship)` only if `run.ship_visible`; only if `overlay_visible`, `draw_debug_hitboxes(surface, run)` (DRA-29) then `draw_debug_overlay(surface, run.ship)`; `draw_game_over(surface)` only if `run.game_over`; `draw_hud(surface, run, below_overlay=debug)` last, on top of everything. Source: systems/ship.md, systems/drifters.md, systems/debug-overlay.md, systems/scroll.md, systems/run.md and systems/hud.md, Presentation; 10-ui.md, rules 1 (the HUD on top) and 3 (the blink); 12-art-and-audio.md, rule 2 (the background stays behind).
+- **Draw.** In this order: fill with `ui.look.BACKGROUND`; `draw_starfield(surface, run.scroll)`; `render_drifter(surface, obj)` for each `obj` in `run.drifters`, in order (DRA-29); `draw_ship(surface, run.ship)` only if `run.ship_visible`; only if `overlay_visible`, `draw_debug_hitboxes(surface, run)` (DRA-29) then `draw_debug_overlay(surface, run.ship)`; only if `run.game_over`, `draw_game_over(surface)` then `draw_final_score(surface, run.score)` (DRA-61: the final score); `draw_hud(surface, run, below_overlay=debug)` last, on top of everything. Source: systems/ship.md, systems/drifters.md, systems/debug-overlay.md, systems/scroll.md, systems/run.md and systems/hud.md, Presentation; 10-ui.md, rules 1 (the HUD on top) and 3 (the blink); 12-art-and-audio.md, rule 2 (the background stays behind).
 - **Drifters behind the ship (DRA-29).** Warnings and meteorites are drawn after the starfield and before the ship, so the player's ship stays on top where they cross.
 - **`below_overlay`** is `mode is RunMode.DEBUG`, fixed for the run. Never `overlay_visible`: in debug mode the HUD stays below the overlay's place while F3 hides it, so the readout never jumps. Source: scope report DRA-13, HUD layout.
 - `pygame.QUIT`: log INFO `quit` and leave the loop. That only happens on desktop.
@@ -675,6 +685,25 @@ New checks:
 - **Bad fireball file and a row with no position (desktop, headless, `SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`):** no code change. In a scratch copy of `game/tuning/`, set `"tail_ratio": 0` in `drifters/fireball.json`. Point `app.tuning.TUNING_DIR` at it and call `run()`. The log shows ERROR `unexpected error, showing the error screen` with a `ValueError` naming `tuning/drifters/fireball.json` and `tail_ratio`. Repeat with the file as committed and the row `{"type": "satellite"}` added to `debug_spawns.json`: the message names `tuning/debug_spawns.json`, the row as `rows[<i>]` and `satellite placement needs y`. No `error screen failed` line. Source: this contract, Rules, Tuning loader and Debug test spawn list; 15-tech-constraints.md, rule 8.
 - **Package contents:** as for DRA-47, and `core/drifters/fireball.py`, `ui/drifters/fireball_view.py` and `tuning/drifters/fireball.json` must be in `game.apk`.
 
+Integration checks for DRA-61, on top of the required browser checks and every earlier check above, as reworded below (all must still pass). Each check starts in a fresh page unless it says otherwise. Background: the score equals the meters flown, 1 point a meter (`systems/run.md`, Rules, Score). The world scrolls 1.1 px a tick from tick 31, so the score reaches 1 on tick 40 (about 0.67 s), about 62 at 10 s, and 1 000 on tick 9121 (about 152 s). "Reference text" means the text rendered in the same page with the game's default font at the stated size, in white (255, 255, 255). `score_text` is the format in `systems/hud.md`, Presentation: `SCORE`, a space, the digits in groups of three split by one space.
+
+Earlier checks, reworded for DRA-61. Wherever an earlier check reads "the readout", "the meters readout" or `<n> m`, it now reads the SCORE line at HUD line 1, with the same number:
+- **DRA-6, Catch-up cap:** SCORE doesn't jump by the hidden time's distance.
+- **DRA-13, Readout counts up**, now **SCORE counts up (`/`):** a screenshot right after play starts shows `SCORE 0` at the top left, its text top near y 4, matching reference text at 16 px. Screenshots about 5 s and 10 s later, with no key held, show larger whole numbers, the 10 s one about 62. Within a run the number never goes down.
+- **DRA-13, Hovering still earns meters:** SCORE keeps counting at the same rate as with no key held.
+- **DRA-13, No overlap in debug mode:** the white SCORE line sits below the overlay's fourth line, with a gap and no shared pixel row, and stays exactly where it was while F3 hides the overlay.
+- **DRA-23, The wait** (and its DRA-29 rewording): SCORE keeps counting, about 33 more in the 5 s (about 26 in the 4 s).
+- **DRA-23, Game over:** the Game Over box now holds three white lines, all centered: "Game Over", then `score_text(<n>)` with `<n>` from the `game over meters=<n>` line (for example `SCORE 23`), then "Press any arrow to retry". They match reference text at 32, 16 and 16 px.
+- **DRA-23, Everything freezes:** the two canvas reads 2 s apart are identical, SCORE and the box's score line included.
+- **DRA-23, A new run plays like the first** and **Normal mode:** SCORE reads `SCORE 0` where they read `0 m`.
+- Every other check stands as written.
+
+New checks:
+- **No meters readout (`/`, no key held):** for 10 s after play starts, no white (255, 255, 255) pixel lies in x 0 to 299, rows 20 to 47 (HUD line 2), while SCORE counts on line 1 above it. In `?debug=1`, the same holds for the 28 rows starting one HUD line spacing (20 px) below the SCORE line's top, left of x 300. Source: scope report DRA-61, Limits; systems/hud.md, Presentation.
+- **Digits in groups (`/`, hold ArrowUp from play start):** the ship sits on the top line and normal mode spawns nothing, so the run lasts. Between about 153 s and 160 s after play start, SCORE matches reference text of one of `SCORE 1 000` to `SCORE 1 052` at 16 px: a 1, one space, then three digits. Source: scope report DRA-61, Limits (format); systems/hud.md, Presentation.
+- **The final score (`?debug=1`):** end a run as in the DRA-23 game over check. The box's score line and the HUD's SCORE line show the same text, `score_text(<n>)` with `<n>` from `game over meters=<n>`, and it doesn't change while the box shows. Release every arrow and tap one: INFO `new run`, the box is gone and SCORE reads `SCORE 0`. Source: 02-game-flow.md, rules 3, 5 and 6; systems/run.md, Rules, Score.
+- **Package contents:** as for DRA-56, and `ui/score_text.py` must be in `game.apk`.
+
 ## Impact
 DRA-39 changes this frozen contract (v6). The tuning loader reads `hazards.json` and the satellite's own fields; the debug test spawn list moves from code into `game/tuning/debug_spawns.json`, with two modes and an editable loop length; `debug_spawns_due` takes the loaded list. The DRA-29 "Tuning loaded" check is reworded for the longer log line. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `load_tuning`, `debug_spawns`, `DEBUG_SPAWN`, `TUNING_DIR`, `frame_loop`, `add_drifters` and `pygbag`:
 
@@ -714,6 +743,17 @@ DRA-56 changes this frozen contract (v8). The tuning loader reads `fireball.json
 
 Until integration, once `DrifterType.FIREBALL` exists (task DRA-56-01), the game stops at startup with the error screen: the loader has no rules for `fireball.json`. Tests are not affected.
 
+DRA-61 changes this frozen contract (v9). The frame loop passes the final score to the Game Over box; the earlier checks that read the meters readout are reworded for SCORE. Grepping `game/` (tests included) for `draw_game_over`, `draw_hud` and `frame_loop`:
+
+| File | Change needed |
+|---|---|
+| `game/app/frame.py` | imports `draw_final_score` and calls `draw_final_score(surface, run.score)` right after `draw_game_over(surface)`; the `_draw` docstring names the score. Integration Engineer. |
+| `game/app/loop.py`, `guard.py`, `mode.py`, `log.py`, `settings.py`, `tuning.py`, `debug_spawns.py`, `game/main.py`, `game/scripts/`, `pygbag.ini` | none. `pygbag.ini` already packs every `ui/*.py`. |
+| `game/tuning/` | none. |
+| `game/tests/` | none from this contract. |
+
+Until integration, `draw_game_over(surface)` keeps its signature, so the existing call in `game/app/frame.py` stays valid. Every `game/tests/check.sh` step passes, typecheck included, and the game never shows the error screen at game over. After task DRA-61-03 and before integration, the box shows the title and the prompt with the score line's place empty between them.
+
 ## Rationale
 - **`choose_mode` is pure and returns the rejected value.** The WARNING for a bad switch must go out after logging is configured, and logging needs the mode first. Returning the rejected value lets `run()` set up logging and then warn, with one config call.
 - **`read_switch` runs before logging and outside the guard.** It only reads a string and has nothing to fail on in normal use. If it ever raises, Python prints the traceback to stdout. In the browser that is pygbag's hidden terminal, not the devtools console (D2), so the page stays blank. The same holds for the startup module imports and `setup_logging`. This gap is accepted because that code is stdlib only and small. The guard can't cover it, because the guard needs logging, and logging needs the mode.
@@ -741,6 +781,7 @@ Until integration, once `DrifterType.FIREBALL` exists (task DRA-56-01), the game
 - **The guard removes null characters, the view doesn't (DRA-19).** pygame's font render raises on a string with `\x00` in it. Before DRA-19 that made the guard log "error screen failed" and leave the last frame up, so a debug-mode player saw no error screen for that message. The guard already shapes `detail` into one line, so it is the one place that turns an exception into displayable text. Removing the character, not replacing it, keeps the rest of the message as it was. The full message with the null stays in the logged traceback (10-ui.md, error_debug_line).
 - **The app holds one `Run` (DRA-23).** Game over freezes the ship and the scroll together, and a retry resets them together. Those are game rules, so they live in core. The app keeps one state, calls one step per tick, and only decides what to draw from the run's fields.
 - **The app skips `draw_ship` while the ship blinks hidden (DRA-23).** `run.ship_visible` is the core fact; the app reads it and doesn't call the view, the same way it calls the overlay only while `overlay_visible`. The ship view stays unchanged.
+- **The app passes `run.score` to the Game Over box's score line, a call of its own (DRA-61).** The box stays free of core, as in DRA-23, and the app already reads the run's fields to decide what to draw. A second call, not a new argument, keeps the existing `draw_game_over(surface)` call valid through the build, so QA stays clean before integration (Director, DRA-61 revision: "keep QA clean"). The HUD keeps taking the run, so its call doesn't change.
 - **The Game Over box is drawn before the HUD (DRA-23).** 10-ui.md, rule 1 puts the HUD on top of everything. The box is in the middle of the screen and the HUD at the top, so they never overlap, and the HUD stays the last call.
 - **The DRA-6 and DRA-13 checks are reworded, not dropped (DRA-23).** They relied on the ship respawning once a second with no key held. The behavior they check (one line per event, the cap, the readout rate) still holds; only the way to see it changes.
 - **The tuning is loaded in the app and checked by hand (DRA-29).** The Director decided the app loads and validates the files once and core never reads files. game/CONTEXT.md puts validation at the edge. A JSON Schema library would need packages pygbag can't install, so the loader checks the schema's rules itself and the schema stays the written rule both sides follow.

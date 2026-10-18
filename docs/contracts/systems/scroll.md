@@ -1,7 +1,7 @@
 # Scroll: world scroll, distance and starfield
 Version: 3
-Status: frozen
-Features: DRA-13, DRA-19, DRA-23
+Status: draft
+Features: DRA-13, DRA-19, DRA-23, DRA-61
 Created by: architect
 
 ## Purpose
@@ -14,7 +14,7 @@ Who builds what:
 - `game/ui/starfield.py`: the UI Developer, task `DRA-13-02-ui-developer`.
 - `game/tests/core/test_scroll.py`: the QA Engineer, task `DRA-13-04-qa-engineer`.
 - Creating the scroll at play start and stepping it once per playing tick: `core.run`, from `docs/contracts/systems/run.md` (DRA-23). Drawing the starfield from `run.scroll`: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
-- The meters readout that shows `meters`: `docs/contracts/systems/hud.md`.
+- The score, which counts `meters` at 1 point a meter: `docs/contracts/systems/run.md`. The SCORE line that shows it: `docs/contracts/systems/hud.md`. `meters` has no readout of its own.
 
 ## Diagram
 ```mermaid
@@ -35,7 +35,8 @@ flowchart LR
   APP["app.frame"] -- "run.scroll" --> SF["ui.starfield.draw_starfield"]
   APP -- "run" --> HUD["ui.hud.draw_hud"]
   SF -. reads .-> D["scroll.distance_px"]
-  HUD -. reads .-> M["scroll.meters"]
+  HUD -. reads .-> SC["run.score"]
+  SC -. reads .-> M["scroll.meters"]
 ```
 
 Timeline from play start (tick 0 is the state `start_scroll()` returns):
@@ -153,6 +154,14 @@ DRA-23 changes this frozen contract (v2). No code, signature, value or log line 
 | `game/app/frame.py` | stops calling `start_scroll` and `step_scroll`; `core.run` does. Integration Engineer, from `systems/app.md`. |
 | `game/tests/core/test_scroll.py` | none. It calls the scroll directly. |
 | `game/tests/ui/test_hud.py` | see `systems/hud.md`, Impact. |
+
+DRA-61 changes this frozen contract (v3). No code, signature, value or log line changes. Only who reads `meters` for the screen changes: `core.run`'s `score` reads it, and the HUD shows the score instead of a meters readout. Grepping `game/` (tests included) for `core.scroll`, `Scroll`, `.meters`:
+
+| File | Change needed |
+|---|---|
+| `game/core/scroll.py`, `game/ui/starfield.py`, `game/tests/core/test_scroll.py` | none. |
+| `game/core/run.py` | `score` reads `scroll.meters`. See `systems/run.md`, Impact. Task `DRA-61-01-gameplay-implementer`. |
+| `game/ui/hud.py`, `game/tests/ui/test_hud.py` | see `systems/hud.md`, Impact. |
 
 ## Rationale
 - **`Final` and `slots=True` (DRA-19).** Same reasons as in `systems/ship.md`, Rationale. Core modules stay alike. `Scroll`'s field docstrings and its two properties are unaffected by slots.
