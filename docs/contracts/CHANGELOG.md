@@ -110,3 +110,10 @@
 - `systems/run.md`: 4 to 5, frozen.
 - `systems/scroll.md`: 3 to 4, frozen.
 - Run score, score text on the HUD, and the game-over screen with score.
+
+## DRA-62, 2026-10-18
+- `systems/app.md`: 10 to 11, frozen.
+- `systems/drifters.md`: 4 to 5, frozen.
+- `systems/run.md`: 5 to 6, frozen.
+- `systems/scroll.md`: 4 to 5, frozen.
+- The coin drifter: a pickup that moves only with the scroll, pays points when the ship touches it and shows a points popup. Adds the coin tuning file and schema, the popup in core and UI, the coin view, and coin rows in the debug spawn list.
