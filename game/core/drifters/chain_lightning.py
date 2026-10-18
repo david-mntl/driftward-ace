@@ -14,6 +14,7 @@ from typing import ClassVar, Self
 
 from core.collision import Circle, Hitbox, Line, place_hitbox
 from core.drifters.base import (
+    ENTRY_WARNING_SIZE,
     Birth,
     Drifter,
     DrifterType,
@@ -293,9 +294,9 @@ class ChainLightning(Drifter):
         """Return where the entry warning is drawn, px.
 
         The settled node's center (the chain's own center before it is settled), clamped so the
-        whole warning, a circle of radius half the warning copy's width, shows.
+        whole warning, a circle of radius half `ENTRY_WARNING_SIZE`, shows.
         """
-        radius: float = self.warning_copy().width / 2
+        radius: float = ENTRY_WARNING_SIZE / 2
         cx, cy = self.x, self.y
         if self.warning_node is not None:
             cx, cy = self.node_centers()[self.warning_node]

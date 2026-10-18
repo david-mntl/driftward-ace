@@ -806,25 +806,25 @@ def warning_node_of(chain: Drifter) -> int | None:
 
 
 def test_the_warning_sits_above_the_node_nearest_the_ship_and_stays_put() -> None:
-    # (variant, x, y, ship x, ship y, node index, warning center). Sizes: the triangle, 140 wide.
+    # (variant, x, y, ship x, ship y, node index, warning center). The warning is 24 wide.
     cases: list[tuple[str, float, float | None, float, float, int, tuple[float, float]]] = [
-        ("pair_flat", 320.0, None, 100.0, 300.0, 0, (256.0, 70.0)),
-        ("pair_flat", 320.0, None, 500.0, 300.0, 1, (384.0, 70.0)),
+        ("pair_flat", 320.0, None, 100.0, 300.0, 0, (256.0, 12.0)),
+        ("pair_flat", 320.0, None, 500.0, 300.0, 1, (384.0, 12.0)),
         # A tie in distance: the left node.
-        ("pair_flat", 320.0, None, 320.0, 240.0, 0, (256.0, 70.0)),
+        ("pair_flat", 320.0, None, 320.0, 240.0, 0, (256.0, 12.0)),
         # A tie in distance and in x: the lower index, the upper node.
         ("pair_vertical", 320.0, 240.0, 320.0, 240.0, 0, (320.0, 176.0)),
-        ("trio_line", 320.0, None, 330.0, 0.0, 1, (320.0, 70.0)),
-        ("trio_line", 320.0, None, 5.0, 400.0, 0, (192.0, 70.0)),
-        ("trio_line", 320.0, None, 630.0, 400.0, 2, (448.0, 70.0)),
-        # The center is clamped by half the triangle's width, on both axes.
-        ("pair_flat", 30.0, None, 10.0, 300.0, 0, (70.0, 70.0)),
-        ("pair_flat", 620.0, None, 630.0, 300.0, 1, (570.0, 70.0)),
-        ("pair_flat", 320.0, 470.0, 256.0, 470.0, 0, (256.0, 410.0)),
-        ("pair_flat", 20.0, 470.0, 5.0, 470.0, 0, (70.0, 410.0)),
-        # Wide chains and narrow ones are clamped by the same triangle, not by their own size.
-        ("pair_vertical", 20.0, 240.0, 20.0, 5.0, 0, (70.0, 176.0)),
-        ("pair_vertical", 620.0, 240.0, 620.0, 470.0, 1, (570.0, 304.0)),
+        ("trio_line", 320.0, None, 330.0, 0.0, 1, (320.0, 12.0)),
+        ("trio_line", 320.0, None, 5.0, 400.0, 0, (192.0, 12.0)),
+        ("trio_line", 320.0, None, 630.0, 400.0, 2, (448.0, 12.0)),
+        # The center is clamped by half the 24 px warning, on both axes.
+        ("pair_flat", 30.0, None, 10.0, 300.0, 0, (12.0, 12.0)),
+        ("pair_flat", 620.0, None, 630.0, 300.0, 1, (628.0, 12.0)),
+        ("pair_flat", 320.0, 470.0, 256.0, 470.0, 0, (256.0, 468.0)),
+        ("pair_flat", 20.0, 470.0, 5.0, 470.0, 0, (12.0, 468.0)),
+        # Wide chains and narrow ones are clamped the same, not by their own size.
+        ("pair_vertical", 20.0, 240.0, 20.0, 5.0, 0, (20.0, 176.0)),
+        ("pair_vertical", 620.0, 240.0, 620.0, 470.0, 1, (620.0, 304.0)),
     ]
     for variant, x, y, ship_x, ship_y, index, center in cases:
         run = run_with_ship(
@@ -852,13 +852,13 @@ def test_the_warning_sits_above_the_node_nearest_the_ship_and_stays_put() -> Non
     unsettled = place("pair_flat")
     assert replace(born, uid=0, warning_node=None) == unsettled
     assert born.uid == 1
-    assert born.warning_center() == (256.0, 70.0)
+    assert born.warning_center() == (256.0, 12.0)
     run = start
     for _ in range(WARNING_TICKS - 1):
         run = step_run(run, Thrust(right=True))
         chain = run.drifters[0]
         assert chain.phase is Phase.WARNING
-        assert chain.warning_center() == (256.0, 70.0)
+        assert chain.warning_center() == (256.0, 12.0)
         assert warning_node_of(chain) == 0
         assert (chain.x, chain.y) == (320.0, -6.0)
     run = step_run(run, Thrust(right=True))
@@ -890,14 +890,14 @@ def test_the_warning_copy_is_the_point_up_triangle_for_every_variant_and_invert(
             # The owner is not changed by asking.
             assert_nodes(chain.nodes, expected_nodes(name, invert))
             assert chain.warning_tilt_degrees() == 0.0
-    # Sized on the triangle, whatever the chain: a narrow chain near a wall is clamped by 70.
+    # Whatever the chain: a spot 12 px or more from the wall is not moved.
     narrow = place("pair_vertical", 20.0, 100.0)
     assert narrow.width == NODE_SIZE
-    assert narrow.warning_center() == (70.0, 100.0)
+    assert narrow.warning_center() == (20.0, 100.0)
     # A chain built without add_drifters warns above its own center, clamped.
-    assert place("pair_flat").warning_center() == (HOME_X, 70.0)
-    assert place("trio_l", 20.0, 100.0).warning_center() == (70.0, 100.0)
-    assert place("trio_l", 620.0, 900.0).warning_center() == (570.0, 410.0)
+    assert place("pair_flat").warning_center() == (HOME_X, 12.0)
+    assert place("trio_l", 20.0, 100.0).warning_center() == (20.0, 100.0)
+    assert place("trio_l", 620.0, 900.0).warning_center() == (620.0, 468.0)
     assert place("pair_flat", 320.0, 240.0).warning_node is None
     assert place("pair_flat", 320.0, 240.0).warning_center() == (320.0, 240.0)
 

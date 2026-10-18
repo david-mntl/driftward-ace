@@ -224,7 +224,7 @@ def test_satellite_new_drifter_gets_rehit_values_from_the_hazard_rules() -> None
 
 
 def test_satellite_shows_its_warning_for_60_states_then_turns_active_in_place() -> None:
-    for invert, wall_x, warn_x in ((False, -18.0, 18.0), (True, 658.0, 622.0)):
+    for invert, wall_x, warn_x in ((False, -18.0, 12.0), (True, 658.0, 628.0)):
         for variant in ("flat", "angled"):
             drifter: Drifter = place(y=300.0, variant=variant, invert=invert)
             for count in range(WARNING_TICKS):
@@ -245,9 +245,9 @@ def test_satellite_shows_its_warning_for_60_states_then_turns_active_in_place() 
                 Box(wall_x, 300.0, *PANEL),
             )
             assert not drifter.has_entered
-    # The warning is clamped to the screen at any y: against the wall, the footprint inside.
-    assert place(y=-100.0).warning_center() == (18.0, 6.0)
-    assert place(y=900.0, invert=True).warning_center() == (622.0, 474.0)
+    # The warning is clamped to the screen at any y: against the wall, the whole warning inside.
+    assert place(y=-100.0).warning_center() == (12.0, 12.0)
+    assert place(y=900.0, invert=True).warning_center() == (628.0, 468.0)
     # Not scaled by the level.
     assert place(level=8).warning_ticks == WARNING_TICKS
     assert advance(place(level=8), WARNING_TICKS - 1).phase is Phase.WARNING

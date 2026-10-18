@@ -24,6 +24,10 @@ log = logging.getLogger(__name__)
 GRAZE_MARGIN: Final[int] = 14
 """Graze zone margin around a hazard's hitbox, px. Source: 06-scoring.md, graze_margin (locked)."""
 
+ENTRY_WARNING_SIZE: Final[int] = 24
+"""Entry warning diameter, px, the same for every drifter. Source: 07-drifters.md,
+entry_warning_size (guess)."""
+
 DEFAULT_REHIT_COOLDOWN_TICKS: Final[int] = 180
 """Ticks a hazard can't hit again after a hit. Source: 05-lives-and-damage.md, rehit_cooldown
 (guess)."""
@@ -278,15 +282,14 @@ class Drifter(ABC):
         return self.x + half_w <= 0 or self.x - half_w >= SCREEN_W or self.y - half_h >= SCREEN_H
 
     def warning_center(self) -> tuple[float, float]:
-        """Return (x, y) moved just inside the screen, px: the drifter's footprint stays on it.
+        """Return (x, y) moved just inside the screen, px: the whole warning stays on it.
 
-        Source: 07-drifters.md, rule 9; 91-decision-log.md, row 39.
+        Source: 07-drifters.md, rule 9; 91-decision-log.md, rows 39 and 62.
         """
-        half_w: float = self.width / 2
-        half_h: float = self.height / 2
+        half: float = ENTRY_WARNING_SIZE / 2
         return (
-            min(max(self.x, half_w), SCREEN_W - half_w),
-            min(max(self.y, half_h), SCREEN_H - half_h),
+            min(max(self.x, half), SCREEN_W - half),
+            min(max(self.y, half), SCREEN_H - half),
         )
 
     def warning_tilt_degrees(self) -> float:
