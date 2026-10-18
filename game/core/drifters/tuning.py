@@ -50,10 +50,16 @@ class DrifterTypeTuning:
     """One of the variant names."""
 
     speed_ratio: float
-    """Level 1 speed as a multiple of `core.ship.TOP_SIDE_SPEED`."""
+    """Level 1 speed as a multiple of `core.ship.TOP_SIDE_SPEED`.
+
+    Not read for a parked drifter: the loader gives the coin 0.0.
+    """
 
     entry_warning_ticks: int
-    """Entry warning length, ticks. At least 1."""
+    """Entry warning length, ticks. At least 1 for a hazard.
+
+    0 for the coin, a pickup with no entry warning.
+    """
 
     extra: DrifterTypeExtra | None = None
     """The type's own values. None for the meteorite and the satellite."""

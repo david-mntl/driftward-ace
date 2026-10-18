@@ -60,6 +60,18 @@ def start_scroll() -> Scroll:
     return Scroll(ticks=0, scrolled_ticks=0)
 
 
+def scroll_step_px(scroll: Scroll) -> float:
+    """Return how far the world moves down, px, on the tick that steps `scroll`.
+
+    SCROLL_PER_TICK once the next tick passes SCROLL_START_DELAY, else 0.0. Reads the same rule
+    as `step_scroll`, so the two agree on every tick. Pure, logs nothing.
+    Source: 03-world-and-camera.md, rules 4 and 9; systems/scroll.md, The next step's movement.
+    """
+    if scroll.ticks + 1 > SCROLL_START_DELAY:
+        return SCROLL_PER_TICK
+    return 0.0
+
+
 def step_scroll(scroll: Scroll) -> Scroll:
     """Advance the scroll one fixed 60 Hz tick and return the new state.
 
