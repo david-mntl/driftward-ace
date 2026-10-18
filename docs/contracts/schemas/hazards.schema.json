@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/hazards.schema.json",
+  "title": "Shared hazard values",
+  "description": "The file game/tuning/hazards.json: values every hazard shares, read in both run modes. The file must exist; every field is optional, and a field left out keeps its default from core.drifters.base (DEFAULT_REHIT_COOLDOWN_TICKS 180, DEFAULT_REHIT_DIM 0.75). {} is a valid file. Key names are the GDD's (05-lives-and-damage.md, Values). Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader) into core.drifters.tuning.HazardRules. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, The base, Re-hit cooldown.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {
+    "rehit_cooldown": {
+      "description": "Ticks the hazard that took a life can't hit the ship again. Never scales with level. Default 180 (05-lives-and-damage.md, rehit_cooldown, guess). Maps to HazardRules.rehit_cooldown_ticks.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "rehit_dim": {
+      "description": "Share of normal brightness a hazard is drawn at during its re-hit cooldown. 1 means no dimming. Default 0.75 (05-lives-and-damage.md, rehit_dim, guess). Maps to HazardRules.rehit_dim.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}

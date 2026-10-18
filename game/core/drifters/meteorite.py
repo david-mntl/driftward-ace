@@ -21,9 +21,17 @@ class Meteorite(Drifter):
     drifter_type: ClassVar[DrifterType] = DrifterType.METEORITE
 
     @classmethod
-    def default_y(cls, height: float) -> float:
-        """Return the start y, px: the bottom edge on the top edge of the screen."""
-        return -height / 2
+    def start_position(
+        cls, x: float | None, y: float | None, width: float, height: float, invert: bool
+    ) -> tuple[float, float]:
+        """Return the start center, px: the placement's x (required) and y.
+
+        A missing y is `-height / 2`: the bottom edge on the top edge of the screen.
+        Raises ValueError("meteorite placement needs x") without an x.
+        """
+        if x is None:
+            raise ValueError(f"{cls.drifter_type.value} placement needs x")
+        return x, -height / 2 if y is None else y
 
     def update(self, ctx: TickContext) -> Self:
         """Count the warning, or fall by `speed` px while ACTIVE. GONE stays as it is."""
@@ -36,11 +44,3 @@ class Meteorite(Drifter):
     def effect_on_touch(self) -> TouchEffect:
         """Touching a meteorite is a hit."""
         return TouchEffect.HIT
-
-    def may_hit_ship(self) -> bool:
-        """Return True until it has hit the ship once.
-
-        Meteorite-only stand-in while LD-06 is open: a meteorite that hit the ship can't hit
-        it again, even while it still overlaps. Source: scope report DRA-29, Stand-ins.
-        """
-        return not self.hit_ship

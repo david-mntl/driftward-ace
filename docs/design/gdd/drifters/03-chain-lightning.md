@@ -3,7 +3,7 @@ Status: draft
 Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules), [../04-ship.md](../04-ship.md) (top sideways speed), [../06-scoring.md](../06-scoring.md) (graze)
 
 ## Summary
-Two or three glowing nodes fall from the top in a fixed layout. They charge with growing blue rays, then blue lightning fires from node to node, then they charge again, until they leave. The nodes are harmless; only the lightning hurts. The charge shows when the strike comes. Where it lands is for the player to read from the nodes: the lightning always joins them.
+Two or three glowing nodes fall from the top in a fixed layout. They charge with growing blue rays, then blue lightning fires from node to node, then they charge again, until they leave. Nothing hurts while it charges. While the lightning fires, the arcs and their nodes hurt. The charge shows when the strike comes. Where it lands is for the player to read from the nodes: the lightning always joins them.
 
 ## Values
 | Key | Value | Unit | Range | Status | Source |
@@ -17,7 +17,7 @@ Two or three glowing nodes fall from the top in a fixed layout. They charge with
 | node_spacing | 128 between neighbouring nodes, center to center | px | — | guess | Director |
 | node_size | 12, a circle | px | — | guess | Director |
 | arc_width | 6. Each arc is a straight line from node center to node center; its length comes from the layout | px | — | guess | Director |
-| hitbox | each firing arc: a line 6 px thick ([../07-drifters.md](../07-drifters.md) rule 8). The nodes have none | px | — | guess | Director |
+| hitbox | each firing arc: a line 6 px thick with round ends ([../07-drifters.md](../07-drifters.md) rule 8). Each node while one of its arcs fires: a circle as big as the node. Nothing while charging | px | — | guess | Director |
 | speed_ratio | 0.375 × the ship's top sideways speed ([../04-ship.md](../04-ship.md), derived values), straight down. Its own number; it only starts equal to the meteorite's | — | — | guess | Director |
 | speed | ≈ 2.5 at Level 1, from `speed_ratio` and the current ship guesses | px/tick | — | guess | derived |
 | charge_ticks | 120 (2 s) | ticks | — | guess | Director |
@@ -45,11 +45,11 @@ Two or three glowing nodes fall from the top in a fixed layout. They charge with
 
 ## Rules
 1. **One drifter.** The nodes are parts of one chain lightning, never drifters of their own. Its position is the center of the box around all its nodes; the variant and `invert` set where each node sits around it. All nodes move together.
-2. **Appears:** at its placed x, just above the top edge ([../07-drifters.md](../07-drifters.md) rule 14), then falls into view. Its entry warning shows first: the triangle icon, at the x of the node nearest the ship when the warning starts, against the top edge. The warning stays there.
+2. **Appears:** at its placed x, just above the top edge ([../07-drifters.md](../07-drifters.md) rule 14), then falls into view. Its entry warning shows first, in the shared look ([../07-drifters.md](../07-drifters.md), Values) with the triangle icon, at the x of the node nearest the ship when the warning starts, against the top edge. The warning stays there.
 3. **Telegraph:** the charge starts the moment it appears and lasts `charge_ticks`. It shows when the strike comes, not which nodes connect. That is part of this hazard on purpose: the player learns that the lightning always joins the nodes.
 4. **Moves:** straight down at `speed` on screen, every tick. No targeting. The scroll doesn't add to it ([../03-world-and-camera.md](../03-world-and-camera.md) rule 9).
 5. **Fires:** after the charge, every arc fires for `fire_ticks`, then the next charge starts. An arc fires only while both its nodes are on screen (any part visible). A node that has left takes its arcs with it; the other arcs keep working while their own nodes are on screen.
-6. **Hits:** touching a firing arc is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)). Nodes and charging arcs never hit.
+6. **Hits:** touching a firing arc, or a node while one of its arcs fires, is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)). Nothing hits while charging.
 7. **Leaves:** once every node is fully below the floor ([../07-drifters.md](../07-drifters.md) rule 12).
 8. **Scales:** `speed` × the level's hazard speed; `charge_ticks` × the level's Timer ×, never below `telegraph_min` ([../08-difficulty.md](../08-difficulty.md)). `fire_ticks` never scales.
 9. **Looks and sounds:** placeholder until the look is drawn. The jagged arc stays inside its `arc_width` band, so the hitbox is never bigger than what the player sees. Sound: none yet.

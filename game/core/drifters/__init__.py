@@ -5,3 +5,4 @@ A new drifter adds one import line here.
 """
 
 from core.drifters import meteorite as meteorite
+from core.drifters import satellite as satellite

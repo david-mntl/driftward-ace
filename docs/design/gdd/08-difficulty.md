@@ -28,7 +28,7 @@ Level table. Source: Director. Status: locked, except the Timer × row: guess (1
 1. **Level** = the highest level whose "starts at" is ≤ the run's meters ([06-scoring.md](06-scoring.md)). Meters never go down, so level never goes down.
 2. **Scroll speed** multiplies `scroll_base` ([03-world-and-camera.md](03-world-and-camera.md)).
 3. **Hazard speed** multiplies every hazard's movement speed ([07-drifters.md](07-drifters.md)). It is applied once, when the drifter appears, and the drifter keeps that speed for its whole life. A placement may name another level for that drifter; then that level's values are used instead.
-4. **Timer ×** multiplies a drifter's timers the same way: spawn times inside a wave, charge times, pulse and patrol periods, lava on and off times. It never shortens an entry warning, and never pushes a telegraph below `telegraph_min` ([07-drifters.md](07-drifters.md)). A spec may exempt one of its timers (chain lightning's fire time).
+4. **Timer ×** multiplies a drifter's timers the same way: spawn times inside a wave, charge times, pulse and patrol periods, lava on and off times. It never shortens an entry warning, and never pushes a telegraph below `telegraph_min` ([07-drifters.md](07-drifters.md)). A spec may exempt one of its timers (chain lightning's fire time). A scaled timer rounds up to a whole tick.
 5. **Switches for playtesting.** Hazard speed and Timer × can each be switched off. Off means Level 1 values at every level.
 6. **Rest gap** multiplies `rest_gap_base`, the pause between waves.
 7. **Tier unlocks.** From its level on, a tier's drifters may appear in waves.

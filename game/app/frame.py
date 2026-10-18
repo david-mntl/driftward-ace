@@ -1,6 +1,7 @@
 """The async frame loop on the fixed 60 Hz tick. Imported only by app.loop.start, inside the guard.
 
-Before the first frame it loads and checks the drifter tuning (both modes). Each frame: read
+Before the first frame it loads and checks the drifter tuning (both modes) and, in debug mode
+only, the debug test spawn list. Each frame: read
 events, build the thrust from the held arrow keys, run up to MAX_TICKS_PER_FRAME ticks (one
 core.run.step_run each, then in debug mode the debug test spawn list's due drifters through
 core.run.add_drifters), draw the starfield, the drifters, the ship while the run shows it, the
@@ -16,7 +17,7 @@ import time
 
 import pygame
 
-from app.debug_spawns import debug_spawns_due
+from app.debug_spawns import DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.mode import RunMode
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
 from app.tuning import load_tuning
@@ -51,6 +52,7 @@ async def frame_loop(mode: RunMode) -> None:
     surface: pygame.Surface = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     debug: bool = mode is RunMode.DEBUG
     tuning: DrifterTuning = load_tuning()
+    spawn_list: DebugSpawnList | None = load_debug_spawns(tuning) if debug else None
     run: Run = start_run()
     overlay_visible: bool = debug
     accumulator: float = 0.0
@@ -64,7 +66,7 @@ async def frame_loop(mode: RunMode) -> None:
         now: float = time.perf_counter()
         accumulator += now - previous
         previous = now
-        run, accumulator = _run_ticks(run, thrust, accumulator, debug, tuning)
+        run, accumulator = _run_ticks(run, thrust, accumulator, spawn_list, tuning)
         was_capped = _apply_cap(accumulator, was_capped)
         if was_capped:
             accumulator = 0.0
@@ -111,19 +113,23 @@ def _held_thrust() -> Thrust:
 
 
 def _run_ticks(
-    run: Run, thrust: Thrust, accumulator: float, debug: bool, tuning: DrifterTuning
+    run: Run,
+    thrust: Thrust,
+    accumulator: float,
+    spawn_list: DebugSpawnList | None,
+    tuning: DrifterTuning,
 ) -> tuple[Run, float]:
     """Run one tick per whole TICK_SECONDS in the accumulator, at most MAX_TICKS_PER_FRAME.
 
-    Each tick is one step_run call. In debug mode only, right after it, the debug test spawn
-    list's due placements go in through add_drifters. Returns (run, accumulator left).
-    Source: 15-tech-constraints.md, rules 2 and 7; systems/app.md, Rules, Tick.
+    Each tick is one step_run call. In debug mode only (spawn_list is not None), right after
+    it, the spawn list's due placements go in through add_drifters. Returns (run, accumulator
+    left). Source: 15-tech-constraints.md, rules 2 and 7; systems/app.md, Rules, Tick.
     """
     ticks: int = 0
     while accumulator >= TICK_SECONDS and ticks < MAX_TICKS_PER_FRAME:
         run = step_run(run, thrust)
-        if debug:
-            run = add_drifters(run, debug_spawns_due(run.scroll.ticks), tuning)
+        if spawn_list is not None:
+            run = add_drifters(run, debug_spawns_due(spawn_list, run.scroll.ticks), tuning)
         accumulator -= TICK_SECONDS
         ticks += 1
     return run, accumulator

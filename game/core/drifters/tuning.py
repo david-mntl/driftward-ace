@@ -7,10 +7,15 @@ Source: docs/contracts/systems/drifters.md, Interface, tuning.py.
 
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from core.collision import Hitbox
-from core.drifters.base import DrifterType
+from core.drifters.base import (
+    DEFAULT_REHIT_COOLDOWN_TICKS,
+    DEFAULT_REHIT_DIM,
+    DrifterType,
+    VariantExtra,
+)
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +32,9 @@ class VariantTuning:
 
     hitbox: Hitbox
     """Shapes as offsets from the center, px."""
+
+    extra: VariantExtra | None = None
+    """The drifter's own per-variant values. None for a drifter with none."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -58,6 +66,17 @@ class PlaytestSwitches:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class HazardRules:
+    """Values every hazard shares. A field left out keeps its default."""
+
+    rehit_cooldown_ticks: int = DEFAULT_REHIT_COOLDOWN_TICKS
+    """Ticks a hazard can't hit again after a hit, at least 0. Never scales with level."""
+
+    rehit_dim: float = DEFAULT_REHIT_DIM
+    """Brightness share of a hazard during its cooldown, 0..1."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DrifterTuning:
     """All drifter tuning for a run."""
 
@@ -66,3 +85,6 @@ class DrifterTuning:
 
     switches: PlaytestSwitches
     """The playtest switches."""
+
+    hazards: HazardRules = field(default_factory=HazardRules)
+    """The values every hazard shares."""

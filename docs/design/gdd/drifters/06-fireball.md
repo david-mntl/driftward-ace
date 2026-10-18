@@ -14,6 +14,7 @@ A comet that dives across the screen on a straight, steep diagonal. By default i
 | priority | 2 | — | — | guess | 07-drifters.md |
 | variants | small 21, big 32 (head width) | px | — | guess | Director |
 | default_variant | small | — | — | guess | Director |
+| size | the ball (the head): 21 small, 32 big. It sets when the fireball counts as off screen and how big its entry warning is. The tail doesn't count | px | — | guess | Director |
 | hitbox | two circles: the head, radius = head width ÷ 2 (10.5, 16); the tail, half the head's radius (5.25, 8), touching the head from behind, along its path | px | — | guess | Director |
 | speed_ratio | 0.47 × the ship's top sideways speed ([../04-ship.md](../04-ship.md), derived values), measured along its path | — | — | guess | Director |
 | speed | ≈ 3.1 at Level 1, along its path, from `speed_ratio` and the current ship guesses. Both variants share it | px/tick | — | guess | derived |

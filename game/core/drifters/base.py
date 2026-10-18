@@ -23,12 +23,23 @@ log = logging.getLogger(__name__)
 GRAZE_MARGIN: Final[int] = 14
 """Graze zone margin around a hazard's hitbox, px. Source: 06-scoring.md, graze_margin (locked)."""
 
+DEFAULT_REHIT_COOLDOWN_TICKS: Final[int] = 180
+"""Ticks a hazard can't hit again after a hit. Source: 05-lives-and-damage.md, rehit_cooldown
+(guess)."""
+
+DEFAULT_REHIT_DIM: Final[float] = 0.75
+"""Brightness share of a hazard during its re-hit cooldown, 0..1. Source:
+05-lives-and-damage.md, rehit_dim (guess)."""
+
 
 class DrifterType(Enum):
     """Every drifter the game knows. One member per built drifter spec in 07-drifters.md."""
 
     METEORITE = "meteorite"
     """Source: drifters/01-meteorite.md."""
+
+    SATELLITE = "satellite"
+    """Source: drifters/02-satellite.md."""
 
 
 class Phase(Enum):
@@ -66,6 +77,14 @@ class TickContext:
 
 
 @dataclass(frozen=True, slots=True)
+class VariantExtra:
+    """Base of a drifter's own per-variant values. Empty.
+
+    A drifter that needs some subclasses it in its own module.
+    """
+
+
+@dataclass(frozen=True, slots=True)
 class Birth:
     """Everything the spawner settled for one new drifter. Final numbers only."""
 
@@ -98,6 +117,18 @@ class Birth:
 
     specialty_enabled: bool | None
     """The placement's specialty switch. None means the drifter's default."""
+
+    invert: bool
+    """The placement's invert."""
+
+    variant_extra: VariantExtra | None
+    """The variant's own values. None for a drifter with none."""
+
+    rehit_cooldown_ticks: int
+    """Re-hit cooldown length, ticks. Never scaled."""
+
+    rehit_dim: float
+    """Brightness during the re-hit cooldown, 0..1."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -159,11 +190,17 @@ class Drifter(ABC):
     specialty: Specialty | None = None
     """The optional extra behavior. None when the drifter has none."""
 
-    hit_ship: bool = False
-    """A fact: this drifter has hit the ship at least once. Set by the run.
+    has_entered: bool = False
+    """It has been at least partly on screen while ACTIVE. Set by the run (`mark_entered`)."""
 
-    What it means for later touches is the drifter's own rule (`may_hit_ship`).
-    """
+    rehit_cooldown_ticks: int = DEFAULT_REHIT_COOLDOWN_TICKS
+    """Re-hit cooldown length, ticks, from the spawner."""
+
+    rehit_dim: float = DEFAULT_REHIT_DIM
+    """Brightness while the re-hit cooldown runs, 0..1, from the spawner."""
+
+    rehit_ticks_left: int = 0
+    """Ticks of re-hit cooldown still to come. 0 means it may hit. Set by the run."""
 
     def current_hitbox(self) -> Hitbox:
         """Return the placed hitbox, or () unless the phase is ACTIVE."""
@@ -180,12 +217,37 @@ class Drifter(ABC):
             return ()
         return grow_hitbox(self.current_hitbox(), GRAZE_MARGIN)
 
-    def is_off_screen(self) -> bool:
-        """Return True only in ACTIVE, when fully past a side wall or fully below the floor.
+    def is_partly_on_screen(self) -> bool:
+        """Return True when the width x height footprint shares area with the screen.
 
-        Never true at the top, where drifters enter. Source: 07-drifters.md, rule 12.
+        Touching an edge from outside doesn't count. Source: 07-drifters.md, rule 12;
+        91-decision-log.md, row 58.
         """
-        if self.phase is not Phase.ACTIVE:
+        half_w: float = self.width / 2
+        half_h: float = self.height / 2
+        return (
+            self.x - half_w < SCREEN_W
+            and self.x + half_w > 0
+            and self.y - half_h < SCREEN_H
+            and self.y + half_h > 0
+        )
+
+    def mark_entered(self) -> Self:
+        """Return the drifter with `has_entered` True once it is ACTIVE and partly on screen.
+
+        Otherwise it returns the drifter unchanged. `has_entered` never goes back to False.
+        """
+        if self.has_entered or self.phase is not Phase.ACTIVE or not self.is_partly_on_screen():
+            return self
+        return replace(self, has_entered=True)
+
+    def is_off_screen(self) -> bool:
+        """Return True only in ACTIVE, once entered, fully past a side wall or below the floor.
+
+        Never true at the top, where drifters enter, and never before `has_entered`.
+        Source: 07-drifters.md, rule 12; 91-decision-log.md, row 58.
+        """
+        if self.phase is not Phase.ACTIVE or not self.has_entered:
             return False
         half_w: float = self.width / 2
         half_h: float = self.height / 2
@@ -203,30 +265,54 @@ class Drifter(ABC):
             min(max(self.y, half_h), SCREEN_H - half_h),
         )
 
+    def warning_tilt_degrees(self) -> float:
+        """Return how far the entry warning's copy is turned, degrees, counterclockwise.
+
+        0.0: the copy stays upright. A drifter whose warning shows where it flies overrides it.
+        """
+        return 0.0
+
+    def may_hit_ship(self) -> bool:
+        """Return True while no re-hit cooldown runs: the one rule every hazard shares.
+
+        Source: 05-lives-and-damage.md, rule 1.5; 91-decision-log.md, row 54.
+        """
+        return self.rehit_ticks_left == 0
+
+    def brightness(self) -> float:
+        """Return the share of normal brightness to draw at, 0..1.
+
+        `rehit_dim` while the re-hit cooldown runs, else 1.0. Source: 05-lives-and-damage.md,
+        rule 1.5, rehit_dim.
+        """
+        if self.rehit_ticks_left > 0:
+            return self.rehit_dim
+        return 1.0
+
     @classmethod
     def born(cls, birth: Birth) -> Self:
         """Build the drifter in WARNING from `birth`.
 
-        Raises ValueError when the placement switches a specialty on: the base has none.
-        A drifter with a specialty or its own timers overrides this.
+        Raises ValueError when the placement switches a specialty on or sets `invert`: the
+        base has neither. A drifter with a specialty, an invert or its own fields overrides this.
         """
+        name: str = cls.drifter_type.value
         if birth.specialty_enabled is True:
-            raise ValueError(f"{cls.drifter_type.value} has no specialty")
-        return cls(
-            x=birth.x,
-            y=birth.y,
-            variant=birth.variant,
-            width=birth.width,
-            height=birth.height,
-            speed=birth.speed,
-            hitbox=birth.hitbox,
-            warning_ticks=birth.warning_ticks,
-        )
+            raise ValueError(f"{name} has no specialty")
+        if birth.invert:
+            raise ValueError(f"{name} has no invert")
+        return born_drifter(cls, birth)
 
     @classmethod
     @abstractmethod
-    def default_y(cls, height: float) -> float:
-        """Return the start y, px, a placement gets when it sets none."""
+    def start_position(
+        cls, x: float | None, y: float | None, width: float, height: float, invert: bool
+    ) -> tuple[float, float]:
+        """Return the center, px, a new drifter starts at.
+
+        A coordinate the placement set is kept. A missing one gets the drifter's default, or
+        raises ValueError("<type> placement needs <x or y>") when the drifter has none.
+        """
 
     @abstractmethod
     def update(self, ctx: TickContext) -> Self:
@@ -236,12 +322,24 @@ class Drifter(ABC):
     def effect_on_touch(self) -> TouchEffect:
         """Return what touching this drifter does."""
 
-    @abstractmethod
-    def may_hit_ship(self) -> bool:
-        """Return whether this drifter, in its current state, can hit the ship.
 
-        Each drifter decides, for example from `hit_ship`. The base has no default (LD-06).
-        """
+def born_drifter[T: Drifter](cls: type[T], birth: Birth) -> T:
+    """Return a `cls` in WARNING built from the shared fields of `birth`. No checks.
+
+    Every other field keeps its default, so a subclass's own fields need defaults.
+    """
+    return cls(
+        x=birth.x,
+        y=birth.y,
+        variant=birth.variant,
+        width=birth.width,
+        height=birth.height,
+        speed=birth.speed,
+        hitbox=birth.hitbox,
+        warning_ticks=birth.warning_ticks,
+        rehit_cooldown_ticks=birth.rehit_cooldown_ticks,
+        rehit_dim=birth.rehit_dim,
+    )
 
 
 def tick_warning[T: Drifter](drifter: T) -> T:
