@@ -31,10 +31,10 @@ Priority 1 is built first. Priorities are a starting proposal, so the Director a
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
 | telegraph_min | 45 | ticks, at Level 8 | — | locked | Director |
-| entry_warning_look | a copy of the drifter at half its size, inside a shooting-star glow with random spikes | — | — | guess | Director (placeholder look) |
+| entry_warning_look | a small copy of the drifter, inside a shooting-star glow with random spikes | — | — | guess | Director (placeholder look) |
 | entry_warning_glow | (255, 220, 120), warm yellow-white | RGB | — | guess | Director |
 | entry_warning_spikes | 6 to 9 thin spikes (1 px) out of the glow, random per drifter and steady while it shows | count, px | — | guess | Director |
-| entry_warning_size | the whole warning (copy, glow and spikes) fits inside the drifter's own width; the copy is half that size | px | — | guess | Director |
+| entry_warning_size | 24 across for the whole warning (glow and spikes), the same for every drifter. The glow is 18 across. The copy is scaled so its longest side is 14, so it sits inside the glow | px | — | guess | Director |
 | entry_warning_ticks | 60 (1.0 s), shared by every hazard. A spec may set another length only with the Director's approval. Pickups have none | ticks | — | guess | Director |
 
 ## Rules shared by every hazard

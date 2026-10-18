@@ -1,5 +1,5 @@
 # Run: lives, falls, hits, drifters, respawn wait, game over and retry
-Version: 3
+Version: 4
 Status: frozen
 Features: DRA-23, DRA-29, DRA-39, DRA-47
 Created by: architect
@@ -7,12 +7,12 @@ Created by: architect
 ## Purpose
 One run of the game, from play start to game over, as one core state. It holds the ship, the world scroll, the drifters on the field, the lives, the invulnerability timer, the respawn wait and the Game Over state, and steps them all once per tick. It applies the fall rule and the hit rule: the ship step reports where the ship is, the drifters report where they are and what a touch does, and the run decides what it costs. It marks when each drifter has entered the screen, starts and counts down each hazard's re-hit cooldown, and drops drifters that have left. It also starts a new run when the player retries.
 
-The app holds one `Run` and calls one step per tick. It may also hand the run new drifters through `add_drifters`, the only way a drifter enters a run.
+The app holds one `Run` and calls one step per tick. It may also hand the run new drifters through `add_drifters`, the only way a drifter enters a run. Each new drifter settles its entry warning there, from the ship at that moment.
 
 A life is lost by a fall or by a hit. No life-lost feedback plays: the blink is the only effect (scope report DRA-23, Limits; LD-08 stays open).
 
 Who builds what:
-- `game/core/run.py`: the Gameplay Implementer, task `DRA-23-01-gameplay-implementer`. Drifters, `add_drifters`, hits and drops: task `DRA-29-03-gameplay-implementer`. Entering, the re-hit cooldown and the end of `hit_ship`: task `DRA-39-01-gameplay-implementer`.
+- `game/core/run.py`: the Gameplay Implementer, task `DRA-23-01-gameplay-implementer`. Drifters, `add_drifters`, hits and drops: task `DRA-29-03-gameplay-implementer`. Entering, the re-hit cooldown and the end of `hit_ship`: task `DRA-39-01-gameplay-implementer`. `settle_warning` in `add_drifters`: task `DRA-47-02-gameplay-implementer`.
 - `game/ui/game_over.py`, the Game Over box: the UI Developer, task `DRA-23-03-ui-developer`.
 - `game/tests/core/test_run.py`: the QA Engineer, task `DRA-23-04-qa-engineer`. Drifters in the run: `game/tests/core/test_run_drifters.py`, tasks `DRA-29-08-qa-engineer` and `DRA-39-07-qa-engineer`.
 - The hearts that show `lives`: `docs/contracts/systems/hud.md`.
@@ -240,7 +240,7 @@ A game-over tick (`game_over` True):
 
 `add_drifters(run, placements, tuning)` (DRA-29):
 - If `run.game_over` or `placements` is empty, return `run` unchanged. Nothing enters a frozen run. Source: 02-game-flow.md, rule 5.
-- Otherwise, for each placement in order: `obj = spawn_drifter(placement, run.level, tuning)`; then `replace(obj, uid=next_uid)` and `next_uid += 1`. Append the new drifters after the existing ones. Return the run with the new `drifters` and `next_uid`. Nothing else changes. Source: drifters.md, Rules, Spawner; scope report DRA-29, Limits ("a spawner is the only way a drifter is created").
+- Otherwise, for each placement in order: `obj = spawn_drifter(placement, run.level, tuning)`; then `replace(obj, uid=next_uid).settle_warning(TickContext(ship=run.ship))` and `next_uid += 1`. Append the new drifters after the existing ones. Return the run with the new `drifters` and `next_uid`. Nothing else changes. `settle_warning` (DRA-47) lets a drifter fix its entry warning from the ship as it is now, the state the warning is first drawn with; only the chain lightning uses it (the node nearest the ship), every other drifter comes back unchanged. The `drifter spawn` line logs the settled drifter; the warning's place is not logged. Source: drifters.md, Rules, Spawner and The base (Warning settle); drifters/03-chain-lightning.md, rule 2; scope report DRA-29, Limits ("a spawner is the only way a drifter is created").
 - New drifters are in WARNING with `ticks_in_phase` 0. They are first updated on the next `step_run`. So a drifter added after tick T shows its warning on the states after ticks T to T + `warning_ticks` − 1.
 - It works the same during the respawn wait. It never reads the run mode. The app decides what to add (`docs/contracts/systems/app.md`).
 - An error from `spawn_drifter` rises. Core never catches it. Source: game/CONTEXT.md, Error handling.
@@ -282,6 +282,14 @@ DRA-39 changes this frozen contract (v2). No `Run` field, property, signature, c
 | `game/tests/ui/test_hud.py` | none. |
 | `game/tests/core/test_run_drifters.py` | breaks: `rock(hit_ship=...)`, every `hit_ship` check and `test_a_meteorite_hits_once`. Rebuilt for the cooldown and the entered rule by task `DRA-39-07-qa-engineer`. |
 
+DRA-47 changes this contract on top of DRA-39 (not closed out, still `draft` at v2). Only `add_drifters` changes: each new drifter is passed through `settle_warning(TickContext(ship=run.ship))` after it gets its uid. No `Run` field, signature, step of `step_run` or log line changes. Grepping `game/` (tests included) for `add_drifters`:
+
+| File | Change needed |
+|---|---|
+| `game/core/run.py` | `add_drifters` calls `settle_warning`. Task `DRA-47-02-gameplay-implementer`. |
+| `game/app/frame.py` | none. |
+| `game/tests/core/test_run_drifters.py`, `game/tests/core/test_run.py` | none: the meteorite and the satellite come back unchanged from `settle_warning`. Chain lightnings in the run are tested by task `DRA-47-08-qa-engineer` in its own file. |
+
 ## Rationale
 - **A run state that holds the ship, the scroll and the drifters.** Game over freezes them together and a retry resets them together. Core owns rules, so core holds them together.
 - **The ship step stops at step 7, and the run applies falls and hits.** What a fall or a hit costs depends on lives and invulnerability, which neither the ship nor a drifter knows.
@@ -300,6 +308,7 @@ DRA-39 changes this frozen contract (v2). No `Run` field, property, signature, c
 - **A hit during the wait keeps the wait (DRA-29).** Rule 1.4: "Nothing else changes." Accepted by the Director (scope report Decision log, 2026-10-15).
 - **`add_drifters` is a separate call, made after `step_run` (DRA-29).** The Director asked for one way in that the app calls, and core never reads the run mode. Adding after the tick means a new drifter's birth state is drawn, and its warning shows on exactly `warning_ticks` drawn states.
 - **`add_drifters` does nothing at game over (DRA-29).** Everything is frozen. It also keeps the app's debug list simple: it can call `add_drifters` every tick, and the frozen tick count never adds the same drifter twice.
+- **The warning settles in `add_drifters` (DRA-47).** The chain lightning's warning sits above the node nearest the ship "when the warning starts". The spawner never sees the ship, and the run is the one place that has both the new drifter and the ship at that moment. One call per new drifter, with a default that does nothing, keeps `step_run` unchanged.
 - **`uid` comes from the run (DRA-29).** Only the run sees every drifter enter. A counter in the run keeps `step_run` and `add_drifters` pure.
 - **`level` is a property (DRA-29).** It is a fact about the run (08-difficulty.md, rule 1), computed from the meters. The spawner gets it from `add_drifters` and is the only reader.
 - **Lifecycle logs in `core.run` (DRA-29).** The run sees each drifter's phase before and after the tick and owns the drop, so it can log each event once. The drifters stay pure.

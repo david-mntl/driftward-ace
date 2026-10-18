@@ -449,17 +449,18 @@ def test_is_off_screen_rules() -> None:
 
 
 def test_warning_center_moves_just_inside_the_screen() -> None:
-    # Above the screen: at its x, against the top edge (y = height / 2).
-    assert place(300.0, y=-14.0).warning_center() == (300.0, 14.0)
-    assert place(300.0, y=-1000.0).warning_center() == (300.0, 14.0)
-    assert place(300.0, y=-20.0, variant="big").warning_center() == (300.0, 20.0)
+    # Above the screen: at its x, against the top edge (y = half the 24 px warning),
+    # whatever the drifter's size.
+    assert place(300.0, y=-14.0).warning_center() == (300.0, 12.0)
+    assert place(300.0, y=-1000.0).warning_center() == (300.0, 12.0)
+    assert place(300.0, y=-20.0, variant="big").warning_center() == (300.0, 12.0)
     # On the screen and away from the edges: its own spot.
     assert place(300.0, y=200.0).warning_center() == (300.0, 200.0)
     # Off a side: just inside that side, in line with it.
-    assert place(-50.0, y=200.0).warning_center() == (14.0, 200.0)
-    assert place(SCREEN_W + 50.0, y=200.0).warning_center() == (SCREEN_W - 14.0, 200.0)
+    assert place(-50.0, y=200.0).warning_center() == (12.0, 200.0)
+    assert place(SCREEN_W + 50.0, y=200.0).warning_center() == (SCREEN_W - 12.0, 200.0)
     # Off the bottom: just inside the floor.
-    assert place(300.0, y=SCREEN_H + 50.0).warning_center() == (300.0, SCREEN_H - 14.0)
+    assert place(300.0, y=SCREEN_H + 50.0).warning_center() == (300.0, SCREEN_H - 12.0)
 
 
 def test_graze_zone_is_the_hitbox_grown_by_14_and_touch_is_a_hit() -> None:

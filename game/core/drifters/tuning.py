@@ -13,7 +13,9 @@ from core.collision import Hitbox
 from core.drifters.base import (
     DEFAULT_REHIT_COOLDOWN_TICKS,
     DEFAULT_REHIT_DIM,
+    DEFAULT_TELEGRAPH_MIN_TICKS,
     DrifterType,
+    DrifterTypeExtra,
     VariantExtra,
 )
 
@@ -53,6 +55,9 @@ class DrifterTypeTuning:
     entry_warning_ticks: int
     """Entry warning length, ticks. At least 1."""
 
+    extra: DrifterTypeExtra | None = None
+    """The type's own values. None for the meteorite and the satellite."""
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PlaytestSwitches:
@@ -74,6 +79,9 @@ class HazardRules:
 
     rehit_dim: float = DEFAULT_REHIT_DIM
     """Brightness share of a hazard during its cooldown, 0..1."""
+
+    telegraph_min_ticks: int = DEFAULT_TELEGRAPH_MIN_TICKS
+    """The shortest a scaled telegraph may get, ticks, at least 0."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

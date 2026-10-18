@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/chain-lightning-tuning.schema.json",
+  "title": "Chain lightning tuning file",
+  "description": "The file game/tuning/drifters/chain_lightning.json. Built on drifter-tuning.schema.json: the same default_variant, speed_ratio and entry_warning_ticks, plus the chain lightning's own type values, and variants that give their nodes and arcs instead of width, height and hitbox. The loader works those three out from the nodes (docs/contracts/systems/drifters.md, Rules, Chain lightning, Layout). Node positions are in units of node_spacing, so node_spacing is the one knob for every layout. Values from drifters/03-chain-lightning.md (guess unless noted): default_variant pair_flat; speed_ratio 0.375; entry_warning_ticks 60 (07-drifters.md, shared); node_spacing 128; node_size 12; arc_width 6; charge_ticks 120; fire_ticks 120; charge_rays 4; ray_length 6; ray_width 1 (placeholder_look: 1 px rays); entry_warning_icon trio_triangle (locked). The seven layouts and their numbers are in drifters.md, Rules, Chain lightning, Layout. Key mapping to the GDD: charge_rays is the most rays per node (charge_rays, 4 at most); ray_width is the placeholder_look's 1 px; invert_mirror encodes the With invert column of the layout table; entry_warning_icon names the variant whose layout the warning shows. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Rules this schema can't express, also enforced by the loader: default_variant and entry_warning_icon are variant names; every arc names two different nodes of its variant, and no two arcs join the same pair; every arc joins two nodes exactly 1 unit apart (07: node_spacing between neighbouring nodes); the box around a variant's node centers is centered on 0, 0 (03, rule 1); arc_width <= node_size, so every hitbox shape lies inside the footprint. Tolerance for the last two: 1e-6 units. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, Chain lightning.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_variant",
+    "variants",
+    "speed_ratio",
+    "entry_warning_ticks",
+    "node_spacing",
+    "node_size",
+    "arc_width",
+    "charge_ticks",
+    "fire_ticks",
+    "charge_rays",
+    "ray_length",
+    "ray_width",
+    "entry_warning_icon"
+  ],
+  "properties": {
+    "default_variant": {
+      "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants. pair_flat.",
+      "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+    },
+    "variants": {
+      "description": "Named layouts (03-chain-lightning.md, Layouts). A new layout is a new entry here and needs no code (03, How to extend).",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "drifter-tuning.schema.json#/$defs/variant_name" },
+      "additionalProperties": { "$ref": "#/$defs/variant" }
+    },
+    "speed_ratio": { "$ref": "drifter-tuning.schema.json#/properties/speed_ratio" },
+    "entry_warning_ticks": { "$ref": "drifter-tuning.schema.json#/properties/entry_warning_ticks" },
+    "node_spacing": {
+      "description": "Distance between neighbouring nodes, center to center, px. Every node coordinate is multiplied by it. 128.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "node_size": {
+      "description": "Node diameter, px. Each node is a circle this wide: its look, and its hitbox while one of its arcs fires. 12.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "arc_width": {
+      "description": "Arc thickness, px: the band drawn and the line hitbox, round ends (07-drifters.md, rule 8). At most node_size. 6.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "charge_ticks": {
+      "description": "Charge length at Level 1, ticks. Timer x applies at birth, rounded up, never below telegraph_min (08-difficulty.md, rule 4). 120.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "fire_ticks": {
+      "description": "Fire length, ticks. Never scales with level. 120.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "charge_rays": {
+      "description": "Most charge rays per node. One shows when the charge starts and one more each time another 1/charge_rays of the charge has passed. 4.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "ray_length": {
+      "description": "Ray length out from the node's edge, px. 6.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "ray_width": {
+      "description": "Ray thickness, px. 1 (placeholder_look).",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "entry_warning_icon": {
+      "description": "The variant whose layout the entry warning shows, and whose width sizes it, whatever the placed variant. trio_triangle (locked). Must be a key of variants.",
+      "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+    }
+  },
+  "$defs": {
+    "point": {
+      "description": "A node center [x, y] in units of node_spacing, as an offset from the chain's center. y down.",
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": false
+    },
+    "arc": {
+      "description": "Two node indices, from 0, in the variant's nodes list.",
+      "type": "array",
+      "prefixItems": [
+        { "type": "integer", "minimum": 0 },
+        { "type": "integer", "minimum": 0 }
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": false
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "arcs", "invert_mirror"],
+      "properties": {
+        "nodes": {
+          "description": "2 or 3 node centers, in the order the arcs read them (left to middle to right). More than three is a new drifter (03, How to extend).",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/point" }
+        },
+        "arcs": {
+          "description": "The node pairs the lightning joins (03, Layouts, Arcs).",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/arc" }
+        },
+        "invert_mirror": {
+          "description": "What the placement's invert does to this layout: left_right negates every node x, top_bottom negates every node y (03, Layouts, With invert: the triangle turns upside down, the rest mirror left to right).",
+          "enum": ["left_right", "top_bottom"]
+        }
+      }
+    }
+  }
+}

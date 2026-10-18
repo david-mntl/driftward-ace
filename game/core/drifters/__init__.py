@@ -4,5 +4,6 @@ Importing anything under `core.drifters` imports every drifter module, so each c
 A new drifter adds one import line here.
 """
 
+from core.drifters import chain_lightning as chain_lightning
 from core.drifters import meteorite as meteorite
 from core.drifters import satellite as satellite

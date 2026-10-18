@@ -1,13 +1,13 @@
 # Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite, the chain lightning and their views
-Version: 2
+Version: 3
 Status: frozen
 Features: DRA-29, DRA-39, DRA-47
 Created by: architect
 
 ## Purpose
-Every drifter in the game (hazards first, coins and the rest later) is built on one shared base. This contract holds that base, the hitbox shapes and their overlap test, the level table the spawner reads, the spawner (the only way a drifter is created), the drifters built so far (the meteorite and the satellite), and the views that draw drifters and their entry warnings.
+Every drifter in the game (hazards first, coins and the rest later) is built on one shared base. This contract holds that base, the hitbox shapes (circle, box and line) and their overlap test, the level table the spawner reads, the spawner (the only way a drifter is created), the drifters built so far (the meteorite, the satellite and the chain lightning), and the views that draw drifters and their entry warnings.
 
-The base holds the rules every drifter shares: the entry warning, the hitbox, the graze zone, when a drifter has entered the screen and when it has left it, and the re-hit cooldown with its dim look. A drifter carries final numbers only. The spawner reads the level and the shared hazard values once, at birth, and sets the drifter's speed and cooldown length. The drifter never knows the level. The run (`docs/contracts/systems/run.md`) holds the drifters, updates them every tick, marks when each has entered, tests them against the ship, starts and counts down their cooldowns, and drops them when they leave.
+The base holds the rules every drifter shares: the entry warning (where it shows, what its copy looks like), the hitbox, the graze zone, when a drifter has entered the screen and when it has left it, the re-hit cooldown with its dim look, and how a timer scales with level. A drifter carries final numbers only. The spawner reads the level and the shared hazard values once, at birth, and sets the drifter's speed, its timer factor and its cooldown length. The drifter never knows the level. The run (`docs/contracts/systems/run.md`) holds the drifters, lets each fix its warning from the ship when it is added, updates them every tick, marks when each has entered, tests them against the ship, starts and counts down their cooldowns, and drops them when they leave.
 
 Structure chosen by the Director (scope report DRA-29, Limits and Decision log): inheritance, a thin abstract base, one subclass per drifter, one level deep, no middle classes. Shared bits are helper functions. Guards: abstract methods, a registry that refuses duplicates, a test that the drifter list, the tuning files, the classes and the views all match, and collision tests that fail when a shape kind has no cases (scope report DRA-39, Limits).
 
@@ -16,12 +16,15 @@ Who builds what:
 - `game/core/levels.py`: task `DRA-29-02-gameplay-implementer`.
 - The package `game/core/drifters/` (`__init__.py`, `base.py`, `tuning.py`, `registry.py`, `spawner.py`, `meteorite.py`): task `DRA-29-02-gameplay-implementer`. The shared re-hit cooldown, entering, start position and the new placement fields: task `DRA-39-01-gameplay-implementer`.
 - `game/core/drifters/satellite.py`: task `DRA-39-03-gameplay-implementer`.
-- The drifters inside `core.run`: `docs/contracts/systems/run.md` (tasks `DRA-29-03`, `DRA-39-01`).
-- `game/ui/shapes.py`: the UI Developer, task `DRA-29-04-ui-developer`.
-- The package `game/ui/drifters/` (`__init__.py`, `registry.py`, `entry_warning.py`, `meteorite_view.py`): task `DRA-29-05-ui-developer`. Brightness, `dim_color` and the tilted warning copy: task `DRA-39-02-ui-developer`. `satellite_view.py`: task `DRA-39-04-ui-developer`.
-- Hitbox and graze outlines and drifter labels in the debug overlay: `docs/contracts/systems/debug-overlay.md` (task `DRA-29-06`). No change in DRA-39.
-- Tests: the QA Engineer. DRA-29: tasks `DRA-29-07` to `DRA-29-09`. DRA-39: `DRA-39-05-qa-engineer` (collision), `DRA-39-06-qa-engineer` (base, spawner, meteorite, satellite) and `DRA-39-07-qa-engineer` (drifters in the run).
-- The data files, by whoever the Director names (DRA-29: the main session). They are content, so no task file: `game/tuning/drifters/meteorite.json` (`docs/contracts/schemas/drifter-tuning.schema.json`), `game/tuning/drifters/satellite.json` (`docs/contracts/schemas/satellite-tuning.schema.json`), `game/tuning/playtest.json` (`docs/contracts/schemas/playtest-switches.schema.json`), `game/tuning/hazards.json` (`docs/contracts/schemas/hazards.schema.json`) and `game/tuning/debug_spawns.json` (`docs/contracts/schemas/debug-spawn-list.schema.json`).
+- The line shape in `game/core/collision.py`: task `DRA-47-01-gameplay-implementer`.
+- `DrifterTypeExtra`, the timer helpers, the warning copy and warning settle hooks, the new `Birth` and `HazardRules` fields, the spawner's handing them over, and `add_drifters` calling `settle_warning`: task `DRA-47-02-gameplay-implementer`.
+- `game/core/drifters/chain_lightning.py`: task `DRA-47-03-gameplay-implementer`.
+- The drifters inside `core.run`: `docs/contracts/systems/run.md` (tasks `DRA-29-03`, `DRA-39-01`, `DRA-47-02`).
+- `game/ui/shapes.py`: the UI Developer, task `DRA-29-04-ui-developer`. The line shape: task `DRA-47-04-ui-developer`.
+- The package `game/ui/drifters/` (`__init__.py`, `registry.py`, `entry_warning.py`, `meteorite_view.py`): task `DRA-29-05-ui-developer`. Brightness, `dim_color` and the tilted warning copy: task `DRA-39-02-ui-developer`. `satellite_view.py`: task `DRA-39-04-ui-developer`. The warning drawn from `warning_copy()`: task `DRA-47-05-ui-developer`. `chain_lightning_view.py`: task `DRA-47-06-ui-developer`.
+- Hitbox and graze outlines and drifter labels in the debug overlay: `docs/contracts/systems/debug-overlay.md` (task `DRA-29-06`). No change in DRA-39 or DRA-47: line outlines come from `ui.shapes`.
+- Tests: the QA Engineer. DRA-29: tasks `DRA-29-07` to `DRA-29-09`. DRA-39: `DRA-39-05-qa-engineer` (collision), `DRA-39-06-qa-engineer` (base, spawner, meteorite, satellite) and `DRA-39-07-qa-engineer` (drifters in the run). DRA-47: `DRA-47-07-qa-engineer` (collision with lines, the ship against every chain lightning variant) and `DRA-47-08-qa-engineer` (the chain lightning, the new base hooks, chain lightnings in the run).
+- The data files, by whoever the Director names (DRA-29: the main session). They are content, so no task file: `game/tuning/drifters/meteorite.json` (`docs/contracts/schemas/drifter-tuning.schema.json`), `game/tuning/drifters/satellite.json` (`docs/contracts/schemas/satellite-tuning.schema.json`), `game/tuning/drifters/chain_lightning.json` (`docs/contracts/schemas/chain-lightning-tuning.schema.json`, DRA-47), `game/tuning/playtest.json` (`docs/contracts/schemas/playtest-switches.schema.json`), `game/tuning/hazards.json` (`docs/contracts/schemas/hazards.schema.json`) and `game/tuning/debug_spawns.json` (`docs/contracts/schemas/debug-spawn-list.schema.json`).
 - Loading and checking the data files, the debug test spawn list, and calling `add_drifters` and `render_drifter`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`. No task file.
 
 ## Diagram
@@ -43,6 +46,8 @@ classDiagram
     is_off_screen() bool
     warning_center() tuple
     warning_tilt_degrees() float
+    warning_copy() Self
+    settle_warning(ctx) Self
     may_hit_ship() bool
     brightness() float
     born(birth)$ Self
@@ -63,8 +68,27 @@ classDiagram
     born(birth)$ Self
     warning_tilt_degrees() float
   }
+  class ChainLightning {
+    invert, nodes, arcs
+    node_size, arc_width
+    charge_ticks, fire_ticks
+    charge_rays, ray_length, ray_width
+    warning_layout, warning_node
+    born(birth)$ Self
+    is_charging() bool
+    is_firing() bool
+    charge_ray_count() int
+    node_centers() tuple
+    nodes_on_screen() tuple
+    firing_arcs() tuple
+    current_hitbox() Hitbox
+    warning_center() tuple
+    warning_copy() Self
+    settle_warning(ctx) Self
+  }
   Drifter <|-- Meteorite
   Drifter <|-- Satellite
+  Drifter <|-- ChainLightning
   Drifter o-- Specialty : 0..1
 ```
 
@@ -102,11 +126,12 @@ Birth, the only place the level is read:
 flowchart LR
   P["Placement<br/>drifter_type, x?, y?, variant?,<br/>as_level?, specialty_enabled?, invert, speed?"] --> S["spawn_drifter(placement, level, tuning)"]
   L["level<br/>(run.level, or as_level)"] --> S
-  T["DrifterTuning<br/>drifters, switches, hazards<br/>(checked by app.tuning)"] --> S
+  T["DrifterTuning<br/>drifters (variants, extra), switches, hazards<br/>(checked by app.tuning)"] --> S
   LV["core.levels<br/>hazard speed ×, Timer ×"] --> S
   SH["core.ship.TOP_SIDE_SPEED"] --> S
   S --> SP["cls.start_position(x, y, width, height, invert)"]
-  SP --> B["Birth<br/>final numbers"] --> C["cls.born(birth)"] --> O["Drifter<br/>phase WARNING"]
+  SP --> B["Birth<br/>final numbers, timer_mult,<br/>telegraph_min_ticks, variant_extra, type_extra"] --> C["cls.born(birth)"] --> O["Drifter<br/>phase WARNING"]
+  O --> AD["core.run.add_drifters:<br/>uid, then settle_warning(TickContext(run.ship))"]
 ```
 
 Meteorite timeline, medium, Level 1, added at the end of tick T:
@@ -134,12 +159,39 @@ At T+60 its right edge is on the left wall: it touches the screen but is not on 
 
 Angled at Level 1: `velocity_x` = 2.4675 × cos 20° ≈ 2.3187, `velocity_y` = 2.4675 × sin 20° ≈ 0.8439. Placed at y 200 from the left wall, it is dropped past the right wall on n = 292 (x ≈ 659.06, y ≈ 446.43). Placed at y 300, it is dropped below the floor first, on n = 221 (x ≈ 494.43, y ≈ 486.51, top edge ≈ 480.51). With `invert` it starts at x 658 and `velocity_x` is negative.
 
+Chain lightning cycle (DRA-47). `cycle_tick = ticks_in_phase % (charge_ticks + fire_ticks)` while ACTIVE:
+```mermaid
+stateDiagram-v2
+    [*] --> WARNING: spawn_drifter(), then add_drifters settles the warning node
+    WARNING --> Charging: warning ends: appears, cycle_tick 0
+    Charging --> Charging: cycle_tick < charge_ticks<br/>rays: 1 + cycle_tick × charge_rays // charge_ticks<br/>no hitbox
+    Charging --> Firing: cycle_tick reaches charge_ticks
+    Firing --> Firing: cycle_tick < charge_ticks + fire_ticks<br/>each arc with both nodes on screen fires<br/>hitbox: those arcs and their nodes
+    Firing --> Charging: cycle_tick wraps to 0
+    Charging --> [*]: every node fully below the floor: run drops it
+    Firing --> [*]: same
+```
+
+Chain lightning timeline, `pair_flat`, Level 1, placed at x 320 with no y and no `invert`, added at the end of tick T with the ship at (320, 240). Nodes at offsets (−64, 0) and (64, 0); 140 × 12; `charge_ticks` 120, `fire_ticks` 120, `charge_rays` 4; speed 2.4675:
+```
+state after tick   T        T+1..T+59   T+60       T+90      T+120     T+150     T+179     T+180     T+259     T+260
+phase              WARNING  WARNING     ACTIVE     ACTIVE    ACTIVE    ACTIVE    ACTIVE    ACTIVE    ACTIVE    dropped
+ticks_in_phase     0        1..59       0          30        60        90        119       120       199
+y                  -6.00    -6.00       -6.00      68.03     142.05    216.08    287.63    290.10    485.03    487.50
+charging / firing  -        -           charging   charging  charging  charging  charging  firing    firing
+rays per node      0        0           1          2         3         4         4         0         0
+firing arcs        ()       ()          ()         ()        ()        ()        ()        (0,)      (0,)
+hitbox             none     none        none       none      none      none      none      line + 2 circles
+warning shows at   (256, 12)
+```
+Both nodes are 64 px from the ship in x and equally far in y, so the tie picks the left node, x 256. The warning is 24 px across like every warning, so `R` = 12 and its center sits at y 12. On T+259 the nodes' top edges are at 479.03, still on screen, so the arc fires; on T+260 the top edge is at 481.50 and the run drops it. At Level 1 a chain that starts at the top fires once, on 80 ticks, from y ≈ 290 down; it never charges a second time (see Rationale). At Level 8: speed 2.4675 × 1.42 ≈ 3.5039, charge `ceil(120 × 0.70)` = 84 ticks, fire still 120.
+
 Views:
 ```mermaid
 flowchart LR
   APP["app.frame"] -- "each obj in run.drifters" --> R["ui.drifters.registry.render_drifter"]
-  R -- "WARNING" --> W["ui.drifters.entry_warning.draw_entry_warning<br/>(the drifter's view at half size, full brightness,<br/>turned by warning_tilt_degrees())"]
-  R -- "ACTIVE" --> V["registered view at obj.brightness()<br/>render_meteorite, render_satellite"]
+  R -- "WARNING" --> W["ui.drifters.entry_warning.draw_entry_warning<br/>(the view of obj.warning_copy() scaled to a 14 px longest side,<br/>full brightness, turned by warning_tilt_degrees())"]
+  R -- "ACTIVE" --> V["registered view at obj.brightness()<br/>render_meteorite, render_satellite,<br/>render_chain_lightning"]
   R -- "GONE" --> N["nothing"]
 ```
 
@@ -170,13 +222,25 @@ class Box:
     h: float  # full height, px, > 0
 
 
-Shape = Circle | Box
+@dataclass(frozen=True, slots=True)
+class Line:  # DRA-47
+    """A line hitbox shape: straight from A to B, a set thickness, round ends, px."""
+
+    ax: float  # end A x: offset from the owner's center in a variant's hitbox; screen x once placed
+    ay: float  # end A y, same, y down
+    bx: float  # end B x, same
+    by: float  # end B y, same
+    thickness: float  # full thickness, px, > 0. Every point within thickness / 2 of segment AB
+
+
+Shape = Circle | Box | Line  # Line from DRA-47
 Hitbox = tuple[Shape, ...]  # one or more shapes. Empty () = touches nothing
 
 
 def place_hitbox(hitbox: Hitbox, x: float, y: float) -> Hitbox:
     ...
     # Every shape moved by (x, y): offsets from the owner's center become screen positions.
+    # A line moves both ends.
 
 
 def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool:
@@ -186,11 +250,12 @@ def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool:
 
 def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox:
     ...
-    # Each shape grown by margin on every side: Circle r + margin; Box w + 2 margin, h + 2 margin.
+    # Each shape grown by margin on every side: Circle r + margin; Box w + 2 margin, h + 2 margin;
+    # Line thickness + 2 margin, ends unchanged (it grows on each side and at both ends).
 
 
 # All three raise TypeError("unknown shape kind '<class name>'") for an object that is not a
-# Circle or a Box (DRA-39). Nothing is ever treated as a box by default.
+# Circle, a Box or a Line (DRA-39, Line from DRA-47). Nothing is ever treated as a box by default.
 ```
 
 ### game/core/levels.py
@@ -241,6 +306,9 @@ DEFAULT_REHIT_COOLDOWN_TICKS: Final[int] = (
 DEFAULT_REHIT_DIM: Final[float] = (
     0.75  # 05-lives-and-damage.md, rehit_dim, × brightness (guess). DRA-39
 )
+DEFAULT_TELEGRAPH_MIN_TICKS: Final[int] = (
+    45  # 07-drifters.md, telegraph_min, ticks (locked). DRA-47
+)
 
 
 class DrifterType(Enum):
@@ -248,6 +316,7 @@ class DrifterType(Enum):
 
     METEORITE = "meteorite"  # drifters/01-meteorite.md
     SATELLITE = "satellite"  # drifters/02-satellite.md. DRA-39
+    CHAIN_LIGHTNING = "chain_lightning"  # drifters/03-chain-lightning.md. DRA-47
 
 
 class Phase(Enum):
@@ -276,6 +345,11 @@ class VariantExtra:
 
 
 @dataclass(frozen=True, slots=True)
+class DrifterTypeExtra:                                             # DRA-47
+    """Base of a drifter's own values that hold for every variant. Empty. A drifter that needs
+    some subclasses it in its own module (the chain lightning: ChainLightningTypeExtra)."""
+
+@dataclass(frozen=True, slots=True)
 class Birth:
     """Everything the spawner settled for one new drifter. Final numbers only."""
 
@@ -287,7 +361,7 @@ class Birth:
     hitbox: Hitbox  # the variant's shapes, offsets from the center
     speed: float  # final speed, px/tick, hazard speed × already applied
     warning_ticks: int  # entry warning length, ticks, never scaled
-    timer_mult: float  # the Timer × to apply to the drifter's own timers. Neither built drifter has one
+    timer_mult: float  # the Timer × to apply to the drifter's own timers (the chain lightning's charge)
     specialty_enabled: (
         bool | None
     )  # the placement's switch; None = the drifter's default
@@ -297,6 +371,10 @@ class Birth:
     )  # the variant's own values, None for a drifter with none. DRA-39
     rehit_cooldown_ticks: int  # re-hit cooldown length, ticks, never scaled. DRA-39
     rehit_dim: float  # brightness during the cooldown, 0..1. DRA-39
+    type_extra: (
+        DrifterTypeExtra | None
+    )  # the drifter type's own values, None for a drifter with none. DRA-47
+    telegraph_min_ticks: int  # the shortest a scaled telegraph may get, ticks. DRA-47
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -369,6 +447,16 @@ class Drifter(ABC):
         ...  # DRA-39
         # How far the warning copy is turned, degrees, counterclockwise on screen. 0.0 here.
 
+    def warning_copy(self) -> Self:
+        ...  # DRA-47
+        # The drifter whose look the entry warning shows, scaled to a 14 px longest side.
+        # self here.
+
+    def settle_warning(self, ctx: TickContext) -> Self:
+        ...  # DRA-47
+        # Fix where the entry warning shows, from the ship at the moment the drifter enters the run.
+        # Called once, by core.run.add_drifters. self unchanged here.
+
     def may_hit_ship(self) -> bool:
         ...  # DRA-39: concrete, the shared rule
         # rehit_ticks_left == 0. Subclasses don't override it.
@@ -414,8 +502,13 @@ def tick_warning[T: Drifter](obj: T) -> T:
     ...  # PEP 695 type parameter, bound Drifter
     # The shared WARNING step: ticks_in_phase + 1, or ACTIVE with ticks_in_phase 0 once
     # ticks_in_phase + 1 reaches warning_ticks. Position unchanged.
+
+def scale_timer(ticks: int, timer_mult: float) -> int: ...          # DRA-47
+    # A drifter's own timer at its level: ticks × timer_mult rounded up to a whole tick.
+def scale_telegraph(ticks: int, timer_mult: float, telegraph_min_ticks: int) -> int: ...   # DRA-47
+    # A telegraph at its level: max(scale_timer(ticks, timer_mult), telegraph_min_ticks).
 ```
-The code documents each field with the comment above, as `core/ship.py` does for `Ship`. `Drifter` and `Specialty` refer to each other, so the module uses `from __future__ import annotations` or string annotations. With `slots=True` the methods never use the zero-argument `super()`. DRA-39 removes the field `hit_ship` and the abstract `default_y`; `may_hit_ship` is no longer abstract.
+The code documents each field with the comment above, as `core/ship.py` does for `Ship`. `Drifter` and `Specialty` refer to each other, so the module uses `from __future__ import annotations` or string annotations. With `slots=True` the methods never use the zero-argument `super()`. DRA-39 removes the field `hit_ship` and the abstract `default_y`; `may_hit_ship` is no longer abstract. DRA-47 adds `warning_copy` and `settle_warning`, both concrete with a do-nothing default, so the meteorite, the satellite and the registry test's stubs need no change.
 
 ### game/core/drifters/tuning.py
 Checked values the app hands to core. Built by `app.tuning` from the JSON files. Core trusts them.
@@ -437,6 +530,9 @@ class DrifterTypeTuning:
     default_variant: str  # one of the variant names
     speed_ratio: float  # Level 1 speed as a multiple of core.ship.TOP_SIDE_SPEED
     entry_warning_ticks: int  # ticks, >= 1
+    extra: DrifterTypeExtra | None = (
+        None  # DRA-47. The type's own values; None for the meteorite and the satellite
+    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -453,6 +549,7 @@ class HazardRules:  # DRA-39
         DEFAULT_REHIT_COOLDOWN_TICKS  # ticks, >= 0. Never scales with level
     )
     rehit_dim: float = DEFAULT_REHIT_DIM  # 0..1
+    telegraph_min_ticks: int = DEFAULT_TELEGRAPH_MIN_TICKS  # DRA-47. ticks, >= 0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -571,18 +668,102 @@ class Satellite(Drifter):
 ```
 The fields have defaults so `born_drifter` can build the satellite before `born` sets them.
 
+### game/core/drifters/chain_lightning.py (DRA-47)
+```python
+# Imports: stdlib (math, enum), core.collision, core.world, core.drifters.base, core.drifters.registry.
+type Point = tuple[float, float]         # px, y down
+type ArcNodes = tuple[int, int]          # two node indices, from 0
+
+class InvertMirror(Enum):
+    LEFT_RIGHT = "left_right"            # invert negates every node x
+    TOP_BOTTOM = "top_bottom"            # invert negates every node y (the triangle: point down)
+
+@dataclass(frozen=True, slots=True)
+class ChainLayout:
+    """One layout: where the nodes sit and which ones the lightning joins."""
+    nodes: tuple[Point, ...]             # 2 or 3 node centers, px offsets from the chain's center, before invert
+    arcs: tuple[ArcNodes, ...]           # the node pairs the lightning joins, at least one
+    invert_mirror: InvertMirror          # what invert does to this layout
+
+@dataclass(frozen=True, slots=True)
+class ChainLightningVariantExtra(VariantExtra):
+    """The chain lightning's per-variant value: its layout."""
+    layout: ChainLayout
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ChainLightningTypeExtra(DrifterTypeExtra):
+    """The chain lightning's values that hold for every variant. Final numbers, px and ticks."""
+    node_size: float          # node diameter, px, > 0
+    arc_width: float          # arc thickness, px, > 0, <= node_size
+    charge_ticks: int         # Level 1 charge, ticks, >= 1. Scaled at birth
+    fire_ticks: int           # fire, ticks, >= 1. Never scaled
+    charge_rays: int          # most rays per node, >= 1
+    ray_length: float         # px, > 0, out from the node's edge
+    ray_width: float          # px, > 0
+    warning_layout: ChainLayout   # the layout the entry warning shows, whatever the variant
+
+def mirrored_nodes(layout: ChainLayout, invert: bool) -> tuple[Point, ...]: ...
+    # layout.nodes unchanged without invert. With it: (-x, y) for LEFT_RIGHT, (x, -y) for TOP_BOTTOM.
+def layout_size(nodes: Sequence[Point], node_size: float) -> tuple[float, float]: ...
+    # (width, height), px, of the box around every node circle: the spread of the centers + node_size.
+def chain_hitbox(nodes: Sequence[Point], arcs: Sequence[ArcNodes], node_size: float,
+                 arc_width: float) -> Hitbox: ...
+    # Offsets from the chain's center: one Line per arc, node center to node center, thickness
+    # arc_width, in arcs order; then one Circle per node, radius node_size / 2, in node order.
+
+@register_drifter
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ChainLightning(Drifter):
+    """Telegraphed link. Falls straight down, charges, then fires arcs between its nodes, again
+    and again until it leaves. drifters/03-chain-lightning.md."""
+    drifter_type: ClassVar[DrifterType] = DrifterType.CHAIN_LIGHTNING
+    invert: bool = False                  # the placement's invert
+    nodes: tuple[Point, ...] = ()         # node centers, px offsets from (x, y), invert applied
+    arcs: tuple[ArcNodes, ...] = ()       # node index pairs, from the variant
+    node_size: float = 0.0                # node diameter, px
+    arc_width: float = 0.0                # arc thickness, px
+    charge_ticks: int = 1                 # final charge, ticks: Timer × applied, never below telegraph_min
+    fire_ticks: int = 1                   # fire, ticks, never scaled
+    charge_rays: int = 1                  # most rays per node
+    ray_length: float = 0.0               # px, out from the node's edge
+    ray_width: float = 1.0                # px
+    warning_layout: ChainLayout | None = None   # the entry warning's icon layout, before invert, never inverted
+    warning_node: int | None = None       # index of the node the warning shows above. Set by settle_warning
+
+    @classmethod
+    def born(cls, birth: Birth) -> Self: ...
+    @classmethod
+    def start_position(cls, x: float | None, y: float | None, width: float, height: float,
+                       invert: bool) -> tuple[float, float]: ...
+        # x is required: None raises ValueError("chain_lightning placement needs x"). y None: -height / 2.
+    def update(self, ctx: TickContext) -> Self: ...
+    def effect_on_touch(self) -> TouchEffect: ...     # TouchEffect.HIT
+    def is_charging(self) -> bool: ...                # ACTIVE and cycle tick < charge_ticks
+    def is_firing(self) -> bool: ...                  # ACTIVE and cycle tick >= charge_ticks
+    def charge_ray_count(self) -> int: ...            # rays per node now; 0 unless charging
+    def node_centers(self) -> tuple[Point, ...]: ...  # screen px: (x + offset x, y + offset y), node order
+    def nodes_on_screen(self) -> tuple[bool, ...]: ...    # per node: its node_size square shares area with the screen
+    def firing_arcs(self) -> tuple[int, ...]: ...     # indices into arcs that fire now, ascending; () unless firing
+    def current_hitbox(self) -> Hitbox: ...           # placed: the firing arcs, then the nodes they touch; () otherwise
+    def warning_center(self) -> tuple[float, float]: ...   # above the settled node, against the top edge
+    def warning_copy(self) -> Self: ...               # itself in the warning layout, sized on it
+    def settle_warning(self, ctx: TickContext) -> Self: ...   # sets warning_node: the node nearest the ship
+```
+The fields have defaults so `born_drifter` can build the chain lightning before `born` sets them. `app.tuning` imports `ChainLayout`, `InvertMirror`, `ChainLightningVariantExtra`, `ChainLightningTypeExtra`, `layout_size` and `chain_hitbox` to build the tuning records, so the hitbox is worked out in one place.
+
 ### game/core/drifters/__init__.py
-Imports every drifter module once (`meteorite`, and `satellite` from DRA-39), so each class registers when anything under `core.drifters` is first imported. A package docstring and nothing else. A new drifter adds one import line here.
+Imports every drifter module once (`meteorite`, `satellite` from DRA-39, `chain_lightning` from DRA-47), so each class registers when anything under `core.drifters` is first imported. A package docstring and nothing else. A new drifter adds one import line here.
 
 ### game/ui/shapes.py
-Unchanged in DRA-39.
+The line shape from DRA-47. Signatures unchanged.
 ```python
-# Imports: pygame, core.collision. Never app.
+# Imports: pygame, math, core.collision. Never app.
 def draw_shape(
     surface: pygame.Surface, color: tuple[int, int, int], shape: Shape, width: int = 0
 ) -> None:
     ...
-    # One placed shape. width 0 fills it; width 1 draws a 1 px outline.
+    # One placed shape. width 0 fills it; width 1 draws a 1 px outline. Raises
+    # TypeError("unknown shape kind '<class name>'") for anything not a Circle, a Box or a Line (DRA-47).
 
 
 def draw_hitbox(
@@ -627,22 +808,24 @@ ENTRY_WARNING_GLOW: Final[tuple[int, int, int]] = (
     220,
     120,
 )  # 07-drifters.md, entry_warning_glow (guess)
-ENTRY_WARNING_SCALE: Final[float] = (
-    0.5  # 07-drifters.md, entry_warning_look: half size (guess)
+ENTRY_WARNING_SIZE: Final[int] = 24  # core/drifters/base.py, not ui. 07-drifters.md,
+# entry_warning_size: the warning's diameter, the same for every drifter (guess)
+ENTRY_WARNING_COPY_SIZE: Final[int] = (
+    14  # 07-drifters.md, entry_warning_size: longest side of the copy (guess)
 )
 SPIKE_COUNT_MIN: Final[int] = 6  # 07-drifters.md, entry_warning_spikes (guess)
 SPIKE_COUNT_MAX: Final[int] = 9  # same
-WARNING_SIZE_RATIO: Final[float] = (
-    1.0  # 07-drifters.md, entry_warning_size: the whole warning
-)
-# fits inside the drifter's own width (guess)
 GLOW_RATIO: Final[float] = 0.75  # glow radius as a share of the warning's radius.
 # Placeholder choice, not in the GDD (see Rationale)
 
 
 def draw_entry_warning(
     surface: pygame.Surface, obj: Drifter, view: DrifterView
-) -> None: ...
+) -> None:
+    ...
+    # DRA-47: the copy is view(..., obj.warning_copy(), ...). The warning's size is fixed.
+
+
 def drop_entry_warning(obj: Drifter) -> None:
     ...  # forget obj's warning image; nothing when it has none.
     # render_drifter calls it when it draws obj ACTIVE. Director approval, 2026-10-15.
@@ -686,8 +869,21 @@ def render_satellite(
 ) -> None: ...
 
 
-# game/ui/drifters/__init__.py: imports every view module once (meteorite_view, and satellite_view
-# from DRA-39), so each view registers. A package docstring and nothing else.
+# game/ui/drifters/chain_lightning_view.py (DRA-47). Imports: pygame, math, core.collision,
+# core.drifters.base, core.drifters.chain_lightning, ui.shapes, ui.drifters.registry. Never app.
+CHAIN_NODE_COLOR: Final[tuple[int, int, int]] = (0, 220, 255)    # drifters/03-chain-lightning.md, placeholder_look (guess)
+CHAIN_RAY_COLOR: Final[tuple[int, int, int]] = (120, 200, 255)   # same
+CHAIN_ARC_COLOR: Final[tuple[int, int, int]] = (220, 240, 255)   # same
+FIRST_RAY_DEGREES: Final[float] = 45.0     # drifters/03-chain-lightning.md, ray_length: the first ray on the
+                                           # 45° diagonal (guess). Counterclockwise on screen from pointing right
+
+@register_view(DrifterType.CHAIN_LIGHTNING)
+def render_chain_lightning(surface: pygame.Surface, obj: Drifter, center: tuple[float, float],
+                           scale: float, brightness: float) -> None: ...
+    # Raises TypeError("render_chain_lightning draws a ChainLightning") for any other drifter.
+
+# game/ui/drifters/__init__.py: imports every view module once (meteorite_view, satellite_view
+# from DRA-39, chain_lightning_view from DRA-47), so each view registers. A package docstring and nothing else.
 ```
 
 ## Presentation
@@ -696,28 +892,44 @@ Every fact a view shows is a core field or a core method. No view works out a ru
 | Core field or method | Shown as |
 |---|---|
 | `obj.phase` | `render_drifter` picks what to draw: the entry warning in WARNING, the drifter in ACTIVE, nothing in GONE. Source: 07-drifters.md, rule 9 |
-| `obj.warning_center()` | the center of the entry warning. Source: 07-drifters.md, rule 9; drifters/01-meteorite.md, rule 1; drifters/02-satellite.md, rule 1 |
-| `obj.warning_tilt_degrees()` | how far the half-size copy inside the warning is turned. 0 for the meteorite and the flat satellite. Source: drifters/02-satellite.md, rule 1 (DRA-39) |
+| `obj.warning_center()` | the center of the entry warning. Source: 07-drifters.md, rule 9; drifters/01-meteorite.md, rule 1; drifters/02-satellite.md, rule 1; drifters/03-chain-lightning.md, rule 2 (DRA-47) |
+| `obj.warning_tilt_degrees()` | how far the copy inside the warning is turned. 0 for the meteorite, the flat satellite and the chain lightning. Source: drifters/02-satellite.md, rule 1 (DRA-39) |
+| `obj.warning_copy()` | the drifter drawn inside the warning, scaled so its longest side is `ENTRY_WARNING_COPY_SIZE`. The drifter itself for the meteorite and the satellite; the `trio_triangle` layout for every chain lightning. It does not size the warning: that size is fixed. Source: drifters/03-chain-lightning.md, entry_warning_icon (DRA-47) |
 | `obj.x`, `obj.y` | the center of the drifter's look while ACTIVE |
-| `obj.width`, `obj.height` | the size of the meteorite's look, and the size of the whole entry warning (never wider than `obj.width`) |
+| `obj.width`, `obj.height` | the size of the drifter's look. The copy in the entry warning is scaled by `ENTRY_WARNING_COPY_SIZE / max(width, height)` of `obj.warning_copy()`. The warning itself has one fixed size |
 | `obj.hitbox` | the satellite's look: its two boxes, filled (DRA-39). Source: drifters/02-satellite.md, placeholder_look |
+| `obj.nodes`, `obj.node_size` | the chain lightning's nodes: where each sits around `center`, and how big (DRA-47). Source: drifters/03-chain-lightning.md, placeholder_look, node_size |
+| `obj.firing_arcs()`, `obj.arcs`, `obj.arc_width` | which arc bands are drawn, between which nodes, how thick (DRA-47). Source: drifters/03-chain-lightning.md, rules 5 and 9, placeholder_look |
+| `obj.charge_ray_count()`, `obj.charge_rays`, `obj.ray_length`, `obj.ray_width` | how many rays each node shows now, how they are spread, how long and how thick (DRA-47). Source: drifters/03-chain-lightning.md, telegraph, charge_rays, ray_length, placeholder_look |
 | `obj.brightness()` | the share of normal brightness the look is drawn at: `rehit_dim` (0.75) during the re-hit cooldown, 1.0 otherwise. Source: 05-lives-and-damage.md, rule 1.5, rehit_dim (guess) (DRA-39) |
 | `obj.uid` | the seed for the warning's spikes, so they are random per drifter and steady while it shows. Source: 07-drifters.md, entry_warning_spikes |
 | `obj.drifter_type` | which registered view draws it |
 | `obj.variant` | not drawn by these views. The debug label shows it (`docs/contracts/systems/debug-overlay.md`) |
 
-**Brightness** (DRA-39). Every view multiplies each color it draws by its `brightness` argument through `dim_color`: `math.floor(channel × brightness + 0.5)` per channel. `render_drifter` passes `obj.brightness()` in ACTIVE; the entry warning always passes 1.0, because a drifter still warning has never hit. At 0.75 the meteorite's grey (140, 140, 140) becomes (105, 105, 105), the satellite's body (240, 240, 240) becomes (180, 180, 180) and its panel (60, 110, 220) becomes (45, 83, 165). The drifter returns to its full colors on the first frame drawn from a state whose cooldown has reached 0. A drifter made of parts calls one view, so all its parts dim together. Source: 05-lives-and-damage.md, rule 1.5 and rehit_dim (guess); 91-decision-log.md, row 56.
+**Brightness** (DRA-39). Every view multiplies each color it draws by its `brightness` argument through `dim_color`: `math.floor(channel × brightness + 0.5)` per channel. `render_drifter` passes `obj.brightness()` in ACTIVE; the entry warning always passes 1.0, because a drifter still warning has never hit. At 0.75 the meteorite's grey (140, 140, 140) becomes (105, 105, 105), the satellite's body (240, 240, 240) becomes (180, 180, 180) and its panel (60, 110, 220) becomes (45, 83, 165). The chain lightning's nodes (0, 220, 255) become (0, 165, 191), its rays (120, 200, 255) become (90, 150, 191) and its arc band (220, 240, 255) becomes (165, 180, 191) (DRA-47). The drifter returns to its full colors on the first frame drawn from a state whose cooldown has reached 0. A drifter made of parts calls one view, so all its parts dim together. Source: 05-lives-and-damage.md, rule 1.5 and rehit_dim (guess); 91-decision-log.md, row 56.
 
 **Meteorite** (`render_meteorite`). A filled circle in `dim_color(METEORITE_COLOR, brightness)`, (140, 140, 140) at full brightness, as wide as `obj.width × scale`: center `(round(center[0]), round(center[1]))`, radius `round(obj.width * scale / 2)`. Full size: radius 10, 14, 20 for small, medium, big. Source: drifters/01-meteorite.md, placeholder_look, variants (guess).
 
 **Satellite** (`render_satellite`, DRA-39). The satellite's two hitbox boxes, filled, upright, never turned (the satellite never rotates; only its warning copy is tilted). `obj.hitbox[0]` is the body and `obj.hitbox[1]` the panel bar: the satellite's tuning lists them in that order (`docs/contracts/schemas/satellite-tuning.schema.json`). Each box is drawn with `ui.shapes.draw_shape(surface, color, Box(center[0] + box.cx * scale, center[1] + box.cy * scale, box.w * scale, box.h * scale))`, so the full-size look sits exactly on the debug outlines. First the panel bar in `dim_color(SATELLITE_PANEL_COLOR, brightness)`, (60, 110, 220) at full brightness, then the body on top in `dim_color(SATELLITE_BODY_COLOR, brightness)`, (240, 240, 240). Full size: a 36 × 6 blue bar with a 12 × 12 white square over its middle. Half size: 18 × 3 and 6 × 6. A hitbox that isn't two boxes raises `TypeError`. Source: drifters/02-satellite.md, placeholder_look, size, hitbox, rule 8 (guess).
 
-**Entry warning** (`draw_entry_warning`), one image per drifter, built once and blitted each frame. The whole warning (glow, spikes and copy) fits inside the drifter's own width, so it is smaller than the drifter it warns of. Source: 07-drifters.md, entry_warning_size (guess); scope report DRA-29, Decision log (2026-10-15). With `R = WARNING_SIZE_RATIO × obj.width / 2`, the warning's outer radius (10, 14, 20 px for small, medium, big meteorites; 18 px for the satellite):
-- **Glow.** A filled circle in `ENTRY_WARNING_GLOW`, (255, 220, 120), radius `GLOW_RATIO × R` (7.5, 10.5, 15 px; 13.5 px for the satellite), centered. Source: 07-drifters.md, entry_warning_look, entry_warning_glow (guess); the glow's radius is a placeholder choice (see Rationale).
+**Chain lightning** (`render_chain_lightning`, DRA-47). Any drifter that is not a `ChainLightning` raises `TypeError`. Each node sits at `(center[0] + offset_x × scale, center[1] + offset_y × scale)` for its offset in `obj.nodes`. Drawn in this order, so the nodes sit on the ends of the bands and the rays on top:
+1. **Arc bands.** For each index in `obj.firing_arcs()`, the arc's two placed nodes joined by `ui.shapes.draw_shape(surface, dim_color(CHAIN_ARC_COLOR, brightness), Line(ax, ay, bx, by, obj.arc_width × scale))`, filled: a band (220, 240, 255) 6 px thick at full size, exactly the arc's hitbox. Nothing while charging or in the warning. Source: placeholder_look; rule 9 (the hitbox is never bigger than what the player sees); 91-decision-log.md, row 60.
+2. **Nodes.** Every node, a filled circle in `dim_color(CHAIN_NODE_COLOR, brightness)`, (0, 220, 255) at full brightness: center `(round(node_x), round(node_y))`, radius `round(obj.node_size × scale / 2)`: 6 at full size, 1 in the entry warning. Drawn always, firing or not. Source: placeholder_look, node_size.
+3. **Rays.** Around every node, `obj.charge_ray_count()` rays (0 unless charging). Ray `k` (from 0) points at `FIRST_RAY_DEGREES + k × 360 / obj.charge_rays` degrees, counterclockwise on screen from pointing right: direction `(cos θ, −sin θ)`. It runs from `node + direction × obj.node_size / 2 × scale` (the node's edge) to `node + direction × (obj.node_size / 2 + obj.ray_length) × scale`, drawn with `pygame.draw.line(surface, dim_color(CHAIN_RAY_COLOR, brightness), start, end, max(1, round(obj.ray_width × scale)))`. With 4 rays the order is 45° (up right), 135° (up left), 225° (down left), 315° (down right): one ray up right for the first quarter of the charge, all four for the last. Source: telegraph, charge_rays, ray_length, placeholder_look (guess); 91-decision-log.md, row 62.
+- Full size, firing `pair_flat` at (320, 300): a band from (256, 300) to (384, 300), 6 px thick, with a 12 px cyan disc on each end. The warning copy (WARNING: no band, no ray), at the warning's scale of 0.1: three cyan discs of radius 1 in a point-up triangle with 12.8 px sides. Source: placeholder_look; entry_warning_icon (locked).
+- No art, no jagged arc, no glow, no flicker, no sound (scope report DRA-47, Out). The charge's "faster" in the GDD's telegraph is left to the real look; the placeholder shows only the growing count.
+
+**Line shape** (`ui.shapes.draw_shape`, DRA-47). With `t = thickness` and `n` the unit normal of AB:
+- `width` 0 (filled): the rectangle with corners `A + n t/2`, `B + n t/2`, `B − n t/2`, `A − n t/2`, through `pygame.draw.polygon` (float corners), then a filled circle at A and at B, center `(round(x), round(y))`, radius `round(t / 2)`. With A equal to B, the circle only.
+- `width` 1 (outline): the two long sides, `A + n t/2` to `B + n t/2` and `A − n t/2` to `B − n t/2`, as 1 px lines, and the outer half of each end circle (radius `round(t / 2)`) as a 1 px arc. With A equal to B, a 1 px circle outline. The debug overlay's line outlines and graze zones come from this, with no change to the overlay.
+- Source: 07-drifters.md, rule 8 (a line with round ends); 91-decision-log.md, rows 47 and 60.
+
+**Entry warning** (`draw_entry_warning`), one image per drifter, built once and blitted each frame. Every warning has the same size, whatever the drifter (hotfix, 2026-10-18; decision log row 63). With `R = ENTRY_WARNING_SIZE / 2 = 12 px`, the warning's outer radius, the same for every drifter. Source: 07-drifters.md, entry_warning_size (guess); 91-decision-log.md, row 63:
+- **Glow.** A filled circle in `ENTRY_WARNING_GLOW`, (255, 220, 120), radius `GLOW_RATIO × R` (9 px), centered. Source: 07-drifters.md, entry_warning_look, entry_warning_glow (guess); the glow's radius is a placeholder choice (see Rationale).
 - **Spikes.** `random.Random(obj.uid)` picks, in this order: the count, `randint(SPIKE_COUNT_MIN, SPIKE_COUNT_MAX)` (6 to 9); then for each spike an angle `uniform(0, 2π)` and a length `uniform(GLOW_RATIO × R, R)`, so each spike reaches out of the glow and never past `R`. Each spike is a 1 px line (pygame's `width` 1) in `ENTRY_WARNING_GLOW` from the center outward. Random per drifter, steady while it shows. Source: 07-drifters.md, entry_warning_spikes (guess).
-- **Copy.** On top of the glow, the drifter's own view at `ENTRY_WARNING_SCALE` (half size) and full brightness, centered. When `obj.warning_tilt_degrees()` is 0: `view(image, obj, image_center, 0.5, 1.0)`, as before. Otherwise (DRA-39) the copy is drawn the same way onto its own `pygame.SRCALPHA` surface of the image's size, turned with `pygame.transform.rotate(copy, obj.warning_tilt_degrees())` (positive turns counterclockwise on screen), and blitted centered on the image's middle pixel. For the meteorite, a grey circle half as wide as the rock (radius 5, 7, 10). For the satellite, an 18 × 3 bar with a 6 × 6 body; the angled one's copy is turned 20° so its right end dips (or its left end with `invert`): it points the way the satellite will fly. Source: 07-drifters.md, entry_warning_look, entry_warning_size (guess); drifters/02-satellite.md, rule 1.
-- **Place.** The image's center sits on `round(obj.warning_center())`: for a top entry, at the drifter's x, just inside the top edge; for the satellite, at its y, just inside the wall it enters from (x 18, or 622 with `invert`). Source: 07-drifters.md, rule 9; drifters/02-satellite.md, rule 1; scope report DRA-29, Decision log (2026-10-15).
-- **Pre-rendered.** The image is a `pygame.SRCALPHA` surface, square, side `2 × ceil(R) + 1` (37 px for the satellite), with the warning's center on its middle pixel, so no pixel of the warning lies more than `R` from the center in x or y. A turned copy that would reach past the image is clipped by it; the satellite's turned copy reaches at most about 9.5 px from the center. It is built on the first frame the drifter shows its warning and kept in a dict keyed by `(obj.uid, obj.drifter_type, obj.variant, obj.warning_tilt_degrees())` (the tilt joins the key in DRA-39). The entry is dropped on the first frame `render_drifter` draws that drifter ACTIVE, through `drop_entry_warning(obj)` (Director approval, 2026-10-15). The image depends only on its key, so a kept entry is never wrong. Never rebuilt per frame. Source: 12-art-and-audio.md, rule 3 (glow is pre-rendered); 15-tech-constraints.md, rule 5.
+- **Copy.** On top of the glow, the drifter's own view drawing `copy = obj.warning_copy()` (DRA-47) at `scale = ENTRY_WARNING_COPY_SIZE / max(copy.width, copy.height)` and full brightness, centered, so its longest side is 14 px, inside the 18 px glow. When `obj.warning_tilt_degrees()` is 0: `view(image, copy, image_center, scale, 1.0)`; for the meteorite and the satellite the copy is `obj` itself. For a chain lightning, three cyan discs in the point-up triangle, whatever its variant or `invert`, scaled by 14 / 140 = 0.1: discs of radius 1, 12.8 px between the nodes. Otherwise (DRA-39) the copy is drawn the same way onto its own `pygame.SRCALPHA` surface of the image's size, turned with `pygame.transform.rotate(copy, obj.warning_tilt_degrees())` (positive turns counterclockwise on screen), and blitted centered on the image's middle pixel. For the meteorite, a grey circle 14 px across (radius 7) at every size. For the satellite, a 14 × 2.3 bar with a 4.7 × 4.7 body (scale 14 / 36); the angled one's copy is turned 20° so its right end dips (or its left end with `invert`): it points the way the satellite will fly. Source: 07-drifters.md, entry_warning_look, entry_warning_size (guess); drifters/02-satellite.md, rule 1.
+- **Place.** The image's center sits on `round(obj.warning_center())`: for a top entry, at the drifter's x, just inside the top edge; for the satellite, at its y, just inside the wall it enters from (x 12, or 628 with `invert`); for a chain lightning, at the x of the node nearest the ship when it was added, with its center at y 12 (DRA-47). Source: 07-drifters.md, rule 9; drifters/02-satellite.md, rule 1; drifters/03-chain-lightning.md, rule 2; scope report DRA-29, Decision log (2026-10-15).
+- **Pre-rendered.** The image is a `pygame.SRCALPHA` surface, square, side `2 × ceil(R) + 1` (25 px, the same for every drifter, a chain lightning too), with the warning's center on its middle pixel, so no pixel of the warning lies more than `R` from the center in x or y. A turned copy that would reach past the image is clipped by it; the satellite's turned copy reaches at most about 7 px from the center. It is built on the first frame the drifter shows its warning and kept in a dict keyed by `(obj.uid, obj.drifter_type, obj.variant, obj.warning_tilt_degrees())` (the tilt joins the key in DRA-39). The entry is dropped on the first frame `render_drifter` draws that drifter ACTIVE, through `drop_entry_warning(obj)` (Director approval, 2026-10-15). The image depends only on its key, so a kept entry is never wrong. Never rebuilt per frame. Source: 12-art-and-audio.md, rule 3 (glow is pre-rendered); 15-tech-constraints.md, rule 5.
 
 Rules for every view:
 - Views only draw. They never fill, never flip, never log per frame, never catch an error, never change a drifter, never read the run mode or a key. Source: 10-ui.md, rule 5; game/CONTEXT.md, Run modes.
@@ -725,15 +937,20 @@ Rules for every view:
 - The app calls `render_drifter` for every drifter in `run.drifters`, in order, after the starfield and before the ship (`docs/contracts/systems/app.md`, Draw).
 
 ## Rules
-Values. Every constant above has its value and source on its line. Variant sizes, hitboxes, angles, speed, warning length, `rehit_cooldown`, `rehit_dim` and every look value are `guess` in the GDD. The level table's Hazard speed row and `graze_margin` are locked. Variant, angle and speed values are not in code: they come from the tuning files (Tuning files, below). `rehit_cooldown` and `rehit_dim` have their defaults in `core/drifters/base.py` and may be set in `game/tuning/hazards.json`.
+Values. Every constant above has its value and source on its line. Variant sizes, hitboxes, angles, layouts, speed, warning length, the chain lightning's sizes and timers, `rehit_cooldown`, `rehit_dim` and every look value are `guess` in the GDD. The level table's Hazard speed row, `graze_margin`, `telegraph_min` and the chain lightning's `entry_warning_icon` are locked. Variant, angle, layout, size, timer, ray and speed values are not in code: they come from the tuning files (Tuning files, below). `rehit_cooldown`, `rehit_dim` and `telegraph_min` (DRA-47) have their defaults in `core/drifters/base.py` and may be set in `game/tuning/hazards.json`. Colors stay constants in the views, as for every placeholder look so far (see Rationale).
 
 Collision (`core/collision.py`). Source: 07-drifters.md, rule 8; 06-scoring.md, rule 3; 91-decision-log.md, row 35:
-- A hitbox is one or more circles and upright boxes. Each shape's `cx`, `cy` is an offset from the owner's center until `place_hitbox` moves it to a screen position. Lines and polygons (07-drifters.md, rule 8) are not built yet; they come with the drifters that need them (scope report DRA-39, Out).
+- A hitbox is one or more circles, upright boxes and lines (lines from DRA-47). Each shape's position (`cx`, `cy`; a line's `ax`, `ay`, `bx`, `by`) is an offset from the owner's center until `place_hitbox` moves it to a screen position. Polygons (07-drifters.md, rule 8) are not built yet; they come with floating islands (scope report DRA-47, Out).
 - Two shapes overlap when they share area. Shapes that only touch at an edge or a point don't overlap: the tests are strict (`<`). Accepted by the Director (scope report DRA-29, Decision log, 2026-10-15). Circle and circle: distance between centers < r1 + r2. Box and box: |Δcx| < (w1 + w2) / 2 and |Δcy| < (h1 + h2) / 2. Circle and box: the box point nearest the circle's center is at a distance < r.
+- **Line** (DRA-47). A line is every point within `thickness / 2` of the segment AB: straight, at any angle, with round ends. A line whose A and B are the same point is a circle of radius `thickness / 2`. With `h = thickness / 2`. Source: 07-drifters.md, rule 8; 91-decision-log.md, rows 47 and 60:
+  - Line and circle: the shortest distance from the circle's center to segment AB < h + r.
+  - Line and line: the shortest distance between the two segments < h1 + h2. Segments that cross or touch are at distance 0.
+  - Line and box: the shortest distance between segment AB and the box (the filled rectangle) < h. A segment that meets the box, inside or on its edge, is at distance 0.
+  - Distances are compared squared, with no square root: the point-to-segment distance uses the clamped projection `t = clamp(((P − A) · (B − A)) / |B − A|², 0, 1)` (or P to A when A equals B), and a crossing is found with cross-product signs. When segments don't meet, their shortest distance is the smallest of the four end-to-other-segment distances; a segment that doesn't meet a box is closest at one of its two ends or at one of the box's four corners. So whole numbers, halves and 3-4-5 triangles give exact results, as for the other shapes.
 - The result never depends on the order: `hitboxes_overlap(a, b) == hitboxes_overlap(b, a)`.
 - `hitboxes_overlap(a, b)` is True when any shape of `a` overlaps any shape of `b`. An empty hitbox overlaps nothing.
-- `grow_hitbox` grows each shape by the margin on every side: a circle's radius grows by it, a box grows by it on all four sides (w and h by twice the margin). Centers don't move. Source: 06-scoring.md, rule 3.
-- **Unknown shape kind** (DRA-39). `place_hitbox`, `grow_hitbox` and `hitboxes_overlap` raise `TypeError("unknown shape kind '<class name>'")` for any shape that is not a `Circle` or a `Box`. A new shape kind must be handled in all three, and gets its own collision cases (test task DRA-39-05). Source: scope report DRA-39, Limits (collision tests and guards).
+- `grow_hitbox` grows each shape by the margin on every side: a circle's radius grows by it, a box grows by it on all four sides (w and h by twice the margin), a line's thickness grows by twice the margin, so it grows on each side and at both ends (DRA-47). Centers and line ends don't move. Source: 06-scoring.md, rule 3; 91-decision-log.md, row 47.
+- **Unknown shape kind** (DRA-39). `place_hitbox`, `grow_hitbox` and `hitboxes_overlap` raise `TypeError("unknown shape kind '<class name>'")` for any shape that is not a `Circle`, a `Box` or a `Line`. A new shape kind must be handled in all three, and gets its own collision cases (test tasks DRA-39-05, DRA-47-07). Source: scope report DRA-39, Limits (collision tests and guards).
 - Pure. No logging, no randomness.
 
 Levels (`core/levels.py`). Source: 08-difficulty.md:
@@ -747,9 +964,12 @@ The base (`core/drifters/base.py`):
 - **Graze zone.** `graze_zone()` is the current hitbox grown by `GRAZE_MARGIN` (14 px), only for a drifter whose `effect_on_touch()` is HIT. Others have `()`. It is computed and drawn in the debug overlay only; nothing pays for it yet. Source: 06-scoring.md, rules 3 and 5; scope report DRA-39, Out (graze scoring).
 - **Entering** (DRA-39). `is_partly_on_screen()` is True when the drifter's `width × height` footprint shares area with the screen: `x - width / 2 < SCREEN_W` and `x + width / 2 > 0` and `y - height / 2 < SCREEN_H` and `y + height / 2 > 0`. A footprint that only touches an edge from outside is not on screen. `mark_entered()` returns the drifter with `has_entered = True` when it is ACTIVE, not yet entered, and partly on screen; otherwise it returns it unchanged. `has_entered` never goes back to False. The run calls `mark_entered()` on every drifter right after its update (`systems/run.md`, step 3). Source: 07-drifters.md, rule 12; 91-decision-log.md, row 58.
 - **Leaving.** `is_off_screen()` is True only in ACTIVE, only once `has_entered` is True (DRA-39), and only when the drifter is fully off screen at a side or the bottom: its right edge `x + width / 2 <= 0`, or its left edge `x - width / 2 >= SCREEN_W`, or its top edge `y - height / 2 >= SCREEN_H`. Never at the top, where drifters enter, and never while the warning shows. A drifter that has not yet been at least partly on screen is never off screen, wherever it is. Fully below the floor uses the same test as the ship (`systems/ship.md`, step 8). Source: 07-drifters.md, rule 12; 91-decision-log.md, row 58; drifters/01-meteorite.md, rule 5; drifters/02-satellite.md, rule 5.
-- **Warning place.** `warning_center()` is (x, y) clamped so the drifter's `width × height` footprint lies on the screen: x into `[width / 2, SCREEN_W - width / 2]`, y into `[height / 2, SCREEN_H - height / 2]`. A spot on the screen and clear of the edges is unchanged. A spot off the screen moves just inside the nearest edge, in line with it. For a top entry: at the drifter's x, against the top edge. For a side entry: at the drifter's y, against that side. Source: 07-drifters.md, rule 9; drifters/01-meteorite.md, rule 1; drifters/02-satellite.md, rule 1; 91-decision-log.md, row 39.
-- **Warning tilt** (DRA-39). `warning_tilt_degrees()` says how far the half-size copy in the entry warning is turned, in degrees, counterclockwise on screen (pygame's `transform.rotate` convention). The base returns 0.0: the copy stays upright. A drifter whose warning must show where it flies overrides it (the satellite; later the fireball). Source: drifters/02-satellite.md, rule 1; drifters/06-fireball.md, rule 1.
+- **Warning place.** `warning_center()` is (x, y) clamped so the whole warning lies on the screen, whatever the drifter's size: x into `[ENTRY_WARNING_SIZE / 2, SCREEN_W - ENTRY_WARNING_SIZE / 2]`, y into `[ENTRY_WARNING_SIZE / 2, SCREEN_H - ENTRY_WARNING_SIZE / 2]` (12 px from each edge). A spot on the screen and clear of the edges is unchanged. A spot off the screen moves just inside the nearest edge, in line with it. For a top entry: at the drifter's x, against the top edge. For a side entry: at the drifter's y, against that side. Source: 07-drifters.md, rule 9; drifters/01-meteorite.md, rule 1; drifters/02-satellite.md, rule 1; 91-decision-log.md, rows 39 and 63.
+- **Warning tilt** (DRA-39). `warning_tilt_degrees()` says how far the copy in the entry warning is turned, in degrees, counterclockwise on screen (pygame's `transform.rotate` convention). The base returns 0.0: the copy stays upright. A drifter whose warning must show where it flies overrides it (the satellite; later the fireball). Source: drifters/02-satellite.md, rule 1; drifters/06-fireball.md, rule 1.
+- **Warning copy** (DRA-47). `warning_copy()` is the drifter whose look the entry warning shows, scaled so its longest side is `ENTRY_WARNING_COPY_SIZE`. The base returns `self`. A drifter whose warning shows something other than itself overrides it (the chain lightning: always the triangle). The copy is only drawn; nothing else reads it, and it does not size the warning. Source: 07-drifters.md, entry_warning_look and entry_warning_size; drifters/03-chain-lightning.md, entry_warning_icon.
+- **Warning settle** (DRA-47). `settle_warning(ctx)` fixes, once, anything about the entry warning that depends on the ship at the moment the drifter enters the run. `core.run.add_drifters` calls it on each new drifter right after giving it its uid, with `TickContext(ship=run.ship)` (`systems/run.md`). The base returns `self` unchanged. It never moves the drifter, never changes its phase or timers. A drifter built without `add_drifters` (the debug list's load check, tests) is simply not settled and falls back to its own default. Source: drifters/03-chain-lightning.md, rule 2 ("nearest the ship when the warning starts"); 07-drifters.md, rule 9.
 - **Re-hit cooldown** (DRA-39). Every hazard shares one rule. A drifter may hit the ship only while `rehit_ticks_left` is 0: `may_hit_ship()` is `rehit_ticks_left == 0`, and no subclass overrides it. When a hazard takes part in a hit, the run sets its `rehit_ticks_left` to its `rehit_cooldown_ticks`, and counts it down by 1 at the end of every later playing tick (`systems/run.md`, steps 7 and 8). So that one hazard can't hit on the `rehit_cooldown_ticks` ticks after the hit, and can hit again after that, even if the ship still touches it. The hazard keeps going as normal: nothing else about it changes. Every other hazard can hit as soon as invulnerability ends. `rehit_cooldown_ticks` and `rehit_dim` are set by the spawner at birth from `tuning.hazards` and never scale with level. `brightness()` is `rehit_dim` while `rehit_ticks_left > 0`, else 1.0: the view draws the hazard that much darker while it can't hit. A drifter made of parts counts as one hazard with one counter, so all its parts dim together. Replaces the DRA-29 "hits once" stand-in and the field `hit_ship`. Source: 05-lives-and-damage.md, rule 1.5, rehit_cooldown, rehit_dim and Edge cases (guess); 91-decision-log.md, rows 54 and 56; scope report DRA-39, Feature and Limits.
+- **Timers** (DRA-47). A drifter's own timer scales at birth, in its `born`, from `birth.timer_mult`. `scale_timer(ticks, timer_mult)` is `math.ceil(round(ticks × timer_mult, 6))`: rounded up to a whole tick, after rounding to 6 decimals so a floating-point error never adds a tick (120 × 0.85 is 102, never 103). `scale_telegraph(ticks, timer_mult, telegraph_min_ticks)` is `max(scale_timer(ticks, timer_mult), telegraph_min_ticks)`: a telegraph never gets shorter than `telegraph_min`, at any level, and a tuning value already below it is raised to it. The spawner hands `telegraph_min_ticks` over from `tuning.hazards` in `Birth`. Entry warnings and the re-hit cooldown never use these. Source: 08-difficulty.md, rules 4 and 5; 07-drifters.md, rule 2, telegraph_min (locked).
 - **Birth.** `born_drifter(cls, birth)` builds any drifter from the shared fields of `birth`; the drifter's own fields keep their defaults. The base `born` refuses a specialty (`ValueError("<type> has no specialty")` when `specialty_enabled` is True) and an invert (`ValueError("<type> has no invert")` when `invert` is True), then calls `born_drifter`. `False` and `None` are fine. A drifter with a specialty, an `invert` or its own fields overrides `born` and builds on `born_drifter` with `dataclasses.replace`. Source: 07-drifters.md, rules 11 and 13; scope report DRA-29, Limits.
 - **Start.** `start_position(x, y, width, height, invert)` returns the center a new drifter starts at. A coordinate the placement set is always kept (07-drifters.md, rule 14: "A placement may set another spot"). A missing one gets the drifter's default, or raises `ValueError("<type> placement needs <x or y>")` when the drifter has none. Each drifter defines it; there is no base default. Source: 07-drifters.md, rules 13 and 14.
 - **Specialty.** The slot exists; no specialty is built. Nothing calls `Specialty.update` or `effect_on_ship` yet. The first feature with a specialty designs where they run in the tick. Source: 07-drifters.md, rule 11; scope report DRA-29, Limits and Out.
@@ -766,10 +986,10 @@ Spawner, `spawn_drifter(placement, level, tuning)`. The only place that reads a 
 2. `variant_name = placement.variant` or, when None, `type_tuning.default_variant`. A name not in `type_tuning.variants` raises `ValueError("unknown variant '<name>' for drifter type '<type>'")`. Source: 07-drifters.md, rule 10.
 3. `use_level = placement.as_level` when set, else `level`. `check_level(use_level)` raises outside 1 to 8.
 4. Speed: `base_speed = placement.speed` when set (DRA-39), else `type_tuning.speed_ratio × TOP_SIDE_SPEED`. Then `speed = base_speed × hazard_speed_mult(use_level)`, or `× hazard_speed_mult(1)` when `tuning.switches.hazard_speed_scaling` is False, whatever the level or `as_level`. A placement's speed is a Level 1 speed in px/tick, along the drifter's path, like the default it replaces. Source: 08-difficulty.md, rules 3 and 5; drifters/01-meteorite.md and drifters/02-satellite.md, speed_ratio; scope report DRA-39, Values needed (speed override: Director, temporary stand-in, not in the GDD).
-5. Timers: `timer_mult = timer_mult(use_level)`, or `timer_mult(1)` when `tuning.switches.timer_scaling` is False. Handed to the drifter in `Birth`. Neither built drifter has a timer it scales. Source: 08-difficulty.md, rules 4 and 5.
+5. Timers: `timer_mult = timer_mult(use_level)`, or `timer_mult(1)` when `tuning.switches.timer_scaling` is False. Handed to the drifter in `Birth`, with `telegraph_min_ticks = tuning.hazards.telegraph_min_ticks` (DRA-47). The drifter scales its own timers in `born` (The base, Timers). Only the chain lightning has one so far, its charge. Source: 08-difficulty.md, rules 4 and 5.
 6. `warning_ticks = type_tuning.entry_warning_ticks`, never scaled. Source: 07-drifters.md, rule 9; 08-difficulty.md, rule 4.
 7. `x, y = cls.start_position(placement.x, placement.y, variant.width, variant.height, placement.invert)`. Raises for a missing coordinate the drifter needs (DRA-39).
-8. Return `cls.born(Birth(...))` with the variant's width, height, hitbox and `extra` (as `variant_extra`), `placement.invert`, and `tuning.hazards.rehit_cooldown_ticks` and `tuning.hazards.rehit_dim`. Phase WARNING, `ticks_in_phase` 0, `uid` 0 (the run sets it), `has_entered` False, `rehit_ticks_left` 0. `born` raises for a specialty or an invert the drifter lacks.
+8. Return `cls.born(Birth(...))` with the variant's width, height, hitbox and `extra` (as `variant_extra`), `type_tuning.extra` (as `type_extra`, DRA-47), `placement.invert`, and `tuning.hazards.rehit_cooldown_ticks`, `tuning.hazards.rehit_dim` and `tuning.hazards.telegraph_min_ticks` (DRA-47). Phase WARNING, `ticks_in_phase` 0, `uid` 0 (the run sets it), `has_entered` False, `rehit_ticks_left` 0. `born` raises for a specialty or an invert the drifter lacks.
 - Applied once, at birth. The drifter keeps its speed and its cooldown length for its whole life and never knows the level. Source: 07-drifters.md, rule 6; 08-difficulty.md, rule 3; 05-lives-and-damage.md, rehit_cooldown ("Never scales with level"); 91-decision-log.md, row 34.
 - Placement coordinates are screen px, y down. Wave files use world coordinates (03-world-and-camera.md, rule 1); the wave loader converts them later.
 - `Placement.speed` is set only by the debug test spawn list for now (scope report DRA-39). It is not a GDD placement field (07-drifters.md, rule 13).
@@ -798,15 +1018,49 @@ Satellite (`core/drifters/satellite.py`, DRA-39). Source: drifters/02-satellite.
 - **Speed at Level 1:** `0.375 × TOP_SIDE_SPEED` ≈ 2.4675 px/tick along its path, its own `speed_ratio`. Angled: ≈ 2.3187 across and ≈ 0.8439 down per tick. Source: speed_ratio, speed (guess, derived).
 - A flat satellite placed above the top line can never reach the ship. Allowed. Source: Edge cases.
 
+Chain lightning (`core/drifters/chain_lightning.py`, DRA-47). Source: drifters/03-chain-lightning.md; scope report DRA-47:
+- **Archetype:** Telegraphed link. A moving drifter: its speed is its on-screen speed and the scroll doesn't add to it. Source: archetype, kind (locked); rule 4; 03-world-and-camera.md, rule 9.
+- **One drifter.** Its 2 or 3 nodes are parts of it, never drifters of their own. `x`, `y` is the center of the box around all its nodes; `nodes` holds each node's offset from it. All nodes move together. `width` and `height` are the box around every node circle, so entering, leaving and the debug label use the whole chain. Source: rule 1.
+- **Layout.** A variant is its layout: node positions, arcs and what `invert` does. The tuning file gives node positions in units of `node_spacing`; `app.tuning` multiplies them by it and builds `ChainLayout` in px, `width` and `height` with `layout_size`, and the un-inverted `hitbox` with `chain_hitbox`. Arcs join neighbouring nodes along the shape, left to middle to right; the triangle also joins its two ends. The seven layouts, in units (y down, from the chain's center), with their size at `node_spacing` 128 and `node_size` 12. Source: Layouts table, node_spacing, node_size (guess); 91-decision-log.md, row 62:
+
+  | Variant | Nodes | Arcs | invert_mirror | Width × height, px |
+  |---|---|---|---|---|
+  | pair_flat (default) | (−0.5, 0), (0.5, 0) | (0, 1) | left_right | 140 × 12 |
+  | pair_diagonal | (−0.35355339, −0.35355339), (0.35355339, 0.35355339) | (0, 1) | left_right | ≈ 102.51 × 102.51 |
+  | pair_vertical | (0, −0.5), (0, 0.5) | (0, 1) | left_right | 12 × 140 |
+  | trio_line | (−1, 0), (0, 0), (1, 0) | (0, 1), (1, 2) | left_right | 268 × 12 |
+  | trio_diagonal | (−0.70710678, −0.70710678), (0, 0), (0.70710678, 0.70710678) | (0, 1), (1, 2) | left_right | ≈ 193.02 × 193.02 |
+  | trio_l | (−0.5, −0.5), (−0.5, 0.5), (0.5, 0.5) | (0, 1), (1, 2) | left_right | 140 × 140 |
+  | trio_triangle | (−0.5, 0.4330127), (0, −0.4330127), (0.5, 0.4330127) | (0, 1), (1, 2), (2, 0) | top_bottom | 140 × ≈ 122.85 |
+
+  Diagonals are at 45° with the left node highest (y down, so the left node has the smaller y). The L is top, corner, right. The triangle has equal sides and its point up. Every arc joins two nodes 1 unit (`node_spacing`) apart. `left_right` on a layout that is already symmetric (pair_flat, pair_vertical, trio_line) changes nothing, as the GDD's "the same".
+- **Born:** refuses a specialty (`ValueError("chain_lightning has no specialty")`). Reads `birth.variant_extra`, which must be a `ChainLightningVariantExtra`, else `ValueError("chain_lightning variant '<name>' has no layout")`, and `birth.type_extra`, which must be a `ChainLightningTypeExtra`, else `ValueError("chain_lightning tuning has no type values")`. Then `replace(born_drifter(cls, birth), ...)` with: `invert = birth.invert`; `nodes = mirrored_nodes(layout, birth.invert)`; `arcs = layout.arcs`; `hitbox = chain_hitbox(nodes, arcs, node_size, arc_width)`; `charge_ticks = scale_telegraph(type.charge_ticks, birth.timer_mult, birth.telegraph_min_ticks)`; `fire_ticks = type.fire_ticks`; `node_size`, `arc_width`, `charge_rays`, `ray_length`, `ray_width` and `warning_layout` from the type; `warning_node` None. Mirroring keeps the box around the nodes, so `width` and `height` stay as born. Final numbers: set once, at birth. Source: rules 1, 8; Layouts ("`invert` mirrors the layout exactly"); specialty (locked).
+- **Start:** `start_position`: x is the placement's (required: `ValueError("chain_lightning placement needs x")` without it). y is the placement's, or `-height / 2` when None: the bottom of its box on the top edge, fully off screen. Source: rule 2; 07-drifters.md, rule 14.
+- **Update:** in WARNING, `tick_warning(self)`. In ACTIVE, `y += speed` and `ticks_in_phase + 1`; `x` never changes. In GONE, unchanged. No targeting; the ship in `ctx` is never read. Source: rule 4.
+- **Cycle.** In ACTIVE, `cycle_tick = ticks_in_phase % (charge_ticks + fire_ticks)`. `is_charging()` is True while `cycle_tick < charge_ticks`; `is_firing()` is True otherwise. Both are False outside ACTIVE. So the charge starts on the state where it appears and lasts exactly `charge_ticks` states; then every arc fires for `fire_ticks` states; then the next charge starts, until it leaves. No pause besides the charge. Source: rules 3 and 5; cycle (locked); telegraph (locked).
+- **Charge rays.** `charge_ray_count()` is `1 + cycle_tick × charge_rays // charge_ticks` while charging (integer division), else 0. At Level 1 (120 ticks, 4 rays): 1 ray on cycle ticks 0 to 29, 2 on 30 to 59, 3 on 60 to 89, 4 on 90 to 119. It never passes `charge_rays`, and the last part of every charge shows them all, at every level. Source: charge_rays (guess); 91-decision-log.md, row 62; scope report DRA-47, Decision log.
+- **On screen.** `nodes_on_screen()` holds, for each node, whether its `node_size × node_size` square, centered on the node, shares area with the screen: `nx − node_size / 2 < SCREEN_W` and `nx + node_size / 2 > 0` and `ny − node_size / 2 < SCREEN_H` and `ny + node_size / 2 > 0`, strict like the base's `is_partly_on_screen`. Any part visible counts. Source: rule 5 ("any part visible").
+- **Firing arcs.** `firing_arcs()` is, while firing, every arc index (ascending) whose two nodes are both on screen; otherwise (). A node that has not come in yet, or has left, takes its arcs with it; the other arcs keep firing while their own nodes are on screen. An arc stops on the first state one of its nodes is off screen. Source: rule 5; Edge cases ("A node leaves while its arc fires: that arc stops at once").
+- **Hitbox.** `current_hitbox()` is `()` in WARNING and GONE, while charging, and while firing with no arc in `firing_arcs()`. Otherwise it is placed at (x, y): one `Line` per firing arc, node center to node center, thickness `arc_width`, in `firing_arcs()` order; then one `Circle` of radius `node_size / 2` for every node that is an end of at least one firing arc, in node order. A node whose arcs are all off is not a hit. The line's round ends lie inside its nodes. Source: hitbox (guess); rule 6; 07-drifters.md, rule 8; 91-decision-log.md, row 60.
+- **Touch:** `effect_on_touch()` is HIT. Touching a firing arc, or a node while one of its arcs fires, is a hit; nothing hits while it charges. The run's hit test reads `current_hitbox()` as for every drifter. The graze zone (base) is the current hitbox grown by 14, so it exists only while an arc fires; nothing pays for it yet. Source: rule 6; graze (locked); 06-scoring.md, rule 3; scope report DRA-47, Out (graze scoring).
+- **Hitting again:** the shared re-hit cooldown. The whole chain is one hazard with one counter: after a hit no part of it can hit for `rehit_cooldown_ticks`, and `brightness()` dims every node, ray and band together. It keeps falling and keeps its cycle. A touch while the ship is invulnerable is no hit and the arc keeps firing; a ship still inside the arc when invulnerability ends is not hit again until the cooldown ends. Source: Edge cases; 05-lives-and-damage.md, rule 1.5; 91-decision-log.md, row 54.
+- **Warning node.** `settle_warning(ctx)` sets `warning_node` to the index of the node whose center (`node_centers()`) has the smallest squared distance to the ship's center (`ctx.ship.x`, `ctx.ship.y`). On equal distances, the node with the smaller x; on equal x too, the lower index. Called once, by `add_drifters`, on the birth state, which is the first state drawn with the warning: "when the warning starts". Source: rule 2; 91-decision-log.md, row 62.
+- **Warning place.** `warning_center()`, with `R = ENTRY_WARNING_SIZE / 2` (12): the settled node's center (or the chain's own (x, y) when `warning_node` is None) with x clamped into `[R, SCREEN_W − R]` and y into `[R, SCREEN_H − R]`, so the whole warning shows. A chain that starts above the top edge warns at the node's x, against the top edge, at y 12. The chain doesn't move in WARNING, so the warning stays where it started. Source: rule 2; 07-drifters.md, rule 9.
+- **Warning copy.** `warning_copy()` is `replace(self, nodes=warning_layout.nodes, arcs=warning_layout.arcs, width=..., height=..., hitbox=...)` with `width` and `height` from `layout_size(warning_layout.nodes, node_size)` and the hitbox from `chain_hitbox`: the `trio_triangle` layout, point up, never mirrored, whatever the variant or `invert`. It is in WARNING like its owner, so it is drawn as nodes only. `warning_tilt_degrees()` is the base's 0. Source: entry_warning_icon (locked), entry_warning_size (guess); "The real layout is a surprise".
+- **Leaving:** the base rule. Its box is fully below the floor exactly when every node is. It starts fully above the top edge, so it is never removed before it has entered. Source: rule 7; 07-drifters.md, rules 12 and 14.
+- **Values at Level 1** (all guess but `telegraph_min`): `speed_ratio` 0.375 × `TOP_SIDE_SPEED` ≈ 2.4675 px/tick; `charge_ticks` 120; `fire_ticks` 120; `charge_rays` 4; `ray_length` 6; `ray_width` 1; `node_spacing` 128; `node_size` 12; `arc_width` 6; `entry_warning_ticks` 60. Charge by level, 120 × Timer × rounded up: 120, 113, 107, 102, 98, 93, 89, 84, all above `telegraph_min` 45. With `timer_scaling` off, 120 at every level. Source: Values table; 08-difficulty.md, Timer × row and rules 4 and 5; 07-drifters.md, telegraph_min.
+- **No specialty.** It accepts `invert`, `variant`, `x`, `y`, `speed` (the debug list) and `as_level`. Arcs pass over coins and other drifters with no effect. Source: specialty (locked); 07-drifters.md, rule 15.
+
 Tuning files (loaded by `app.tuning`, `docs/contracts/systems/app.md`). Source: scope report DRA-29, Limits and Decision log; scope report DRA-39, Limits:
-- One JSON file per drifter type, `game/tuning/drifters/<drifter_type value>.json`. A drifter with no fields of its own follows `docs/contracts/schemas/drifter-tuning.schema.json` (the meteorite). A drifter with its own fields follows `docs/contracts/schemas/<drifter_type value>-tuning.schema.json` (the satellite: `satellite-tuning.schema.json`, which adds `angle_degrees` to each variant and requires exactly two boxes, body first).
+- One JSON file per drifter type, `game/tuning/drifters/<drifter_type value>.json`. A drifter with no fields of its own follows `docs/contracts/schemas/drifter-tuning.schema.json` (the meteorite). A drifter with its own fields follows `docs/contracts/schemas/<drifter_type value>-tuning.schema.json` (the satellite: `satellite-tuning.schema.json`, which adds `angle_degrees` to each variant and requires exactly two boxes, body first; the chain lightning: `chain-lightning-tuning.schema.json`, file `chain_lightning.json`, DRA-47).
+- **The chain lightning's file** (DRA-47). Its own type values (`node_spacing`, `node_size`, `arc_width`, `charge_ticks`, `fire_ticks`, `charge_rays`, `ray_length`, `ray_width`, `entry_warning_icon`) sit next to the shared ones, and each variant gives `nodes`, `arcs` and `invert_mirror` instead of `width`, `height` and `hitbox`. `app.tuning` builds from it: per variant, `ChainLayout` (nodes × `node_spacing`), `VariantTuning(width, height, hitbox, extra=ChainLightningVariantExtra(layout))` with `layout_size` and `chain_hitbox`; for the type, `DrifterTypeTuning.extra = ChainLightningTypeExtra(...)` with `warning_layout` the layout of the variant `entry_warning_icon` names. The file's values are the Layout table and Values at Level 1 above. Every number the chain lightning uses is in this file or in `hazards.json`; none is in code. Source: scope report DRA-47, Limits ("Every value in the tuning file, never hard-coded").
 - The two playtest switches in `game/tuning/playtest.json`, to `docs/contracts/schemas/playtest-switches.schema.json`. Both `true` by default: the level table applies (08-difficulty.md, rules 3 and 4). `false` gives Level 1 values at every level (rule 5).
-- The shared hazard values in `game/tuning/hazards.json` (DRA-39), to `docs/contracts/schemas/hazards.schema.json`: `rehit_cooldown` and `rehit_dim`, both optional. A field left out keeps its default (`DEFAULT_REHIT_COOLDOWN_TICKS`, `DEFAULT_REHIT_DIM`). Source: scope report DRA-39, Limits ("None of them is required anywhere: left out means default").
+- The shared hazard values in `game/tuning/hazards.json` (DRA-39), to `docs/contracts/schemas/hazards.schema.json`: `rehit_cooldown`, `rehit_dim` and, from DRA-47, `telegraph_min`, all optional. A field left out keeps its default (`DEFAULT_REHIT_COOLDOWN_TICKS`, `DEFAULT_REHIT_DIM`, `DEFAULT_TELEGRAPH_MIN_TICKS`). Source: scope report DRA-39, Limits ("None of them is required anywhere: left out means default").
 - Every `DrifterType` has exactly one tuning file, one registered class and one registered view, and nothing else has. Test task DRA-29-09 guards it.
 
 Logging: `core.collision`, `core.levels` and `core.drifters.*` log nothing. The run logs spawn, active, touch and gone, by event (`systems/run.md`, Logging). Source: 15-tech-constraints.md, rule 9.
 
-How to add a drifter (later features): add a `DrifterType` member; a subclass module with `@register_drifter`, imported in `core/drifters/__init__.py`, with its `start_position`, `update` and `effect_on_touch`; a tuning file in `game/tuning/drifters/` (with its own schema and `VariantExtra` subclass if it has fields of its own, read by `app.tuning`); a view module with `@register_view`, imported in `ui/drifters/__init__.py`. The guard test fails until all four exist. The ship-against-every-variant collision cases pick the new drifter up from its tuning file with no new test code.
+How to add a drifter (later features): add a `DrifterType` member; a subclass module with `@register_drifter`, imported in `core/drifters/__init__.py`, with its `start_position`, `update` and `effect_on_touch`; a tuning file in `game/tuning/drifters/` (with its own schema and `VariantExtra` or `DrifterTypeExtra` subclass if it has fields of its own, read by `app.tuning`); a view module with `@register_view`, imported in `ui/drifters/__init__.py`. The guard test fails until all four exist. The ship-against-every-variant collision cases pick the new drifter up from its tuning file with no new test code when its variants list a `hitbox`; a drifter whose hitbox is built from other values (the chain lightning) has its own branch there.
 
 ## Impact
 DRA-39 changes this frozen contract (v1). New: `DrifterType.SATELLITE`, the satellite module and view, `VariantExtra`, `HazardRules`, `born_drifter`, the base fields `has_entered`, `rehit_cooldown_ticks`, `rehit_dim`, `rehit_ticks_left`, the base methods `is_partly_on_screen`, `mark_entered`, `warning_tilt_degrees`, `brightness`, the abstract `start_position`, the `Birth` fields `invert`, `variant_extra`, `rehit_cooldown_ticks`, `rehit_dim`, the `Placement` fields `invert` and `speed`, the `VariantTuning.extra` and `DrifterTuning.hazards` fields, the view argument `brightness` and `dim_color`. Changed: `Placement.x` becomes optional; `is_off_screen` needs `has_entered`; `may_hit_ship` becomes a concrete shared rule; collision raises for unknown shapes; the warning cache key gains the tilt. Removed: `hit_ship`, `default_y`, the meteorite's own `may_hit_ship`. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.drifters`, `core.collision`, `ui.drifters`, `ui.shapes`, `hit_ship`, `may_hit_ship`, `default_y`, `is_off_screen`, `Placement(`, `DrifterTuning(`, `VariantTuning(` and `Meteorite(`:
@@ -828,6 +1082,25 @@ DRA-39 changes this frozen contract (v1). New: `DrifterType.SATELLITE`, the sate
 | `game/tests/ui/test_drifter_registry.py` | no change. Fails from task DRA-39-03 until `satellite_view.py` (task DRA-39-04) and `game/tuning/drifters/satellite.json` exist, as it should. |
 | `game/tests/core/test_run.py`, `game/tests/ui/test_hud.py`, `game/tests/ui/test_ship_view.py` | none. |
 
+DRA-47 changes this contract on top of DRA-39, which has passed integration but is not closed out, so it is still `draft` at v1. New: the `Line` shape and its overlap rules, `DrifterType.CHAIN_LIGHTNING`, `DrifterTypeExtra`, `DEFAULT_TELEGRAPH_MIN_TICKS`, `scale_timer`, `scale_telegraph`, the base methods `warning_copy` and `settle_warning`, the `Birth` fields `type_extra` and `telegraph_min_ticks`, `DrifterTypeTuning.extra`, `HazardRules.telegraph_min_ticks`, the chain lightning module and view, line drawing in `ui.shapes`. Changed: `Shape` gains `Line`; the entry warning is sized on and draws `warning_copy()`; `draw_shape` raises for an unknown shape instead of drawing it as a box; the spawner fills the two new `Birth` fields. Nothing removed. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.collision`, `Shape`, `.cx`, `.w`, `core.drifters`, `Birth(`, `HazardRules(`, `DrifterTypeTuning(`, `DrifterType`, `draw_shape`, `draw_hitbox`, `warning_center`, `obj.width` / `drifter.width` and `ui.drifters`:
+
+| File | Change needed |
+|---|---|
+| `game/core/collision.py` | `Line`, its overlap, place and grow rules. Task `DRA-47-01-gameplay-implementer`. |
+| `game/core/drifters/base.py`, `tuning.py`, `spawner.py`, `game/core/run.py` | the hooks, helpers and fields above; `add_drifters` calls `settle_warning` (`systems/run.md`). Task `DRA-47-02-gameplay-implementer`. |
+| `game/core/drifters/chain_lightning.py` (new), `game/core/drifters/__init__.py`, the `CHAIN_LIGHTNING` member in `base.py` | the chain lightning and its import. Task `DRA-47-03-gameplay-implementer`. |
+| `game/core/drifters/meteorite.py`, `satellite.py`, `registry.py`, `game/core/levels.py`, `game/core/ship.py` | none. The new base methods have defaults. |
+| `game/ui/shapes.py` | the line, filled and outlined; unknown shapes raise. mypy fails on its box branch once `Shape` gains `Line` (task DRA-47-01) until then. Task `DRA-47-04-ui-developer`. |
+| `game/ui/drifters/entry_warning.py` | size and copy from `warning_copy()`. Task `DRA-47-05-ui-developer`. |
+| `game/ui/drifters/chain_lightning_view.py` (new), `game/ui/drifters/__init__.py` | the view and its import. Task `DRA-47-06-ui-developer`. |
+| `game/ui/drifters/registry.py`, `meteorite_view.py`, `satellite_view.py`, `game/ui/ship_view.py`, `game/ui/debug_overlay.py` | none. The overlay draws line outlines through `ui.shapes`. |
+| `game/app/tuning.py` | reads `chain_lightning.json` and `telegraph_min`, builds the chain lightning's records; `_check_inside` must not read `Line` as a box, and mypy fails on it once `Shape` gains `Line` until integration (`systems/app.md`). Once `DrifterType.CHAIN_LIGHTNING` exists (task DRA-47-03), `load_tuning` raises at startup until the file and the loader exist. Integration Engineer. |
+| `game/app/debug_spawns.py`, `game/app/frame.py` | none: chain lightning rows and the `chain_lightning` mode work through `DrifterType` and `spawn_drifter`. |
+| `game/tests/core/test_collision.py` | breaks: the guard test expects `{Circle, Box}`; `moved` and `touching_distance` read box fields from any non-circle (mypy fails there once `Line` exists); `load_variant_cases` reads `hitbox` from every tuning file, so it fails without `chain_lightning.json` and errors at collection with it. Task `DRA-47-07-qa-engineer`. |
+| `game/tests/ui/test_drifter_registry.py` | no change. Fails from task DRA-47-03 until `chain_lightning_view.py` (task DRA-47-06) and `game/tuning/drifters/chain_lightning.json` exist, as it should. |
+| `game/tests/core/test_drifters.py`, `test_satellite.py`, `test_run_drifters.py`, `test_run.py`, `game/tests/ui/test_hud.py`, `test_ship_view.py` | none. They build `DrifterTypeTuning` and `HazardRules` with keywords, and the new fields have defaults. |
+| `game/tests/core/test_chain_lightning.py` (new) | task `DRA-47-08-qa-engineer`. |
+
 ## Rationale
 - **A thin abstract base, one subclass per drifter (Director).** Each drifter reads as one file. Abstract `start_position`, `update` and `effect_on_touch` make a half-built subclass fail at registration (`inspect.isabstract`), not mid-run.
 - **`born` and `start_position` are classmethods.** The spawner builds every drifter the same way and never knows a subclass's fields. A drifter with its own fields or timers overrides `born` and applies them there, on top of `born_drifter`.
@@ -847,8 +1120,26 @@ DRA-39 changes this frozen contract (v1). New: `DrifterType.SATELLITE`, the sate
 - **The warning copy is turned, the satellite is not (DRA-39).** 02-satellite.md, rule 8: "The satellite never rotates, so its boxes stay upright." Rule 1 tilts only the warning copy. `warning_tilt_degrees()` is a base hook so the fireball's tilted warning reuses it.
 - **The satellite's look reads its hitbox boxes (DRA-39).** Its placeholder look is "the two hitbox boxes, filled". Drawing exactly those boxes with `draw_shape` keeps the look and the hitbox the same, as the ship view does. The order (body first) is fixed in its schema so the view knows which box is white.
 - **Unknown shapes raise (DRA-39).** Before DRA-39 an unknown shape fell through to the box test. When the line shape arrives, a missing case would then pass silently as a box. Raising makes it fail on first use, and the guard test makes it fail before that.
-- **Strict overlap, the graze zone as a method, the level table in core, `speed_ratio` per drifter, the switches beating `as_level`, the specialty interface only, `TouchEffect.COLLECT` reserved, the registry in its own module, the glow at 0.75 of the warning's radius, the warning image cached and dropped when the drifter appears, `width` and `height` on the drifter, `uid` from the run.** As in DRA-29; unchanged. The glow's radius is a placeholder choice with no rule depending on it: the glow must be wider than the half-size copy and narrower than `R` so the spikes can reach out of it.
+- **Strict overlap, the graze zone as a method, the level table in core, `speed_ratio` per drifter, the switches beating `as_level`, the specialty interface only, `TouchEffect.COLLECT` reserved, the registry in its own module, the glow at 0.75 of the warning's radius, the warning image cached and dropped when the drifter appears, `width` and `height` on the drifter, `uid` from the run.** As in DRA-29; unchanged. The glow's radius is a placeholder choice with no rule depending on it: the glow must be wider than the copy (14 px) and narrower than `R` so the spikes can reach out of it.
 - **The tilt joins the warning cache key (DRA-39).** The image depends on it. uids repeat across runs, so a key without the tilt could, in principle, hand one drifter another's turned copy.
-- **Room for the next drifters (scope report DRA-39, Coming next; not built).** Fireball: a type-level extra (its one angle) can join `DrifterTypeTuning` the way `VariantExtra` joined `VariantTuning`; it overrides `born`, `start_position` (corner default) and `warning_tilt_degrees`. Its size is its ball, so its tail lies outside the footprint, and the app's "inside the footprint" check will need a rule for it then. Chain lightning: `current_hitbox` changes over time; the line shape joins `Shape` with its own collision cases; a scaled timer rounds up (08-difficulty.md, rule 4) from `birth.timer_mult`; a placement field for its charge time. Coin: `TouchEffect.COLLECT`, no entry warning (the schema's `entry_warning_ticks` ≥ 1 changes then), and a parked drifter will need the scroll in `TickContext`. Islands: the polygon shape, and collision that reports depth and direction. None of these needs a change to what DRA-39 builds.
+- **Room for the next drifters (not built).** Fireball: its one angle is a `DrifterTypeExtra` (DRA-47); it overrides `born`, `start_position` (corner default) and `warning_tilt_degrees`. Its size is its ball, so its tail lies outside the footprint, and the app's "inside the footprint" check will need a rule for it then. Coin: `TouchEffect.COLLECT`, no entry warning (the schema's `entry_warning_ticks` ≥ 1 changes then), and a parked drifter will need the scroll in `TickContext`. Islands: the polygon shape, and collision that reports depth and direction. Electric ball: its pulse is a telegraph, so `scale_telegraph` serves it.
+- **The line is a capsule, measured squared (DRA-47).** 07-drifters.md, rule 8 and 91-decision-log.md, row 60 give it round ends, so "every point within thickness / 2 of AB" is the whole definition, and each overlap is a distance test against the segment. Comparing squared distances and finding crossings with cross-product signs keeps whole numbers, halves and 3-4-5 cases exact, so the line's collision tables can hold exact edge cases like the circle's and the box's. Growing it is one number, which is also what row 47 asks of its graze zone.
+- **Nodes in units of `node_spacing` (DRA-47).** The GDD gives one spacing for every layout. Units make it one knob: changing 128 rescales all seven layouts with no other edit. The loader checks that every arc is 1 unit long and that the nodes are centered, so a hand-edited layout can't drift from 03, rule 1 and the spacing rule. Diagonal and triangle coordinates are irrational; 8 decimals put them well inside the 1e-6 check.
+- **A variant is data: nodes, arcs and `invert_mirror` (DRA-47).** 07-drifters.md, rule 10 says variants change values only, and 03, How to extend says a new layout is a new row. The GDD's With invert column is not one rule for all (the triangle turns upside down, the rest mirror left to right), so each layout names its mirror. A new layout needs no code.
+- **Width, height and hitbox are worked out, never typed in (DRA-47).** They follow from the nodes, `node_size` and `arc_width`. One function each in core (`layout_size`, `chain_hitbox`), used by the loader and by `born`, keeps one home for that rule. The variant's `hitbox` is the full firing set; what fires on a tick is `current_hitbox()`, which is where the re-hit cooldown bullet above already put the chain's "hurts only while firing".
+- **`DrifterTypeExtra` joins `DrifterTypeTuning` (DRA-47).** Sizes, timers, rays and the warning icon hold for every layout, so they sit once at the top of the file and reach `born` through `Birth.type_extra`, the way the DRA-39 Rationale planned for the fireball. Copying them into every variant would put one value in seven places.
+- **`warning_copy()` instead of a size hook and a look hook (DRA-47).** The chain's warning must show the triangle and be sized on it. One method that returns the drifter to draw covers both, and the entry warning still calls the drifter's own view, so no view learns that it is drawing a warning.
+- **`settle_warning(ctx)` in `add_drifters`, not in the spawner (DRA-47).** "The node nearest the ship when the warning starts" needs the ship, and the spawner is pure and shipless: the debug list's load check spawns rows with no run at all. `add_drifters` already holds the run, and the state it returns is the first one drawn with the warning, so that is the moment the warning starts. Passing a `TickContext` keeps one shape for "facts a drifter may read" and leaves room for the scroll later.
+- **Nearest is straight-line distance between centers (DRA-47).** The GDD says "nearest the ship", with no axis. For the layouts with nodes at different heights, the lower node is nearer, which is the one the player will meet first. Ties go to the leftmost node (91-decision-log.md, row 62); the lower index only settles nodes stacked at one x, which share their x anyway.
+- **The chain's warning is clamped by `R` on both axes (DRA-47).** The base clamps by the same fixed `R`, but the chain's warning centers on a node, not on the chain, so it has its own `warning_center()`. Clamping by `R` keeps all of it on screen at any node x, and puts its center at y 12 for a top entry.
+- **The cycle is read from `ticks_in_phase` (DRA-47).** Charge and fire alternate with fixed lengths from the moment it appears, so `ticks_in_phase % (charge + fire)` is the whole state. No second counter can drift from the first, and `update` stays the meteorite's.
+- **Ray count by integer division (DRA-47).** `1 + cycle_tick × charge_rays // charge_ticks` gives the Director's "one more every 0.5 s" at Level 1 and keeps "all four for the last quarter" at every level, where Timer × makes the charge shorter (scope report DRA-47, Decision log). Integer math has no rounding to argue about.
+- **A node is on screen by its square, like the base's footprint (DRA-47).** "Any part visible" with the same strict test as `is_partly_on_screen` keeps one meaning of "on screen" across the game. At a screen corner the square can show a sliver the circle doesn't; nothing is drawn or hit there, and it can last a tick or two at most.
+- **`scale_timer` rounds to 6 decimals before rounding up (DRA-47).** 08-difficulty.md, rule 4 rounds up. A product like 120 × 0.85 can land a hair above 102 in floating point, and a plain `ceil` would then add a tick the GDD never asked for. The table values give the same result either way today; the guard is for tuned values.
+- **`telegraph_min` is a hazards value with a core default (DRA-47).** It is shared by every telegraph, like the re-hit cooldown, and the Director wants every value configurable. Its GDD value is locked, so the file may leave it out and get 45.
+- **`ray_width` is in the file; colors stay in the views (DRA-47).** "Everything configurable" covers sizes and thicknesses, so the 1 px of the rays joins `ray_length`. Colors are placeholder look values; every view so far keeps them as constants with their GDD source, and art will replace them. Making colors configurable would mean carrying them on the drifter like `rehit_dim`; that is a call for the Director, not made here.
+- **Draw order: bands, nodes, rays (DRA-47).** The band runs center to center, so its round ends sit under the node discs, and the player reads the lightning as joining the nodes (03, rule 3). Rays start at the node's edge, so drawing them last never hides a node.
+- **A top-start chain fires once at Level 1 (DRA-47).** At 2.4675 px a tick it crosses the 480 px screen in about 200 ticks, and the charge takes 120, so it fires from about y 290 for at most about 80 ticks and leaves during its fire. That is what the GDD's guesses give; the contract doesn't change them. It is reported to the Director as a tuning point.
+- **No art task (DRA-47).** Sprite art, the jagged arc and sound are out of scope (scope report DRA-47, Out). Every look is a placeholder drawn in code.
 - **No spawn on the ship (07-drifters.md, rule 3) is not checked at runtime.** Meteorites start above the top line and satellites outside a wall, where the ship can't be. For waves, it is a wave-design rule that wave_check will enforce.
 - **No art task.** Sprite art is out of scope (scope report DRA-39, Out). Every look is a placeholder drawn in code.

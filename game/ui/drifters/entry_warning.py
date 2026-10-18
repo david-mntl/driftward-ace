@@ -1,7 +1,7 @@
-"""The entry warning: a glow with spikes and a half-size copy of the drifter, drawn at its entry.
+"""The entry warning: a glow with spikes and a small copy of the drifter, drawn at its entry.
 
 Source: docs/contracts/systems/drifters.md, Presentation, Entry warning; 07-drifters.md,
-entry_warning values (guess). The whole warning fits inside the drifter's own width. One image
+entry_warning values (guess). Every warning has the same size, whatever the drifter. One image
 is built per drifter on its first warning frame and blitted every frame after. It only draws.
 """
 
@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Final
 
 import pygame
 
-from core.drifters.base import Drifter, DrifterType
+from core.drifters.base import ENTRY_WARNING_SIZE, Drifter, DrifterType
 
 if TYPE_CHECKING:
     from ui.drifters.registry import DrifterView
@@ -24,19 +24,15 @@ log = logging.getLogger(__name__)
 ENTRY_WARNING_GLOW: Final[tuple[int, int, int]] = (255, 220, 120)
 """Glow and spike color, RGB. Source: 07-drifters.md, entry_warning_glow (guess)."""
 
-ENTRY_WARNING_SCALE: Final[float] = 0.5
-"""Size of the drifter's copy inside the warning, 0..1. Source: 07-drifters.md,
-entry_warning_look: half size (guess)."""
+ENTRY_WARNING_COPY_SIZE: Final[int] = 14
+"""Longest side of the drifter's copy inside the warning, px. It fits inside the glow
+(diameter GLOW_RATIO * ENTRY_WARNING_SIZE). Source: 07-drifters.md, entry_warning_size (guess)."""
 
 SPIKE_COUNT_MIN: Final[int] = 6
 """Fewest spikes in one warning. Source: 07-drifters.md, entry_warning_spikes (guess)."""
 
 SPIKE_COUNT_MAX: Final[int] = 9
 """Most spikes in one warning. Source: 07-drifters.md, entry_warning_spikes (guess)."""
-
-WARNING_SIZE_RATIO: Final[float] = 1.0
-"""Warning diameter as a share of the drifter's width, 0..1. Source: 07-drifters.md,
-entry_warning_size: the whole warning fits inside the drifter's own width (guess)."""
 
 GLOW_RATIO: Final[float] = 0.75
 """Glow radius as a share of the warning's radius, 0..1. A placeholder choice, not in the GDD:
@@ -51,7 +47,8 @@ _IMAGES: dict[_Key, pygame.Surface] = {}
 def draw_entry_warning(surface: pygame.Surface, drifter: Drifter, view: DrifterView) -> None:
     """Blit the drifter's warning image centered on `drifter.warning_center()`, rounded to px.
 
-    Builds the image on the first call for the drifter, and reuses it after.
+    Builds the image on the first call for the drifter, and reuses it after. The image is sized on
+    `drifter.warning_copy().width` and shows that copy, not the drifter itself.
     """
     key: _Key = _key(drifter)
     image: pygame.Surface | None = _IMAGES.get(key)
@@ -73,36 +70,38 @@ def _key(drifter: Drifter) -> _Key:
 
 
 def _build_image(drifter: Drifter, view: DrifterView) -> pygame.Surface:
-    """Return the warning image: glow, spikes, then the drifter's copy on top.
+    """Return the warning image: glow, spikes, then the drifter's warning copy on top.
 
     The copy is drawn at full brightness, turned by `drifter.warning_tilt_degrees()`.
 
     Square, side 2 * ceil(R) + 1, with the warning's center on its middle pixel, so nothing
-    lies more than R from the center, where R = WARNING_SIZE_RATIO * width / 2, px.
+    lies more than R from the center, where R = ENTRY_WARNING_SIZE / 2, px.
     """
-    radius: float = WARNING_SIZE_RATIO * drifter.width / 2
+    copy: Drifter = drifter.warning_copy()
+    radius: float = ENTRY_WARNING_SIZE / 2
     half: int = math.ceil(radius)
     image: pygame.Surface = pygame.Surface((2 * half + 1, 2 * half + 1), pygame.SRCALPHA)
     center: tuple[int, int] = (half, half)
     pygame.draw.circle(image, ENTRY_WARNING_GLOW, center, GLOW_RATIO * radius)
     _draw_spikes(image, center, drifter.uid, radius)
-    _draw_copy(image, drifter, view)
+    _draw_copy(image, copy, drifter.warning_tilt_degrees(), view)
     return image
 
 
-def _draw_copy(image: pygame.Surface, drifter: Drifter, view: DrifterView) -> None:
-    """Draw the half-size copy centered on `image`, turned counterclockwise by the drifter's tilt.
+def _draw_copy(image: pygame.Surface, copy: Drifter, tilt: float, view: DrifterView) -> None:
+    """Draw `copy` centered on `image`, turned counterclockwise by `tilt` degrees.
 
+    The copy is scaled so its longest side is ENTRY_WARNING_COPY_SIZE px.
     A turned copy is drawn on its own transparent surface first, so turning never touches the glow.
     """
     center: tuple[float, float] = (image.get_width() // 2, image.get_height() // 2)
-    tilt: float = drifter.warning_tilt_degrees()
+    scale: float = ENTRY_WARNING_COPY_SIZE / max(copy.width, copy.height)
     if tilt == 0.0:
-        view(image, drifter, center, ENTRY_WARNING_SCALE, 1.0)
+        view(image, copy, center, scale, 1.0)
         return
-    copy: pygame.Surface = pygame.Surface(image.get_size(), pygame.SRCALPHA)
-    view(copy, drifter, center, ENTRY_WARNING_SCALE, 1.0)
-    turned: pygame.Surface = pygame.transform.rotate(copy, tilt)
+    layer: pygame.Surface = pygame.Surface(image.get_size(), pygame.SRCALPHA)
+    view(layer, copy, center, scale, 1.0)
+    turned: pygame.Surface = pygame.transform.rotate(layer, tilt)
     image.blit(turned, turned.get_rect(center=(round(center[0]), round(center[1]))))
 
 
