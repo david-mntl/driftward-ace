@@ -19,7 +19,8 @@ from core.drifters.base import Drifter, Phase, TickContext, TouchEffect
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning
 from core.levels import level_at
-from core.scroll import Scroll, start_scroll, step_scroll
+from core.popup import PointsPopup, step_popups
+from core.scroll import Scroll, scroll_step_px, start_scroll, step_scroll
 from core.ship import Ship, Thrust, is_below_floor, ship_hitbox, spawn, step
 
 log = logging.getLogger(__name__)
@@ -39,6 +40,9 @@ is TBD, LD-04). 0.1 s x 60 ticks/s (15-tech-constraints.md, tick_rate, locked) =
 RESPAWN_WAIT_LIMIT: Final[int | None] = None
 """Longest respawn wait, ticks. None means no limit. Nothing reads it in DRA-23.
 Source: 05-lives-and-damage.md, rule 2.5: the wait has no time limit."""
+
+POINTS_PER_METER: Final[int] = 1
+"""Points for each whole meter flown. Source: 06-scoring.md, points_per_meter (locked)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +79,21 @@ class Run:
     next_uid: int = 1
     """The uid the next added drifter gets. Source: systems/run.md, Interface (DRA-29)."""
 
+    coin_points: int = 0
+    """Points from coins this run, >= 0. Step 5a adds to it. Source: systems/run.md, Score."""
+
+    popups: tuple[PointsPopup, ...] = ()
+    """Points popups on screen, oldest first. Source: systems/run.md, Interface (DRA-62)."""
+
+    @property
+    def score(self) -> int:
+        """The run's score in whole points: meters flown times POINTS_PER_METER plus coin points.
+
+        Worked out on each read, never stored. Source: systems/run.md, Rules, Score;
+        06-scoring.md, rules 1 and 2.
+        """
+        return self.scroll.meters * POINTS_PER_METER + self.coin_points
+
     @property
     def invulnerable(self) -> bool:
         """True while invulnerability has ticks left. Source: 05-lives-and-damage.md, rule 2.4."""
@@ -101,6 +120,8 @@ class Run:
 
 def start_run() -> Run:
     """Return a new run: the ship at spawn, the scroll at tick 0, every other field default.
+
+    No drifters, next_uid 1, coin_points 0 (so the score is 0) and no popups.
 
     Source: 02-game-flow.md, rule 3; systems/run.md, Interface.
     """
@@ -168,10 +189,11 @@ def _is_press(thrust: Thrust, held: Thrust) -> bool:
 
 
 def _step_playing(run: Run, thrust: Thrust) -> Run:
-    """A playing tick: press, timer, drifters, wait, ship, scroll, fall or hit, cooldowns, drops.
+    """A playing tick: press, timer, drifters, popups, wait, ship, scroll, collect, fall or hit,
+    cooldowns, drops.
 
     A hit is tested only when the ship did not fall. Source: systems/run.md, Rules, a playing
-    tick, steps 1 to 10.
+    tick, steps 1 to 10 with 3a and 5a.
     """
     press: bool = _is_press(thrust, run.held)
     protected: bool = run.invulnerable
@@ -190,15 +212,17 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
         ship=ship,
         scroll=scroll,
         drifters=drifters,
+        popups=step_popups(run.popups),
         invuln_ticks_left=left,
         waiting=stands,
         held=thrust,
     )
+    collected: Run = stepped if stands else _apply_collect(stepped)
     if is_below_floor(ship):
-        outcome: Run = _apply_fall(stepped, protected, thrust)
+        outcome: Run = _apply_fall(collected, protected, thrust)
     else:
-        outcome = _apply_hit(stepped, protected, thrust)
-    return _drop_drifters(_cool_down(outcome, stepped.drifters))
+        outcome = _apply_hit(collected, protected, thrust)
+    return _drop_drifters(_cool_down(outcome, collected.drifters))
 
 
 def _update_drifters(run: Run) -> tuple[Drifter, ...]:
@@ -207,7 +231,7 @@ def _update_drifters(run: Run) -> tuple[Drifter, ...]:
     Each updated drifter is then marked entered when it is on screen. Logs each drifter that
     turns from WARNING to ACTIVE.
     """
-    ctx = TickContext(ship=run.ship)
+    ctx = TickContext(ship=run.ship, scroll_step_px=scroll_step_px(run.scroll))
     updated: tuple[Drifter, ...] = tuple(
         drifter.update(ctx).mark_entered() for drifter in run.drifters
     )
@@ -221,6 +245,54 @@ def _update_drifters(run: Run) -> tuple[Drifter, ...]:
                 after.y,
             )
     return updated
+
+
+def _collects(drifter: Drifter, ship_box: Hitbox) -> bool:
+    """True when `drifter` is ACTIVE, a COLLECT on touch, and overlaps `ship_box`."""
+    return (
+        drifter.phase is Phase.ACTIVE
+        and drifter.effect_on_touch() is TouchEffect.COLLECT
+        and hitboxes_overlap(drifter.current_hitbox(), ship_box)
+    )
+
+
+def _apply_collect(stepped: Run) -> Run:
+    """Collect every pickup the ship overlaps after its step (step 5a).
+
+    Each one adds its points to the coin points, adds its popup (when it has one) after the
+    popups step 3a kept, and turns GONE so step 9 drops it. Protection plays no part. Nothing else
+    changes. Source: systems/run.md, Rules, step 5a.
+    """
+    ship_box: Hitbox = ship_hitbox(stepped.ship)
+    collecting: tuple[bool, ...] = tuple(
+        _collects(drifter, ship_box) for drifter in stepped.drifters
+    )
+    if not any(collecting):
+        return stepped
+    drifters: list[Drifter] = []
+    popups: list[PointsPopup] = []
+    points: int = 0
+    for drifter, collected in zip(stepped.drifters, collecting, strict=True):
+        if not collected:
+            drifters.append(drifter)
+            continue
+        log.debug(
+            "drifter touch id=%d type=%s effect=%s",
+            drifter.uid,
+            drifter.drifter_type.value,
+            drifter.effect_on_touch().value,
+        )
+        points += drifter.collect_points()
+        popup: PointsPopup | None = drifter.collect_popup()
+        if popup is not None:
+            popups.append(popup)
+        drifters.append(replace(drifter, phase=Phase.GONE))
+    return replace(
+        stepped,
+        drifters=tuple(drifters),
+        coin_points=stepped.coin_points + points,
+        popups=stepped.popups + tuple(popups),
+    )
 
 
 def _apply_fall(stepped: Run, protected: bool, thrust: Thrust) -> Run:

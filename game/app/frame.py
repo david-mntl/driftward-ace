@@ -1,13 +1,14 @@
 """The async frame loop on the fixed 60 Hz tick. Imported only by app.loop.start, inside the guard.
 
 Before the first frame it loads and checks the drifter tuning (both modes) and, in debug mode
-only, the debug test spawn list. Each frame: read
-events, build the thrust from the held arrow keys, run up to MAX_TICKS_PER_FRAME ticks (one
-core.run.step_run each, then in debug mode the debug test spawn list's due drifters through
-core.run.add_drifters), draw the starfield, the drifters, the ship while the run shows it, the
-debug outlines and overlay if visible, the Game Over box at game over and the HUD, flip, then
-yield to the browser. The app holds one Run; core does the ship, the scroll, the drifters, the
-lives, the respawn wait, game over and retry.
+only, the debug test spawn list. Each frame: read events, build the thrust from the held arrow
+keys, run up to MAX_TICKS_PER_FRAME ticks (one core.run.step_run each, then in debug mode the
+debug test spawn list's due drifters through core.run.add_drifters), draw the starfield, the
+drifters, the points popups, the ship while the run shows it, the debug outlines and overlay if
+visible, the Game Over box with the final score at game over and the HUD, flip, then yield to
+the browser.
+The app holds one Run; core does the ship, the scroll, the drifters, the lives, the respawn
+wait, game over and retry.
 Source: docs/contracts/systems/app.md, Rules, Frame loop. 15-tech-constraints.md, rules 1 and 2.
 """
 
@@ -27,9 +28,10 @@ from core.ship import Thrust
 from core.world import SCREEN_H, SCREEN_W
 from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay
 from ui.drifters.registry import render_drifter
-from ui.game_over import draw_game_over
+from ui.game_over import draw_final_score, draw_game_over
 from ui.hud import draw_hud
 from ui.look import BACKGROUND
+from ui.popup_view import draw_points_popup
 from ui.ship_view import draw_ship
 from ui.starfield import draw_starfield
 
@@ -148,17 +150,20 @@ def _apply_cap(accumulator: float, was_capped: bool) -> bool:
 
 
 def _draw(surface: pygame.Surface, run: Run, overlay_visible: bool, debug: bool) -> None:
-    """Fill the background, then draw the starfield, the drifters, the ship while shown, the
-    debug outlines and overlay if visible, the Game Over box at game over, and the HUD last.
+    """Fill the background, then draw the starfield, the drifters, the points popups, the ship
+    while shown, the debug outlines and overlay if visible, the Game Over box and its final
+    score line at game over, and the HUD last.
 
-    Drifters sit behind the ship. The HUD sits below the overlay's place for the whole run in
-    debug mode, even while F3 hides the overlay. Source: systems/app.md, Rules, Draw, Drifters
-    behind the ship and below_overlay.
+    Drifters sit behind the ship, and the popups over the drifters and behind the ship. The HUD
+    sits below the overlay's place for the whole run in debug mode, even while F3 hides the
+    overlay. Source: systems/app.md, Rules, Draw, Drifters behind the ship and below_overlay.
     """
     surface.fill(BACKGROUND)
     draw_starfield(surface, run.scroll)
     for drifter in run.drifters:
         render_drifter(surface, drifter)
+    for popup in run.popups:
+        draw_points_popup(surface, popup)
     if run.ship_visible:
         draw_ship(surface, run.ship)
     if overlay_visible:
@@ -166,4 +171,5 @@ def _draw(surface: pygame.Surface, run: Run, overlay_visible: bool, debug: bool)
         draw_debug_overlay(surface, run.ship)
     if run.game_over:
         draw_game_over(surface)
+        draw_final_score(surface, run.score)
     draw_hud(surface, run, below_overlay=debug)

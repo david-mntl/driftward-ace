@@ -5,7 +5,8 @@ docs/contracts/systems/ship.md, Rules, Hitbox. Tasks: docs/contracts/DRA-29/task
 engineer.md (the two ship tests at the end), docs/contracts/DRA-39/tasks/DRA-39-05-qa-engineer.md
 (circle and box tables, guards) and docs/contracts/DRA-47/tasks/DRA-47-07-qa-engineer.md (the line
 tables, the chain lightning ship cases) and docs/contracts/DRA-56/tasks/DRA-56-03-qa-engineer.md
-(the fireball ship cases, the tail alone).
+(the fireball ship cases, the tail alone) and docs/contracts/DRA-62/tasks/DRA-62-05-qa-engineer.md
+(the coin ship cases).
 
 Every expected number is exact in binary (whole numbers, halves, sixteenths, 3-4-5 triangles) or
 comes from the GDD values below or from `game/tuning/drifters/*.json`. The ship-against-every-
@@ -34,7 +35,7 @@ from core.collision import (
     hitboxes_overlap,
     place_hitbox,
 )
-from core.drifters.base import Drifter, DrifterType, Phase, TickContext
+from core.drifters.base import Drifter, DrifterType, Phase, TickContext, TouchEffect
 from core.drifters.chain_lightning import (
     ChainLayout,
     ChainLightning,
@@ -44,6 +45,7 @@ from core.drifters.chain_lightning import (
     chain_hitbox,
     layout_size,
 )
+from core.drifters.coin import CoinTypeExtra, CoinVariantExtra, coin_hitbox
 from core.drifters.fireball import FireballTypeExtra, fireball_hitbox
 from core.drifters.satellite import SatelliteVariantExtra
 from core.drifters.spawner import Placement, spawn_drifter
@@ -777,6 +779,17 @@ class ChainFacts:
 
 
 @dataclass(frozen=True, slots=True)
+class CoinFacts:
+    """The coin's sizes as its tuning file states them, px."""
+
+    crystal_width: float
+    crystal_height: float
+    body_height: float
+    ring_width: float
+    ring_height: float
+
+
+@dataclass(frozen=True, slots=True)
 class VariantCase:
     """One variant of one drifter type, as its tuning file states it."""
 
@@ -791,6 +804,9 @@ class VariantCase:
     invert: bool = False
     chain: ChainFacts | None = None
     """Set for a chain lightning variant: its hitbox is built from nodes and arcs."""
+
+    coin: CoinFacts | None = None
+    """Set for a coin variant: its hitbox is built from the crystal's width and body height."""
 
 
 def chain_layout(raw: dict[str, object], spacing: float) -> ChainLayout:
@@ -925,10 +941,76 @@ def load_fireball_cases(data: dict[str, object]) -> list[VariantCase]:
     ]
 
 
+def load_coin_cases(data: dict[str, object]) -> list[VariantCase]:
+    """Return one case per variant of the coin's tuning file.
+
+    The records are built the way `app.tuning` builds them (contract, Tuning files, the coin's
+    file), here: per variant `VariantTuning(width=crystal_width, height=crystal_height,
+    hitbox=coin_hitbox(crystal_width, body_height), extra=CoinVariantExtra(...))`, and for the
+    type `speed_ratio` 0.0, `entry_warning_ticks` 0 and a `CoinTypeExtra`.
+    """
+
+    def number(key: str) -> float:
+        return float(cast(float, data[key]))
+
+    facts: CoinFacts = CoinFacts(
+        crystal_width=number("crystal_width"),
+        crystal_height=number("crystal_height"),
+        body_height=number("body_height"),
+        ring_width=number("ring_width"),
+        ring_height=number("ring_height"),
+    )
+    raw_variants: dict[str, dict[str, object]] = cast(
+        dict[str, dict[str, object]], data["variants"]
+    )
+    hitbox: Hitbox = coin_hitbox(facts.crystal_width, facts.body_height)
+    variants: dict[str, VariantTuning] = {
+        name: VariantTuning(
+            width=facts.crystal_width,
+            height=facts.crystal_height,
+            hitbox=hitbox,
+            extra=CoinVariantExtra(points=int(cast(int, raw["points"])), glint=bool(raw["glint"])),
+        )
+        for name, raw in raw_variants.items()
+    }
+    tuning: DrifterTuning = DrifterTuning(
+        drifters={
+            DrifterType.COIN: DrifterTypeTuning(
+                variants=variants,
+                default_variant=str(data["default_variant"]),
+                speed_ratio=0.0,
+                entry_warning_ticks=0,
+                extra=CoinTypeExtra(
+                    body_height=int(facts.body_height),
+                    ring_width=int(facts.ring_width),
+                    ring_height=int(facts.ring_height),
+                    glint_size=int(number("glint_size")),
+                    glint_left=int(number("glint_left")),
+                    glint_top=int(number("glint_top")),
+                    popup_ticks=int(number("popup_ticks")),
+                    popup_rise_per_tick=number("popup_rise_per_tick"),
+                ),
+            )
+        },
+        switches=PlaytestSwitches(),
+    )
+    return [
+        VariantCase(
+            DrifterType.COIN,
+            name,
+            tuning,
+            circles_and_boxes(hitbox),
+            coin=facts,
+        )
+        for name in variants
+    ]
+
+
 def load_variant_cases() -> list[VariantCase]:
     """Return one case per variant of every drifter type, from `game/tuning/drifters/`.
 
-    The chain lightning and the fireball get one case per variant and `invert` value.
+    The chain lightning and the fireball get one case per variant and `invert` value. The coin
+    gets one case per variant.
     """
     cases: list[VariantCase] = []
     for drifter_type in DrifterType:
@@ -942,6 +1024,9 @@ def load_variant_cases() -> list[VariantCase]:
             continue
         if drifter_type is DrifterType.FIREBALL:
             cases.extend(load_fireball_cases(data))
+            continue
+        if drifter_type is DrifterType.COIN:
+            cases.extend(load_coin_cases(data))
             continue
         raw_variants: dict[str, dict[str, object]] = cast(
             dict[str, dict[str, object]], data["variants"]
@@ -982,7 +1067,7 @@ def load_variant_cases() -> list[VariantCase]:
 
 VARIANT_CASES: list[VariantCase] = load_variant_cases()
 
-SHAPE_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.chain is None]
+SHAPE_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.chain is None and c.coin is None]
 """Types whose tuning file lists a hitbox, and any type with no file (it fails by name)."""
 
 CHAIN_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.chain is not None]
@@ -992,6 +1077,10 @@ FIREBALL_CASES: list[VariantCase] = [
     c for c in VARIANT_CASES if c.drifter_type is DrifterType.FIREBALL and c.variant is not None
 ]
 """The fireball, per variant and `invert` value. Head is `shapes[0]`, tail `shapes[1]`."""
+
+
+COIN_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.coin is not None]
+"""The coin, per variant. Born ACTIVE, so it has its own tests, not the WARNING ones."""
 
 
 def case_id(case: VariantCase) -> str:
@@ -1281,6 +1370,105 @@ def test_ship_meets_the_fireball_tail_alone(case: VariantCase) -> None:
             assert not overlap_both_ways(head_only, ship), f"the head is not clear: {where}"
             assert overlap_both_ways(tail_only, ship) is expect, where
             assert overlap_both_ways(active.current_hitbox(), ship) is expect, where
+
+
+@pytest.mark.parametrize("case", COIN_CASES, ids=[case_id(c) for c in COIN_CASES])
+def test_ship_meets_every_coin_variant_at_its_own_touching_distance(case: VariantCase) -> None:
+    facts: CoinFacts | None = case.coin
+    assert facts is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    # The hitbox is the file's crystal width by its body height, and nothing else.
+    assert case.shapes == (Box(0.0, 0.0, facts.crystal_width, facts.body_height),)
+    for name, toward in DIRECTIONS.items():
+        distance, exact = touching_distance(case.shapes, toward)
+        assert exact, name
+        assert distance > 0, name
+        for gap, expect in ((distance, False), (distance - INSIDE, True)):
+            x: float = SPAWN_X - toward[0] * gap
+            y: float = SPAWN_Y - toward[1] * gap
+            coin: Drifter = drifter_at(case, x, y)
+            assert (coin.x, coin.y) == (x, y)
+            assert coin.current_hitbox() == place_hitbox(case.shapes, x, y), (name, gap)
+            assert overlap_both_ways(coin.current_hitbox(), ship) is expect, (name, gap)
+
+
+@pytest.mark.parametrize("case", COIN_CASES, ids=[case_id(c) for c in COIN_CASES])
+def test_a_coin_overlaps_the_ship_on_the_state_it_is_spawned_on(case: VariantCase) -> None:
+    ship: Hitbox = ship_hitbox(spawn())
+    coin: Drifter = drifter_at(case, SPAWN_X, SPAWN_Y)
+    assert coin.phase is Phase.ACTIVE
+    assert coin.ticks_in_phase == 0
+    assert coin.warning_ticks == 0
+    assert coin.current_hitbox() != ()
+    assert overlap_both_ways(coin.current_hitbox(), ship)
+    # The same on a state a coin is added on, away from the ship's center: no empty hitbox first.
+    beside: Drifter = drifter_at(case, SPAWN_X + 10.0, SPAWN_Y)
+    assert beside.phase is Phase.ACTIVE
+    assert beside.current_hitbox() == place_hitbox(case.shapes, SPAWN_X + 10.0, SPAWN_Y)
+    assert overlap_both_ways(beside.current_hitbox(), ship)
+
+
+@pytest.mark.parametrize("case", COIN_CASES, ids=[case_id(c) for c in COIN_CASES])
+def test_only_the_coin_box_counts_not_its_points_or_its_ring(case: VariantCase) -> None:
+    facts: CoinFacts | None = case.coin
+    assert facts is not None
+    half_w: float = facts.crystal_width / 2
+    half_body: float = facts.body_height / 2
+    assert facts.crystal_height > facts.body_height
+    assert facts.ring_width > facts.crystal_width
+    placed: Hitbox = ship_hitbox(spawn())
+    bar: Box = cast(Box, placed[0])
+    foot: Box = cast(Box, placed[1])
+    bar_left: float = bar.cx - bar.w / 2
+    bar_right: float = bar.cx + bar.w / 2
+    bar_top: float = bar.cy - bar.h / 2
+    foot_top: float = foot.cy - foot.h / 2
+    foot_bottom: float = foot.cy + foot.h / 2
+    foot_left: float = foot.cx - foot.w / 2
+    # Between the bar's top and the foot's top: the box, the points and the ring are all there,
+    # so only the bar is near.
+    row: float = (bar_top + foot_top) / 2
+    assert row - facts.crystal_height / 2 >= bar_top
+    assert row + facts.crystal_height / 2 <= foot_top
+    # name, the coin's center with its box just touching the ship, and the unit step away from the
+    # ship. Each place has a point or the ring across the ship's edge.
+    places: tuple[tuple[str, float, float, int, int], ...] = (
+        ("above the bar, a point reaches in", bar.cx, bar_top - half_body, 0, -1),
+        ("below the foot, a point reaches in", foot.cx, foot_bottom + half_body, 0, 1),
+        ("left of the bar, the ring reaches in", bar_left - half_w, row, -1, 0),
+        ("right of the bar, the ring reaches in", bar_right + half_w, row, 1, 0),
+        ("left of the foot, the ring reaches in", foot_left - half_w, foot.cy, -1, 0),
+        (
+            "above the foot, beside the bar, a point reaches in",
+            bar_left - half_w,
+            foot_top - half_body,
+            0,
+            -1,
+        ),
+    )
+    for name, x, y, away_x, away_y in places:
+        # What would count if the points or the ring did: they cross the ship's edge here.
+        points: Hitbox = (Box(x, y, facts.crystal_width, facts.crystal_height),)
+        ring: Hitbox = (Box(x, y, facts.ring_width, facts.ring_height),)
+        assert overlap_both_ways(points, placed) or overlap_both_ways(ring, placed), name
+        # Only the 12 x 10 box counts: touching the ship, or a hair clear of it, no overlap.
+        for gap in (0.0, HAIR):
+            coin: Drifter = drifter_at(case, x + away_x * gap, y + away_y * gap)
+            assert not overlap_both_ways(coin.current_hitbox(), placed), (name, gap)
+        # A hair into the ship the box does overlap: the edge above is the box's own.
+        coin_in: Drifter = drifter_at(case, x - away_x * HAIR, y - away_y * HAIR)
+        assert overlap_both_ways(coin_in.current_hitbox(), placed), name
+
+
+@pytest.mark.parametrize("case", COIN_CASES, ids=[case_id(c) for c in COIN_CASES])
+def test_a_coin_touch_is_a_collect_never_a_hit(case: VariantCase) -> None:
+    ship: Hitbox = ship_hitbox(spawn())
+    for x, y in ((SPAWN_X, SPAWN_Y), (SPAWN_X + 100.0, SPAWN_Y - 100.0)):
+        coin: Drifter = drifter_at(case, x, y)
+        assert coin.effect_on_touch() is TouchEffect.COLLECT
+        assert coin.effect_on_touch() is not TouchEffect.HIT
+        assert coin.graze_zone() == ()
+        assert overlap_both_ways(coin.current_hitbox(), ship) is (x == SPAWN_X)
 
 
 def test_ship_hitbox_is_an_inverted_t_at_the_ship_center() -> None:

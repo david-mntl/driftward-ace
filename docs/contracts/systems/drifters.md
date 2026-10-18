@@ -1,13 +1,13 @@
-# Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite, the chain lightning, the fireball and their views
-Version: 4
+# Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite, the chain lightning, the fireball, the coin and their views
+Version: 5
 Status: frozen
-Features: DRA-29, DRA-39, DRA-47, DRA-56
+Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62
 Created by: architect
 
 ## Purpose
-Every drifter in the game (hazards first, coins and the rest later) is built on one shared base. This contract holds that base, the hitbox shapes (circle, box and line) and their overlap test, the level table the spawner reads, the spawner (the only way a drifter is created), the drifters built so far (the meteorite, the satellite, the chain lightning and the fireball), and the views that draw drifters and their entry warnings.
+Every drifter in the game, hazards and pickups, is built on one shared base. This contract holds that base, the hitbox shapes (circle, box and line) and their overlap test, the level table the spawner reads, the spawner (the only way a drifter is created), the drifters built so far (four hazards: the meteorite, the satellite, the chain lightning and the fireball; one pickup: the coin), and the views that draw drifters and their entry warnings.
 
-The base holds the rules every drifter shares: the entry warning (where it shows, what its copy looks like), the hitbox, the graze zone, the parts of the drifter that are drawn, when a drifter has entered the screen and when it has left it (judged on those drawn parts), the re-hit cooldown with its dim look, and how a timer scales with level. A drifter carries final numbers only. The spawner reads the level and the shared hazard values once, at birth, and sets the drifter's speed, its timer factor and its cooldown length. The drifter never knows the level. The run (`docs/contracts/systems/run.md`) holds the drifters, lets each fix its warning from the ship when it is added, updates them every tick, marks when each has entered, tests them against the ship, starts and counts down their cooldowns, and drops them when they leave.
+The base holds the rules every drifter shares: the entry warning (where it shows, what its copy looks like), the hitbox, the graze zone, the parts of the drifter that are drawn, when a drifter has entered the screen and when it has left it (judged on those drawn parts), the re-hit cooldown with its dim look, how a timer scales with level, whether the drifter is parked (it moves only with the scroll) or moving, and what a pickup pays when it is collected (its points and its points popup). A drifter carries final numbers only. The spawner reads the level and the shared hazard values once, at birth, and sets the drifter's speed, its timer factor and its cooldown length; a parked drifter gets no speed of its own. The drifter never knows the level. Each tick it may read the ship and how far the world scrolls on that tick (`TickContext`). The run (`docs/contracts/systems/run.md`) holds the drifters, lets each fix its warning from the ship when it is added, updates them every tick, marks when each has entered, collects the pickups the ship touches, tests the hazards against the ship, starts and counts down their cooldowns, and drops them when they leave or are collected.
 
 Structure chosen by the Director (scope report DRA-29, Limits and Decision log): inheritance, a thin abstract base, one subclass per drifter, one level deep, no middle classes. Shared bits are helper functions. Guards: abstract methods, a registry that refuses duplicates, a test that the drifter list, the tuning files, the classes and the views all match, and collision tests that fail when a shape kind has no cases (scope report DRA-39, Limits).
 
@@ -20,12 +20,14 @@ Who builds what:
 - `DrifterTypeExtra`, the timer helpers, the warning copy and warning settle hooks, the new `Birth` and `HazardRules` fields, the spawner's handing them over, and `add_drifters` calling `settle_warning`: task `DRA-47-02-gameplay-implementer`.
 - `game/core/drifters/chain_lightning.py`: task `DRA-47-03-gameplay-implementer`.
 - `drawn_parts`, the `FIREBALL` member and `game/core/drifters/fireball.py`: task `DRA-56-01-gameplay-implementer`.
-- The drifters inside `core.run`: `docs/contracts/systems/run.md` (tasks `DRA-29-03`, `DRA-39-01`, `DRA-47-02`). DRA-56 changes nothing there.
+- The `COIN` member, `TickContext.scroll_step_px`, `Drifter.parked`, `collect_points`, `collect_popup`, the spawner's parked rule, `game/core/popup.py` (its Interface is in `docs/contracts/systems/run.md`) and `game/core/drifters/coin.py`: task `DRA-62-01-gameplay-implementer`.
+- The drifters inside `core.run`: `docs/contracts/systems/run.md` (tasks `DRA-29-03`, `DRA-39-01`, `DRA-47-02`). DRA-56 changes nothing there. The collect step, the popups and the scroll in `TickContext`: task `DRA-62-02-gameplay-implementer`.
 - `game/ui/shapes.py`: the UI Developer, task `DRA-29-04-ui-developer`. The line shape: task `DRA-47-04-ui-developer`.
-- The package `game/ui/drifters/` (`__init__.py`, `registry.py`, `entry_warning.py`, `meteorite_view.py`): task `DRA-29-05-ui-developer`. Brightness, `dim_color` and the tilted warning copy: task `DRA-39-02-ui-developer`. `satellite_view.py`: task `DRA-39-04-ui-developer`. The warning drawn from `warning_copy()`: task `DRA-47-05-ui-developer`. `chain_lightning_view.py`: task `DRA-47-06-ui-developer`. `fireball_view.py`: task `DRA-56-02-ui-developer`.
-- Hitbox and graze outlines and drifter labels in the debug overlay: `docs/contracts/systems/debug-overlay.md` (task `DRA-29-06`). No change in DRA-39 or DRA-47: line outlines come from `ui.shapes`.
-- Tests: the QA Engineer. DRA-29: tasks `DRA-29-07` to `DRA-29-09`. DRA-39: `DRA-39-05-qa-engineer` (collision), `DRA-39-06-qa-engineer` (base, spawner, meteorite, satellite) and `DRA-39-07-qa-engineer` (drifters in the run). DRA-47: `DRA-47-07-qa-engineer` (collision with lines, the ship against every chain lightning variant) and `DRA-47-08-qa-engineer` (the chain lightning, the new base hooks, chain lightnings in the run). DRA-56: `DRA-56-03-qa-engineer` (the ship against every fireball variant) and `DRA-56-04-qa-engineer` (the fireball, drawn parts, fireballs in the run).
-- The data files, by whoever the Director names (DRA-29: the main session). They are content, so no task file: `game/tuning/drifters/meteorite.json` (`docs/contracts/schemas/drifter-tuning.schema.json`), `game/tuning/drifters/satellite.json` (`docs/contracts/schemas/satellite-tuning.schema.json`), `game/tuning/drifters/chain_lightning.json` (`docs/contracts/schemas/chain-lightning-tuning.schema.json`, DRA-47), `game/tuning/drifters/fireball.json` (`docs/contracts/schemas/fireball-tuning.schema.json`, DRA-56), `game/tuning/playtest.json` (`docs/contracts/schemas/playtest-switches.schema.json`), `game/tuning/hazards.json` (`docs/contracts/schemas/hazards.schema.json`) and `game/tuning/debug_spawns.json` (`docs/contracts/schemas/debug-spawn-list.schema.json`).
+- The package `game/ui/drifters/` (`__init__.py`, `registry.py`, `entry_warning.py`, `meteorite_view.py`): task `DRA-29-05-ui-developer`. Brightness, `dim_color` and the tilted warning copy: task `DRA-39-02-ui-developer`. `satellite_view.py`: task `DRA-39-04-ui-developer`. The warning drawn from `warning_copy()`: task `DRA-47-05-ui-developer`. `chain_lightning_view.py`: task `DRA-47-06-ui-developer`. `fireball_view.py`: task `DRA-56-02-ui-developer`. `coin_view.py`: task `DRA-62-03-ui-developer`.
+- The points popup a coin leaves and its view (`game/ui/popup_view.py`): `docs/contracts/systems/run.md` (task `DRA-62-04-ui-developer`).
+- Hitbox and graze outlines and drifter labels in the debug overlay: `docs/contracts/systems/debug-overlay.md` (task `DRA-29-06`). No change in DRA-39, DRA-47, DRA-56 or DRA-62: line outlines come from `ui.shapes`; the coin's box is outlined like any box, and it has no graze zone.
+- Tests: the QA Engineer. DRA-29: tasks `DRA-29-07` to `DRA-29-09`. DRA-39: `DRA-39-05-qa-engineer` (collision), `DRA-39-06-qa-engineer` (base, spawner, meteorite, satellite) and `DRA-39-07-qa-engineer` (drifters in the run). DRA-47: `DRA-47-07-qa-engineer` (collision with lines, the ship against every chain lightning variant) and `DRA-47-08-qa-engineer` (the chain lightning, the new base hooks, chain lightnings in the run). DRA-56: `DRA-56-03-qa-engineer` (the ship against every fireball variant) and `DRA-56-04-qa-engineer` (the fireball, drawn parts, fireballs in the run). DRA-62: `DRA-62-05-qa-engineer` (the ship against every coin variant) and `DRA-62-06-qa-engineer` (the coin, its popup, coins in the run).
+- The data files, by whoever the Director names (DRA-29: the main session). They are content, so no task file: `game/tuning/drifters/meteorite.json` (`docs/contracts/schemas/drifter-tuning.schema.json`), `game/tuning/drifters/satellite.json` (`docs/contracts/schemas/satellite-tuning.schema.json`), `game/tuning/drifters/chain_lightning.json` (`docs/contracts/schemas/chain-lightning-tuning.schema.json`, DRA-47), `game/tuning/drifters/fireball.json` (`docs/contracts/schemas/fireball-tuning.schema.json`, DRA-56), `game/tuning/drifters/coin.json` (`docs/contracts/schemas/coin-tuning.schema.json`, DRA-62), `game/tuning/playtest.json` (`docs/contracts/schemas/playtest-switches.schema.json`), `game/tuning/hazards.json` (`docs/contracts/schemas/hazards.schema.json`) and `game/tuning/debug_spawns.json` (`docs/contracts/schemas/debug-spawn-list.schema.json`).
 - Loading and checking the data files, the debug test spawn list, and calling `add_drifters` and `render_drifter`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`. No task file.
 
 ## Diagram
@@ -35,6 +37,7 @@ classDiagram
   class Drifter {
     <<abstract>>
     drifter_type: ClassVar~DrifterType~
+    parked: ClassVar~bool~
     uid, x, y, variant, width, height
     speed, hitbox, warning_ticks
     phase, ticks_in_phase, specialty
@@ -52,6 +55,8 @@ classDiagram
     settle_warning(ctx) Self
     may_hit_ship() bool
     brightness() float
+    collect_points() int
+    collect_popup() PointsPopup|None
     born(birth)$ Self
     start_position(x, y, width, height, invert)$ tuple*
     update(ctx) Self*
@@ -97,10 +102,22 @@ classDiagram
     warning_tilt_degrees() float
     warning_copy() Self
   }
+  class Coin {
+    parked = True
+    points, glint, body_height
+    ring_width, ring_height
+    glint_size, glint_left, glint_top
+    popup_ticks, popup_rise_per_tick
+    born(birth)$ Self
+    drawn_parts() tuple~Box~
+    collect_points() int
+    collect_popup() PointsPopup
+  }
   Drifter <|-- Meteorite
   Drifter <|-- Satellite
   Drifter <|-- ChainLightning
   Drifter <|-- Fireball
+  Drifter <|-- Coin
   Drifter o-- Specialty : 0..1
 ```
 
@@ -108,12 +125,13 @@ Life of one drifter:
 ```mermaid
 stateDiagram-v2
     [*] --> WARNING: spawn_drifter()<br/>ticks_in_phase 0, no hitbox
+    [*] --> ACTIVE: spawn_drifter() for a pickup (the coin, DRA-62)<br/>no entry warning, ticks_in_phase 0
     WARNING --> WARNING: update(), ticks_in_phase + 1
     WARNING --> ACTIVE: update() when ticks_in_phase + 1 reaches warning_ticks<br/>appears at its x, y, can hit
     ACTIVE --> ACTIVE: update(), moves<br/>run: mark_entered() sets has_entered once partly on screen
     ACTIVE --> [*]: is_off_screen(): has_entered and every drawn part fully past a side or below the floor<br/>run drops it
-    ACTIVE --> GONE: a drifter's own rule (none yet)
-    GONE --> [*]: run drops it
+    ACTIVE --> GONE: the run collects it (a pickup the ship touches, run step 5a, DRA-62)
+    GONE --> [*]: run drops it, the same tick
 ```
 
 Re-hit cooldown of one hazard (the run sets and counts it, `systems/run.md`, steps 7 and 8):
@@ -136,7 +154,7 @@ It can't hit on ticks T+1 to T+180, the 180 ticks after the hit, and can hit aga
 Birth, the only place the level is read:
 ```mermaid
 flowchart LR
-  P["Placement<br/>drifter_type, x?, y?, variant?,<br/>as_level?, specialty_enabled?, invert, speed?"] --> S["spawn_drifter(placement, level, tuning)"]
+  P["Placement<br/>drifter_type, x?, y?, variant?,<br/>as_level?, specialty_enabled?, invert, speed?"] --> S["spawn_drifter(placement, level, tuning)<br/>parked drifter: speed 0, no speed? allowed (DRA-62)"]
   L["level<br/>(run.level, or as_level)"] --> S
   T["DrifterTuning<br/>drifters (variants, extra), switches, hazards<br/>(checked by app.tuning)"] --> S
   LV["core.levels<br/>hazard speed ×, Timer ×"] --> S
@@ -229,12 +247,42 @@ At T+60 the head's drawn box reaches 1.5 px into the screen, so it has entered. 
 
 Big, `invert`, the top-right corner: starts at (640, −16), tail at (+13.77, −19.66) from the head, r 8; drawn boxes 35 × 35 and 19 × 19. Dropped on n = 208 (x ≈ 271.04, y ≈ 510.93). Small from the left wall at y 120: starts at (−10.5, 120), warning at (12, 120), dropped on n = 150 (x ≈ 255.58, y ≈ 500.00).
 
+Coin (DRA-62). One drifter: a crystal 12 × 20, its 12 × 10 middle the hitbox, a ring 22 × 8 across its middle. Parked: it moves only by `ctx.scroll_step_px`. No entry warning: born ACTIVE. Full size, center (x, y), pixel columns and rows as the view draws them at `(cx, cy) = (round(x), round(y))`:
+```
+column        cx-6 . . . . cx-1 cx . . . . cx+5
+row cy-10     .  .  .  .  .  #   #  .  .  .  .  .     top point, 2 px wide
+row cy-9      .  .  .  .  #  l   s  #  .  .  .  .
+row cy-8      .  .  .  #  l  l   s  s  #  .  .  .
+row cy-7      .  .  #  G  G  l   s  s  s  #  .  .     G: the rare glint, 2 x 2, its top-left at (3, 3) in the 12 x 20 box
+row cy-6      .  #  l  G  G  l   s  s  s  s  #  .
+row cy-5      #  l  l  l  l  l   s  s  s  s  s  #     body top row: the hitbox's top
+  ...         (rows cy-4 to cy+3 the same: the ring crosses here)
+row cy+4      #  l  l  l  l  l   s  s  s  s  s  #     body bottom row: the hitbox's bottom
+row cy+5      .  #  l  l  l  l   s  s  s  s  #  .
+  ...
+row cy+9      .  .  .  .  .  #   #  .  .  .  .  .     bottom point
+l: lit side, s: shade side, #: the 1 px rim. Common coins have no G (lit there).
+The ring: a 1 px ellipse in the 22 x 8 rect from (cx-11, cy-4), columns cx-11..cx+10, rows cy-4..cy+3, drawn over the crystal.
+```
+Drawn parts: the crystal's box `Box(x, y, 12, 20)` and the ring's box `Box(x, y, 22, 8)`. Every drawn pixel lies inside them once moved by the center's rounding, which is at most 0.5 px; the sizes are even whole numbers, so the box edges and the pixel edges both fall on whole px (Rationale).
+
+Coin timeline, common, Level 1, placed with x 320 and no y, added at the end of tick T, with the world already scrolling (T ≥ 30), so `scroll_step_px` is 1.1 on every later tick. `n` counts ticks after T:
+```
+state after tick   T        T+1      T+9      T+n                T+454     T+455
+phase              ACTIVE   ACTIVE   ACTIVE   ACTIVE             ACTIVE    dropped
+y                  -10.00   -8.90    -0.10    -10 + n × 1.1      489.40    490.50
+hitbox             box 12 × 10, centered, on every ACTIVE state
+has_entered        no       yes      yes      yes                yes
+warning            none, ever
+```
+At T its crystal's bottom edge is on the top edge: on no state is a pixel of it drawn before T+1. On T+454 the crystal's top edge is at 479.40, still on screen; on T+455 it is at 480.50 and the ring's at 486.50: every part is off, so the run drops it. Placed on tick 1, before the scroll starts, it stays at y −10 on the states after ticks 1 to 30 and first moves on tick 31. Placed at (440, 210): it is on screen at once, enters on its first update, and is dropped on n = 255 (y 490.50). At Level 8 it moves exactly the same: hazard speed × and Timer × never touch it.
+
 Views:
 ```mermaid
 flowchart LR
   APP["app.frame"] -- "each obj in run.drifters" --> R["ui.drifters.registry.render_drifter"]
   R -- "WARNING" --> W["ui.drifters.entry_warning.draw_entry_warning<br/>(the view of obj.warning_copy() scaled to a 14 px longest side,<br/>full brightness, turned by warning_tilt_degrees())"]
-  R -- "ACTIVE" --> V["registered view at obj.brightness()<br/>render_meteorite, render_satellite,<br/>render_chain_lightning, render_fireball"]
+  R -- "ACTIVE" --> V["registered view at obj.brightness()<br/>render_meteorite, render_satellite,<br/>render_chain_lightning, render_fireball,<br/>render_coin (DRA-62)"]
   R -- "GONE" --> N["nothing"]
 ```
 
@@ -341,7 +389,7 @@ def level_at(meters: int) -> int:
 
 ### game/core/drifters/base.py
 ```python
-# Imports: stdlib, core.collision, core.ship, core.world.
+# Imports: stdlib, core.collision, core.ship, core.world, core.popup (DRA-62, for PointsPopup).
 GRAZE_MARGIN: Final[int] = 14  # 06-scoring.md, graze_margin, px (locked)
 DEFAULT_REHIT_COOLDOWN_TICKS: Final[int] = (
     180  # 05-lives-and-damage.md, rehit_cooldown, ticks (guess). DRA-39
@@ -361,6 +409,7 @@ class DrifterType(Enum):
     SATELLITE = "satellite"  # drifters/02-satellite.md. DRA-39
     CHAIN_LIGHTNING = "chain_lightning"  # drifters/03-chain-lightning.md. DRA-47
     FIREBALL = "fireball"  # drifters/06-fireball.md. DRA-56
+    COIN = "coin"  # drifters/04-coin.md. DRA-62
 
 
 class Phase(Enum):
@@ -371,7 +420,7 @@ class Phase(Enum):
 
 class TouchEffect(Enum):
     HIT = "hit"  # touching it is a hit (05-lives-and-damage.md, rule 1)
-    COLLECT = "collect"  # reserved for coins. No drifter returns it yet
+    COLLECT = "collect"  # touching it collects it: it pays and goes (06-scoring.md, rule 2). The coin. DRA-62
     NONE = "none"  # touching it does nothing
 
 
@@ -380,6 +429,8 @@ class TickContext:
     """Per-tick facts a drifter may read in update(). Never the level."""
 
     ship: Ship  # the ship as it was at the start of this tick
+    scroll_step_px: float = 0.0  # DRA-62. px the world scrolls down on this tick, from
+    # core.scroll.scroll_step_px. 0.0 before the scroll starts. A parked drifter moves by it
 
 
 @dataclass(frozen=True, slots=True)
@@ -439,6 +490,8 @@ class Drifter(ABC):
     """One drifter on the field after a tick. Screen px, y down, x and y at its center."""
 
     drifter_type: ClassVar[DrifterType]  # set by each subclass
+    parked: ClassVar[bool] = False  # DRA-62. True: it sits still in the world and moves only with
+    # the scroll (03-world-and-camera.md, rule 9). The coin. Read by the spawner
     uid: int = 0  # unique within a run, from 1. Set by core.run.add_drifters; 0 before
     x: float  # center x, screen px
     y: float  # center y, screen px, y down
@@ -514,6 +567,15 @@ class Drifter(ABC):
         ...  # DRA-39
         # rehit_dim while rehit_ticks_left > 0, else 1.0.
 
+    def collect_points(self) -> int:
+        ...  # DRA-62
+        # Points the run adds to coin_points when it collects this drifter. 0 here.
+
+    def collect_popup(self) -> PointsPopup | None:
+        ...  # DRA-62
+        # The points popup the run shows when it collects this drifter, born at age 0.
+        # None here: no popup.
+
     @classmethod
     def born(cls, birth: Birth) -> Self:
         ...
@@ -557,7 +619,7 @@ def scale_timer(ticks: int, timer_mult: float) -> int: ...          # DRA-47
 def scale_telegraph(ticks: int, timer_mult: float, telegraph_min_ticks: int) -> int: ...   # DRA-47
     # A telegraph at its level: max(scale_timer(ticks, timer_mult), telegraph_min_ticks).
 ```
-The code documents each field with the comment above, as `core/ship.py` does for `Ship`. `Drifter` and `Specialty` refer to each other, so the module uses `from __future__ import annotations` or string annotations. With `slots=True` the methods never use the zero-argument `super()`. DRA-39 removes the field `hit_ship` and the abstract `default_y`; `may_hit_ship` is no longer abstract. DRA-47 adds `warning_copy` and `settle_warning`, both concrete with a do-nothing default, so the meteorite, the satellite and the registry test's stubs need no change. DRA-56 adds `drawn_parts`, concrete, whose default is the footprint the two screen tests used before, so no existing drifter, stub or test changes behavior; `base.py` imports `Box` from `core.collision` for it.
+The code documents each field with the comment above, as `core/ship.py` does for `Ship`. `Drifter` and `Specialty` refer to each other, so the module uses `from __future__ import annotations` or string annotations. With `slots=True` the methods never use the zero-argument `super()`. DRA-39 removes the field `hit_ship` and the abstract `default_y`; `may_hit_ship` is no longer abstract. DRA-47 adds `warning_copy` and `settle_warning`, both concrete with a do-nothing default, so the meteorite, the satellite and the registry test's stubs need no change. DRA-56 adds `drawn_parts`, concrete, whose default is the footprint the two screen tests used before, so no existing drifter, stub or test changes behavior; `base.py` imports `Box` from `core.collision` for it. DRA-62 adds the `COIN` member, `TickContext.scroll_step_px` with a default of 0.0 (every existing `TickContext(ship=...)` call still builds), the class attribute `parked` (False) and the concrete `collect_points` (0) and `collect_popup` (None), so no existing drifter, stub or test changes behavior. `PointsPopup` is in `game/core/popup.py` (`docs/contracts/systems/run.md`, Interface).
 
 ### game/core/drifters/tuning.py
 Checked values the app hands to core. Built by `app.tuning` from the JSON files. Core trusts them.
@@ -577,8 +639,10 @@ class VariantTuning:
 class DrifterTypeTuning:
     variants: Mapping[str, VariantTuning]  # by variant name
     default_variant: str  # one of the variant names
-    speed_ratio: float  # Level 1 speed as a multiple of core.ship.TOP_SIDE_SPEED
-    entry_warning_ticks: int  # ticks, >= 1
+    speed_ratio: float  # Level 1 speed as a multiple of core.ship.TOP_SIDE_SPEED. Not read for a
+    # parked drifter (DRA-62): the loader gives the coin 0.0
+    entry_warning_ticks: int  # ticks, >= 1 for a hazard. 0 for the coin, a pickup with no entry
+    # warning (DRA-62)
     extra: DrifterTypeExtra | None = (
         None  # DRA-47. The type's own values; None for the meteorite and the satellite
     )
@@ -651,6 +715,7 @@ class Placement:
 def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Drifter:
     ...
     # The only way a drifter is created. Pure: no logging, no randomness.
+    # DRA-62: a parked drifter gets speed 0.0, and a placement speed raises for it.
 ```
 The field order keeps every existing call working: `Placement(DrifterType.METEORITE, x=160.0, variant="small")` and `Placement(DrifterType.METEORITE, 300.0, y=...)` still build.
 
@@ -847,8 +912,66 @@ class Fireball(Drifter):
 ```
 The fields have defaults so `born_drifter` can build the fireball before `born` sets them. `app.tuning` imports `FireballTypeExtra` and `fireball_hitbox` to build the tuning records, so the hitbox is worked out in one place.
 
+### game/core/drifters/coin.py (DRA-62)
+```python
+# Imports: stdlib, core.collision, core.popup, core.drifters.base, core.drifters.registry.
+
+@dataclass(frozen=True, slots=True)
+class CoinVariantExtra(VariantExtra):
+    """The coin's per-variant values."""
+    points: int               # points paid when collected, >= 1. 50 common, 100 rare
+    glint: bool               # True: the view draws the glint. The rare one
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CoinTypeExtra(DrifterTypeExtra):
+    """The coin's values that hold for every variant. Final numbers, px and ticks."""
+    body_height: int          # the crystal's middle rectangle, px, even, < the crystal's height.
+                              # The hitbox's height
+    ring_width: int           # the ring's ellipse, px, even
+    ring_height: int          # px, even
+    glint_size: int           # the glint's side, px, >= 1
+    glint_left: int           # the glint's left edge, px from the crystal box's left edge
+    glint_top: int            # the glint's top edge, px from the crystal box's top edge
+    popup_ticks: int          # how long the points popup shows, ticks, >= 1
+    popup_rise_per_tick: float  # how far the popup rises each tick, px, >= 0
+
+def coin_hitbox(crystal_width: float, body_height: float) -> Hitbox: ...
+    # (Box(0.0, 0.0, crystal_width, body_height),): the crystal's middle rectangle, centered.
+
+@register_drifter
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Coin(Drifter):
+    """Pickup. Sits still in the world and moves down only with the scroll. Collected on touch:
+    it pays its points and leaves a points popup. drifters/04-coin.md."""
+    drifter_type: ClassVar[DrifterType] = DrifterType.COIN
+    parked: ClassVar[bool] = True
+    points: int = 0                   # from the variant
+    glint: bool = False               # from the variant
+    body_height: int = 0              # from the type, and every value below
+    ring_width: int = 0
+    ring_height: int = 0
+    glint_size: int = 0
+    glint_left: int = 0
+    glint_top: int = 0
+    popup_ticks: int = 1
+    popup_rise_per_tick: float = 0.0
+
+    @classmethod
+    def born(cls, birth: Birth) -> Self: ...          # ACTIVE from birth: no entry warning
+    @classmethod
+    def start_position(cls, x: float | None, y: float | None, width: float, height: float,
+                       invert: bool) -> tuple[float, float]: ...
+        # x is required: None raises ValueError("coin placement needs x"). y None: -height / 2.
+    def update(self, ctx: TickContext) -> Self: ...   # y += ctx.scroll_step_px while ACTIVE
+    def effect_on_touch(self) -> TouchEffect: ...     # TouchEffect.COLLECT
+    def drawn_parts(self) -> tuple[Box, ...]: ...     # the crystal's box, then the ring's box
+    def collect_points(self) -> int: ...              # points
+    def collect_popup(self) -> PointsPopup: ...       # at (x, y), age 0, popup_ticks, popup_rise_per_tick
+```
+The fields have defaults so `born_drifter` can build the coin before `born` sets them. Sizes are whole px (the schema asks for even integers), so the view's pixels match the boxes exactly (Rationale). `app.tuning` imports `CoinVariantExtra`, `CoinTypeExtra` and `coin_hitbox` to build the tuning records, so the hitbox is worked out in one place.
+
 ### game/core/drifters/__init__.py
-Imports every drifter module once (`meteorite`, `satellite` from DRA-39, `chain_lightning` from DRA-47, `fireball` from DRA-56), so each class registers when anything under `core.drifters` is first imported. A package docstring and nothing else. A new drifter adds one import line here.
+Imports every drifter module once (`meteorite`, `satellite` from DRA-39, `chain_lightning` from DRA-47, `fireball` from DRA-56, `coin` from DRA-62), so each class registers when anything under `core.drifters` is first imported. A package docstring and nothing else. A new drifter adds one import line here.
 
 ### game/ui/shapes.py
 The line shape from DRA-47. Signatures unchanged.
@@ -989,9 +1112,24 @@ def render_fireball(surface: pygame.Surface, obj: Drifter, center: tuple[float, 
     # Raises TypeError("render_fireball draws two circles, head then tail") when obj.hitbox is not
     # exactly two Circles.
 
+# game/ui/drifters/coin_view.py (DRA-62). Imports: pygame, core.drifters.base, core.drifters.coin,
+# ui.drifters.registry. Never app.
+COIN_LIT_COLOR: Final[tuple[int, int, int]] = (200, 30, 90)     # drifters/04-coin.md, palette: crystal lit side (guess)
+COIN_SHADE_COLOR: Final[tuple[int, int, int]] = (70, 0, 60)     # same: crystal shade side
+COIN_RIM_COLOR: Final[tuple[int, int, int]] = (255, 80, 150)    # same: ring and rim
+COIN_GLINT_COLOR: Final[tuple[int, int, int]] = (255, 220, 240) # same: rare glint
+COIN_LINE_WIDTH: Final[int] = 1    # drifters/04-coin.md, placeholder_look: the 1 px rim and the 1 px ring (guess)
+
+@register_view(DrifterType.COIN)
+def render_coin(surface: pygame.Surface, obj: Drifter, center: tuple[float, float],
+                scale: float, brightness: float) -> None: ...
+    # Raises TypeError("render_coin draws a Coin") for any other drifter, and
+    # ValueError("render_coin draws at full size only") when scale is not 1.0: a coin has no
+    # entry warning, so render_drifter never asks for a smaller copy.
+
 # game/ui/drifters/__init__.py: imports every view module once (meteorite_view, satellite_view
-# from DRA-39, chain_lightning_view from DRA-47, fireball_view from DRA-56), so each view registers.
-# A package docstring and nothing else.
+# from DRA-39, chain_lightning_view from DRA-47, fireball_view from DRA-56, coin_view from DRA-62),
+# so each view registers. A package docstring and nothing else.
 ```
 
 ## Presentation
@@ -1009,7 +1147,10 @@ Every fact a view shows is a core field or a core method. No view works out a ru
 | `obj.nodes`, `obj.node_size` | the chain lightning's nodes: where each sits around `center`, and how big (DRA-47). Source: drifters/03-chain-lightning.md, placeholder_look, node_size |
 | `obj.firing_arcs()`, `obj.arcs`, `obj.arc_width` | which arc bands are drawn, between which nodes, how thick (DRA-47). Source: drifters/03-chain-lightning.md, rules 5 and 9, placeholder_look |
 | `obj.charge_ray_count()`, `obj.charge_rays`, `obj.ray_length`, `obj.ray_width` | how many rays each node shows now, how they are spread, how long and how thick (DRA-47). Source: drifters/03-chain-lightning.md, telegraph, charge_rays, ray_length, placeholder_look |
-| `obj.brightness()` | the share of normal brightness the look is drawn at: `rehit_dim` (0.75) during the re-hit cooldown, 1.0 otherwise. Source: 05-lives-and-damage.md, rule 1.5, rehit_dim (guess) (DRA-39) |
+| `obj.brightness()` | the share of normal brightness the look is drawn at: `rehit_dim` (0.75) during the re-hit cooldown, 1.0 otherwise. Source: 05-lives-and-damage.md, rule 1.5, rehit_dim (guess) (DRA-39). A coin never takes part in a hit, so it is always 1.0 |
+| `obj.width`, `obj.height`, `obj.body_height` (coin) | the crystal: 12 wide, 20 tall, its middle rectangle 10 tall, so each point 5 tall (DRA-62). Source: drifters/04-coin.md, crystal_size (guess) |
+| `obj.ring_width`, `obj.ring_height` (coin) | the ring's 22 × 8 ellipse across the crystal's middle (DRA-62). Source: drifters/04-coin.md, placeholder_look (guess) |
+| `obj.glint`, `obj.glint_size`, `obj.glint_left`, `obj.glint_top` (coin) | whether the glint shows (the rare coin), and its 2 × 2 square with its top-left at (3, 3) in the crystal's 12 × 20 box (DRA-62). Source: drifters/04-coin.md, placeholder_look; scope report DRA-62, Not in GDD (rare glint, Director approval) |
 | `obj.uid` | the seed for the warning's spikes, so they are random per drifter and steady while it shows. Source: 07-drifters.md, entry_warning_spikes |
 | `obj.drifter_type` | which registered view draws it |
 | `obj.variant` | not drawn by these views. The debug label shows it (`docs/contracts/systems/debug-overlay.md`) |
@@ -1031,6 +1172,16 @@ Every fact a view shows is a core field or a core method. No view works out a ru
 - In the entry warning the view draws `obj.warning_copy()`: the comet laid straight down, the tail above the head, 3 × R long, scaled to 14 px (scale 14 / 31.5 small, 14 / 48 big). At that scale both variants draw the same: a head of radius 5 whose center sits 2.33 px below the copy's center, and a tail of radius 2 whose center sits 4.67 px above it. The entry warning then turns it by `obj.warning_tilt_degrees()`: 35° counterclockwise, so the head points down and to the right, or 35° clockwise with `invert`, so it points down and to the left. Source: drifters/06-fireball.md, rule 1; 07-drifters.md, entry_warning_size.
 - No trail, no sprite, no glow, no sound (scope report DRA-56, Out).
 
+**Coin** (`render_coin`, DRA-62). Any drifter that is not a `Coin` raises `TypeError`; a `scale` other than 1.0 raises `ValueError`. Everything is drawn on whole pixels around `(cx, cy) = (round(center[0]), round(center[1]))`, with `half_width = round(obj.width / 2)` (6), `half_height = round(obj.height / 2)` (10) and `half_body = round(obj.body_height / 2)` (5). Each color goes through `dim_color(color, brightness)`. In this order (the pixel map is in Diagram, Coin):
+1. **Lit side.** `pygame.draw.polygon` filled in `COIN_LIT_COLOR`, (200, 30, 90), through `(cx − 1, cy − half_height)`, `(cx − half_width, cy − half_body)`, `(cx − half_width, cy + half_body − 1)`, `(cx − 1, cy + half_height − 1)`: the left 6 columns, cx − 6 to cx − 1.
+2. **Shade side.** The same in `COIN_SHADE_COLOR`, (70, 0, 60), through `(cx, cy − half_height)`, `(cx + half_width − 1, cy − half_body)`, `(cx + half_width − 1, cy + half_body − 1)`, `(cx, cy + half_height − 1)`: the right 6 columns, cx to cx + 5. Together the two halves are the crystal, columns cx − 6 to cx + 5 and rows cy − 10 to cy + 9: a 12 × 10 body from row cy − 5 to cy + 4 with a 5-row point above and below, each point 2 px wide at its tip.
+3. **Rim.** `pygame.draw.polygon` with width `COIN_LINE_WIDTH` (1) in `COIN_RIM_COLOR`, (255, 80, 150), through the crystal's eight corners, clockwise from the top: `(cx − 1, cy − 10)`, `(cx, cy − 10)`, `(cx + 5, cy − 5)`, `(cx + 5, cy + 4)`, `(cx, cy + 9)`, `(cx − 1, cy + 9)`, `(cx − 6, cy + 4)`, `(cx − 6, cy − 5)` (written for the full-size numbers; in general from `half_width`, `half_height`, `half_body` as in steps 1 and 2). The point edges run at 45°, so every rim pixel lies on the crystal's outer pixels.
+4. **Ring.** `pygame.draw.ellipse` with width `COIN_LINE_WIDTH` in `COIN_RIM_COLOR`, in the rect `(cx − obj.ring_width // 2, cy − obj.ring_height // 2, obj.ring_width, obj.ring_height)`: (cx − 11, cy − 4, 22, 8), columns cx − 11 to cx + 10, rows cy − 4 to cy + 3. Drawn over the crystal, so its top and bottom arcs cross the crystal's face.
+5. **Glint**, only when `obj.glint`. `pygame.draw.rect` filled in `COIN_GLINT_COLOR`, (255, 220, 240), at `(cx − half_width + obj.glint_left, cy − half_height + obj.glint_top, obj.glint_size, obj.glint_size)`: (cx − 3, cy − 7, 2, 2). It lies in the left half of the top point, one pixel inside the rim and three rows above the ring. Drawn last, so it shows whole.
+- Every pixel lies inside the crystal's `obj.width × obj.height` box and the ring's `obj.ring_width × obj.ring_height` box, both centered on `(cx, cy)`. Those are `obj.drawn_parts()` moved by the rounding (Rules, Coin, Drawn parts).
+- Full size, common, at (440, 210): lit (200, 30, 90) in columns 435 to 439, shade (70, 0, 60) in 440 to 444, pink (255, 80, 150) on the outline (434 and 445 in the body's rows) and on the ring, which reaches columns 429 to 450 on rows 206 to 213; no (255, 220, 240) pixel. Rare: the same plus a (255, 220, 240) square on columns 437 to 438, rows 203 to 204.
+- No galaxy core, no cloud, no swirl, no shine, no glint animation, no sound (scope report DRA-62, Limits and Out). The galaxy core color (15, 0, 20) in the palette is not drawn by the placeholder.
+
 **Line shape** (`ui.shapes.draw_shape`, DRA-47). With `t = thickness` and `n` the unit normal of AB:
 - `width` 0 (filled): the rectangle with corners `A + n t/2`, `B + n t/2`, `B − n t/2`, `A − n t/2`, through `pygame.draw.polygon` (float corners), then a filled circle at A and at B, center `(round(x), round(y))`, radius `round(t / 2)`. With A equal to B, the circle only.
 - `width` 1 (outline): the two long sides, `A + n t/2` to `B + n t/2` and `A − n t/2` to `B − n t/2`, as 1 px lines, and the outer half of each end circle (radius `round(t / 2)`) as a 1 px arc. With A equal to B, a 1 px circle outline. The debug overlay's line outlines and graze zones come from this, with no change to the overlay.
@@ -1049,7 +1200,7 @@ Rules for every view:
 - The app calls `render_drifter` for every drifter in `run.drifters`, in order, after the starfield and before the ship (`docs/contracts/systems/app.md`, Draw).
 
 ## Rules
-Values. Every constant above has its value and source on its line. Variant sizes, hitboxes, angles, layouts, speed, warning length, the chain lightning's sizes and timers, the fireball's head widths, angle and tail size, `rehit_cooldown`, `rehit_dim` and every look value are `guess` in the GDD. `DRAW_MARGIN` is not a game value (Rationale). The level table's Hazard speed row, `graze_margin`, `telegraph_min` and the chain lightning's `entry_warning_icon` are locked. Variant, angle, layout, size, timer, ray and speed values are not in code: they come from the tuning files (Tuning files, below). `rehit_cooldown`, `rehit_dim` and `telegraph_min` (DRA-47) have their defaults in `core/drifters/base.py` and may be set in `game/tuning/hazards.json`. Colors stay constants in the views, as for every placeholder look so far (see Rationale).
+Values. Every constant above has its value and source on its line. Variant sizes, hitboxes, angles, layouts, speed, warning length, the chain lightning's sizes and timers, the fireball's head widths, angle and tail size, `rehit_cooldown`, `rehit_dim` and every look value are `guess` in the GDD. `DRAW_MARGIN` is not a game value (Rationale). The level table's Hazard speed row, `graze_margin`, `telegraph_min` and the chain lightning's `entry_warning_icon` are locked. Variant, angle, layout, size, timer, ray and speed values are not in code: they come from the tuning files (Tuning files, below). `rehit_cooldown`, `rehit_dim` and `telegraph_min` (DRA-47) have their defaults in `core/drifters/base.py` and may be set in `game/tuning/hazards.json`. Colors stay constants in the views, as for every placeholder look so far (see Rationale). The coin's values (DRA-62) are all `guess` but `common` 50 and its locked rows; its popup rise (0.5 px a tick) and its glint are Director approvals not in the GDD (scope report DRA-62, Not in GDD); all of them come from `game/tuning/drifters/coin.json`.
 
 Collision (`core/collision.py`). Source: 07-drifters.md, rule 8; 06-scoring.md, rule 3; 91-decision-log.md, row 35:
 - A hitbox is one or more circles, upright boxes and lines (lines from DRA-47). Each shape's position (`cx`, `cy`; a line's `ax`, `ay`, `bx`, `by`) is an offset from the owner's center until `place_hitbox` moves it to a screen position. Polygons (07-drifters.md, rule 8) are not built yet; they come with floating islands (scope report DRA-47, Out).
@@ -1071,7 +1222,7 @@ Levels (`core/levels.py`). Source: 08-difficulty.md:
 
 The base (`core/drifters/base.py`):
 - **Position.** `x`, `y` are the drifter's center in screen px, y down. Source: scope report DRA-29, Limits.
-- **Phase.** Every drifter is born in WARNING with `ticks_in_phase` 0. In WARNING it can't touch anything: `current_hitbox()` is `()`. `tick_warning` adds one tick; once `ticks_in_phase + 1` reaches `warning_ticks`, the drifter turns ACTIVE with `ticks_in_phase` 0, at its placed position, and can touch from that tick on. So the warning shows on exactly `warning_ticks` states. Entry warnings never scale with level. Source: 07-drifters.md, rules 1 and 9; 08-difficulty.md, rule 4.
+- **Phase.** Every hazard is born in WARNING with `ticks_in_phase` 0. A pickup has no entry warning: the coin is born ACTIVE (Coin, Born; DRA-62). In WARNING it can't touch anything: `current_hitbox()` is `()`. `tick_warning` adds one tick; once `ticks_in_phase + 1` reaches `warning_ticks`, the drifter turns ACTIVE with `ticks_in_phase` 0, at its placed position, and can touch from that tick on. So the warning shows on exactly `warning_ticks` states. Entry warnings never scale with level. Source: 07-drifters.md, rules 1 and 9; 08-difficulty.md, rule 4.
 - **Hitbox.** In ACTIVE, `current_hitbox()` is the variant's hitbox placed at (x, y). In WARNING and GONE it is `()`. Source: 07-drifters.md, rules 8 and 9.
 - **Graze zone.** `graze_zone()` is the current hitbox grown by `GRAZE_MARGIN` (14 px), only for a drifter whose `effect_on_touch()` is HIT. Others have `()`. It is computed and drawn in the debug overlay only; nothing pays for it yet. Source: 06-scoring.md, rules 3 and 5; scope report DRA-39, Out (graze scoring).
 - **Drawn parts** (DRA-56). `drawn_parts()` returns upright boxes, in screen px, that together hold every pixel the drifter's view draws while ACTIVE. The base returns one box, the footprint: `Box(x, y, width, height)`. That holds the whole look of the meteorite (a disc as wide as it) and the satellite (its two boxes inside 36 × 12). A drifter whose look reaches outside its footprint overrides it (the fireball: its tail). The chain lightning keeps the footprint: its rays reach up to `ray_length` past its nodes' box, the one exception 07-drifters.md, rule 12 names, kept as it is (drifters/03-chain-lightning.md, rule 7: it leaves once every node is below the floor). Entering and leaving are judged on these boxes, so a drifter is fully off screen only when nothing of it that is drawn is still on screen. Source: 07-drifters.md, rule 12; 91-decision-log.md, row 64.
@@ -1085,6 +1236,9 @@ The base (`core/drifters/base.py`):
 - **Timers** (DRA-47). A drifter's own timer scales at birth, in its `born`, from `birth.timer_mult`. `scale_timer(ticks, timer_mult)` is `math.ceil(round(ticks × timer_mult, 6))`: rounded up to a whole tick, after rounding to 6 decimals so a floating-point error never adds a tick (120 × 0.85 is 102, never 103). `scale_telegraph(ticks, timer_mult, telegraph_min_ticks)` is `max(scale_timer(ticks, timer_mult), telegraph_min_ticks)`: a telegraph never gets shorter than `telegraph_min`, at any level, and a tuning value already below it is raised to it. The spawner hands `telegraph_min_ticks` over from `tuning.hazards` in `Birth`. Entry warnings and the re-hit cooldown never use these. Source: 08-difficulty.md, rules 4 and 5; 07-drifters.md, rule 2, telegraph_min (locked).
 - **Birth.** `born_drifter(cls, birth)` builds any drifter from the shared fields of `birth`; the drifter's own fields keep their defaults. The base `born` refuses a specialty (`ValueError("<type> has no specialty")` when `specialty_enabled` is True) and an invert (`ValueError("<type> has no invert")` when `invert` is True), then calls `born_drifter`. `False` and `None` are fine. A drifter with a specialty, an `invert` or its own fields overrides `born` and builds on `born_drifter` with `dataclasses.replace`. Source: 07-drifters.md, rules 11 and 13; scope report DRA-29, Limits.
 - **Start.** `start_position(x, y, width, height, invert)` returns the center a new drifter starts at. A coordinate the placement set is always kept (07-drifters.md, rule 14: "A placement may set another spot"). A missing one gets the drifter's default, or raises `ValueError("<type> placement needs <x or y>")` when the drifter has none. Each drifter defines it; there is no base default. Source: 07-drifters.md, rules 13 and 14.
+- **Parked and moving** (DRA-62). A drifter is moving (the default, `parked` False: its speed is its on-screen speed, and the scroll doesn't add to it) or parked (`parked` True: it sits still in the world and moves down the screen only with the scroll). A parked drifter has no speed of its own: the spawner gives it 0.0, and in `update` it moves down by `ctx.scroll_step_px` and nothing else, so it moves exactly with the starfield, stands still before the scroll starts, and hazard speed × never touches it. Source: 03-world-and-camera.md, rule 9; drifters/04-coin.md, kind (locked) and rule 3.
+- **Per-tick facts** (DRA-62). `TickContext` holds the ship as it was at the start of the tick and `scroll_step_px`, the px the world scrolls down on this tick (`core.scroll.scroll_step_px` of the scroll going into the tick, `systems/scroll.md`). The run builds it in step 3 (`systems/run.md`). Moving drifters never read `scroll_step_px`. A `TickContext` built with the ship alone (tests, `settle_warning` in `add_drifters`) has 0.0, the world standing still. Source: 03-world-and-camera.md, rules 4 and 9.
+- **Collect** (DRA-62). A drifter whose `effect_on_touch()` is COLLECT is a pickup. The run collects it when the ship's hitbox overlaps its `current_hitbox()` (`systems/run.md`, step 5a): it adds `collect_points()` to the run's coin points, shows `collect_popup()` if it isn't None, and sets the drifter GONE, so it is dropped on the same tick. The base returns 0 and None; the coin overrides both. A pickup has no graze zone (`graze_zone()` is () for anything but HIT) and never starts a re-hit cooldown. Source: 07-drifters.md, Summary (Pickup); 06-scoring.md, rules 2 and 5; drifters/04-coin.md, rule 4.
 - **Specialty.** The slot exists; no specialty is built. Nothing calls `Specialty.update` or `effect_on_ship` yet. The first feature with a specialty designs where they run in the tick. Source: 07-drifters.md, rule 11; scope report DRA-29, Limits and Out.
 - **Variants** change values only (size, hitbox, speed, angle), never behavior. A new variant is a new entry in the drifter's tuning file and needs no code. Source: 07-drifters.md, rule 10; drifters/02-satellite.md, How to extend.
 - `update` never mutates its input and uses no frame time, no randomness. Same drifter and context in, same drifter out. Source: 15-tech-constraints.md, rule 2.
@@ -1099,10 +1253,11 @@ Spawner, `spawn_drifter(placement, level, tuning)`. The only place that reads a 
 2. `variant_name = placement.variant` or, when None, `type_tuning.default_variant`. A name not in `type_tuning.variants` raises `ValueError("unknown variant '<name>' for drifter type '<type>'")`. Source: 07-drifters.md, rule 10.
 3. `use_level = placement.as_level` when set, else `level`. `check_level(use_level)` raises outside 1 to 8.
 4. Speed: `base_speed = placement.speed` when set (DRA-39), else `type_tuning.speed_ratio × TOP_SIDE_SPEED`. Then `speed = base_speed × hazard_speed_mult(use_level)`, or `× hazard_speed_mult(1)` when `tuning.switches.hazard_speed_scaling` is False, whatever the level or `as_level`. A placement's speed is a Level 1 speed in px/tick, along the drifter's path, like the default it replaces. Source: 08-difficulty.md, rules 3 and 5; drifters/01-meteorite.md and drifters/02-satellite.md, speed_ratio; scope report DRA-39, Values needed (speed override: Director, temporary stand-in, not in the GDD).
+   **Parked** (DRA-62): when `cls.parked` is True, a placement with `speed` set raises `ValueError("<type> has no speed")` (the coin: `coin has no speed`), and otherwise `speed = 0.0`. `speed_ratio` and hazard speed × are not read. Source: 03-world-and-camera.md, rule 9; drifters/04-coin.md, rule 3 ("Hazard speed and Timer × don't touch it"); scope report DRA-62, Limits (debug rows: no speed).
 5. Timers: `timer_mult = timer_mult(use_level)`, or `timer_mult(1)` when `tuning.switches.timer_scaling` is False. Handed to the drifter in `Birth`, with `telegraph_min_ticks = tuning.hazards.telegraph_min_ticks` (DRA-47). The drifter scales its own timers in `born` (The base, Timers). Only the chain lightning has one so far, its charge. Source: 08-difficulty.md, rules 4 and 5.
 6. `warning_ticks = type_tuning.entry_warning_ticks`, never scaled. Source: 07-drifters.md, rule 9; 08-difficulty.md, rule 4.
 7. `x, y = cls.start_position(placement.x, placement.y, variant.width, variant.height, placement.invert)`. Raises for a missing coordinate the drifter needs (DRA-39).
-8. Return `cls.born(Birth(...))` with the variant's width, height, hitbox and `extra` (as `variant_extra`), `type_tuning.extra` (as `type_extra`, DRA-47), `placement.invert`, and `tuning.hazards.rehit_cooldown_ticks`, `tuning.hazards.rehit_dim` and `tuning.hazards.telegraph_min_ticks` (DRA-47). Phase WARNING, `ticks_in_phase` 0, `uid` 0 (the run sets it), `has_entered` False, `rehit_ticks_left` 0. `born` raises for a specialty or an invert the drifter lacks.
+8. Return `cls.born(Birth(...))` with the variant's width, height, hitbox and `extra` (as `variant_extra`), `type_tuning.extra` (as `type_extra`, DRA-47), `placement.invert`, and `tuning.hazards.rehit_cooldown_ticks`, `tuning.hazards.rehit_dim` and `tuning.hazards.telegraph_min_ticks` (DRA-47). Phase WARNING (ACTIVE for the coin, whose `born` skips the warning, DRA-62), `ticks_in_phase` 0, `uid` 0 (the run sets it), `has_entered` False, `rehit_ticks_left` 0. `born` raises for a specialty or an invert the drifter lacks.
 - Applied once, at birth. The drifter keeps its speed and its cooldown length for its whole life and never knows the level. Source: 07-drifters.md, rule 6; 08-difficulty.md, rule 3; 05-lives-and-damage.md, rehit_cooldown ("Never scales with level"); 91-decision-log.md, row 34.
 - Placement coordinates are screen px, y down. Wave files use world coordinates (03-world-and-camera.md, rule 1); the wave loader converts them later.
 - `Placement.speed` is set only by the debug test spawn list for now (scope report DRA-39). It is not a GDD placement field (07-drifters.md, rule 13).
@@ -1183,17 +1338,34 @@ Fireball (`core/drifters/fireball.py`, DRA-56). Source: drifters/06-fireball.md;
 - **Speed at Level 1:** `0.47 × TOP_SIDE_SPEED` = 0.47 × 6.58 ≈ 3.0926 px/tick along its path: ≈ 1.7738 across and ≈ 2.5333 down per tick. Source: speed_ratio, speed (guess, derived); 06-fireball.md, Values note (about 2.5 down and 1.8 sideways).
 - A side entry placed so low that it never shows (below the floor) is never removed, as for every drifter (Rationale, DRA-39).
 
+Coin (`core/drifters/coin.py`, DRA-62). Source: drifters/04-coin.md; scope report DRA-62:
+- **Archetype:** Pickup. A parked drifter: it doesn't move on its own, only down with the scroll. Source: archetype, kind (locked); rule 3; 03-world-and-camera.md, rule 9.
+- **Variants:** `common`, the default, 50 points, and `rare`, 100 points, with the glint. Same size, same hitbox, same everything else. The tuning file gives each variant's `points` and `glint`; `app.tuning` builds every variant's `width` (12), `height` (20) and hitbox from the type's sizes. Source: variants (common 50 locked, rare 100 guess), default_variant (guess); 06-scoring.md, coin_points; 07-drifters.md, rule 10.
+- **Size and hitbox:** the crystal is 12 wide and 20 tall: a 12 × 10 rectangle with a 5 px point above and one below. `width` and `height` are the crystal. The hitbox is one box, the rectangle only: `coin_hitbox(12, 10)`, `Box(0, 0, 12, 10)`. The points, the ring and the glint never count, so the ship must really touch the crystal. Source: crystal_size, hitbox (guess); 07-drifters.md, rule 8.
+- **Born:** refuses a specialty (`ValueError("coin has no specialty")`) and an invert (`ValueError("coin has no invert")`), as the base does. Reads `birth.variant_extra`, which must be a `CoinVariantExtra`, else `ValueError("coin variant '<name>' has no points")`, and `birth.type_extra`, which must be a `CoinTypeExtra`, else `ValueError("coin tuning has no type values")`. Then `replace(born_drifter(cls, birth), phase=Phase.ACTIVE, ticks_in_phase=0, ...)` with `points` and `glint` from the variant and every `CoinTypeExtra` value copied onto its field of the same name. Its `speed` is the spawner's 0.0 and its `warning_ticks` the file's 0. Source: entry_warning none (locked); 07-drifters.md, rule 9 and entry_warning_ticks ("Pickups have none"); 91-decision-log.md, row 42; specialty, invert: not in the spec (07-drifters.md, rule 13).
+- **No warning of any kind.** It is ACTIVE on the state it is added, so `render_drifter` never draws an entry warning for it, and nothing at all is drawn before the coin itself scrolls in. No telegraph. Source: entry_warning (locked); rules 1 and 2; scope report DRA-62, Limits (Director: "COIN SHOWS NO WARNING").
+- **Start:** `start_position`: x is the placement's (required: `ValueError("coin placement needs x")` without it). y is the placement's, or `-height / 2` (−10) when None: the crystal's bottom edge on the top edge, fully off screen. Source: enters_from (locked); rule 1; 07-drifters.md, rules 13 and 14.
+- **Update:** in ACTIVE, `y += ctx.scroll_step_px` and `ticks_in_phase + 1`; `x` never changes. In WARNING and GONE, unchanged. The ship in `ctx` is never read. Before the scroll starts it stands still; then it moves 1.1 px a tick at Level 1, exactly as the starfield does. Source: rule 3; kind (locked).
+- **Touch:** `effect_on_touch()` is COLLECT. Touching it never hits. No graze zone (base: only HIT has one). Source: rule 4; graze (locked: no); 06-scoring.md, rule 5.
+- **Collected** (by the run, `systems/run.md`, step 5a): `collect_points()` is `points`; `collect_popup()` is `PointsPopup(x=x, start_y=y, points=points, lifetime_ticks=popup_ticks, rise_per_tick=popup_rise_per_tick)` at age 0: its center is the coin's center on the tick it is collected. The run then sets it GONE and drops it the same tick: it disappears. An invulnerable ship collects it, and so does a ship that falls below the floor on that tick; a ship standing in the respawn wait doesn't. Those three rules are the run's. Source: rule 4; Edge cases; scope report DRA-62, Limits and Not in GDD (popup start, fall tick).
+- **Drawn parts:** `drawn_parts()` is `(Box(x, y, width, height), Box(x, y, ring_width, ring_height))`: the crystal's box, 12 × 20, and the ring's box, 22 × 8, both centered on the coin. The ring is wider than the crystal, so it counts at the sides. The view draws every pixel inside these two boxes moved by the center's rounding (Presentation, Coin), so when both boxes are fully past an edge nothing of the coin is on screen. Source: 07-drifters.md, rule 12 ("every part counts", the ring included: scope report DRA-62, Values needed); 91-decision-log.md, row 64.
+- **Leaving:** the base rule on those boxes. It starts fully above the top edge, so it is never removed before it has entered. Once it has, it is removed when its crystal's top edge is at or below the floor (y ≥ 490 at the 20 px height). A coin not collected is lost: nothing pays for it. Source: rule 5; 07-drifters.md, rule 12.
+- **Scales:** nothing. Its points, its size, its popup and its movement never change with level; `as_level` is accepted and changes nothing. Source: rule 6.
+- **Values** (all guess but `common` 50 and the locked rows): points 50 and 100; crystal 12 × 20, body 10; ring 22 × 8; glint 2 × 2 at (3, 3); `popup_ticks` 60; `popup_rise_per_tick` 0.5. Source: Values table; scope report DRA-62, Not in GDD (rise 0.5 px a tick and the glint, both Director approvals).
+- It accepts `x`, `y`, `variant` and `as_level`. `invert`, a specialty and `speed` are refused. Drifters pass over it with no effect, and it never blocks. Source: 07-drifters.md, rules 13 and 15; drifters/04-coin.md, Edge cases.
+
 Tuning files (loaded by `app.tuning`, `docs/contracts/systems/app.md`). Source: scope report DRA-29, Limits and Decision log; scope report DRA-39, Limits:
-- One JSON file per drifter type, `game/tuning/drifters/<drifter_type value>.json`. A drifter with no fields of its own follows `docs/contracts/schemas/drifter-tuning.schema.json` (the meteorite). A drifter with its own fields follows `docs/contracts/schemas/<drifter_type value>-tuning.schema.json` (the satellite: `satellite-tuning.schema.json`, which adds `angle_degrees` to each variant and requires exactly two boxes, body first; the chain lightning: `chain-lightning-tuning.schema.json`, file `chain_lightning.json`, DRA-47; the fireball: `fireball-tuning.schema.json`, file `fireball.json`, DRA-56).
+- One JSON file per drifter type, `game/tuning/drifters/<drifter_type value>.json`. A drifter with no fields of its own follows `docs/contracts/schemas/drifter-tuning.schema.json` (the meteorite). A drifter with its own fields follows `docs/contracts/schemas/<drifter_type value>-tuning.schema.json` (the satellite: `satellite-tuning.schema.json`, which adds `angle_degrees` to each variant and requires exactly two boxes, body first; the chain lightning: `chain-lightning-tuning.schema.json`, file `chain_lightning.json`, DRA-47; the fireball: `fireball-tuning.schema.json`, file `fireball.json`, DRA-56; the coin: `coin-tuning.schema.json`, file `coin.json`, DRA-62).
+- **The coin's file** (DRA-62). Its own type values (`crystal_width`, `crystal_height`, `body_height`, `ring_width`, `ring_height`, `glint_size`, `glint_left`, `glint_top`, `popup_ticks`, `popup_rise_per_tick`) sit next to `default_variant` and `variants`, and each variant gives `points` and `glint` only. It has no `speed_ratio` and no `entry_warning_ticks`: a parked pickup has neither. `app.tuning` builds from it: per variant, `VariantTuning(width=crystal_width, height=crystal_height, hitbox=coin_hitbox(crystal_width, body_height), extra=CoinVariantExtra(points=..., glint=...))`; for the type, `DrifterTypeTuning(..., speed_ratio=0.0, entry_warning_ticks=0, extra=CoinTypeExtra(...))`, the two zeros never read as tuning (Spawner, step 4; Coin, Born). The file's values: `default_variant` common; `common` 50 and no glint, `rare` 100 with the glint; `crystal_width` 12; `crystal_height` 20; `body_height` 10; `ring_width` 22; `ring_height` 8; `glint_size` 2; `glint_left` 3; `glint_top` 3; `popup_ticks` 60; `popup_rise_per_tick` 0.5. Every size, point value and timing the coin uses is in this file; none is in code. Only the look's colors, the 1 px line width of the rim and the ring, and the popup's font stay in the views (Rationale). Source: drifters/04-coin.md, Values; scope report DRA-62, Limits ("Every value in the tuning file, never hard-coded").
 - **The fireball's file** (DRA-56). Its own type values (`angle_degrees`, `tail_ratio`) sit next to the shared ones, and each variant gives `head_width` only, instead of `width`, `height` and `hitbox`. `app.tuning` builds from it: per variant, `VariantTuning(width=head_width, height=head_width, hitbox=fireball_hitbox(head_width, tail_ratio, angle_degrees, False), extra=None)`; for the type, `DrifterTypeTuning.extra = FireballTypeExtra(angle_degrees=..., tail_ratio=...)`. The file's values: `default_variant` small; `small` 21 and `big` 32; `speed_ratio` 0.47; `entry_warning_ticks` 60; `angle_degrees` 35; `tail_ratio` 0.5. Every number the fireball uses is in this file or in `hazards.json`; none is in code. Source: drifters/06-fireball.md, Values (guess); scope report DRA-56, Limits ("Every value in the tuning file, never hard-coded").
 - **The chain lightning's file** (DRA-47). Its own type values (`node_spacing`, `node_size`, `arc_width`, `charge_ticks`, `fire_ticks`, `charge_rays`, `ray_length`, `ray_width`, `entry_warning_icon`) sit next to the shared ones, and each variant gives `nodes`, `arcs` and `invert_mirror` instead of `width`, `height` and `hitbox`. `app.tuning` builds from it: per variant, `ChainLayout` (nodes × `node_spacing`), `VariantTuning(width, height, hitbox, extra=ChainLightningVariantExtra(layout))` with `layout_size` and `chain_hitbox`; for the type, `DrifterTypeTuning.extra = ChainLightningTypeExtra(...)` with `warning_layout` the layout of the variant `entry_warning_icon` names. The file's values are the Layout table and Values at Level 1 above. Every number the chain lightning uses is in this file or in `hazards.json`; none is in code. Source: scope report DRA-47, Limits ("Every value in the tuning file, never hard-coded").
 - The two playtest switches in `game/tuning/playtest.json`, to `docs/contracts/schemas/playtest-switches.schema.json`. Both `true` by default: the level table applies (08-difficulty.md, rules 3 and 4). `false` gives Level 1 values at every level (rule 5).
 - The shared hazard values in `game/tuning/hazards.json` (DRA-39), to `docs/contracts/schemas/hazards.schema.json`: `rehit_cooldown`, `rehit_dim` and, from DRA-47, `telegraph_min`, all optional. A field left out keeps its default (`DEFAULT_REHIT_COOLDOWN_TICKS`, `DEFAULT_REHIT_DIM`, `DEFAULT_TELEGRAPH_MIN_TICKS`). Source: scope report DRA-39, Limits ("None of them is required anywhere: left out means default").
 - Every `DrifterType` has exactly one tuning file, one registered class and one registered view, and nothing else has. Test task DRA-29-09 guards it.
 
-Logging: `core.collision`, `core.levels` and `core.drifters.*` log nothing. The run logs spawn, active, touch and gone, by event (`systems/run.md`, Logging). Source: 15-tech-constraints.md, rule 9.
+Logging: `core.collision`, `core.levels`, `core.popup` and `core.drifters.*` log nothing. The run logs spawn, active, touch (a hit or a collect) and gone, by event (`systems/run.md`, Logging). Source: 15-tech-constraints.md, rule 9.
 
-How to add a drifter (later features): add a `DrifterType` member; a subclass module with `@register_drifter`, imported in `core/drifters/__init__.py`, with its `start_position`, `update` and `effect_on_touch`; a tuning file in `game/tuning/drifters/` (with its own schema and `VariantExtra` or `DrifterTypeExtra` subclass if it has fields of its own, read by `app.tuning`); a view module with `@register_view`, imported in `ui/drifters/__init__.py`. The guard test fails until all four exist. The ship-against-every-variant collision cases pick the new drifter up from its tuning file with no new test code when its variants list a `hitbox`; a drifter whose hitbox is built from other values (the chain lightning, the fireball) has its own branch there. A drifter whose look reaches outside its footprint overrides `drawn_parts`.
+How to add a drifter (later features): add a `DrifterType` member; a subclass module with `@register_drifter`, imported in `core/drifters/__init__.py`, with its `start_position`, `update` and `effect_on_touch` (and `parked = True` for a drifter that moves only with the scroll; `collect_points` and `collect_popup` for a pickup); a tuning file in `game/tuning/drifters/` (with its own schema and `VariantExtra` or `DrifterTypeExtra` subclass if it has fields of its own, read by `app.tuning`); a view module with `@register_view`, imported in `ui/drifters/__init__.py`. The guard test fails until all four exist. The ship-against-every-variant collision cases pick the new drifter up from its tuning file with no new test code when its variants list a `hitbox`; a drifter whose hitbox is built from other values (the chain lightning, the fireball) has its own branch there. A drifter whose look reaches outside its footprint overrides `drawn_parts`.
 
 ## Impact
 DRA-39 changes this frozen contract (v1). New: `DrifterType.SATELLITE`, the satellite module and view, `VariantExtra`, `HazardRules`, `born_drifter`, the base fields `has_entered`, `rehit_cooldown_ticks`, `rehit_dim`, `rehit_ticks_left`, the base methods `is_partly_on_screen`, `mark_entered`, `warning_tilt_degrees`, `brightness`, the abstract `start_position`, the `Birth` fields `invert`, `variant_extra`, `rehit_cooldown_ticks`, `rehit_dim`, the `Placement` fields `invert` and `speed`, the `VariantTuning.extra` and `DrifterTuning.hazards` fields, the view argument `brightness` and `dim_color`. Changed: `Placement.x` becomes optional; `is_off_screen` needs `has_entered`; `may_hit_ship` becomes a concrete shared rule; collision raises for unknown shapes; the warning cache key gains the tilt. Removed: `hit_ship`, `default_y`, the meteorite's own `may_hit_ship`. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.drifters`, `core.collision`, `ui.drifters`, `ui.shapes`, `hit_ship`, `may_hit_ship`, `default_y`, `is_off_screen`, `Placement(`, `DrifterTuning(`, `VariantTuning(` and `Meteorite(`:
@@ -1252,6 +1424,26 @@ DRA-56 changes this frozen contract (v3). New: `DrifterType.FIREBALL`, the base 
 
 Rule 12 check for the shipped drifters (91-decision-log.md, row 64). The meteorite's look is a disc as wide as its footprint, and the satellite's two boxes lie inside its 36 × 12 footprint; both are drawn with whole-pixel sizes (radius 10, 14, 20; boxes 12 × 12 and 36 × 6), so when the footprint is fully past an edge no pixel of them is on screen. Neither breaks the new rule; neither needs a follow-up. The chain lightning is the named exception and keeps its rule.
 
+DRA-62 changes this frozen contract (v4). New: `DrifterType.COIN`, `TickContext.scroll_step_px` (default 0.0), the class attribute `Drifter.parked` (default False), the base methods `collect_points` and `collect_popup`, the spawner's parked rule, the coin module (`CoinVariantExtra`, `CoinTypeExtra`, `coin_hitbox`, `Coin`) and its view (`render_coin` and its constants), the coin's tuning file and schema. Changed: `TouchEffect.COLLECT` is no longer only reserved; the comments on `DrifterTypeTuning.speed_ratio` and `entry_warning_ticks`. Nothing removed, and no existing drifter changes behavior. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `TickContext(`, `DrifterType`, `TouchEffect`, `available_drifters`, `registered_views`, `spawn_drifter`, `DrifterTypeTuning(`, `core.drifters`, `ui.drifters` and `tuning/drifters`:
+
+| File | Change needed |
+|---|---|
+| `game/core/drifters/base.py` | the `COIN` member, `scroll_step_px`, `parked`, `collect_points`, `collect_popup`, the `core.popup` import, the `COLLECT` docstring. Task `DRA-62-01-gameplay-implementer`. |
+| `game/core/popup.py` (new) | `PointsPopup` and `step_popups` (`systems/run.md`, Interface). Task `DRA-62-01-gameplay-implementer`. |
+| `game/core/drifters/spawner.py`, `tuning.py` | the parked rule in step 4; the two `DrifterTypeTuning` docstrings. Task `DRA-62-01-gameplay-implementer`. |
+| `game/core/drifters/coin.py` (new), `game/core/drifters/__init__.py` | the coin and its import. Task `DRA-62-01-gameplay-implementer`. |
+| `game/core/run.py` | step 3 passes `scroll_step_px`; the collect step and the popups (`systems/run.md`). Task `DRA-62-02-gameplay-implementer`. |
+| `game/core/drifters/meteorite.py`, `satellite.py`, `chain_lightning.py`, `fireball.py`, `registry.py`, `game/core/collision.py`, `levels.py`, `ship.py`, `world.py` | none. They never read `scroll_step_px`; `parked` defaults to False, and the collect methods have defaults. |
+| `game/ui/drifters/coin_view.py` (new), `game/ui/drifters/__init__.py` | the view and its import. Task `DRA-62-03-ui-developer`. |
+| `game/ui/drifters/registry.py`, `entry_warning.py`, the four other views, `game/ui/shapes.py`, `game/ui/debug_overlay.py` | none. A coin is never in WARNING, so the entry warning never sees it. The overlay outlines its box and labels it like any drifter, and draws no graze outline for it (`graze_zone()` is ()). |
+| `game/app/tuning.py`, `game/app/frame.py` | the coin's file, the popups in the draw (`systems/app.md`). Integration Engineer. Once `DrifterType.COIN` exists (task DRA-62-01), `load_tuning` raises at startup until the file and its loader exist. |
+| `game/app/debug_spawns.py` | none: coin rows and the `coin` mode go through `DrifterType` and `spawn_drifter`, which refuse `speed` and `invert` for a coin. |
+| `game/tuning/drifters/coin.json` (new), `game/tuning/debug_spawns.json` | content, by whoever the Director names: the new file to its schema with the values in Rules, Tuning files; the coin rows in `systems/app.md`, Integration checks for DRA-62. |
+| `game/tests/core/test_collision.py` | breaks: `load_variant_cases` fails the first ship test naming `coin` while the file is missing, and reads `raw["hitbox"]` from `coin.json` once it exists, which has none (an error at collection). Its shared ship test also expects every drifter to be born in WARNING. Task `DRA-62-05-qa-engineer`. |
+| `game/tests/ui/test_drifter_registry.py` | no change. Fails from task DRA-62-01 until `coin_view.py` (task DRA-62-03) and `game/tuning/drifters/coin.json` exist, as it should. |
+| `game/tests/core/test_drifters.py`, `test_satellite.py`, `test_chain_lightning.py`, `test_fireball.py`, `test_run_drifters.py`, `test_run.py`, `test_run_score.py`, `game/tests/ui/test_hud.py`, `test_ship_view.py`, `test_entry_warning.py` | none. They build `TickContext(ship=...)`, which still builds; their drifters are not parked and never collect; their runs hold no coin. |
+| `game/tests/core/test_coin.py` (new) | task `DRA-62-06-qa-engineer`. |
+
 ## Rationale
 - **A thin abstract base, one subclass per drifter (Director).** Each drifter reads as one file. Abstract `start_position`, `update` and `effect_on_touch` make a half-built subclass fail at registration (`inspect.isabstract`), not mid-run.
 - **`born` and `start_position` are classmethods.** The spawner builds every drifter the same way and never knows a subclass's fields. A drifter with its own fields or timers overrides `born` and applies them there, on top of `born_drifter`.
@@ -1273,7 +1465,7 @@ Rule 12 check for the shipped drifters (91-decision-log.md, row 64). The meteori
 - **Unknown shapes raise (DRA-39).** Before DRA-39 an unknown shape fell through to the box test. When the line shape arrives, a missing case would then pass silently as a box. Raising makes it fail on first use, and the guard test makes it fail before that.
 - **Strict overlap, the graze zone as a method, the level table in core, `speed_ratio` per drifter, the switches beating `as_level`, the specialty interface only, `TouchEffect.COLLECT` reserved, the registry in its own module, the glow at 0.75 of the warning's radius, the warning image cached and dropped when the drifter appears, `width` and `height` on the drifter, `uid` from the run.** As in DRA-29; unchanged. The glow's radius is a placeholder choice with no rule depending on it: the glow must be wider than the copy (14 px) and narrower than `R` so the spikes can reach out of it.
 - **The tilt joins the warning cache key (DRA-39).** The image depends on it. uids repeat across runs, so a key without the tilt could, in principle, hand one drifter another's turned copy.
-- **Room for the next drifters (not built).** Coin: `TouchEffect.COLLECT`, no entry warning (the schema's `entry_warning_ticks` ≥ 1 changes then), and a parked drifter will need the scroll in `TickContext`. Islands: the polygon shape, and collision that reports depth and direction. Electric ball: its pulse is a telegraph, so `scale_telegraph` serves it.
+- **Room for the next drifters (not built).** Islands: parked like the coin (`parked`, `scroll_step_px`), plus the polygon shape and collision that reports depth and direction. Electric ball: its pulse is a telegraph, so `scale_telegraph` serves it.
 - **The line is a capsule, measured squared (DRA-47).** 07-drifters.md, rule 8 and 91-decision-log.md, row 60 give it round ends, so "every point within thickness / 2 of AB" is the whole definition, and each overlap is a distance test against the segment. Comparing squared distances and finding crossings with cross-product signs keeps whole numbers, halves and 3-4-5 cases exact, so the line's collision tables can hold exact edge cases like the circle's and the box's. Growing it is one number, which is also what row 47 asks of its graze zone.
 - **Nodes in units of `node_spacing` (DRA-47).** The GDD gives one spacing for every layout. Units make it one knob: changing 128 rescales all seven layouts with no other edit. The loader checks that every arc is 1 unit long and that the nodes are centered, so a hand-edited layout can't drift from 03, rule 1 and the spacing rule. Diagonal and triangle coordinates are irrational; 8 decimals put them well inside the 1e-6 check.
 - **A variant is data: nodes, arcs and `invert_mirror` (DRA-47).** 07-drifters.md, rule 10 says variants change values only, and 03, How to extend says a new layout is a new row. The GDD's With invert column is not one rule for all (the triangle turns upside down, the rest mirror left to right), so each layout names its mirror. A new layout needs no code.
@@ -1302,5 +1494,14 @@ Rule 12 check for the shipped drifters (91-decision-log.md, row 64). The meteori
 - **The fireball's look is its hitbox, drawn with `draw_shape` (DRA-56).** Its placeholder look is "two filled circles the size of its hitbox". Drawing exactly those circles keeps the look on the debug outlines, as the satellite does. A 10.5 px radius draws as radius 10, a disc 21 px across, the GDD's head width.
 - **A fireball dropped later than its head alone allows (DRA-56).** From a top corner at Level 1 its head is fully below the floor on n 198; its tail on n 202. Those 4 ticks (about 0.07 s) are what row 64 asks for: the tail can still hit until it disappears (scope report DRA-56, Decision log).
 - **No art task (DRA-56).** Trail art, sprite art and sound are out of scope (scope report DRA-56, Out). The look is a placeholder drawn in code.
+- **The scroll reaches the drifter through `TickContext` (DRA-62).** The DRA-29 and DRA-47 notes planned it: one shape for the facts a drifter may read each tick. A parked drifter needs only how far the world moves this tick, not the whole scroll, so it gets that one number and stays unaware of the start delay and, later, of the level's scroll speed. The default of 0.0 keeps every existing `TickContext(ship=...)` valid.
+- **`parked` is a class attribute read by the spawner (DRA-62).** Parked or moving is the drifter kind 03-world-and-camera.md, rule 9 names, fixed per drifter type, so it lives on the class. The spawner already turns the level into a speed; giving a parked drifter 0.0 there, and refusing a placement speed, keeps "hazard speed × never touches it" in the one place speeds are made. Floating islands will reuse it.
+- **The coin is born ACTIVE (DRA-62).** "No warning of any kind" means no WARNING state at all: `tick_warning` with 0 ticks would still leave one drawn state in WARNING, and the entry warning would show for a frame. Overriding `born` keeps the base rule ("every drifter is born in WARNING") true for every hazard, and the coin says in one line that it has none. It never logs `drifter active`, because it never turns from WARNING to ACTIVE.
+- **`collect_points` and `collect_popup` in the base (DRA-62).** The run must not know which drifter is a coin. Two small hooks with do-nothing defaults let any pickup say what it pays and what it shows, the way `effect_on_touch` says what a touch does. The run owns the collection itself (the score, the popups, the respawn wait), as it owns hits.
+- **The popup's values ride on the coin (DRA-62).** Its length and rise are coin values in the coin's file, which only the app reads. Copying them onto the coin at birth, like the chain lightning's timers, lets the coin build its own popup with no tuning in `step_run`.
+- **The coin's drawn parts need no margin (DRA-62).** The fireball needed `DRAW_MARGIN` because its radii are fractions. The coin's sizes are even whole numbers and its view draws on whole pixels around the rounded center, so each pixel edge sits on a whole px within 0.5 px of the box edge. A box edge at or past 480 then puts the pixel edge at 480 or past too. So the plain boxes are exact, and the drop points in Diagram land clear of the line (y 490.50 against 490). The schema asks for even sizes to keep this true after tuning.
+- **The coin's 12 × 20 is drawn on exactly 12 columns and 20 rows (DRA-62).** An even width has no middle pixel, so each point ends in a 2-px tip and the sides run at 45°. That keeps the two halves 6 columns each ("split down the middle"), the body 10 rows, each point 5 rows, and the glint the Director approved, at (3, 3), one pixel clear of the rim.
+- **The rim and ring line width and the colors stay in the view (DRA-62).** The scope report asks for every value in the tuning file, and every size, point value and timing is there. Colors are placeholder look values kept in views, as for every drifter. The 1 px line width is part of the same look, and a wider rim would draw outside the boxes `drawn_parts` promises, so it isn't a free knob. The popup's font is the HUD's look, kept in its view like the HUD's own font size.
+- **No art task (DRA-62).** The galaxy, the cloud, the shine, the glint animation and sound are out of scope (scope report DRA-62, Out). The look is a placeholder drawn in code.
 - **No spawn on the ship (07-drifters.md, rule 3) is not checked at runtime.** Meteorites start above the top line and satellites outside a wall, where the ship can't be. For waves, it is a wave-design rule that wave_check will enforce.
 - **No art task.** Sprite art is out of scope (scope report DRA-39, Out). Every look is a placeholder drawn in code.

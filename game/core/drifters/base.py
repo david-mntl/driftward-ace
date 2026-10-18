@@ -16,6 +16,7 @@ from enum import Enum
 from typing import ClassVar, Final, Self
 
 from core.collision import Box, Hitbox, grow_hitbox, place_hitbox
+from core.popup import PointsPopup
 from core.ship import Ship
 from core.world import SCREEN_H, SCREEN_W
 
@@ -58,6 +59,9 @@ class DrifterType(Enum):
     FIREBALL = "fireball"
     """Source: drifters/06-fireball.md."""
 
+    COIN = "coin"
+    """Source: drifters/04-coin.md."""
+
 
 class Phase(Enum):
     """Where a drifter is in its life."""
@@ -79,7 +83,7 @@ class TouchEffect(Enum):
     """A hit. Source: 05-lives-and-damage.md, rule 1."""
 
     COLLECT = "collect"
-    """Reserved for coins. No drifter returns it yet."""
+    """Touching it collects it: it pays and goes. The coin. Source: 06-scoring.md, rule 2."""
 
     NONE = "none"
     """Nothing happens."""
@@ -91,6 +95,10 @@ class TickContext:
 
     ship: Ship
     """The ship as it was at the start of this tick."""
+
+    scroll_step_px: float = 0.0
+    """Px the world scrolls down on this tick. 0.0 before the scroll starts. A parked drifter
+    moves by it. Source: 03-world-and-camera.md, rule 9."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +192,10 @@ class Drifter(ABC):
 
     drifter_type: ClassVar[DrifterType]
     """Set by each subclass."""
+
+    parked: ClassVar[bool] = False
+    """True: the drifter sits still in the world and moves only with the scroll (the coin). Read
+    by the spawner. Source: 03-world-and-camera.md, rule 9."""
 
     uid: int = 0
     """Unique within a run, from 1. Set by `core.run.add_drifters`. 0 before that."""
@@ -333,6 +345,20 @@ class Drifter(ABC):
         if self.rehit_ticks_left > 0:
             return self.rehit_dim
         return 1.0
+
+    def collect_points(self) -> int:
+        """Return the points the run adds to the coin points when it collects this drifter.
+
+        0 here. Source: 06-scoring.md, rule 2.
+        """
+        return 0
+
+    def collect_popup(self) -> PointsPopup | None:
+        """Return the points popup the run shows when it collects this drifter, at age 0.
+
+        None here: no popup. Source: drifters/04-coin.md, popup.
+        """
+        return None
 
     @classmethod
     def born(cls, birth: Birth) -> Self:

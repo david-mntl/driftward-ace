@@ -17,12 +17,14 @@ from ui.hud import (
     HEART_MARGIN,
     HEART_SIZE,
     HUD_COLOR,
+    HUD_FONT_SIZE,
     HUD_LINE_SPACING,
     HUD_MARGIN,
     HUD_OVERLAY_GAP,
     HUD_TOP,
     draw_hud,
 )
+from ui.score_text import score_text
 
 SURFACE_SIZE: tuple[int, int] = (640, 480)
 """Test surface. Source: 03-world-and-camera.md, screen_w, screen_h (guess)."""
@@ -51,6 +53,7 @@ WHITE: tuple[int, int, int] = (255, 255, 255)
 # Scope report DRA-13, HUD layout (approved by the Director, not in the GDD).
 assert HUD_COLOR == WHITE
 assert (HUD_MARGIN, HUD_LINE_SPACING, HUD_TOP, HUD_OVERLAY_GAP) == (4, 20, 4, 4)
+assert HUD_FONT_SIZE == 16
 
 # Scope report DRA-23, Values needed (hearts, approved by the Director, not in the GDD).
 assert HEART_COLOR == WHITE
@@ -124,16 +127,14 @@ def _white(rows: Pixels) -> list[tuple[int, int]]:
     return [(x, y) for y, row in enumerate(rows) for x, p in enumerate(row) if p == WHITE]
 
 
-def test_hud_normal_layout_leaves_line_one_empty(pygame_headless: None) -> None:
+def test_hud_normal_layout_starts_inside_the_margin_and_top(pygame_headless: None) -> None:
     rows = _hud(below_overlay=False)
     ink = _ink(rows)
     assert _white(rows), "no white readout pixel drawn"
-    first_row = HUD_TOP + HUD_LINE_SPACING
     top = min(y for _, y in ink)
     left = min(x for x, _ in ink)
-    assert top >= first_row, f"ink above HUD line 2: row {top}"
+    assert top >= HUD_TOP, f"ink above the HUD top: row {top}"
     assert left >= HUD_MARGIN, f"ink left of the margin: column {left}"
-    assert not [1 for _, y in ink if y < first_row], "something drawn on HUD line 1"
 
 
 def test_hud_never_overlaps_the_debug_overlay(pygame_headless: None) -> None:
@@ -151,7 +152,8 @@ def test_hud_keeps_the_gap_below_the_overlay(pygame_headless: None) -> None:
     hud = _white(_hud(below_overlay=True))
     bottom = overlay_text_bottom()
     assert bottom > max(y for _, y in overlay), "overlay_text_bottom is not below the overlay text"
-    assert min(y for _, y in hud) >= bottom + HUD_OVERLAY_GAP + HUD_LINE_SPACING
+    first = min(y for _, y in hud)
+    assert first >= bottom + HUD_OVERLAY_GAP, f"HUD ink at row {first}, overlay bottom {bottom}"
 
 
 def test_hud_does_not_jump_when_the_overlay_is_hidden(pygame_headless: None) -> None:
@@ -243,3 +245,124 @@ def test_hud_hearts_ignore_the_overlay(pygame_headless: None) -> None:
     }
     assert overlay_text, "no overlay text drawn"
     assert not heart_pixels & overlay_text, "a heart pixel shares a place with overlay text"
+
+
+# SCORE line tests, from DRA-61. Contract: systems/hud.md, Presentation (SCORE line) and Rules.
+# Scope report DRA-61, Limits: SCORE on line 1 at the left margin, in the DRA-13 HUD look (default
+# font, 16 px, white, antialiased); the meters readout is gone and line 2 stays empty.
+
+SCORES: tuple[int, ...] = (0, 5, 999, 1234, 1234567, 10**11)
+"""Scores drawn: 0, one digit, a full group, two groups, three groups, twelve digits. Source:
+systems/hud.md, Presentation, score_text (the scope report's examples)."""
+
+ZERO_SCROLL = Scroll(ticks=0, scrolled_ticks=0)
+"""No meters flown, so the run's score is its coin points alone. Source: systems/run.md, score."""
+
+
+def _score_run(score: int, lives: int = 0) -> Run:
+    return Run(ship=spawn(), scroll=ZERO_SCROLL, lives=lives, coin_points=score)
+
+
+def _score_hud(score: int, below_overlay: bool, lives: int = 0) -> Pixels:
+    surface = _blank()
+    draw_hud(surface, _score_run(score, lives), below_overlay)
+    return _pixels(surface)
+
+
+def _hud_top(below_overlay: bool) -> int:
+    return overlay_text_bottom() + HUD_OVERLAY_GAP if below_overlay else HUD_TOP
+
+
+def _reference_text(score: int) -> pygame.Surface:
+    """The SCORE text as the contract sets its look: default font, 16 px, antialiased, white."""
+    return pygame.font.Font(None, HUD_FONT_SIZE).render(score_text(score), True, HUD_COLOR)
+
+
+def _expected_score_line(score: int, below_overlay: bool) -> Pixels:
+    """A black surface with the SCORE text blitted at (HUD_MARGIN, hud_top)."""
+    surface = _blank()
+    surface.blit(_reference_text(score), (HUD_MARGIN, _hud_top(below_overlay)))
+    return _pixels(surface)
+
+
+def test_hud_score_is_on_line_one_at_the_left_margin(pygame_headless: None) -> None:
+    for below_overlay in (False, True):
+        for score in SCORES:
+            drawn = _score_hud(score, below_overlay)
+            assert drawn == _expected_score_line(score, below_overlay), (
+                f"{score=}, {below_overlay=}: not the SCORE text at ({HUD_MARGIN}, "
+                f"{_hud_top(below_overlay)})"
+            )
+        ink = _ink(_score_hud(1234, below_overlay))
+        top = _hud_top(below_overlay)
+        assert min(x for x, _ in ink) >= HUD_MARGIN, f"{below_overlay=}: ink left of the margin"
+        assert top <= min(y for _, y in ink), f"{below_overlay=}: ink above line 1"
+        assert max(y for _, y in ink) < top + HUD_LINE_SPACING, (
+            f"{below_overlay=}: ink below line 1"
+        )
+
+
+def test_hud_score_pixels_follow_the_score(pygame_headless: None) -> None:
+    for below_overlay in (False, True):
+        seen: dict[int, Pixels] = {}
+        for score in (0, 5, 1234, 0, 1234, 5):
+            drawn = _score_hud(score, below_overlay)
+            if score in seen:
+                assert drawn == seen[score], f"{score=}, {below_overlay=}: same score, new pixels"
+            seen[score] = drawn
+        assert len({tuple(map(tuple, rows)) for rows in seen.values()}) == len(seen), (
+            f"{below_overlay=}: two scores drew the same pixels"
+        )
+        widths = [max(x for x, _ in _ink(_score_hud(score, below_overlay))) for score in SCORES]
+        assert widths == sorted(widths), f"{below_overlay=}: the text did not grow right: {widths}"
+        assert widths[-1] > widths[0], f"{below_overlay=}: more digits did not widen the text"
+
+
+def test_hud_line_two_is_empty_and_the_meters_are_gone(pygame_headless: None) -> None:
+    assert SCROLL.meters > 0, "the test run must have flown some meters"
+    for below_overlay in (False, True):
+        rows = _hud(below_overlay=below_overlay, lives=0)
+        line_two_top = _hud_top(below_overlay) + HUD_LINE_SPACING
+        stray = [(x, y) for (x, y) in _ink(rows) if y >= line_two_top]
+        assert not stray, f"{below_overlay=}: ink on or below line 2, first {stray[:3]}"
+        assert _ink(rows), f"{below_overlay=}: no SCORE drawn"
+
+
+def test_hud_score_top_is_the_overlay_bottom_plus_the_gap(pygame_headless: None) -> None:
+    blit_top = overlay_text_bottom() + HUD_OVERLAY_GAP
+    ink_offset = _reference_text(1234).get_bounding_rect().top
+    for score in (0, 1234):
+        ink = _ink(_score_hud(score, below_overlay=True))
+        first = min(y for _, y in ink)
+        assert first == blit_top + _reference_text(score).get_bounding_rect().top, (
+            f"{score=}: first ink row {first}, expected blit top {blit_top} plus {ink_offset}"
+        )
+        assert _score_hud(score, True) == _expected_score_line(score, True)
+    normal_first = min(y for _, y in _ink(_score_hud(1234, below_overlay=False)))
+    assert normal_first == HUD_TOP + ink_offset, "normal mode: SCORE not at HUD_TOP"
+
+
+def test_hud_earlier_rules_hold_with_score(pygame_headless: None) -> None:
+    overlay = _ink(_overlay(), ignore_rows=(TOP_LINE_ROW, FLOOR_ROW))
+    overlay_pixels = set(_ink(_overlay()))
+    bottom = overlay_text_bottom()
+    plain_hearts = [row[HEART_AREA_LEFT:] for row in _score_hud(0, False, lives=3)]
+    for score in SCORES:
+        for below_overlay in (False, True):
+            tag = f"{score=}, {below_overlay=}"
+            rows = _score_hud(score, below_overlay, lives=3)
+            text = [(x, y) for (x, y) in _ink(rows) if x < HEART_AREA_LEFT]
+            assert text, f"{tag}: no SCORE drawn"
+            assert max(y for _, y in _ink(rows)) < TOP_LINE_ROW, f"{tag}: HUD reaches the top line"
+            assert max(x for x, _ in text) < HEART_AREA_LEFT - 1, f"{tag}: SCORE reaches the hearts"
+            assert [row[HEART_AREA_LEFT:] for row in rows] == plain_hearts, f"{tag}: hearts moved"
+            if below_overlay:
+                assert min(y for _, y in text) > max(y for _, y in overlay), f"{tag}: overlap"
+                assert min(y for _, y in text) >= bottom + HUD_OVERLAY_GAP, f"{tag}: gap lost"
+                covered = _blank()
+                draw_debug_overlay(covered, spawn())
+                draw_hud(covered, _score_run(score, 3), True)
+                for y, row in enumerate(_pixels(covered)):
+                    for x, pixel in enumerate(row):
+                        if (x, y) not in overlay_pixels:
+                            assert pixel == rows[y][x], f"{tag}: HUD pixel differs at {(x, y)}"

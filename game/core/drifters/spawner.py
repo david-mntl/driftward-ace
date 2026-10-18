@@ -54,12 +54,31 @@ class Placement:
     """
 
 
+def _birth_speed(
+    cls: type[Drifter], placement: Placement, type_tuning: DrifterTypeTuning, speed_mult: float
+) -> float:
+    """Return the final speed, px/tick: 0.0 for a parked drifter, else Level 1 speed x `speed_mult`.
+
+    Raises ValueError when a parked drifter's placement sets a speed. Source: drifters.md,
+    Rules, Spawner, step 4.
+    """
+    if cls.parked:
+        if placement.speed is not None:
+            raise ValueError(f"{placement.drifter_type.value} has no speed")
+        return 0.0
+    base_speed: float = (
+        type_tuning.speed_ratio * TOP_SIDE_SPEED if placement.speed is None else placement.speed
+    )
+    return base_speed * speed_mult
+
+
 def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Drifter:
-    """Create one drifter in WARNING from `placement`, at `level`.
+    """Create one drifter from `placement`, at `level`: in WARNING, or ACTIVE for the coin.
 
     Raises ValueError for a drifter type with no class or no tuning, an unknown variant, a
-    level outside 1 to 8, or a coordinate, specialty or invert the drifter refuses. The
-    playtest switches beat `as_level`. Entry warnings and the re-hit cooldown never scale.
+    level outside 1 to 8, a coordinate, specialty or invert the drifter refuses, or a speed for
+    a parked drifter. The playtest switches beat `as_level`. Entry warnings and the re-hit
+    cooldown never scale.
     """
     cls: type[Drifter] = drifter_class(placement.drifter_type)
     type_name: str = placement.drifter_type.value
@@ -76,9 +95,6 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
     check_level(use_level)
     speed_level: int = use_level if tuning.switches.hazard_speed_scaling else BASE_LEVEL
     timer_level: int = use_level if tuning.switches.timer_scaling else BASE_LEVEL
-    base_speed: float = (
-        type_tuning.speed_ratio * TOP_SIDE_SPEED if placement.speed is None else placement.speed
-    )
     x, y = cls.start_position(
         placement.x, placement.y, variant.width, variant.height, placement.invert
     )
@@ -90,7 +106,7 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
             width=variant.width,
             height=variant.height,
             hitbox=variant.hitbox,
-            speed=base_speed * hazard_speed_mult(speed_level),
+            speed=_birth_speed(cls, placement, type_tuning, hazard_speed_mult(speed_level)),
             warning_ticks=type_tuning.entry_warning_ticks,
             timer_mult=timer_mult(timer_level),
             specialty_enabled=placement.specialty_enabled,
