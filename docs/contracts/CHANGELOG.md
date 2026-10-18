@@ -78,3 +78,9 @@
 - Python's `object` type and JSON "object" (schemas, loader messages) are unchanged.
 - Earlier changelog entries, task files and reports keep the old word as history. Their links to `07-objects.md` and `objects/` now point to renamed files.
 - `game/tests/check.sh` ends `QA: pass`. A headless run loads the tuning and a meteorite drifter spawns, warns, turns active and falls. The browser build was not re-run.
+
+## DRA-39, 2026-10-18
+- `systems/app.md`: 6 to 7, frozen.
+- `systems/drifters.md`: 1 to 2, frozen.
+- `systems/run.md`: 2 to 3, frozen.
+- Adds the satellite drifter, a re-hit cooldown for hazards, and an editable debug spawn list.

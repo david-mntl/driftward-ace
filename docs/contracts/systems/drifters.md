@@ -1,7 +1,7 @@
-# Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite and their views
-Version: 1
-Status: draft
-Features: DRA-29, DRA-39
+# Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite, the chain lightning and their views
+Version: 2
+Status: frozen
+Features: DRA-29, DRA-39, DRA-47
 Created by: architect
 
 ## Purpose
@@ -150,30 +150,45 @@ Import root is `game/`, as in the tests. Core modules import stdlib and `core` o
 ```python
 # Imports: stdlib only.
 
+
 @dataclass(frozen=True, slots=True)
 class Circle:
     """A circle hitbox shape, px."""
-    cx: float        # center x: offset from the owner's center in a variant's hitbox; screen x once placed
-    cy: float        # center y, same, y down
-    r: float         # radius, px, > 0
+
+    cx: float  # center x: offset from the owner's center in a variant's hitbox; screen x once placed
+    cy: float  # center y, same, y down
+    r: float  # radius, px, > 0
+
 
 @dataclass(frozen=True, slots=True)
 class Box:
     """An upright box hitbox shape, px. Boxes never rotate."""
-    cx: float        # center x, as Circle.cx
-    cy: float        # center y, as Circle.cy
-    w: float         # full width, px, > 0
-    h: float         # full height, px, > 0
+
+    cx: float  # center x, as Circle.cx
+    cy: float  # center y, as Circle.cy
+    w: float  # full width, px, > 0
+    h: float  # full height, px, > 0
+
 
 Shape = Circle | Box
-Hitbox = tuple[Shape, ...]       # one or more shapes. Empty () = touches nothing
+Hitbox = tuple[Shape, ...]  # one or more shapes. Empty () = touches nothing
 
-def place_hitbox(hitbox: Hitbox, x: float, y: float) -> Hitbox: ...
+
+def place_hitbox(hitbox: Hitbox, x: float, y: float) -> Hitbox:
+    ...
     # Every shape moved by (x, y): offsets from the owner's center become screen positions.
-def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool: ...
+
+
+def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool:
+    ...
     # True when any shape of a overlaps any shape of b. Both placed. Pure.
-def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox: ...
+
+
+def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox:
+    ...
     # Each shape grown by margin on every side: Circle r + margin; Box w + 2 margin, h + 2 margin.
+
+
 # All three raise TypeError("unknown shape kind '<class name>'") for an object that is not a
 # Circle or a Box (DRA-39). Nothing is ever treated as a box by default.
 ```
@@ -182,147 +197,221 @@ def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox: ...
 Unchanged in DRA-39.
 ```python
 # Imports: stdlib only.
-LEVEL_COUNT: Final[int] = 8                                   # 08-difficulty.md, level table (locked)
-HAZARD_SPEED_MULT: Final[tuple[float, ...]] = (1.00, 1.06, 1.12, 1.18, 1.24, 1.30, 1.36, 1.42)
-                                                              # 08-difficulty.md, Hazard speed × row (locked)
+LEVEL_COUNT: Final[int] = 8  # 08-difficulty.md, level table (locked)
+HAZARD_SPEED_MULT: Final[tuple[float, ...]] = (
+    1.00,
+    1.06,
+    1.12,
+    1.18,
+    1.24,
+    1.30,
+    1.36,
+    1.42,
+)
+# 08-difficulty.md, Hazard speed × row (locked)
 TIMER_MULT: Final[tuple[float, ...]] = (1.00, 0.94, 0.89, 0.85, 0.81, 0.77, 0.74, 0.70)
-                                                              # 08-difficulty.md, Timer × row (guess)
-LEVEL_STARTS_M: Final[tuple[int, ...]] = (0,)                 # 08-difficulty.md, Starts at row: Level 1 at 0 m.
-                                                              # Levels 2 to 8 are TBD (DF-05); they join here when set.
+# 08-difficulty.md, Timer × row (guess)
+LEVEL_STARTS_M: Final[tuple[int, ...]] = (
+    0,
+)  # 08-difficulty.md, Starts at row: Level 1 at 0 m.
+# Levels 2 to 8 are TBD (DF-05); they join here when set.
 
-def check_level(level: int) -> None: ...
+
+def check_level(level: int) -> None:
+    ...
     # Raises ValueError("level <n> is outside 1 to 8") unless 1 <= level <= LEVEL_COUNT.
-def hazard_speed_mult(level: int) -> float: ...   # HAZARD_SPEED_MULT[level - 1], after check_level
-def timer_mult(level: int) -> float: ...          # TIMER_MULT[level - 1], after check_level
-def level_at(meters: int) -> int: ...
+
+
+def hazard_speed_mult(
+    level: int,
+) -> float: ...  # HAZARD_SPEED_MULT[level - 1], after check_level
+def timer_mult(level: int) -> float: ...  # TIMER_MULT[level - 1], after check_level
+def level_at(meters: int) -> int:
+    ...
     # The highest level whose start in LEVEL_STARTS_M is <= meters. 1 while only Level 1 has a start.
 ```
 
 ### game/core/drifters/base.py
 ```python
 # Imports: stdlib, core.collision, core.ship, core.world.
-GRAZE_MARGIN: Final[int] = 14                    # 06-scoring.md, graze_margin, px (locked)
-DEFAULT_REHIT_COOLDOWN_TICKS: Final[int] = 180   # 05-lives-and-damage.md, rehit_cooldown, ticks (guess). DRA-39
-DEFAULT_REHIT_DIM: Final[float] = 0.75           # 05-lives-and-damage.md, rehit_dim, × brightness (guess). DRA-39
+GRAZE_MARGIN: Final[int] = 14  # 06-scoring.md, graze_margin, px (locked)
+DEFAULT_REHIT_COOLDOWN_TICKS: Final[int] = (
+    180  # 05-lives-and-damage.md, rehit_cooldown, ticks (guess). DRA-39
+)
+DEFAULT_REHIT_DIM: Final[float] = (
+    0.75  # 05-lives-and-damage.md, rehit_dim, × brightness (guess). DRA-39
+)
+
 
 class DrifterType(Enum):
     """Every drifter the game knows. One member per drifter spec in 07-drifters.md that is built."""
-    METEORITE = "meteorite"                      # drifters/01-meteorite.md
-    SATELLITE = "satellite"                      # drifters/02-satellite.md. DRA-39
+
+    METEORITE = "meteorite"  # drifters/01-meteorite.md
+    SATELLITE = "satellite"  # drifters/02-satellite.md. DRA-39
+
 
 class Phase(Enum):
-    WARNING = "warning"      # the entry warning shows; the drifter can't touch anything
-    ACTIVE = "active"        # the drifter is on the field and can touch the ship
-    GONE = "gone"            # the drifter is finished; the run drops it this tick
+    WARNING = "warning"  # the entry warning shows; the drifter can't touch anything
+    ACTIVE = "active"  # the drifter is on the field and can touch the ship
+    GONE = "gone"  # the drifter is finished; the run drops it this tick
+
 
 class TouchEffect(Enum):
-    HIT = "hit"              # touching it is a hit (05-lives-and-damage.md, rule 1)
-    COLLECT = "collect"      # reserved for coins. No drifter returns it yet
-    NONE = "none"            # touching it does nothing
+    HIT = "hit"  # touching it is a hit (05-lives-and-damage.md, rule 1)
+    COLLECT = "collect"  # reserved for coins. No drifter returns it yet
+    NONE = "none"  # touching it does nothing
+
 
 @dataclass(frozen=True, slots=True)
 class TickContext:
     """Per-tick facts a drifter may read in update(). Never the level."""
-    ship: Ship               # the ship as it was at the start of this tick
+
+    ship: Ship  # the ship as it was at the start of this tick
+
 
 @dataclass(frozen=True, slots=True)
 class VariantExtra:
     """Base of a drifter's own per-variant values. Empty. A drifter that needs some
     subclasses it in its own module (the satellite: SatelliteVariantExtra). DRA-39."""
 
+
 @dataclass(frozen=True, slots=True)
 class Birth:
     """Everything the spawner settled for one new drifter. Final numbers only."""
-    x: float                 # center x, screen px
-    y: float                 # center y, screen px, y down
-    variant: str             # the variant's name
-    width: float             # the variant's visible width, px
-    height: float            # the variant's visible height, px
-    hitbox: Hitbox           # the variant's shapes, offsets from the center
-    speed: float             # final speed, px/tick, hazard speed × already applied
-    warning_ticks: int       # entry warning length, ticks, never scaled
-    timer_mult: float        # the Timer × to apply to the drifter's own timers. Neither built drifter has one
-    specialty_enabled: bool | None   # the placement's switch; None = the drifter's default
-    invert: bool             # the placement's invert. DRA-39
-    variant_extra: VariantExtra | None   # the variant's own values, None for a drifter with none. DRA-39
-    rehit_cooldown_ticks: int    # re-hit cooldown length, ticks, never scaled. DRA-39
-    rehit_dim: float             # brightness during the cooldown, 0..1. DRA-39
+
+    x: float  # center x, screen px
+    y: float  # center y, screen px, y down
+    variant: str  # the variant's name
+    width: float  # the variant's visible width, px
+    height: float  # the variant's visible height, px
+    hitbox: Hitbox  # the variant's shapes, offsets from the center
+    speed: float  # final speed, px/tick, hazard speed × already applied
+    warning_ticks: int  # entry warning length, ticks, never scaled
+    timer_mult: float  # the Timer × to apply to the drifter's own timers. Neither built drifter has one
+    specialty_enabled: (
+        bool | None
+    )  # the placement's switch; None = the drifter's default
+    invert: bool  # the placement's invert. DRA-39
+    variant_extra: (
+        VariantExtra | None
+    )  # the variant's own values, None for a drifter with none. DRA-39
+    rehit_cooldown_ticks: int  # re-hit cooldown length, ticks, never scaled. DRA-39
+    rehit_dim: float  # brightness during the cooldown, 0..1. DRA-39
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Specialty(ABC):
     """An optional extra behavior on top of a drifter's movement. Only the base exists."""
-    enabled: bool            # switched on or off for this drifter
+
+    enabled: bool  # switched on or off for this drifter
 
     @abstractmethod
     def update(self, owner: Drifter, ctx: TickContext) -> Self: ...
-    def effect_on_ship(self, owner: Drifter, ship: Ship) -> Ship | None: ...
+    def effect_on_ship(self, owner: Drifter, ship: Ship) -> Ship | None:
+        ...
         # None: no effect. The default, and the only behavior so far.
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Drifter(ABC):
     """One drifter on the field after a tick. Screen px, y down, x and y at its center."""
-    drifter_type: ClassVar[DrifterType]    # set by each subclass
-    uid: int = 0             # unique within a run, from 1. Set by core.run.add_drifters; 0 before
-    x: float                 # center x, screen px
-    y: float                 # center y, screen px, y down
-    variant: str             # the variant's name, e.g. "medium"
-    width: float             # visible width, px, from the variant
-    height: float            # visible height, px, from the variant
-    speed: float             # final speed, px/tick, set by the spawner
-    hitbox: Hitbox           # shapes as offsets from (x, y), from the variant
-    warning_ticks: int       # entry warning length, ticks
-    phase: Phase = Phase.WARNING
-    ticks_in_phase: int = 0  # ticks spent in the current phase. 0 on the state it starts
-    specialty: Specialty | None = None
-    has_entered: bool = False    # DRA-39. It has been at least partly on screen while ACTIVE. Set by the run
-    rehit_cooldown_ticks: int = DEFAULT_REHIT_COOLDOWN_TICKS   # DRA-39. Cooldown length, ticks, from the spawner
-    rehit_dim: float = DEFAULT_REHIT_DIM                       # DRA-39. Brightness while cooling, 0..1, from the spawner
-    rehit_ticks_left: int = 0    # DRA-39. Ticks of re-hit cooldown still to come. 0 = it may hit. Set by the run
 
-    def current_hitbox(self) -> Hitbox: ...
+    drifter_type: ClassVar[DrifterType]  # set by each subclass
+    uid: int = 0  # unique within a run, from 1. Set by core.run.add_drifters; 0 before
+    x: float  # center x, screen px
+    y: float  # center y, screen px, y down
+    variant: str  # the variant's name, e.g. "medium"
+    width: float  # visible width, px, from the variant
+    height: float  # visible height, px, from the variant
+    speed: float  # final speed, px/tick, set by the spawner
+    hitbox: Hitbox  # shapes as offsets from (x, y), from the variant
+    warning_ticks: int  # entry warning length, ticks
+    phase: Phase = Phase.WARNING
+    ticks_in_phase: int = (
+        0  # ticks spent in the current phase. 0 on the state it starts
+    )
+    specialty: Specialty | None = None
+    has_entered: bool = False  # DRA-39. It has been at least partly on screen while ACTIVE. Set by the run
+    rehit_cooldown_ticks: int = (
+        DEFAULT_REHIT_COOLDOWN_TICKS  # DRA-39. Cooldown length, ticks, from the spawner
+    )
+    rehit_dim: float = (
+        DEFAULT_REHIT_DIM  # DRA-39. Brightness while cooling, 0..1, from the spawner
+    )
+    rehit_ticks_left: int = 0  # DRA-39. Ticks of re-hit cooldown still to come. 0 = it may hit. Set by the run
+
+    def current_hitbox(self) -> Hitbox:
+        ...
         # () unless phase is ACTIVE. Otherwise place_hitbox(hitbox, x, y).
-    def graze_zone(self) -> Hitbox: ...
+
+    def graze_zone(self) -> Hitbox:
+        ...
         # grow_hitbox(current_hitbox(), GRAZE_MARGIN) when effect_on_touch() is HIT, else ().
-    def is_partly_on_screen(self) -> bool: ...                      # DRA-39
+
+    def is_partly_on_screen(self) -> bool:
+        ...  # DRA-39
         # True when the width × height footprint shares area with the screen (strict).
-    def mark_entered(self) -> Self: ...                             # DRA-39
+
+    def mark_entered(self) -> Self:
+        ...  # DRA-39
         # self with has_entered True when ACTIVE and partly on screen; otherwise self unchanged.
-    def is_off_screen(self) -> bool: ...
+
+    def is_off_screen(self) -> bool:
+        ...
         # True only in ACTIVE, once has_entered, when fully past a side wall or fully below the floor.
         # Never at the top.
-    def warning_center(self) -> tuple[float, float]: ...
+
+    def warning_center(self) -> tuple[float, float]:
+        ...
         # Where the entry warning is drawn: (x, y) moved just inside the screen.
-    def warning_tilt_degrees(self) -> float: ...                    # DRA-39
+
+    def warning_tilt_degrees(self) -> float:
+        ...  # DRA-39
         # How far the warning copy is turned, degrees, counterclockwise on screen. 0.0 here.
-    def may_hit_ship(self) -> bool: ...                             # DRA-39: concrete, the shared rule
+
+    def may_hit_ship(self) -> bool:
+        ...  # DRA-39: concrete, the shared rule
         # rehit_ticks_left == 0. Subclasses don't override it.
-    def brightness(self) -> float: ...                              # DRA-39
+
+    def brightness(self) -> float:
+        ...  # DRA-39
         # rehit_dim while rehit_ticks_left > 0, else 1.0.
 
     @classmethod
-    def born(cls, birth: Birth) -> Self: ...
+    def born(cls, birth: Birth) -> Self:
+        ...
         # born_drifter(cls, birth), after two checks: raises ValueError("<type> has no specialty")
         # when birth.specialty_enabled is True, and ValueError("<type> has no invert") when
         # birth.invert is True. A subclass with a specialty, an invert or its own fields overrides it.
+
     @classmethod
     @abstractmethod
-    def start_position(cls, x: float | None, y: float | None, width: float, height: float,
-                       invert: bool) -> tuple[float, float]: ...    # DRA-39, replaces default_y
+    def start_position(
+        cls, x: float | None, y: float | None, width: float, height: float, invert: bool
+    ) -> tuple[float, float]:
+        ...  # DRA-39, replaces default_y
         # The center a new drifter starts at. A coordinate the placement set is kept; a missing
         # one gets the drifter's default. Raises ValueError("<type> placement needs <x or y>")
         # for a missing coordinate the drifter has no default for.
+
     @abstractmethod
-    def update(self, ctx: TickContext) -> Self: ...
+    def update(self, ctx: TickContext) -> Self:
+        ...
         # Advance one 60 Hz tick and return a new drifter. Never mutates self.
+
     @abstractmethod
     def effect_on_touch(self) -> TouchEffect: ...
 
-def born_drifter[T: Drifter](cls: type[T], birth: Birth) -> T: ...   # DRA-39. PEP 695, bound Drifter
+
+def born_drifter[T: Drifter](cls: type[T], birth: Birth) -> T:
+    ...  # DRA-39. PEP 695, bound Drifter
     # cls built in WARNING from birth's shared fields: x, y, variant, width, height, speed, hitbox,
     # warning_ticks, rehit_cooldown_ticks, rehit_dim. Every other field keeps its default, so a
     # subclass's own fields need defaults. No checks.
 
-def tick_warning[T: Drifter](obj: T) -> T: ...   # PEP 695 type parameter, bound Drifter
+
+def tick_warning[T: Drifter](obj: T) -> T:
+    ...  # PEP 695 type parameter, bound Drifter
     # The shared WARNING step: ticks_in_phase + 1, or ACTIVE with ticks_in_phase 0 once
     # ticks_in_phase + 1 reaches warning_ticks. Position unchanged.
 ```
@@ -334,28 +423,37 @@ Checked values the app hands to core. Built by `app.tuning` from the JSON files.
 # Imports: stdlib, core.collision, core.drifters.base.
 @dataclass(frozen=True, slots=True, kw_only=True)
 class VariantTuning:
-    width: float             # visible width, px
-    height: float            # visible height, px
-    hitbox: Hitbox           # offsets from the center
-    extra: VariantExtra | None = None   # DRA-39. The drifter's own per-variant values; None for the meteorite
+    width: float  # visible width, px
+    height: float  # visible height, px
+    hitbox: Hitbox  # offsets from the center
+    extra: VariantExtra | None = (
+        None  # DRA-39. The drifter's own per-variant values; None for the meteorite
+    )
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DrifterTypeTuning:
-    variants: Mapping[str, VariantTuning]   # by variant name
-    default_variant: str     # one of the variant names
-    speed_ratio: float       # Level 1 speed as a multiple of core.ship.TOP_SIDE_SPEED
-    entry_warning_ticks: int # ticks, >= 1
+    variants: Mapping[str, VariantTuning]  # by variant name
+    default_variant: str  # one of the variant names
+    speed_ratio: float  # Level 1 speed as a multiple of core.ship.TOP_SIDE_SPEED
+    entry_warning_ticks: int  # ticks, >= 1
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PlaytestSwitches:
-    hazard_speed_scaling: bool = True   # False: Level 1 hazard speed × at every level
-    timer_scaling: bool = True          # False: Level 1 Timer × at every level
+    hazard_speed_scaling: bool = True  # False: Level 1 hazard speed × at every level
+    timer_scaling: bool = True  # False: Level 1 Timer × at every level
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class HazardRules:                                          # DRA-39
+class HazardRules:  # DRA-39
     """Values every hazard shares. From game/tuning/hazards.json; a field left out keeps its default."""
-    rehit_cooldown_ticks: int = DEFAULT_REHIT_COOLDOWN_TICKS   # ticks, >= 0. Never scales with level
-    rehit_dim: float = DEFAULT_REHIT_DIM                       # 0..1
+
+    rehit_cooldown_ticks: int = (
+        DEFAULT_REHIT_COOLDOWN_TICKS  # ticks, >= 0. Never scales with level
+    )
+    rehit_dim: float = DEFAULT_REHIT_DIM  # 0..1
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DrifterTuning:
@@ -368,11 +466,15 @@ class DrifterTuning:
 Unchanged in DRA-39.
 ```python
 # Imports: stdlib, core.drifters.base.
-def register_drifter[G: Drifter](cls: type[G]) -> type[G]: ...   # PEP 695 type parameter, bound Drifter; class decorator
+def register_drifter[G: Drifter](cls: type[G]) -> type[G]:
+    ...  # PEP 695 type parameter, bound Drifter; class decorator
     # Raises TypeError if cls is abstract (inspect.isabstract) or has no drifter_type.
     # Raises ValueError("drifter type 'meteorite' is already registered") on a duplicate.
+
+
 def available_drifters() -> frozenset[DrifterType]: ...  # every registered type
-def drifter_class(drifter_type: DrifterType) -> type[Drifter]: ...
+def drifter_class(drifter_type: DrifterType) -> type[Drifter]:
+    ...
     # Raises ValueError("no class registered for drifter type 'x'").
 ```
 
@@ -382,17 +484,26 @@ def drifter_class(drifter_type: DrifterType) -> type[Drifter]: ...
 @dataclass(frozen=True, slots=True)
 class Placement:
     """Where and how to place one drifter. Screen px, y down, at its center."""
-    drifter_type: DrifterType
-    x: float | None = None            # DRA-39: optional. None: the drifter's default x (start_position)
-    y: float | None = None            # None: the drifter's default y (start_position)
-    variant: str | None = None        # None: the drifter's default_variant
-    as_level: int | None = None       # None: the run's level
-    specialty_enabled: bool | None = None   # None: the drifter's default
-    invert: bool = False              # DRA-39. The spec's invert; a drifter without one refuses True
-    speed: float | None = None        # DRA-39. Level 1 speed in px/tick along its path, replacing the
-                                      # drifter's default; hazard speed × still applies. None: the default
 
-def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Drifter: ...
+    drifter_type: DrifterType
+    x: float | None = (
+        None  # DRA-39: optional. None: the drifter's default x (start_position)
+    )
+    y: float | None = None  # None: the drifter's default y (start_position)
+    variant: str | None = None  # None: the drifter's default_variant
+    as_level: int | None = None  # None: the run's level
+    specialty_enabled: bool | None = None  # None: the drifter's default
+    invert: bool = (
+        False  # DRA-39. The spec's invert; a drifter without one refuses True
+    )
+    speed: float | None = (
+        None  # DRA-39. Level 1 speed in px/tick along its path, replacing the
+    )
+    # drifter's default; hazard speed × still applies. None: the default
+
+
+def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Drifter:
+    ...
     # The only way a drifter is created. Pure: no logging, no randomness.
 ```
 The field order keeps every existing call working: `Placement(DrifterType.METEORITE, x=160.0, variant="small")` and `Placement(DrifterType.METEORITE, 300.0, y=...)` still build.
@@ -404,14 +515,18 @@ The field order keeps every existing call working: `Placement(DrifterType.METEOR
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Meteorite(Drifter):
     """Falling blocker. Falls straight down at its speed. drifters/01-meteorite.md."""
+
     drifter_type: ClassVar[DrifterType] = DrifterType.METEORITE
 
     @classmethod
-    def start_position(cls, x: float | None, y: float | None, width: float, height: float,
-                       invert: bool) -> tuple[float, float]: ...
+    def start_position(
+        cls, x: float | None, y: float | None, width: float, height: float, invert: bool
+    ) -> tuple[float, float]:
+        ...
         # x is required: None raises ValueError("meteorite placement needs x"). y None: -height / 2.
+
     def update(self, ctx: TickContext) -> Self: ...
-    def effect_on_touch(self) -> TouchEffect: ...     # TouchEffect.HIT
+    def effect_on_touch(self) -> TouchEffect: ...  # TouchEffect.HIT
 ```
 No new fields. It uses the base `born` (so `invert` True raises) and the base `may_hit_ship`. DRA-39 removes its `default_y` and its own `may_hit_ship` (the "hits once" stand-in).
 
@@ -421,28 +536,38 @@ No new fields. It uses the base `born` (so `invert` True raises) and the base `m
 @dataclass(frozen=True, slots=True)
 class SatelliteVariantExtra(VariantExtra):
     """The satellite's own per-variant value."""
-    angle_degrees: float     # path angle below level, degrees, 0 <= angle < 90. 0 flat, 20 angled
+
+    angle_degrees: (
+        float  # path angle below level, degrees, 0 <= angle < 90. 0 flat, 20 angled
+    )
+
 
 @register_drifter
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Satellite(Drifter):
     """Side crosser. Crosses from a side wall in a straight line. drifters/02-satellite.md."""
+
     drifter_type: ClassVar[DrifterType] = DrifterType.SATELLITE
-    invert: bool = False         # True: enters from the right wall and flies right to left
-    angle_degrees: float = 0.0   # path angle below level, degrees, from the variant
-    velocity_x: float = 0.0      # px/tick, + is right. Final, set at birth
-    velocity_y: float = 0.0      # px/tick, + is down. Final, set at birth
+    invert: bool = False  # True: enters from the right wall and flies right to left
+    angle_degrees: float = 0.0  # path angle below level, degrees, from the variant
+    velocity_x: float = 0.0  # px/tick, + is right. Final, set at birth
+    velocity_y: float = 0.0  # px/tick, + is down. Final, set at birth
 
     @classmethod
     def born(cls, birth: Birth) -> Self: ...
     @classmethod
-    def start_position(cls, x: float | None, y: float | None, width: float, height: float,
-                       invert: bool) -> tuple[float, float]: ...
+    def start_position(
+        cls, x: float | None, y: float | None, width: float, height: float, invert: bool
+    ) -> tuple[float, float]:
+        ...
         # y is required: None raises ValueError("satellite placement needs y").
         # x None: -width / 2, or SCREEN_W + width / 2 with invert.
+
     def update(self, ctx: TickContext) -> Self: ...
-    def effect_on_touch(self) -> TouchEffect: ...     # TouchEffect.HIT
-    def warning_tilt_degrees(self) -> float: ...      # -angle_degrees, or +angle_degrees with invert
+    def effect_on_touch(self) -> TouchEffect: ...  # TouchEffect.HIT
+    def warning_tilt_degrees(
+        self,
+    ) -> float: ...  # -angle_degrees, or +angle_degrees with invert
 ```
 The fields have defaults so `born_drifter` can build the satellite before `born` sets them.
 
@@ -453,59 +578,113 @@ Imports every drifter module once (`meteorite`, and `satellite` from DRA-39), so
 Unchanged in DRA-39.
 ```python
 # Imports: pygame, core.collision. Never app.
-def draw_shape(surface: pygame.Surface, color: tuple[int, int, int], shape: Shape, width: int = 0) -> None: ...
+def draw_shape(
+    surface: pygame.Surface, color: tuple[int, int, int], shape: Shape, width: int = 0
+) -> None:
+    ...
     # One placed shape. width 0 fills it; width 1 draws a 1 px outline.
-def draw_hitbox(surface: pygame.Surface, color: tuple[int, int, int], hitbox: Hitbox, width: int = 0) -> None: ...
+
+
+def draw_hitbox(
+    surface: pygame.Surface, color: tuple[int, int, int], hitbox: Hitbox, width: int = 0
+) -> None:
+    ...
     # draw_shape for every shape, in order.
 ```
 
 ### game/ui/drifters/
 ```python
 # game/ui/drifters/registry.py. Imports: pygame, math, core.drifters.base, ui.drifters.entry_warning. Never app.
-DrifterView = Callable[[pygame.Surface, Drifter, tuple[float, float], float, float], None]
-    # view(surface, obj, center, scale, brightness): draw obj's look centered at center (screen px),
-    # scaled by scale (1.0 full size, 0.5 half size), every color multiplied by brightness
-    # (0..1, 1.0 normal) through dim_color. DRA-39 adds brightness.
+DrifterView = Callable[
+    [pygame.Surface, Drifter, tuple[float, float], float, float], None
+]
+# view(surface, obj, center, scale, brightness): draw obj's look centered at center (screen px),
+# scaled by scale (1.0 full size, 0.5 half size), every color multiplied by brightness
+# (0..1, 1.0 normal) through dim_color. DRA-39 adds brightness.
 
-def dim_color(color: tuple[int, int, int], brightness: float) -> tuple[int, int, int]: ...   # DRA-39
+
+def dim_color(color: tuple[int, int, int], brightness: float) -> tuple[int, int, int]:
+    ...  # DRA-39
     # Each channel times brightness, rounded half up: math.floor(channel * brightness + 0.5).
-def register_view(drifter_type: DrifterType) -> Callable[[DrifterView], DrifterView]: ...
+
+
+def register_view(drifter_type: DrifterType) -> Callable[[DrifterView], DrifterView]:
+    ...
     # Decorator. Raises ValueError("view for drifter type 'meteorite' is already registered").
+
+
 def registered_views() -> frozenset[DrifterType]: ...
-def render_drifter(surface: pygame.Surface, obj: Drifter) -> None: ...
+def render_drifter(surface: pygame.Surface, obj: Drifter) -> None:
+    ...
     # WARNING: draw_entry_warning(surface, obj, view). ACTIVE: drop_entry_warning(obj), then
     # view(surface, obj, (obj.x, obj.y), 1.0, obj.brightness()).
     # GONE: nothing. Raises ValueError("no view registered for drifter type 'x'").
 
-# game/ui/drifters/entry_warning.py. Imports: pygame, random, math, core.drifters.base. Never app.
-ENTRY_WARNING_GLOW: Final[tuple[int, int, int]] = (255, 220, 120)   # 07-drifters.md, entry_warning_glow (guess)
-ENTRY_WARNING_SCALE: Final[float] = 0.5                      # 07-drifters.md, entry_warning_look: half size (guess)
-SPIKE_COUNT_MIN: Final[int] = 6                              # 07-drifters.md, entry_warning_spikes (guess)
-SPIKE_COUNT_MAX: Final[int] = 9                              # same
-WARNING_SIZE_RATIO: Final[float] = 1.0                       # 07-drifters.md, entry_warning_size: the whole warning
-                                                             # fits inside the drifter's own width (guess)
-GLOW_RATIO: Final[float] = 0.75                              # glow radius as a share of the warning's radius.
-                                                             # Placeholder choice, not in the GDD (see Rationale)
 
-def draw_entry_warning(surface: pygame.Surface, obj: Drifter, view: DrifterView) -> None: ...
-def drop_entry_warning(obj: Drifter) -> None: ...  # forget obj's warning image; nothing when it has none.
+# game/ui/drifters/entry_warning.py. Imports: pygame, random, math, core.drifters.base. Never app.
+ENTRY_WARNING_GLOW: Final[tuple[int, int, int]] = (
+    255,
+    220,
+    120,
+)  # 07-drifters.md, entry_warning_glow (guess)
+ENTRY_WARNING_SCALE: Final[float] = (
+    0.5  # 07-drifters.md, entry_warning_look: half size (guess)
+)
+SPIKE_COUNT_MIN: Final[int] = 6  # 07-drifters.md, entry_warning_spikes (guess)
+SPIKE_COUNT_MAX: Final[int] = 9  # same
+WARNING_SIZE_RATIO: Final[float] = (
+    1.0  # 07-drifters.md, entry_warning_size: the whole warning
+)
+# fits inside the drifter's own width (guess)
+GLOW_RATIO: Final[float] = 0.75  # glow radius as a share of the warning's radius.
+# Placeholder choice, not in the GDD (see Rationale)
+
+
+def draw_entry_warning(
+    surface: pygame.Surface, obj: Drifter, view: DrifterView
+) -> None: ...
+def drop_entry_warning(obj: Drifter) -> None:
+    ...  # forget obj's warning image; nothing when it has none.
     # render_drifter calls it when it draws obj ACTIVE. Director approval, 2026-10-15.
 
+
 # game/ui/drifters/meteorite_view.py. Imports: pygame, core.drifters.base, ui.drifters.registry. Never app.
-METEORITE_COLOR: Final[tuple[int, int, int]] = (140, 140, 140)   # drifters/01-meteorite.md, placeholder_look (guess)
+METEORITE_COLOR: Final[tuple[int, int, int]] = (
+    140,
+    140,
+    140,
+)  # drifters/01-meteorite.md, placeholder_look (guess)
+
 
 @register_view(DrifterType.METEORITE)
-def render_meteorite(surface: pygame.Surface, obj: Drifter, center: tuple[float, float],
-                     scale: float, brightness: float) -> None: ...
+def render_meteorite(
+    surface: pygame.Surface,
+    obj: Drifter,
+    center: tuple[float, float],
+    scale: float,
+    brightness: float,
+) -> None: ...
+
 
 # game/ui/drifters/satellite_view.py (DRA-39). Imports: pygame, core.collision, core.drifters.base,
 # ui.shapes, ui.drifters.registry. Never app.
-SATELLITE_BODY_COLOR: Final[tuple[int, int, int]] = (240, 240, 240)   # drifters/02-satellite.md, placeholder_look (guess)
-SATELLITE_PANEL_COLOR: Final[tuple[int, int, int]] = (60, 110, 220)   # same
+SATELLITE_BODY_COLOR: Final[tuple[int, int, int]] = (
+    240,
+    240,
+    240,
+)  # drifters/02-satellite.md, placeholder_look (guess)
+SATELLITE_PANEL_COLOR: Final[tuple[int, int, int]] = (60, 110, 220)  # same
+
 
 @register_view(DrifterType.SATELLITE)
-def render_satellite(surface: pygame.Surface, obj: Drifter, center: tuple[float, float],
-                     scale: float, brightness: float) -> None: ...
+def render_satellite(
+    surface: pygame.Surface,
+    obj: Drifter,
+    center: tuple[float, float],
+    scale: float,
+    brightness: float,
+) -> None: ...
+
 
 # game/ui/drifters/__init__.py: imports every view module once (meteorite_view, and satellite_view
 # from DRA-39), so each view registers. A package docstring and nothing else.

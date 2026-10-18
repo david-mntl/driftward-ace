@@ -1,7 +1,7 @@
 # Run: lives, falls, hits, drifters, respawn wait, game over and retry
-Version: 2
-Status: draft
-Features: DRA-23, DRA-29, DRA-39
+Version: 3
+Status: frozen
+Features: DRA-23, DRA-29, DRA-39, DRA-47
 Created by: architect
 
 ## Purpose
@@ -96,44 +96,67 @@ can hit on tick            T+1 .. T+180: no                  T+181: yes
 # Imports: stdlib, core.ship, core.scroll, core.collision, core.levels, core.drifters (DRA-29).
 # Never pygame, ui or app. Every module-level constant is typing.Final.
 
-LIVES_START: Final[int] = 3          # 05-lives-and-damage.md, lives_start (locked)
-INVULN_TICKS: Final[int] = 30        # 05-lives-and-damage.md, invuln_ticks (locked)
-BLINK_SWAP_TICKS: Final[int] = 6     # scope report DRA-23, blink: one visible/hidden swap every 0.1 s
-                                     # (approved in chat, not in the GDD; LD-04). 0.1 s × 60 ticks/s = 6.
-RESPAWN_WAIT_LIMIT: Final[int | None] = None   # 05-lives-and-damage.md, rule 2.5: no time limit.
+LIVES_START: Final[int] = 3  # 05-lives-and-damage.md, lives_start (locked)
+INVULN_TICKS: Final[int] = 30  # 05-lives-and-damage.md, invuln_ticks (locked)
+BLINK_SWAP_TICKS: Final[int] = (
+    6  # scope report DRA-23, blink: one visible/hidden swap every 0.1 s
+)
+# (approved in chat, not in the GDD; LD-04). 0.1 s × 60 ticks/s = 6.
+RESPAWN_WAIT_LIMIT: Final[int | None] = (
+    None  # 05-lives-and-damage.md, rule 2.5: no time limit.
+)
+
 
 @dataclass(frozen=True, slots=True)
 class Run:
     """One run's state after a tick."""
-    ship: Ship                       # the ship (core.ship)
-    scroll: Scroll                   # the world scroll and distance (core.scroll)
-    lives: int = LIVES_START         # lives left, 0 to LIVES_START. 0 only in game over
-    invuln_ticks_left: int = 0       # ticks of invulnerability still to come. 0 = not invulnerable
-    waiting: bool = False            # the ship stands at the respawn point until an arrow press
-    game_over: bool = False          # the Game Over box shows and everything is frozen
+
+    ship: Ship  # the ship (core.ship)
+    scroll: Scroll  # the world scroll and distance (core.scroll)
+    lives: int = LIVES_START  # lives left, 0 to LIVES_START. 0 only in game over
+    invuln_ticks_left: int = (
+        0  # ticks of invulnerability still to come. 0 = not invulnerable
+    )
+    waiting: bool = False  # the ship stands at the respawn point until an arrow press
+    game_over: bool = False  # the Game Over box shows and everything is frozen
     held: Thrust = field(default_factory=Thrust)  # the arrow keys held on the last tick
-    retry_armed: bool = False        # game over only: every arrow has been released since the box appeared
-    drifters: tuple[Drifter, ...] = ()   # DRA-29. Drifters on the field, oldest first
-    next_uid: int = 1                # DRA-29. The uid the next added drifter gets
+    retry_armed: bool = (
+        False  # game over only: every arrow has been released since the box appeared
+    )
+    drifters: tuple[Drifter, ...] = ()  # DRA-29. Drifters on the field, oldest first
+    next_uid: int = 1  # DRA-29. The uid the next added drifter gets
 
     @property
-    def invulnerable(self) -> bool: ...
+    def invulnerable(self) -> bool:
+        ...
         # invuln_ticks_left > 0
+
     @property
-    def ship_visible(self) -> bool: ...
+    def ship_visible(self) -> bool:
+        ...
         # True when not invulnerable. While invulnerable:
         # ((INVULN_TICKS - invuln_ticks_left) // BLINK_SWAP_TICKS) % 2 == 0
+
     @property
-    def level(self) -> int: ...      # DRA-29
+    def level(self) -> int:
+        ...  # DRA-29
         # core.levels.level_at(scroll.meters). 1 while Levels 2 to 8 have no start (DF-05).
 
-def start_run() -> Run: ...
+
+def start_run() -> Run:
+    ...
     # Run(ship=spawn(), scroll=start_scroll()). Every other field at its default: no drifters, next_uid 1.
 
-def step_run(run: Run, thrust: Thrust) -> Run: ...
+
+def step_run(run: Run, thrust: Thrust) -> Run:
+    ...
     # One 60 Hz tick. Pure apart from event logging. Never mutates its input.
 
-def add_drifters(run: Run, placements: Sequence[Placement], tuning: DrifterTuning) -> Run: ...   # DRA-29
+
+def add_drifters(
+    run: Run, placements: Sequence[Placement], tuning: DrifterTuning
+) -> Run:
+    ...  # DRA-29
     # The only way drifters enter a run. Spawns each placement, in order, at run.level
     # (or its as_level), gives it the next uid, and appends it. Pure apart from event logging.
     # Raises what spawn_drifter raises (unknown variant, level out of range, ...).
@@ -143,13 +166,22 @@ The code documents each `Run` field with the comment above. `Drifter`, `TickCont
 ```python
 # game/ui/game_over.py. Unchanged in DRA-29.
 # Imports: pygame. Never core, never app. Never reads the run mode or a key.
-BOX_SIZE: tuple[int, int] = (320, 120)             # scope report DRA-23, Game Over box (temporary stand-in)
-BOX_COLOR: tuple[int, int, int, int] = (0, 0, 0, 90)   # same: black, alpha 90 of 255 (about 35%)
-TEXT_COLOR: tuple[int, int, int] = (255, 255, 255) # same: white
-TITLE_TEXT: str = "Game Over"                      # same
-TITLE_FONT_SIZE: int = 32                          # same: default font, 32 px
-PROMPT_TEXT: str = "Press any arrow to retry"      # same
-PROMPT_FONT_SIZE: int = 16                         # same: 16 px, below the title
+BOX_SIZE: tuple[int, int] = (
+    320,
+    120,
+)  # scope report DRA-23, Game Over box (temporary stand-in)
+BOX_COLOR: tuple[int, int, int, int] = (
+    0,
+    0,
+    0,
+    90,
+)  # same: black, alpha 90 of 255 (about 35%)
+TEXT_COLOR: tuple[int, int, int] = (255, 255, 255)  # same: white
+TITLE_TEXT: str = "Game Over"  # same
+TITLE_FONT_SIZE: int = 32  # same: default font, 32 px
+PROMPT_TEXT: str = "Press any arrow to retry"  # same
+PROMPT_FONT_SIZE: int = 16  # same: 16 px, below the title
+
 
 def draw_game_over(surface: pygame.Surface) -> None: ...
 ```
