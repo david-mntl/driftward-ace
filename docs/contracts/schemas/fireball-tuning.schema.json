@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/fireball-tuning.schema.json",
+  "title": "Fireball tuning file",
+  "description": "The file game/tuning/drifters/fireball.json. Built on drifter-tuning.schema.json: the same default_variant, speed_ratio and entry_warning_ticks, plus the fireball's own type values, and variants that give their head width instead of width, height and hitbox. The loader works those three out: width and height are the head width (the fireball's size is its head, 91-decision-log.md, row 61), and the hitbox is the head circle plus the tail circle, built by core.drifters.fireball.fireball_hitbox (docs/contracts/systems/drifters.md, Rules, Fireball). Values from drifters/06-fireball.md (all guess): default_variant small; variants small 21 and big 32 (head width); speed_ratio 0.47; entry_warning_ticks 60 (07-drifters.md, shared); angle_degrees 35; tail_ratio 0.5. Key mapping to the GDD: head_width is the variants row's head width; angle_degrees is the angle row (from straight down, fixed for every fireball, never scaled); tail_ratio is the hitbox row's 'half the head's radius'. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Rule this schema can't express, also enforced by the loader: default_variant is one of the variant names. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, Fireball.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_variant",
+    "variants",
+    "speed_ratio",
+    "entry_warning_ticks",
+    "angle_degrees",
+    "tail_ratio"
+  ],
+  "properties": {
+    "default_variant": {
+      "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants. small.",
+      "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+    },
+    "variants": {
+      "description": "Named sizes (06-fireball.md, variants). A new size is a new entry here and needs no code (06, How to extend).",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "drifter-tuning.schema.json#/$defs/variant_name" },
+      "additionalProperties": { "$ref": "#/$defs/variant" }
+    },
+    "speed_ratio": { "$ref": "drifter-tuning.schema.json#/properties/speed_ratio" },
+    "entry_warning_ticks": { "$ref": "drifter-tuning.schema.json#/properties/entry_warning_ticks" },
+    "angle_degrees": {
+      "description": "Path angle from straight down, degrees. 0 is straight down; below 90 so it always falls. The same for every variant and every level. 35.",
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 90
+    },
+    "tail_ratio": {
+      "description": "Tail radius as a share of the head's radius. The tail touches the head from behind, along the path. 0.5.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head_width"],
+      "properties": {
+        "head_width": {
+          "description": "Head diameter, px: the fireball's size (width and height), its head circle's diameter, and the base of its tail's size. 21 small, 32 big.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}

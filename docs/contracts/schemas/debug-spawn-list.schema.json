@@ -2,13 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "driftward-ace/debug-spawn-list.schema.json",
   "title": "Debug test spawn list",
-  "description": "The file game/tuning/debug_spawns.json, edited by hand. Debug mode only: normal mode never reads it. Not a wave (15-tech-constraints.md, rule 7; 91-decision-log.md, row 38). Each row places one drifter. The rows in play (all of them, or only those of the drifter type named by mode) are spread evenly over one loop of loop_ticks, in file order, and the loop repeats. A row needs only its drifter type and its position; everything else is the drifter's default. Loaded and checked by game/app/debug_spawns.py at startup in debug mode (docs/contracts/systems/app.md, Rules, Debug test spawn list). Rules this schema can't express, also enforced by the loader: type and mode name a built drifter type (DrifterType values); the row has the coordinate its drifter needs (the meteorite and the chain lightning need x, the satellite y); variant names one of that drifter's variants; invert is allowed only for a drifter that has one (the satellite and the chain lightning). The loader checks those by spawning every row once at load. Defaults: mode all, loop_ticks 180 (scope report DRA-39, Values needed: temporary stand-ins, not in the GDD). Owner of the schema: architect.",
+  "description": "The file game/tuning/debug_spawns.json, edited by hand. Debug mode only: normal mode never reads it. Not a wave (15-tech-constraints.md, rule 7; 91-decision-log.md, row 38). Each row places one drifter. The rows in play (all of them, or only those of the drifter type named by mode) are spread evenly over one loop of loop_ticks, in file order, and the loop repeats. A row needs only its drifter type and the position its drifter needs; everything else is the drifter's default. Loaded and checked by game/app/debug_spawns.py at startup in debug mode (docs/contracts/systems/app.md, Rules, Debug test spawn list). Rules this schema can't express, also enforced by the loader: type and mode name a built drifter type (DrifterType values); the row has the coordinate its drifter needs (the meteorite and the chain lightning need x, the satellite y; the fireball needs neither: no x and no y is its corner entry, DRA-56); variant names one of that drifter's variants; invert is allowed only for a drifter that has one (the satellite, the chain lightning and the fireball). The loader checks those by spawning every row once at load. Defaults: mode all, loop_ticks 180 (scope report DRA-39, Values needed: temporary stand-ins, not in the GDD). Owner of the schema: architect.",
   "type": "object",
   "additionalProperties": false,
   "required": ["rows"],
   "properties": {
     "mode": {
-      "description": "Which rows play: \"all\" (the default when left out), or one drifter type value such as \"satellite\" or \"chain_lightning\" to play only that type's rows.",
+      "description": "Which rows play: \"all\" (the default when left out), or one drifter type value such as \"satellite\", \"chain_lightning\" or \"fireball\" to play only that type's rows.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*$"
     },
@@ -28,22 +28,18 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["type"],
-      "anyOf": [
-        { "required": ["x"] },
-        { "required": ["y"] }
-      ],
       "properties": {
         "type": {
-          "description": "The drifter type value, e.g. \"meteorite\", \"satellite\" or \"chain_lightning\".",
+          "description": "The drifter type value, e.g. \"meteorite\", \"satellite\", \"chain_lightning\" or \"fireball\".",
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
         },
         "x": {
-          "description": "Center x, screen px. Required for the meteorite and the chain lightning (the center of the box around its nodes). Left out for a satellite: just outside the wall it enters from.",
+          "description": "Center x, screen px. Required for the meteorite and the chain lightning (the center of the box around its nodes). Left out for a satellite: just outside the wall it enters from. For a fireball (the head's center): x alone is an entry along the top; left out with y, a side entry; left out with no y either, the top-left corner (top-right with invert).",
           "type": "number"
         },
         "y": {
-          "description": "Center y, screen px, y down. Required for the satellite. Left out for a meteorite or a chain lightning: just above the top edge.",
+          "description": "Center y, screen px, y down. Required for the satellite. Left out for a meteorite, a chain lightning or a fireball: just above the top edge. For a fireball, y alone is a side entry: the left wall, or the right with invert.",
           "type": "number"
         },
         "variant": {
@@ -52,7 +48,7 @@
           "pattern": "^[a-z][a-z0-9_]*$"
         },
         "invert": {
-          "description": "The spec's invert (the satellite enters from the right wall and flies left; the chain lightning's layout is mirrored, the triangle turned point down). Left out: false. A drifter without one refuses true.",
+          "description": "The spec's invert (the satellite enters from the right wall and flies left; the chain lightning's layout is mirrored, the triangle turned point down; the fireball flies down and to the left, entering at the right). Left out: false. A drifter without one refuses true.",
           "type": "boolean"
         },
         "speed": {
