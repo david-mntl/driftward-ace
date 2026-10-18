@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/coin-tuning.schema.json",
+  "title": "Coin tuning file",
+  "description": "The file game/tuning/drifters/coin.json. Built on drifter-tuning.schema.json: the same default_variant and variant names, but no speed_ratio and no entry_warning_ticks, because the coin is a parked pickup: it moves only with the scroll and has no entry warning (drifters/04-coin.md, kind and entry_warning, both locked; 07-drifters.md, entry_warning_ticks: 'Pickups have none'). Each variant gives its points and whether it shows the glint, instead of width, height and hitbox. The loader works those three out from the type's sizes: width is crystal_width, height is crystal_height, and the hitbox is one box, crystal_width x body_height, centered, built by core.drifters.coin.coin_hitbox (docs/contracts/systems/drifters.md, Rules, Coin). Values from drifters/04-coin.md (all guess but common's 50, locked) and scope report DRA-62: default_variant common; variants common 50 points, no glint, and rare 100 points, with the glint; crystal_width 12; crystal_height 20; body_height 10; ring_width 22; ring_height 8; glint_size 2; glint_left 3; glint_top 3 (scope report DRA-62, Not in GDD: Director approval); popup_ticks 60; popup_rise_per_tick 0.5 (scope report DRA-62, Not in GDD: Director). Key mapping to the GDD: points is coin_points per variant (06-scoring.md); crystal_width, crystal_height and body_height are the crystal_size row (12 wide, 20 tall, a 12 x 10 rectangle); ring_width and ring_height are placeholder_look's 22 x 8 ellipse; popup_ticks is the popup row's 60 ticks. Sizes are even whole px so the placeholder view draws them on exact pixels (docs/contracts/systems/drifters.md, Rationale). Colors, the 1 px rim and ring, and the popup's font are not here: they stay in the views. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Rules this schema can't express, also enforced by the loader: default_variant is one of the variant names; body_height < crystal_height; glint_left + glint_size <= crystal_width; glint_top + glint_size <= crystal_height. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, Coin.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_variant",
+    "variants",
+    "crystal_width",
+    "crystal_height",
+    "body_height",
+    "ring_width",
+    "ring_height",
+    "glint_size",
+    "glint_left",
+    "glint_top",
+    "popup_ticks",
+    "popup_rise_per_tick"
+  ],
+  "properties": {
+    "default_variant": {
+      "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants. common.",
+      "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+    },
+    "variants": {
+      "description": "Named point values (04-coin.md, variants). A new point value is a new entry here and needs no code (04-coin.md, How to extend).",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "drifter-tuning.schema.json#/$defs/variant_name" },
+      "additionalProperties": { "$ref": "#/$defs/variant" }
+    },
+    "crystal_width": {
+      "description": "The crystal's width, px: the coin's width and its hitbox's width. Even. 12.",
+      "$ref": "#/$defs/even_size"
+    },
+    "crystal_height": {
+      "description": "The crystal's height, px, its two points included: the coin's height. Even. 20.",
+      "$ref": "#/$defs/even_size"
+    },
+    "body_height": {
+      "description": "The crystal's middle rectangle, px: the hitbox's height. Each point is (crystal_height - body_height) / 2 tall. Even, below crystal_height. 10.",
+      "$ref": "#/$defs/even_size"
+    },
+    "ring_width": {
+      "description": "The ring's ellipse width, px, across the crystal's middle. Counts for leaving the screen, never for the hitbox. Even. 22.",
+      "$ref": "#/$defs/even_size"
+    },
+    "ring_height": {
+      "description": "The ring's ellipse height, px. Even. 8.",
+      "$ref": "#/$defs/even_size"
+    },
+    "glint_size": {
+      "description": "The glint's side, px: a solid square, drawn only on a variant with glint true. 2.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "glint_left": {
+      "description": "The glint's left edge, px from the left edge of the crystal's crystal_width x crystal_height box. 3.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "glint_top": {
+      "description": "The glint's top edge, px from the top edge of the crystal's box. 3.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "popup_ticks": {
+      "description": "How many ticks the points popup shows after a collect, then it vanishes with no fade. 60 (1 s).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "popup_rise_per_tick": {
+      "description": "How far the points popup rises up the screen each tick, px/tick. It never moves with the scroll. 0 keeps it still. 0.5.",
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "$defs": {
+    "even_size": {
+      "type": "integer",
+      "minimum": 2,
+      "multipleOf": 2
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["points", "glint"],
+      "properties": {
+        "points": {
+          "description": "Points added to the run's coin points when this coin is collected (06-scoring.md, rule 2). Never scaled by level. 50 common, 100 rare.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "glint": {
+          "description": "True: the placeholder look draws the glint (the rare coin 'shines more'). false common, true rare.",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

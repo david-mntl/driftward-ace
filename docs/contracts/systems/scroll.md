@@ -1,11 +1,11 @@
 # Scroll: world scroll, distance and starfield
 Version: 4
-Status: frozen
-Features: DRA-13, DRA-19, DRA-23, DRA-61
+Status: draft
+Features: DRA-13, DRA-19, DRA-23, DRA-61, DRA-62
 Created by: architect
 
 ## Purpose
-The screen stays fixed. The world scrolls down past it at a steady speed, and distance counts that scroll. This contract holds the scroll's state and its one-tick step, the distance in px and in whole meters, and the starfield view that makes the motion visible. Level 1 speed only: levels and speed changes are out of DRA-13.
+The screen stays fixed. The world scrolls down past it at a steady speed, and distance counts that scroll. This contract holds the scroll's state and its one-tick step, how far the world moves on the next step (what a parked drifter, such as the coin, rides on), the distance in px and in whole meters, and the starfield view that makes the motion visible. Level 1 speed only: levels and speed changes are out of DRA-13.
 
 The scroll and the ship never touch each other. The ship's step doesn't read the scroll, and the scroll's step doesn't read the ship.
 
@@ -15,6 +15,7 @@ Who builds what:
 - `game/tests/core/test_scroll.py`: the QA Engineer, task `DRA-13-04-qa-engineer`.
 - Creating the scroll at play start and stepping it once per playing tick: `core.run`, from `docs/contracts/systems/run.md` (DRA-23). Drawing the starfield from `run.scroll`: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
 - The score, which counts `meters` at 1 point a meter: `docs/contracts/systems/run.md`. The SCORE line that shows it: `docs/contracts/systems/hud.md`. `meters` has no readout of its own.
+- `scroll_step_px` in `game/core/scroll.py`: the Gameplay Implementer, task `DRA-62-02-gameplay-implementer`. `core.run` reads it each tick and hands it to the drifters (`docs/contracts/systems/run.md`, step 3; `docs/contracts/systems/drifters.md`, `TickContext`). Its test: task `DRA-62-06-qa-engineer`, in `game/tests/core/test_scroll.py`.
 
 ## Diagram
 ```mermaid
@@ -32,6 +33,8 @@ flowchart TD
 flowchart LR
   RUN["core.run.step_run"] -- "once per playing tick" --> STEP["core.scroll.step_scroll"]
   STEP -- "Scroll" --> RUN
+  RUN -- "before the step (DRA-62)" --> NX["core.scroll.scroll_step_px<br/>px the world moves this tick"]
+  NX -- "TickContext.scroll_step_px" --> DR["drifters' update<br/>(the coin rides it)"]
   APP["app.frame"] -- "run.scroll" --> SF["ui.starfield.draw_starfield"]
   APP -- "run" --> HUD["ui.hud.draw_hud"]
   SF -. reads .-> D["scroll.distance_px"]
@@ -80,6 +83,11 @@ def start_scroll() -> Scroll: ...
 def step_scroll(scroll: Scroll) -> Scroll: ...
     # One 60 Hz tick. Pure apart from one event log line.
     # Same scroll in, same scroll out. Never mutates its input.
+
+def scroll_step_px(scroll: Scroll) -> float: ...                       # DRA-62
+    # How far the world moves down, px, on the tick that steps this scroll:
+    # SCROLL_PER_TICK when scroll.ticks + 1 > SCROLL_START_DELAY, else 0.0.
+    # Pure, logs nothing. Doesn't step anything.
 ```
 
 ```python
@@ -122,6 +130,11 @@ The step, every tick:
 1. `ticks += 1`. Source: 15-tech-constraints.md, rule 2 (fixed tick).
 2. If the new `ticks` is greater than `SCROLL_START_DELAY`: `scrolled_ticks += 1`. So ticks 1 to 30 don't move the world, and tick 31 is the first that does. Source: 03-world-and-camera.md, rule 4 and scroll_start_delay; 91-decision-log.md, row 24.
 
+The next step's movement (DRA-62):
+- `scroll_step_px(scroll)` is the px the world moves down on the tick that steps `scroll`: `SCROLL_PER_TICK` (1.1) when `scroll.ticks + 1 > SCROLL_START_DELAY`, else 0.0. It reads the same rule as step 2, so it always agrees with the step: `step_scroll(scroll).distance_px − scroll.distance_px` equals `scroll_step_px(scroll)` within 1e-9 px, on every tick. 0.0 on the steps to ticks 1 to 30, 1.1 from the step to tick 31 on. Source: 03-world-and-camera.md, rules 4 and 9 (parked drifters move down with the scroll).
+- It is called on the scroll as it was going into a tick, before `step_scroll` runs on that tick (`systems/run.md`, step 3). It logs nothing, so the `scroll start` line still comes once, from `step_scroll`.
+- It never changes the scroll and is never read by the ship. Only `core.run` calls it, to tell the drifters how far the world moves this tick.
+
 Distance:
 - `distance_px = DISTANCE_START × PX_PER_METER + scrolled_ticks × SCROLL_PER_TICK`. At play start it is 0. Source: 03-world-and-camera.md, rule 8, distance_start.
 - `meters = floor(distance_px / PX_PER_METER)`. Whole meters, rounded down. Source: 06-scoring.md, rule 1 and meters_rounding; 03-world-and-camera.md, px_per_meter.
@@ -163,6 +176,16 @@ DRA-61 changes this frozen contract (v3). No code, signature, value or log line 
 | `game/core/run.py` | `score` reads `scroll.meters`. See `systems/run.md`, Impact. Task `DRA-61-01-gameplay-implementer`. |
 | `game/ui/hud.py`, `game/tests/ui/test_hud.py` | see `systems/hud.md`, Impact. |
 
+DRA-62 changes this frozen contract (v4). One new pure function, `scroll_step_px`. `Scroll`, `start_scroll`, `step_scroll`, every constant and the log line don't change. Grepping `game/` (tests included) for `core.scroll`, `Scroll`, `step_scroll` and `SCROLL_`:
+
+| File | Change needed |
+|---|---|
+| `game/core/scroll.py` | `scroll_step_px`. Task `DRA-62-02-gameplay-implementer`. |
+| `game/core/run.py` | step 3 passes `scroll_step_px(run.scroll)` to the drifters. See `systems/run.md`, Impact. Task `DRA-62-02-gameplay-implementer`. |
+| `game/ui/starfield.py`, `game/ui/hud.py`, `game/app/frame.py`, `game/app/debug_spawns.py` | none. |
+| `game/tests/core/test_scroll.py` | none needed; must pass unchanged. Task `DRA-62-06-qa-engineer` adds one test for `scroll_step_px`. |
+| `game/tests/core/test_run.py`, `test_run_score.py`, `test_run_drifters.py`, `test_chain_lightning.py`, `test_fireball.py`, `game/tests/ui/test_hud.py` | none. They read `run.scroll` and its properties, which don't change. |
+
 ## Rationale
 - **`Final` and `slots=True` (DRA-19).** Same reasons as in `systems/ship.md`, Rationale. Core modules stay alike. `Scroll`'s field docstrings and its two properties are unaffected by slots.
 - **A separate system, not part of `core/world.py`.** `world.py` is constants only, and the DRA-6 world contract keeps it that way. The scroll has state and a step, like the ship. Its constants live with it, the same way the ship's physics constants live in `core/ship.py`.
@@ -175,4 +198,5 @@ DRA-61 changes this frozen contract (v3). No code, signature, value or log line 
 - **The star layout lives in UI.** Star positions are a look, not a rule. Core never draws and never needs them. A fixed seed gives the same layout every run without typing 50 positions into a contract. The seed has no design meaning, so it isn't a GDD value.
 - **The scroll start is logged once.** It is an event, and the integration check needs it to time the 0.5 s delay. A line per meter would be about seven a second, which the log policy rules out.
 - **No art task.** The starfield is a placeholder look of plain dots, approved as a temporary stand-in. No sprite, no asset. The final background is AA-02.
+- **`scroll_step_px` reads the scroll going into the tick (DRA-62).** The run updates drifters (step 3) before it steps the scroll (step 5), and moving the scroll step earlier would change the frozen order of the run's log lines. A pure function of the old scroll gives the same number `step_scroll` is about to add, with no second log line. Computing it in the scroll module keeps the start-delay rule in one place: the run never works out when the world moves. When levels change the speed, this function changes with `step_scroll`, and parked drifters follow for free.
 - **No schema.** DRA-13 adds no data file. Every value is a constant in code, as the ship's are. The tuning file is out of scope.
