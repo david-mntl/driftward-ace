@@ -1,5 +1,5 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
-Version: 6
+Version: 7
 Status: draft
 Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47
 Created by: architect
@@ -116,23 +116,31 @@ class RunMode(Enum):
     NORMAL = "normal"
     DEBUG = "debug"
 
+
 @dataclass(frozen=True)
 class ModeChoice:
     mode: RunMode
-    rejected: str | None   # the switch value that was present but not "1"; None otherwise
+    rejected: (
+        str | None
+    )  # the switch value that was present but not "1"; None otherwise
 
-def read_switch() -> str | None: ...
+
+def read_switch() -> str | None:
+    ...
     # Browser (sys.platform == "emscripten"): the first value of URL query parameter `debug`.
     # Desktop: environment variable DRIFTWARD_DEBUG.
     # None when the switch is absent. Present with an empty value returns "".
 
-def choose_mode(raw: str | None) -> ModeChoice: ...
+
+def choose_mode(raw: str | None) -> ModeChoice:
+    ...
     # Pure. No logging, no I/O.
 ```
 
 ### game/app/log.py (Integration Engineer)
 ```python
-def setup_logging(mode: RunMode) -> None: ...
+def setup_logging(mode: RunMode) -> None:
+    ...
     # The only place that configures logging. Called once, at startup.
     # Installs exactly one handler on the root logger:
     #   browser (sys.platform == "emscripten"): writes each formatted line
@@ -142,7 +150,8 @@ def setup_logging(mode: RunMode) -> None: ...
 
 ### game/app/guard.py (Integration Engineer)
 ```python
-async def guarded(body: Callable[[], Awaitable[None]], mode: RunMode) -> None: ...
+async def guarded(body: Callable[[], Awaitable[None]], mode: RunMode) -> None:
+    ...
     # Awaits body(). Holds the project's only `except Exception`.
     # Module level: stdlib and app.mode only. pygame, core.world and
     # ui.error_screen are imported inside the error step, never at the top.
@@ -150,26 +159,33 @@ async def guarded(body: Callable[[], Awaitable[None]], mode: RunMode) -> None: .
 
 ### game/app/settings.py (Integration Engineer)
 ```python
-TICK_RATE: int = 60                         # 15-tech-constraints.md, tick_rate
-MAX_TICKS_PER_FRAME: int = 5                # 15-tech-constraints.md, max_ticks_per_frame (guess)
+TICK_RATE: int = 60  # 15-tech-constraints.md, tick_rate
+MAX_TICKS_PER_FRAME: int = 5  # 15-tech-constraints.md, max_ticks_per_frame (guess)
 ```
 Constants only. No imports. From DRA-6 the screen size lives in `core/world.py` (`SCREEN_W`, `SCREEN_H`), and `SCREEN_SIZE` is removed from here. See Impact.
 
 ### game/app/loop.py (Integration Engineer)
 ```python
-async def run() -> None: ...
+async def run() -> None:
+    ...
     # Startup order, then guarded(functools.partial(start, choice.mode), choice.mode).
 
-async def start(mode: RunMode) -> None: ...
+
+async def start(mode: RunMode) -> None:
+    ...
     # The guarded body. Imports app.frame here, inside the guard, then awaits frame_loop(mode).
 ```
 Module level: stdlib, `app.mode`, `app.log` and `app.guard` only. No pygame, no `core`, no `ui`, no `app.frame`.
 
 ### game/app/frame.py (Integration Engineer)
 ```python
-ARROW_NAMES: dict[int, str]   # pygame.K_UP -> "up", K_DOWN -> "down", K_LEFT -> "left", K_RIGHT -> "right"
+ARROW_NAMES: dict[
+    int, str
+]  # pygame.K_UP -> "up", K_DOWN -> "down", K_LEFT -> "left", K_RIGHT -> "right"
 
-async def frame_loop(mode: RunMode) -> None: ...
+
+async def frame_loop(mode: RunMode) -> None:
+    ...
     # pygame init, window, frames until pygame.QUIT.
     # Owns: run (core.run.Run), thrust (core.ship.Thrust), overlay_visible (bool).
 ```
@@ -177,25 +193,35 @@ Imports pygame, `app.settings`, `app.mode`, `app.tuning` and `app.debug_spawns` 
 
 App-owned state in `frame_loop` (DRA-23, DRA-29, DRA-39):
 ```python
-tuning: DrifterTuning    # DRA-29. app.tuning.load_tuning() once, before start_run(). Never reloaded
-spawn_list: DebugSpawnList | None   # DRA-39. Debug mode: app.debug_spawns.load_debug_spawns(tuning) once,
-                                    # right after load_tuning(). Normal mode: None, the file is never read
-run: Run                # core.run.start_run() before the first frame; replaced by step_run() every tick,
-                        # and by add_drifters() after a tick in debug mode
-thrust: Thrust          # rebuilt once per frame from the held arrow keys
-overlay_visible: bool   # True from the first frame in debug mode, always False in normal mode.
-                        # F3 flips it, debug mode only.
+tuning: DrifterTuning  # DRA-29. app.tuning.load_tuning() once, before start_run(). Never reloaded
+spawn_list: (
+    DebugSpawnList | None
+)  # DRA-39. Debug mode: app.debug_spawns.load_debug_spawns(tuning) once,
+# right after load_tuning(). Normal mode: None, the file is never read
+run: Run  # core.run.start_run() before the first frame; replaced by step_run() every tick,
+# and by add_drifters() after a tick in debug mode
+thrust: Thrust  # rebuilt once per frame from the held arrow keys
+overlay_visible: (
+    bool  # True from the first frame in debug mode, always False in normal mode.
+)
+# F3 flips it, debug mode only.
 ```
 The ship, the scroll and the drifters are `run.ship`, `run.scroll` and `run.drifters`. The app never keeps its own copy.
 
 ### game/app/tuning.py (Integration Engineer, DRA-29)
 ```python
-TUNING_DIR: Path        # the game's tuning folder: Path(__file__).resolve().parent.parent / "tuning"
-PLAYTEST_FILE: str = "playtest.json"        # in TUNING_DIR
-HAZARDS_FILE: str = "hazards.json"          # in TUNING_DIR. DRA-39
-DRIFTERS_DIR: str = "drifters"                # in TUNING_DIR; one "<drifter_type value>.json" per DrifterType
+TUNING_DIR: (
+    Path  # the game's tuning folder: Path(__file__).resolve().parent.parent / "tuning"
+)
+PLAYTEST_FILE: str = "playtest.json"  # in TUNING_DIR
+HAZARDS_FILE: str = "hazards.json"  # in TUNING_DIR. DRA-39
+DRIFTERS_DIR: str = (
+    "drifters"  # in TUNING_DIR; one "<drifter_type value>.json" per DrifterType
+)
 
-def load_tuning() -> DrifterTuning: ...
+
+def load_tuning() -> DrifterTuning:
+    ...
     # Reads and checks the playtest switches, the shared hazard values (DRA-39) and one file per
     # DrifterType, then builds the core dataclasses (docs/contracts/systems/drifters.md, Interface,
     # core/drifters/tuning.py, SatelliteVariantExtra in core/drifters/satellite.py, and from DRA-47
@@ -207,24 +233,39 @@ Not a startup module: it imports `core.drifters`, so only `app.frame` imports it
 ### game/app/debug_spawns.py (Integration Engineer, DRA-29; editable list DRA-39)
 The debug test spawn list, a file the Director edits by hand: `game/tuning/debug_spawns.json`, to `docs/contracts/schemas/debug-spawn-list.schema.json`. A temporary stand-in kept in the scope reports, not in the GDD. Debug mode only.
 ```python
-SPAWN_LIST_FILE: str = "debug_spawns.json"  # in app.tuning.TUNING_DIR, read at call time
-ALL_ROWS: str = "all"                       # the mode that plays every row
-DEFAULT_MODE: str = ALL_ROWS                # scope report DRA-39, Values needed (stand-in): mode left out
-DEFAULT_LOOP_TICKS: int = 180               # scope report DRA-39, Values needed (stand-in, kept from DRA-29):
-                                            # loop_ticks left out. 3 s
+SPAWN_LIST_FILE: str = (
+    "debug_spawns.json"  # in app.tuning.TUNING_DIR, read at call time
+)
+ALL_ROWS: str = "all"  # the mode that plays every row
+DEFAULT_MODE: str = (
+    ALL_ROWS  # scope report DRA-39, Values needed (stand-in): mode left out
+)
+DEFAULT_LOOP_TICKS: int = (
+    180  # scope report DRA-39, Values needed (stand-in, kept from DRA-29):
+)
+# loop_ticks left out. 3 s
+
 
 @dataclass(frozen=True, slots=True)
 class DebugSpawnList:
     """The checked list, ready to play."""
-    mode: str                                    # "all" or a DrifterType value
-    loop_ticks: int                              # ticks, >= 1
-    schedule: tuple[tuple[int, Placement], ...]  # (offset within the loop, placement) for each row in
-                                                 # play, in file order. Offsets from 0 to loop_ticks - 1
 
-def load_debug_spawns(tuning: DrifterTuning) -> DebugSpawnList: ...
+    mode: str  # "all" or a DrifterType value
+    loop_ticks: int  # ticks, >= 1
+    schedule: tuple[
+        tuple[int, Placement], ...
+    ]  # (offset within the loop, placement) for each row in
+    # play, in file order. Offsets from 0 to loop_ticks - 1
+
+
+def load_debug_spawns(tuning: DrifterTuning) -> DebugSpawnList:
+    ...
     # Reads and checks the file, then every row by spawning it once with spawn_drifter(placement, 1,
     # tuning). Builds the schedule for the rows in play. Raises on any problem.
-def debug_spawns_due(spawn_list: DebugSpawnList, ticks: int) -> tuple[Placement, ...]: ...
+
+
+def debug_spawns_due(spawn_list: DebugSpawnList, ticks: int) -> tuple[Placement, ...]:
+    ...
     # () when ticks < 1. Otherwise every placement in the schedule whose offset ==
     # (ticks - 1) % spawn_list.loop_ticks, in schedule order.
     # ticks is run.scroll.ticks after the tick: 1 on the first tick of play.
@@ -244,75 +285,81 @@ The DRA-6 and DRA-13 call blocks below are kept as history. From DRA-23 the ship
 DRA-6 calls, all made by `frame_loop`. Their signatures are set in the DRA-6 contracts:
 ```python
 # before the first frame:
-ship = spawn()                                  # systems/ship.md
+ship = spawn()  # systems/ship.md
 # per frame, after the events:
 thrust = Thrust(up=..., down=..., left=..., right=...)
 # per tick, inside the accumulator loop:
-ship = step(ship, thrust)                       # systems/ship.md
+ship = step(ship, thrust)  # systems/ship.md
 # per frame, draw:
 surface.fill(BACKGROUND)
-draw_ship(surface, ship)                        # systems/ship.md
+draw_ship(surface, ship)  # systems/ship.md
 if overlay_visible:
-    draw_debug_overlay(surface, ship)           # systems/debug-overlay.md
+    draw_debug_overlay(surface, ship)  # systems/debug-overlay.md
 ```
 
 DRA-13 calls, all made by `frame_loop`. Their signatures are set in the DRA-13 contracts. The full order, with the DRA-6 calls in place:
 ```python
 # before the first frame:
 ship = spawn()
-scroll = start_scroll()                         # systems/scroll.md, right after spawn(): play starts
+scroll = start_scroll()  # systems/scroll.md, right after spawn(): play starts
 # per tick, inside the accumulator loop:
 ship = step(ship, thrust)
-scroll = step_scroll(scroll)                    # systems/scroll.md
+scroll = step_scroll(scroll)  # systems/scroll.md
 # per frame, draw:
 surface.fill(BACKGROUND)
-draw_starfield(surface, scroll)                 # systems/scroll.md, behind everything
+draw_starfield(surface, scroll)  # systems/scroll.md, behind everything
 draw_ship(surface, ship)
 if overlay_visible:
     draw_debug_overlay(surface, ship)
-draw_hud(surface, scroll, below_overlay=debug)  # systems/hud.md, last; debug = mode is RunMode.DEBUG
+draw_hud(
+    surface, scroll, below_overlay=debug
+)  # systems/hud.md, last; debug = mode is RunMode.DEBUG
 ```
 
 DRA-23 calls, all made by `frame_loop`. Their signatures are set in `systems/run.md` and `systems/hud.md`. They replace the DRA-6 and DRA-13 ship and scroll calls above. The full order:
 ```python
 # before the first frame:
-run = start_run()                               # systems/run.md: spawn() and start_scroll(), play starts
+run = start_run()  # systems/run.md: spawn() and start_scroll(), play starts
 # per frame, after the events:
 thrust = Thrust(up=..., down=..., left=..., right=...)
 # per tick, inside the accumulator loop:
-run = step_run(run, thrust)                     # systems/run.md: the only call per tick
+run = step_run(run, thrust)  # systems/run.md: the only call per tick
 # per frame, draw:
 surface.fill(BACKGROUND)
 draw_starfield(surface, run.scroll)
 if run.ship_visible:
-    draw_ship(surface, run.ship)                # the blink
+    draw_ship(surface, run.ship)  # the blink
 if overlay_visible:
     draw_debug_overlay(surface, run.ship)
 if run.game_over:
-    draw_game_over(surface)                     # systems/run.md, Presentation
-draw_hud(surface, run, below_overlay=debug)     # systems/hud.md, last
+    draw_game_over(surface)  # systems/run.md, Presentation
+draw_hud(surface, run, below_overlay=debug)  # systems/hud.md, last
 ```
 
 DRA-29 calls, all made by `frame_loop`. Their signatures are set in `systems/drifters.md`, `systems/run.md` and `systems/debug-overlay.md`. They add to the DRA-23 block above. The full order:
 ```python
 # before the first frame:
-tuning = load_tuning()                          # app.tuning, both modes. A bad file raises here
+tuning = load_tuning()  # app.tuning, both modes. A bad file raises here
 run = start_run()
 # per frame, after the events:
 thrust = Thrust(up=..., down=..., left=..., right=...)
 # per tick, inside the accumulator loop:
 run = step_run(run, thrust)
 if debug:
-    run = add_drifters(run, debug_spawns_due(run.scroll.ticks), tuning)   # systems/run.md
+    run = add_drifters(
+        run, debug_spawns_due(run.scroll.ticks), tuning
+    )  # systems/run.md
 # per frame, draw:
 surface.fill(BACKGROUND)
 draw_starfield(surface, run.scroll)
 for obj in run.drifters:
-    render_drifter(surface, obj)                 # systems/drifters.md: warnings and drifters
+    render_drifter(surface, obj)  # systems/drifters.md: warnings and drifters
 if run.ship_visible:
-    draw_ship(surface, run.ship)                # the inverted T (systems/ship.md)
+    draw_ship(surface, run.ship)  # the inverted T (systems/ship.md)
 if overlay_visible:
-    draw_debug_hitboxes(surface, run)           # systems/debug-overlay.md: outlines and labels first
+    draw_debug_hitboxes(
+        surface, run
+    )  # systems/debug-overlay.md: outlines and labels first
     draw_debug_overlay(surface, run.ship)
 if run.game_over:
     draw_game_over(surface)
@@ -322,8 +369,12 @@ draw_hud(surface, run, below_overlay=debug)
 DRA-39 calls, all made by `frame_loop`. They change the DRA-29 block above only before the first frame and in the tick. The draw order is unchanged: `render_drifter(surface, obj)` keeps its signature (the brightness and the tilt come from the drifter itself).
 ```python
 # before the first frame:
-tuning = load_tuning()                          # app.tuning, both modes: drifter files, playtest.json, hazards.json
-spawn_list = load_debug_spawns(tuning) if debug else None   # app.debug_spawns, debug mode only
+tuning = (
+    load_tuning()
+)  # app.tuning, both modes: drifter files, playtest.json, hazards.json
+spawn_list = (
+    load_debug_spawns(tuning) if debug else None
+)  # app.debug_spawns, debug mode only
 run = start_run()
 # per tick, inside the accumulator loop:
 run = step_run(run, thrust)
@@ -333,7 +384,7 @@ if debug:
 
 ### game/ui/look.py (UI Developer)
 ```python
-BACKGROUND: tuple[int, int, int]   # 12-art-and-audio.md, placeholder_bg
+BACKGROUND: tuple[int, int, int]  # 12-art-and-audio.md, placeholder_bg
 ```
 The one home of the background color in code. `app/frame.py` and later views import it.
 
