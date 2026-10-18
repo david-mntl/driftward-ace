@@ -1,6 +1,6 @@
 # Run: lives, falls, hits, drifters, respawn wait, game over and retry
-Version: 3
-Status: draft
+Version: 4
+Status: frozen
 Features: DRA-23, DRA-29, DRA-39, DRA-47
 Created by: architect
 

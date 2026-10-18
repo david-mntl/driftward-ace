@@ -92,3 +92,9 @@
 - Changed: `game/core/drifters/base.py` (`ENTRY_WARNING_SIZE`, `warning_center`); `game/core/drifters/chain_lightning.py` (`warning_center`); `game/ui/drifters/entry_warning.py` (`ENTRY_WARNING_COPY_SIZE` replaces `ENTRY_WARNING_SCALE` and `WARNING_SIZE_RATIO`); `systems/drifters.md` (Presentation, Entry warning, Rules, Rationale); the DRA-29, DRA-39 and DRA-47 warning checks in `systems/app.md`.
 - Tests: `test_drifters.py`, `test_satellite.py` and `test_chain_lightning.py` expect the new warning centers. New `game/tests/ui/test_entry_warning.py`: every warning image has one size, nothing is drawn past the radius, and the copy sits inside the glow.
 - `game/tests/check.sh` ends `QA: pass`. The browser build was not re-run.
+
+## DRA-47, 2026-10-18
+- `systems/app.md`: 7 to 8, frozen.
+- `systems/drifters.md`: 2 to 3, frozen.
+- `systems/run.md`: 3 to 4, frozen.
+- Adds the chain lightning drifter, the line hitbox shape and its charge rays, and one fixed entry warning size for every drifter.
