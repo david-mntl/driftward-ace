@@ -84,3 +84,11 @@
 - `systems/drifters.md`: 1 to 2, frozen.
 - `systems/run.md`: 2 to 3, frozen.
 - Adds the satellite drifter, a re-hit cooldown for hazards, and an editable debug spawn list.
+
+## Hotfix: one fixed entry warning size, 2026-10-18
+- The Director ordered it, and the main session applied it outside the pipeline. No contract version changed.
+- Every entry warning is now 24 px across, the same for every drifter, in place of "as wide as the drifter, copy at half size". The glow is 18 px across. The copy is scaled so its longest side is 14 px, so it sits inside the glow. The satellite warning was too big, and its parts looked too far apart. GDD: `07-drifters.md` (`entry_warning_look`, `entry_warning_size`), `drifters/06-fireball.md` (size), `drifters/03-chain-lightning.md` (`entry_warning_size`), `91-decision-log.md` row 63.
+- `warning_center()` now keeps the whole 24 px warning on screen (12 px from each edge), so it no longer depends on the drifter's size. The satellite's warning sits at x 12 (628 with `invert`), the small meteorite's at y 12. The chain lightning's own `warning_center()` clamps by the same 12 px, so its warning sits at y 12 (it was 70). The chain lightning still shows the `trio_triangle` icon, now scaled so its 140 px width is 14 px (the discs are 1 px in radius); `warning_copy()` no longer sizes the warning.
+- Changed: `game/core/drifters/base.py` (`ENTRY_WARNING_SIZE`, `warning_center`); `game/core/drifters/chain_lightning.py` (`warning_center`); `game/ui/drifters/entry_warning.py` (`ENTRY_WARNING_COPY_SIZE` replaces `ENTRY_WARNING_SCALE` and `WARNING_SIZE_RATIO`); `systems/drifters.md` (Presentation, Entry warning, Rules, Rationale); the DRA-29, DRA-39 and DRA-47 warning checks in `systems/app.md`.
+- Tests: `test_drifters.py`, `test_satellite.py` and `test_chain_lightning.py` expect the new warning centers. New `game/tests/ui/test_entry_warning.py`: every warning image has one size, nothing is drawn past the radius, and the copy sits inside the glow.
+- `game/tests/check.sh` ends `QA: pass`. The browser build was not re-run.

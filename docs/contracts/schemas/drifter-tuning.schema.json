@@ -40,7 +40,7 @@
       "required": ["width", "height", "hitbox"],
       "properties": {
         "width": {
-          "description": "Visible width, px. Used for the look, the entry warning and leaving the screen.",
+          "description": "Visible width, px. Used for the look, the size of the entry warning copy and leaving the screen.",
           "type": "number",
           "exclusiveMinimum": 0
         },
