@@ -4,7 +4,8 @@ Contract: docs/contracts/systems/drifters.md, Rules, Collision and Chain lightni
 docs/contracts/systems/ship.md, Rules, Hitbox. Tasks: docs/contracts/DRA-29/tasks/DRA-29-07-qa-
 engineer.md (the two ship tests at the end), docs/contracts/DRA-39/tasks/DRA-39-05-qa-engineer.md
 (circle and box tables, guards) and docs/contracts/DRA-47/tasks/DRA-47-07-qa-engineer.md (the line
-tables, the chain lightning ship cases).
+tables, the chain lightning ship cases) and docs/contracts/DRA-56/tasks/DRA-56-03-qa-engineer.md
+(the fireball ship cases, the tail alone).
 
 Every expected number is exact in binary (whole numbers, halves, sixteenths, 3-4-5 triangles) or
 comes from the GDD values below or from `game/tuning/drifters/*.json`. The ship-against-every-
@@ -43,6 +44,7 @@ from core.drifters.chain_lightning import (
     chain_hitbox,
     layout_size,
 )
+from core.drifters.fireball import FireballTypeExtra, fireball_hitbox
 from core.drifters.satellite import SatelliteVariantExtra
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning, DrifterTypeTuning, PlaytestSwitches, VariantTuning
@@ -868,10 +870,65 @@ def load_chain_cases(data: dict[str, object]) -> list[VariantCase]:
     ]
 
 
+def circles_and_boxes(hitbox: Hitbox) -> tuple[Circle | Box, ...]:
+    """Return `hitbox` with every shape narrowed to a circle or a box (a line fails the test)."""
+    narrowed: list[Circle | Box] = []
+    for shape in hitbox:
+        assert isinstance(shape, Circle | Box), f"unexpected shape {shape} in a fireball hitbox"
+        narrowed.append(shape)
+    return tuple(narrowed)
+
+
+def load_fireball_cases(data: dict[str, object]) -> list[VariantCase]:
+    """Return one case per variant and `invert` value of the fireball's tuning file.
+
+    The records are built the way `app.tuning` builds them (contract, Tuning files), here: each
+    variant's hitbox is `fireball_hitbox` of its `head_width` and the type's `tail_ratio` and
+    `angle_degrees`, un-inverted. The case's shapes are the same call with the case's `invert`.
+    """
+    angle: float = float(cast(float, data["angle_degrees"]))
+    ratio: float = float(cast(float, data["tail_ratio"]))
+    heads: dict[str, float] = {
+        name: float(cast(float, raw["head_width"]))
+        for name, raw in cast(dict[str, dict[str, object]], data["variants"]).items()
+    }
+    tuning: DrifterTuning = DrifterTuning(
+        drifters={
+            DrifterType.FIREBALL: DrifterTypeTuning(
+                variants={
+                    name: VariantTuning(
+                        width=head,
+                        height=head,
+                        hitbox=fireball_hitbox(head, ratio, angle, False),
+                        extra=None,
+                    )
+                    for name, head in heads.items()
+                },
+                default_variant=str(data["default_variant"]),
+                speed_ratio=float(cast(float, data["speed_ratio"])),
+                entry_warning_ticks=int(cast(int, data["entry_warning_ticks"])),
+                extra=FireballTypeExtra(angle_degrees=angle, tail_ratio=ratio),
+            )
+        },
+        switches=PlaytestSwitches(),
+    )
+    return [
+        VariantCase(
+            DrifterType.FIREBALL,
+            name,
+            tuning,
+            circles_and_boxes(fireball_hitbox(head, ratio, angle, invert)),
+            invert=invert,
+        )
+        for name, head in heads.items()
+        for invert in (False, True)
+    ]
+
+
 def load_variant_cases() -> list[VariantCase]:
     """Return one case per variant of every drifter type, from `game/tuning/drifters/`.
 
-    The chain lightning gets one case per variant and `invert` value.
+    The chain lightning and the fireball get one case per variant and `invert` value.
     """
     cases: list[VariantCase] = []
     for drifter_type in DrifterType:
@@ -882,6 +939,9 @@ def load_variant_cases() -> list[VariantCase]:
         data: dict[str, object] = json.loads(path.read_text())
         if drifter_type is DrifterType.CHAIN_LIGHTNING:
             cases.extend(load_chain_cases(data))
+            continue
+        if drifter_type is DrifterType.FIREBALL:
+            cases.extend(load_fireball_cases(data))
             continue
         raw_variants: dict[str, dict[str, object]] = cast(
             dict[str, dict[str, object]], data["variants"]
@@ -927,6 +987,11 @@ SHAPE_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.chain is None]
 
 CHAIN_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.chain is not None]
 """The chain lightning, per variant and `invert` value."""
+
+FIREBALL_CASES: list[VariantCase] = [
+    c for c in VARIANT_CASES if c.drifter_type is DrifterType.FIREBALL and c.variant is not None
+]
+"""The fireball, per variant and `invert` value. Head is `shapes[0]`, tail `shapes[1]`."""
 
 
 def case_id(case: VariantCase) -> str:
@@ -1174,6 +1239,48 @@ def test_ship_meets_every_chain_lightning_variant_only_while_it_fires(case: Vari
                 where
             )
             assert overlap_both_ways(firing.current_hitbox(), ship) is place.hit, where
+
+
+@pytest.mark.parametrize("case", FIREBALL_CASES, ids=[case_id(c) for c in FIREBALL_CASES])
+def test_ship_meets_the_fireball_tail_alone(case: VariantCase) -> None:
+    assert len(case.shapes) == 2
+    head, tail = case.shapes
+    assert isinstance(head, Circle)
+    assert isinstance(tail, Circle)
+    ship: Hitbox = ship_hitbox(spawn())
+    foot: Box = cast(Box, ship[1])
+    foot_bottom: float = foot.cy + foot.h / 2
+    # The tail trails the head up and to one side, so the tail alone can reach the ship only from
+    # below, or from the side the head flies toward: the right without `invert` (the head is down
+    # and to the right of the tail), the left with it.
+    outer_x: float = foot.cx - foot.w / 2 if case.invert else foot.cx + foot.w / 2
+    outer_sign: float = -1.0 if case.invert else 1.0
+    row: float = foot_bottom - INSIDE
+    # name, tail center when it overlaps, tail center when just clear
+    places: tuple[tuple[str, tuple[float, float], tuple[float, float]], ...] = (
+        (
+            "below the foot",
+            (SPAWN_X, row),
+            (SPAWN_X, foot_bottom + tail.r + CLEAR_SLACK),
+        ),
+        (
+            "beside the foot",
+            (outer_x - outer_sign * INSIDE, row),
+            (outer_x + outer_sign * (tail.r + CLEAR_SLACK), row),
+        ),
+    )
+    for name, hit_at, clear_at in places:
+        for (tail_x, tail_y), expect in ((hit_at, True), (clear_at, False)):
+            where: str = f"{name}, tail center ({tail_x}, {tail_y})"
+            x: float = tail_x - tail.cx
+            y: float = tail_y - tail.cy
+            active: Drifter = activate(drifter_at(case, x, y))
+            assert active.current_hitbox() == place_hitbox(case.shapes, x, y), where
+            head_only: Hitbox = place_hitbox((head,), x, y)
+            tail_only: Hitbox = place_hitbox((tail,), x, y)
+            assert not overlap_both_ways(head_only, ship), f"the head is not clear: {where}"
+            assert overlap_both_ways(tail_only, ship) is expect, where
+            assert overlap_both_ways(active.current_hitbox(), ship) is expect, where
 
 
 def test_ship_hitbox_is_an_inverted_t_at_the_ship_center() -> None:

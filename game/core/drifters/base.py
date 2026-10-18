@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import ClassVar, Final, Self
 
-from core.collision import Hitbox, grow_hitbox, place_hitbox
+from core.collision import Box, Hitbox, grow_hitbox, place_hitbox
 from core.ship import Ship
 from core.world import SCREEN_H, SCREEN_W
 
@@ -54,6 +54,9 @@ class DrifterType(Enum):
 
     CHAIN_LIGHTNING = "chain_lightning"
     """Source: drifters/03-chain-lightning.md."""
+
+    FIREBALL = "fireball"
+    """Source: drifters/06-fireball.md."""
 
 
 class Phase(Enum):
@@ -245,20 +248,21 @@ class Drifter(ABC):
             return ()
         return grow_hitbox(self.current_hitbox(), GRAZE_MARGIN)
 
+    def drawn_parts(self) -> tuple[Box, ...]:
+        """Return upright boxes, screen px, that hold every pixel the view draws while ACTIVE.
+
+        One box here: the width x height footprint. A drifter whose look reaches outside its
+        footprint overrides this. Source: 07-drifters.md, rule 12; 91-decision-log.md, row 64.
+        """
+        return (Box(self.x, self.y, self.width, self.height),)
+
     def is_partly_on_screen(self) -> bool:
-        """Return True when the width x height footprint shares area with the screen.
+        """Return True when any drawn part shares area with the screen.
 
         Touching an edge from outside doesn't count. Source: 07-drifters.md, rule 12;
-        91-decision-log.md, row 58.
+        91-decision-log.md, rows 58 and 64.
         """
-        half_w: float = self.width / 2
-        half_h: float = self.height / 2
-        return (
-            self.x - half_w < SCREEN_W
-            and self.x + half_w > 0
-            and self.y - half_h < SCREEN_H
-            and self.y + half_h > 0
-        )
+        return any(_box_on_screen(part) for part in self.drawn_parts())
 
     def mark_entered(self) -> Self:
         """Return the drifter with `has_entered` True once it is ACTIVE and partly on screen.
@@ -270,16 +274,15 @@ class Drifter(ABC):
         return replace(self, has_entered=True)
 
     def is_off_screen(self) -> bool:
-        """Return True only in ACTIVE, once entered, fully past a side wall or below the floor.
+        """Return True only in ACTIVE, once entered, with every drawn part past a side or the floor.
 
-        Never true at the top, where drifters enter, and never before `has_entered`.
-        Source: 07-drifters.md, rule 12; 91-decision-log.md, row 58.
+        Each part may leave by a different edge. Never true at the top, where drifters enter, and
+        never before `has_entered`. Source: 07-drifters.md, rule 12; 91-decision-log.md, rows 58
+        and 64.
         """
         if self.phase is not Phase.ACTIVE or not self.has_entered:
             return False
-        half_w: float = self.width / 2
-        half_h: float = self.height / 2
-        return self.x + half_w <= 0 or self.x - half_w >= SCREEN_W or self.y - half_h >= SCREEN_H
+        return all(_box_past_edge(part) for part in self.drawn_parts())
 
     def warning_center(self) -> tuple[float, float]:
         """Return (x, y) moved just inside the screen, px: the whole warning stays on it.
@@ -381,6 +384,23 @@ def born_drifter[T: Drifter](cls: type[T], birth: Birth) -> T:
         warning_ticks=birth.warning_ticks,
         rehit_cooldown_ticks=birth.rehit_cooldown_ticks,
         rehit_dim=birth.rehit_dim,
+    )
+
+
+def _box_on_screen(box: Box) -> bool:
+    """Return True when `box` shares area with the screen. Touching an edge from outside: False."""
+    return (
+        box.cx - box.w / 2 < SCREEN_W
+        and box.cx + box.w / 2 > 0
+        and box.cy - box.h / 2 < SCREEN_H
+        and box.cy + box.h / 2 > 0
+    )
+
+
+def _box_past_edge(box: Box) -> bool:
+    """Return True when `box` is fully past a side wall or fully below the floor, never the top."""
+    return (
+        box.cx + box.w / 2 <= 0 or box.cx - box.w / 2 >= SCREEN_W or box.cy - box.h / 2 >= SCREEN_H
     )
 
 
