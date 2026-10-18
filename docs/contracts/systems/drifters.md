@@ -1,6 +1,6 @@
 # Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite, the chain lightning, the fireball and their views
-Version: 3
-Status: draft
+Version: 4
+Status: frozen
 Features: DRA-29, DRA-39, DRA-47, DRA-56
 Created by: architect
 

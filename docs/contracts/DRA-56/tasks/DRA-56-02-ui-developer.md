@@ -3,7 +3,7 @@ Created by: architect
 Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/drifters.md
-Status: open
+Status: done
 Linear: DRA-58
 
 ## Read in the contract
