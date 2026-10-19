@@ -1,0 +1,13 @@
+{
+  "wave_zero": "w0_tutorial",
+  "levels": [
+    { "fixed": ["w1_fireball", "w2_mix"], "random_count": 0 },
+    { "fixed": ["w3_lvl2_satellite", "w4_lvl2_satellite", "w5_lvl2_mix"], "random_count": 1 },
+    { "fixed": [], "random_count": 0 },
+    { "fixed": [], "random_count": 0 },
+    { "fixed": [], "random_count": 0 },
+    { "fixed": [], "random_count": 0 },
+    { "fixed": [], "random_count": 0 },
+    { "fixed": [], "random_count": 0 }
+  ]
+}
