@@ -1,11 +1,11 @@
 # Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite, the chain lightning, the fireball, the coin and their views
 Version: 5
-Status: frozen
-Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62
+Status: draft
+Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62, DRA-76
 Created by: architect
 
 ## Purpose
-Every drifter in the game, hazards and pickups, is built on one shared base. This contract holds that base, the hitbox shapes (circle, box and line) and their overlap test, the level table the spawner reads, the spawner (the only way a drifter is created), the drifters built so far (four hazards: the meteorite, the satellite, the chain lightning and the fireball; one pickup: the coin), and the views that draw drifters and their entry warnings.
+Every drifter in the game, hazards and pickups, is built on one shared base. This contract holds that base, the hitbox shapes (circle, box and line) and their overlap test, the level table (the spawner reads its hazard speed × and Timer ×, the scroll its scroll speed ×, the waves its Rest gap ×), the spawner (the only way a drifter is created), the drifters built so far (four hazards: the meteorite, the satellite, the chain lightning and the fireball; one pickup: the coin), and the views that draw drifters and their entry warnings.
 
 The base holds the rules every drifter shares: the entry warning (where it shows, what its copy looks like), the hitbox, the graze zone, the parts of the drifter that are drawn, when a drifter has entered the screen and when it has left it (judged on those drawn parts), the re-hit cooldown with its dim look, how a timer scales with level, whether the drifter is parked (it moves only with the scroll) or moving, and what a pickup pays when it is collected (its points and its points popup). A drifter carries final numbers only. The spawner reads the level and the shared hazard values once, at birth, and sets the drifter's speed, its timer factor and its cooldown length; a parked drifter gets no speed of its own. The drifter never knows the level. Each tick it may read the ship and how far the world scrolls on that tick (`TickContext`). The run (`docs/contracts/systems/run.md`) holds the drifters, lets each fix its warning from the ship when it is added, updates them every tick, marks when each has entered, collects the pickups the ship touches, tests the hazards against the ship, starts and counts down their cooldowns, and drops them when they leave or are collected.
 
@@ -13,7 +13,7 @@ Structure chosen by the Director (scope report DRA-29, Limits and Decision log):
 
 Who builds what:
 - `game/core/collision.py`: the Gameplay Implementer, task `DRA-29-01-gameplay-implementer`. Unknown shape kinds raise: task `DRA-39-01-gameplay-implementer`.
-- `game/core/levels.py`: task `DRA-29-02-gameplay-implementer`.
+- `game/core/levels.py`: task `DRA-29-02-gameplay-implementer`. `FIRST_LEVEL`, the scroll speed × and Rest gap × rows: task `DRA-76-01-gameplay-implementer`. Removing `LEVEL_STARTS_M` and `level_at`: task `DRA-76-05-gameplay-implementer`, with the run that stops reading them (`docs/contracts/systems/run.md`).
 - The package `game/core/drifters/` (`__init__.py`, `base.py`, `tuning.py`, `registry.py`, `spawner.py`, `meteorite.py`): task `DRA-29-02-gameplay-implementer`. The shared re-hit cooldown, entering, start position and the new placement fields: task `DRA-39-01-gameplay-implementer`.
 - `game/core/drifters/satellite.py`: task `DRA-39-03-gameplay-implementer`.
 - The line shape in `game/core/collision.py`: task `DRA-47-01-gameplay-implementer`.
@@ -350,10 +350,10 @@ def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox:
 ```
 
 ### game/core/levels.py
-Unchanged in DRA-39.
 ```python
 # Imports: stdlib only.
 LEVEL_COUNT: Final[int] = 8  # 08-difficulty.md, level table (locked)
+FIRST_LEVEL: Final[int] = 1  # DRA-76. 08-difficulty.md, rule 1: a run starts at Level 1
 HAZARD_SPEED_MULT: Final[tuple[float, ...]] = (
     1.00,
     1.06,
@@ -367,10 +367,10 @@ HAZARD_SPEED_MULT: Final[tuple[float, ...]] = (
 # 08-difficulty.md, Hazard speed × row (locked)
 TIMER_MULT: Final[tuple[float, ...]] = (1.00, 0.94, 0.89, 0.85, 0.81, 0.77, 0.74, 0.70)
 # 08-difficulty.md, Timer × row (guess)
-LEVEL_STARTS_M: Final[tuple[int, ...]] = (
-    0,
-)  # 08-difficulty.md, Starts at row: Level 1 at 0 m.
-# Levels 2 to 8 are TBD (DF-05); they join here when set.
+SCROLL_MULT: Final[tuple[float, ...]] = (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7)
+# DRA-76. 08-difficulty.md, Scroll speed × row (locked)
+REST_GAP_MULT: Final[tuple[float, ...]] = (1.00, 0.90, 0.81, 0.73, 0.66, 0.59, 0.53, 0.48)
+# DRA-76. 08-difficulty.md, Rest gap × row (locked)
 
 
 def check_level(level: int) -> None:
@@ -382,10 +382,10 @@ def hazard_speed_mult(
     level: int,
 ) -> float: ...  # HAZARD_SPEED_MULT[level - 1], after check_level
 def timer_mult(level: int) -> float: ...  # TIMER_MULT[level - 1], after check_level
-def level_at(meters: int) -> int:
-    ...
-    # The highest level whose start in LEVEL_STARTS_M is <= meters. 1 while only Level 1 has a start.
+def scroll_mult(level: int) -> float: ...  # DRA-76. SCROLL_MULT[level - 1], after check_level
+def rest_gap_mult(level: int) -> float: ...  # DRA-76. REST_GAP_MULT[level - 1], after check_level
 ```
+From DRA-76 `LEVEL_STARTS_M` and `level_at` are gone: the level no longer comes from the meters (08-difficulty.md, rule 1; 91-decision-log.md, row 65). The run's level comes from its waves (`docs/contracts/systems/waves.md`).
 
 ### game/core/drifters/base.py
 ```python
@@ -1217,8 +1217,11 @@ Collision (`core/collision.py`). Source: 07-drifters.md, rule 8; 06-scoring.md, 
 - Pure. No logging, no randomness.
 
 Levels (`core/levels.py`). Source: 08-difficulty.md:
-- Levels are 1 to 8. Any other level raises `ValueError` naming it.
-- `level_at(meters)` is the highest level whose start is ≤ meters (rule 1). Only Level 1's start is known (0 m), so the run is at Level 1 for now. Levels 2 to 8 start at TBD distances (DF-05) and join `LEVEL_STARTS_M` when the Director sets them.
+- Levels are 1 to 8. Any other level raises `ValueError` naming it, in every function that takes a level.
+- Four rows, one value per level, Level 1 first, each copied from the 08-difficulty.md level table: hazard speed × (locked), Timer × (guess), scroll speed × (locked, DRA-76) and Rest gap × (locked, DRA-76). Each is read through its function, never by index outside this module.
+- Who reads which row: the spawner reads hazard speed × and Timer × (Spawner, below); the scroll reads scroll speed × (`docs/contracts/systems/scroll.md`); the waves read Rest gap × (`docs/contracts/systems/waves.md`, `rest_gap_ticks`).
+- `FIRST_LEVEL` (1) is the level a run starts at, and the level of a run with no waves. Source: 08-difficulty.md, rule 1.
+- The level of a run is not worked out here. It is held by the run's waves and rises when a level's playlist ends (`docs/contracts/systems/waves.md`; 08-difficulty.md, rule 1). Source: 91-decision-log.md, row 65 (replaces the level from meters, row 26, and DF-05).
 
 The base (`core/drifters/base.py`):
 - **Position.** `x`, `y` are the drifter's center in screen px, y down. Source: scope report DRA-29, Limits.
@@ -1444,7 +1447,20 @@ DRA-62 changes this frozen contract (v4). New: `DrifterType.COIN`, `TickContext.
 | `game/tests/core/test_drifters.py`, `test_satellite.py`, `test_chain_lightning.py`, `test_fireball.py`, `test_run_drifters.py`, `test_run.py`, `test_run_score.py`, `game/tests/ui/test_hud.py`, `test_ship_view.py`, `test_entry_warning.py` | none. They build `TickContext(ship=...)`, which still builds; their drifters are not parked and never collect; their runs hold no coin. |
 | `game/tests/core/test_coin.py` (new) | task `DRA-62-06-qa-engineer`. |
 
+DRA-76 changes this frozen contract (v5), in `core/levels.py` only. New: `FIRST_LEVEL`, `SCROLL_MULT`, `REST_GAP_MULT`, `scroll_mult`, `rest_gap_mult`. Gone: `LEVEL_STARTS_M`, `level_at`. `check_level`, `hazard_speed_mult`, `timer_mult`, the spawner and every drifter don't change. Grepping `game/` (tests included) for `core.levels`, `level_at`, `LEVEL_STARTS_M`, `check_level`, `hazard_speed_mult` and `timer_mult`:
+
+| File | Change needed |
+|---|---|
+| `game/core/levels.py` | the new constants and functions: task `DRA-76-01-gameplay-implementer`. `LEVEL_STARTS_M` and `level_at` removed: task `DRA-76-05-gameplay-implementer`. |
+| `game/core/run.py` | `Run.level` reads the waves instead of `level_at` (`systems/run.md`). Task `DRA-76-05-gameplay-implementer`. |
+| `game/core/scroll.py` | reads `scroll_mult` (`systems/scroll.md`). Task `DRA-76-01-gameplay-implementer`. |
+| `game/core/waves.py` (new) | reads `rest_gap_mult`, `FIRST_LEVEL`, `LEVEL_COUNT` (`systems/waves.md`). Task `DRA-76-03-gameplay-implementer`. |
+| `game/core/drifters/spawner.py`, every drifter module, `game/ui/` | none. |
+| `game/tests/core/test_drifters.py` | breaks once `level_at` is gone: it imports it, and one test checks it. Task `DRA-76-02-qa-engineer` drops that check and its import and adds the two new rows to the level table test, before task DRA-76-05 removes `level_at`. |
+| every other test | none. |
+
 ## Rationale
+- **The scroll and rest gap rows join the level table (DRA-76).** The four rows are one table in 08-difficulty.md. One module with one check keeps every per-level value in one place, and the scroll and the waves read it the same way the spawner does.
 - **A thin abstract base, one subclass per drifter (Director).** Each drifter reads as one file. Abstract `start_position`, `update` and `effect_on_touch` make a half-built subclass fail at registration (`inspect.isabstract`), not mid-run.
 - **`born` and `start_position` are classmethods.** The spawner builds every drifter the same way and never knows a subclass's fields. A drifter with its own fields or timers overrides `born` and applies them there, on top of `born_drifter`.
 - **`born_drifter` builds the shared part, `replace` adds the rest (DRA-39).** Listing every base field again in each subclass's `born` would break each drifter whenever the base gains a field, as it does in DRA-39. A typed helper plus `dataclasses.replace` keeps mypy strict happy without `**kwargs` of unknown type. The price is that a drifter's own fields need defaults.

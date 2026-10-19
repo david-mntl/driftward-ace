@@ -1,15 +1,15 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
 Version: 11
-Status: frozen
-Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61, DRA-62
+Status: draft
+Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61, DRA-62, DRA-76
 Created by: architect
 
 ## Purpose
 Start the game, set up logging once, read the run mode once, run the async loop on the fixed 60 Hz tick, and catch any unexpected error so the page shows the error screen instead of freezing. That includes an error raised while importing pygame, core, the views or the frame loop. Build a release package that holds only runtime files.
 
-Before the first frame the app loads and checks the tuning files once (the drifter files, the playtest switches and the shared hazard values) in both modes, and the debug test spawn list in debug mode only, and hands the checked values to core. It holds one `Run` (`docs/contracts/systems/run.md`). Play starts when the ship first appears. Each tick it calls `step_run` once; core does the ship, the scroll, the drifters, the lives, the respawn wait, game over and retry. In debug mode only, after each tick it hands the run the drifters the spawn list says are due, through `core.run.add_drifters`. Normal mode spawns nothing yet.
+Before the first frame the app loads and checks, once, the tuning files (the drifter files, the playtest switches and the shared hazard values) and the wave files (every wave and the playlist), in both modes, and the debug test spawn list in debug mode only, and hands the checked values to core. It holds one `Run` (`docs/contracts/systems/run.md`). Play starts when the ship first appears. The run plays the waves (`docs/contracts/systems/waves.md`), started with one seed the app draws at startup, except in debug mode when the spawn list's `play` is `list` (the default): then the run has no waves and the test spawn list plays instead. Each tick the app calls `step_run` once; core does the ship, the scroll at the level's speed, the drifters, the lives, the respawn wait, the waves and the level, game over and retry. After each tick it hands the run the drifters that are due, the waves' or the spawn list's, through `core.run.add_drifters`.
 
-Each frame draws the starfield, the drifters (entry warnings, meteorites, satellites, chain lightnings, fireballs and coins) behind the ship, the coins' points popups over the drifters and behind the ship, the ship while `run.ship_visible` (the blink), in debug mode the hitbox and graze outlines, drifter labels and the debug overlay (F3 toggles them), the Game Over box with the final score while `run.game_over`, and the HUD with SCORE and the hearts on top. The arrow-key log lines carry the ship's x and y. The guard removes null characters from the debug-mode detail line, so an error message holding one still shows the error screen. Source: scope reports DRA-5 to DRA-47; `docs/contracts/systems/drifters.md`.
+Each frame draws the starfield, the drifters (entry warnings, meteorites, satellites, chain lightnings, fireballs and coins) behind the ship, the coins' points popups over the drifters and behind the ship, the ship while `run.ship_visible` (the blink), in debug mode the hitbox and graze outlines, drifter labels and the debug overlay with the wave and the level (F3 toggles them), the Game Over box with the final score while `run.game_over`, and the HUD with SCORE and the hearts on top. The arrow-key log lines carry the ship's x and y. The guard removes null characters from the debug-mode detail line, so an error message holding one still shows the error screen. Source: scope reports DRA-5 to DRA-47; `docs/contracts/systems/drifters.md`.
 
 Who builds what:
 - `game/main.py`, `game/app/`, `game/scripts/`, `pygbag.ini` (repo root): the Integration Engineer, during integration, from this contract. No task file.
@@ -23,6 +23,8 @@ Who builds what:
 - `game/core/collision.py`, `game/core/levels.py`, `game/core/drifters/`, `game/ui/shapes.py`, `game/ui/drifters/`: DRA-29 and DRA-39, see `docs/contracts/systems/drifters.md`.
 - `game/app/tuning.py`, `game/app/debug_spawns.py`: the Integration Engineer, during DRA-29 integration, from this contract. The hazards file, the satellite's own fields and the editable spawn list: during DRA-39 integration. The chain lightning's file and `telegraph_min`: during DRA-47 integration. The fireball's file and spawn rows with no position: during DRA-56 integration. The coin's file and drawing the popups: during DRA-62 integration. No task file.
 - `game/ui/popup_view.py`: DRA-62, see `docs/contracts/systems/run.md`. `game/core/popup.py`, `game/core/drifters/coin.py`, `game/ui/drifters/coin_view.py`: DRA-62, see `systems/run.md` and `systems/drifters.md`.
+- `game/app/waves.py`, the wave seed, starting the run with waves, the due wave placements, the spawn list's `play` and the overlay's wave lines in the frame: the Integration Engineer, during DRA-76 integration, from this contract. No task file. `game/core/waves.py`, `game/core/wave_files.py`: DRA-76, see `docs/contracts/systems/waves.md`. `draw_debug_wave_lines`: DRA-76, see `docs/contracts/systems/debug-overlay.md`.
+- The wave files, `game/waves/<wave id>.json` (`docs/contracts/schemas/wave.schema.json`) and `game/waves/playlist.json` (`playlist.schema.json`), are content: see `docs/contracts/systems/waves.md`, Purpose, for who fills them.
 - The data files are content, filled to their schemas by whoever the Director names (DRA-29: the main session, by Director decision): `game/tuning/drifters/meteorite.json` (`docs/contracts/schemas/drifter-tuning.schema.json`), `game/tuning/drifters/satellite.json` (`satellite-tuning.schema.json`), `game/tuning/drifters/chain_lightning.json` (`chain-lightning-tuning.schema.json`, DRA-47), `game/tuning/drifters/fireball.json` (`fireball-tuning.schema.json`, DRA-56), `game/tuning/drifters/coin.json` (`coin-tuning.schema.json`, DRA-62), `game/tuning/playtest.json` (`playtest-switches.schema.json`), `game/tuning/hazards.json` (`hazards.schema.json`) and `game/tuning/debug_spawns.json` (`debug-spawn-list.schema.json`), all schemas in `docs/contracts/schemas/`.
 
 ## Diagram
@@ -67,9 +69,11 @@ flowchart LR
     FR --> HU["ui.hud"]
     FR --> TU["app.tuning (DRA-29)"]
     FR --> DS["app.debug_spawns (DRA-29)"]
+    FR --> WA["app.waves (DRA-76)"]
     FR --> UO["ui.drifters.registry (DRA-29)"]
     TU --> CO["core.drifters (DRA-29)"]
     DS --> CO
+    WA --> CWF["core.wave_files, core.waves (DRA-76)"]
     ES["ui.error_screen"] --> PG
   end
   LO -. "start(mode), inside guarded" .-> FR
@@ -84,10 +88,10 @@ flowchart LR
   EV --> HK["thrust = held arrow keys"]
   HK --> AC["add frame time<br/>to accumulator"]
   AC --> T{"acc >= 1/60 s<br/>and ticks < 5?"}
-  T -- yes --> TK["one tick:<br/>run = step_run(run, thrust)<br/>debug mode: run = add_drifters(run,<br/>debug_spawns_due(spawn_list, run.scroll.ticks), tuning)"] --> T
+  T -- yes --> TK["one tick:<br/>run = step_run(run, thrust)<br/>run = add_drifters(run, due, tuning), due =<br/>debug_spawns_due(spawn_list, run.scroll.ticks) when the list plays,<br/>else run.wave_spawns_due (DRA-76)"] --> T
   T -- no --> CAP{"acc still >= 1/60 s?"}
   CAP -- yes --> DROP["acc = 0<br/>(owed time dropped)"] --> D
-  CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, render_drifter for each drifter,<br/>draw_points_popup for each popup (DRA-62),<br/>draw_ship if run.ship_visible,<br/>draw_debug_hitboxes and draw_debug_overlay if overlay_visible,<br/>draw_game_over(surface) then draw_final_score(surface, run.score)<br/>if run.game_over, then draw_hud"]
+  CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, render_drifter for each drifter,<br/>draw_points_popup for each popup (DRA-62),<br/>draw_ship if run.ship_visible,<br/>draw_debug_hitboxes, draw_debug_overlay and<br/>draw_debug_wave_lines (DRA-76) if overlay_visible,<br/>draw_game_over(surface) then draw_final_score(surface, run.score)<br/>if run.game_over, then draw_hud"]
   D --> FL["display.flip()"]
   FL --> Y["await asyncio.sleep(0)"]
   Y --> F
@@ -190,7 +194,7 @@ async def frame_loop(mode: RunMode) -> None:
     # pygame init, window, frames until pygame.QUIT.
     # Owns: run (core.run.Run), thrust (core.ship.Thrust), overlay_visible (bool).
 ```
-Imports pygame, `app.settings`, `app.mode`, `app.tuning` and `app.debug_spawns` (DRA-29), `core.world`, `core.ship` (for `Thrust`), `core.run`, `ui.look`, `ui.starfield`, `ui.drifters.registry` (DRA-29, for `render_drifter`), `ui.ship_view`, `ui.debug_overlay`, `ui.game_over` and `ui.hud`. From DRA-23 it no longer imports `core.scroll`, `spawn` or `step`. Only `start()` imports this module, inside the guard.
+Imports pygame, `app.settings`, `app.mode`, `app.tuning` and `app.debug_spawns` (DRA-29), `core.world`, `core.ship` (for `Thrust`), `core.run`, `ui.look`, `ui.starfield`, `ui.drifters.registry` (DRA-29, for `render_drifter`), `ui.ship_view`, `ui.debug_overlay`, `ui.game_over` and `ui.hud`. From DRA-23 it no longer imports `core.scroll`, `spawn` or `step`. From DRA-76 it also imports `random` (stdlib), `app.waves`, `core.waves` (for `start_waves`) and `draw_debug_wave_lines` from `ui.debug_overlay`. Only `start()` imports this module, inside the guard.
 
 App-owned state in `frame_loop` (DRA-23, DRA-29, DRA-39):
 ```python
@@ -199,8 +203,13 @@ spawn_list: (
     DebugSpawnList | None
 )  # DRA-39. Debug mode: app.debug_spawns.load_debug_spawns(tuning) once,
 # right after load_tuning(). Normal mode: None, the file is never read
-run: Run  # core.run.start_run() before the first frame; replaced by step_run() every tick,
-# and by add_drifters() after a tick in debug mode
+book: WaveBook  # DRA-76. app.waves.load_wave_book(tuning) once, in both modes, right after
+# load_tuning() and before the spawn list. Never reloaded
+plays_list: bool  # DRA-76. True only when spawn_list is not None and spawn_list.play == PLAY_LIST.
+# Fixed for the page
+run: Run  # core.run.start_run(waves=...) before the first frame (waves: start_waves(book,
+# random.getrandbits(64)), or None when plays_list); replaced by step_run() every tick,
+# and by add_drifters() after every tick
 thrust: Thrust  # rebuilt once per frame from the held arrow keys
 overlay_visible: (
     bool  # True from the first frame in debug mode, always False in normal mode.
@@ -243,6 +252,9 @@ ALL_ROWS: str = "all"  # the mode that plays every row
 DEFAULT_MODE: str = (
     ALL_ROWS  # scope report DRA-39, Values needed (stand-in): mode left out
 )
+PLAY_LIST: str = "list"    # DRA-76. play: the rows play
+PLAY_WAVES: str = "waves"  # DRA-76. play: the normal waves play
+DEFAULT_PLAY: str = PLAY_LIST  # DRA-76. scope report DRA-76, Not in GDD (Director): play left out
 DEFAULT_LOOP_TICKS: int = (
     180  # scope report DRA-39, Values needed (stand-in, kept from DRA-29):
 )
@@ -253,6 +265,7 @@ DEFAULT_LOOP_TICKS: int = (
 class DebugSpawnList:
     """The checked list, ready to play."""
 
+    play: str  # DRA-76. PLAY_LIST or PLAY_WAVES
     mode: str  # "all" or a DrifterType value
     loop_ticks: int  # ticks, >= 1
     schedule: tuple[
@@ -274,6 +287,21 @@ def debug_spawns_due(spawn_list: DebugSpawnList, ticks: int) -> tuple[Placement,
     # ticks is run.scroll.ticks after the tick: 1 on the first tick of play.
 ```
 Not a startup module: it imports `core.drifters`. DRA-39 removes `DEBUG_SPAWN_PERIOD` and `DEBUG_SPAWNS`; their three meteorite rows move into the file.
+
+### game/app/waves.py (Integration Engineer, DRA-76)
+The wave files, read once at startup in both modes. The checks are core's (`core.wave_files.build_wave_book`, `docs/contracts/systems/waves.md`); this module only finds, reads and decodes the files.
+```python
+WAVES_DIR: Path  # the game's wave folder: Path(__file__).resolve().parent.parent / "waves"; read at call time
+PLAYLIST_FILE: str = "playlist.json"  # in WAVES_DIR
+
+
+def load_wave_book(tuning: DrifterTuning) -> WaveBook:
+    ...
+    # Reads every "*.json" file in WAVES_DIR but PLAYLIST_FILE as a wave (its id: the file name
+    # without .json), then PLAYLIST_FILE, decodes them, and returns
+    # build_wave_book(<wave documents by id>, <playlist document>, tuning). Raises on any problem.
+```
+Not a startup module: it imports `core`, so only `app.frame` imports it, inside the guard.
 
 ### pygbag.ini (repo root, Integration Engineer)
 ```ini
@@ -407,6 +435,26 @@ if run.ship_visible:
 ```
 `app/frame.py` imports `draw_points_popup` from `ui.popup_view`.
 
+DRA-76 calls. They change the DRA-39 block above before the first frame and in the tick, and add one call to the draw. Signatures are set in `systems/waves.md`, `systems/run.md` and `systems/debug-overlay.md`.
+```python
+# before the first frame:
+tuning = load_tuning()  # app.tuning, both modes
+book = load_wave_book(tuning)  # app.waves, both modes. A bad wave file raises here
+spawn_list = load_debug_spawns(tuning) if debug else None  # app.debug_spawns, debug mode only
+plays_list = spawn_list is not None and spawn_list.play == PLAY_LIST
+run = start_run(waves=None if plays_list else start_waves(book, random.getrandbits(64)))
+# per tick, inside the accumulator loop:
+run = step_run(run, thrust)  # steps the waves too (systems/run.md, step 9a)
+due = debug_spawns_due(spawn_list, run.scroll.ticks) if plays_list else run.wave_spawns_due
+run = add_drifters(run, due, tuning)  # systems/run.md: the one way in, both sources
+# per frame, draw:
+if overlay_visible:
+    draw_debug_hitboxes(surface, run)
+    draw_debug_overlay(surface, run.ship)
+    draw_debug_wave_lines(surface, run)  # systems/debug-overlay.md: lines 5 and 6
+```
+A retry needs no app call: `step_run` restarts the waves itself (`systems/run.md`, a game-over tick).
+
 ### game/ui/look.py (UI Developer)
 ```python
 BACKGROUND: tuple[int, int, int]  # 12-art-and-audio.md, placeholder_bg
@@ -475,21 +523,23 @@ Frame loop (`app/frame.py`, `frame_loop(mode)`):
 - Inside the guard: `pygame.init()`, then `pygame.display.set_mode((SCREEN_W, SCREEN_H))` from `core.world`. Source: 03-world-and-camera.md, screen_w, screen_h (guess). systems/world.md.
 - Before the first frame (DRA-29): `tuning = load_tuning()`, in both modes, before `start_run()`. A bad or missing tuning file raises inside the guard, so the page shows the error screen and the log holds the file and field. Source: game/CONTEXT.md, Error handling (validate at the edge); 15-tech-constraints.md, rule 8; scope report DRA-29, Limits ("The app loads and validates them once at startup").
 - Before the first frame, debug mode only (DRA-39): `spawn_list = load_debug_spawns(tuning)`, right after `load_tuning()`. A bad or missing list raises inside the guard the same way. Normal mode never reads the file, so a broken list can't break normal play. Source: 15-tech-constraints.md, rule 7 (debug only adds the test spawn list); scope report DRA-39, Limits.
-- Before the first frame: `run = start_run()`, and `overlay_visible = mode is RunMode.DEBUG`. Play starts here: the ship first appears at screen center on the first frame drawn after this. Source: 03-world-and-camera.md, ship_start; 10-ui.md, debug_overlay_toggle (shown from the first frame); scope report DRA-13, Values needed (play start); systems/run.md (DRA-23).
+- Before the first frame, both modes (DRA-76): `book = load_wave_book(tuning)`, right after `load_tuning()` and before the spawn list. A bad or missing wave file raises inside the guard, so the page shows the error screen and the log names the file and the problem, in both modes, whatever debug mode plays. Source: scope report DRA-76, Limits ("Loading the wave and playlist files once at startup, in both modes"); 15-tech-constraints.md, rule 8.
+- Before the first frame (DRA-76): `plays_list` is True only in debug mode with the spawn list's `play` equal to `PLAY_LIST` (its default). The run is `start_run(waves=None)` when `plays_list`, else `start_run(waves=start_waves(book, random.getrandbits(64)))`: one seed from Python's `random` module, which the interpreter seeds from the OS at start, drawn once per page load. Core makes every later run's seed from it (`systems/waves.md`, Seeds). The app never draws another seed and never restarts the waves. Source: 10-ui.md, rule 7; 09-waves.md, rule 4 (picks new every run); scope report DRA-76, Not in GDD (picks not seeded, new every run).
+- Before the first frame: `overlay_visible = mode is RunMode.DEBUG`. Play starts at `start_run`: the ship first appears at screen center on the first frame drawn after this. Source: 03-world-and-camera.md, ship_start; 10-ui.md, debug_overlay_toggle (shown from the first frame); scope report DRA-13, Values needed (play start); systems/run.md (DRA-23).
 - The app never calls `spawn`, `step`, `start_scroll` or `step_scroll` itself, and never calls `start_run()` again. A respawn, the wait, game over and a retry all happen inside `step_run`. Source: systems/run.md (DRA-23).
 - **Game over.** While `run.game_over` is True the frame loop carries on as always: it reads events, builds `thrust`, runs ticks (`step_run` keeps the run frozen and watches for the retry) and draws. Nothing in the app changes. Source: 02-game-flow.md, rules 5 and 6; systems/run.md.
 - Each frame, in order: read all events, build `thrust` from the held keys, add the frame time to the accumulator, run one tick per whole 1/60 s in the accumulator, draw, `pygame.display.flip()`, `await asyncio.sleep(0)`. Source: 15-tech-constraints.md, rules 1 and 2.
 - Frame time comes from a monotonic clock (`time.perf_counter`). Ticks never use frame time. Source: 15-tech-constraints.md, rule 2.
 - **Held keys.** After the events, read `pygame.key.get_pressed()` once and build `Thrust(up=pressed[K_UP], down=pressed[K_DOWN], left=pressed[K_LEFT], right=pressed[K_RIGHT])`. Every tick in that frame uses the same `thrust`. Only the four arrow keys move the ship. Source: 01-vision.md, locked decision 1; 04-ship.md, rule 2.1.
-- **Tick.** `run = step_run(run, thrust)`. One `step_run` call per tick. In debug mode only, right after it: `run = add_drifters(run, debug_spawns_due(spawn_list, run.scroll.ticks), tuning)`. In normal mode nothing is added. The app never builds a drifter itself and never changes `run.drifters`. Source: 04-ship.md, rule 1; 15-tech-constraints.md, rules 2 and 7; systems/run.md; scope report DRA-29, Limits ("Normal mode spawns nothing yet").
-- **Draw.** In this order: fill with `ui.look.BACKGROUND`; `draw_starfield(surface, run.scroll)`; `render_drifter(surface, obj)` for each `obj` in `run.drifters`, in order (DRA-29); `draw_points_popup(surface, popup)` for each `popup` in `run.popups`, in order (DRA-62); `draw_ship(surface, run.ship)` only if `run.ship_visible`; only if `overlay_visible`, `draw_debug_hitboxes(surface, run)` (DRA-29) then `draw_debug_overlay(surface, run.ship)`; only if `run.game_over`, `draw_game_over(surface)` then `draw_final_score(surface, run.score)` (DRA-61: the final score); `draw_hud(surface, run, below_overlay=debug)` last, on top of everything. Source: systems/ship.md, systems/drifters.md, systems/debug-overlay.md, systems/scroll.md, systems/run.md and systems/hud.md, Presentation; 10-ui.md, rules 1 (the HUD on top) and 3 (the blink); 12-art-and-audio.md, rule 2 (the background stays behind).
+- **Tick.** `run = step_run(run, thrust)`. One `step_run` call per tick. Right after it, every tick: `run = add_drifters(run, due, tuning)`, where `due` is `debug_spawns_due(spawn_list, run.scroll.ticks)` when `plays_list`, else `run.wave_spawns_due` (DRA-76). Never both. The app never builds a drifter itself, never changes `run.drifters` and never reads a wave. Source: 04-ship.md, rule 1; 15-tech-constraints.md, rules 2 and 7; systems/run.md; scope report DRA-76, Limits ("Debug mode: ... the normal waves or the test spawn list").
+- **Draw.** In this order: fill with `ui.look.BACKGROUND`; `draw_starfield(surface, run.scroll)`; `render_drifter(surface, obj)` for each `obj` in `run.drifters`, in order (DRA-29); `draw_points_popup(surface, popup)` for each `popup` in `run.popups`, in order (DRA-62); `draw_ship(surface, run.ship)` only if `run.ship_visible`; only if `overlay_visible`, `draw_debug_hitboxes(surface, run)` (DRA-29), then `draw_debug_overlay(surface, run.ship)`, then `draw_debug_wave_lines(surface, run)` (DRA-76); only if `run.game_over`, `draw_game_over(surface)` then `draw_final_score(surface, run.score)` (DRA-61: the final score); `draw_hud(surface, run, below_overlay=debug)` last, on top of everything. Source: systems/ship.md, systems/drifters.md, systems/debug-overlay.md, systems/scroll.md, systems/run.md and systems/hud.md, Presentation; 10-ui.md, rules 1 (the HUD on top) and 3 (the blink); 12-art-and-audio.md, rule 2 (the background stays behind).
 - **Drifters behind the ship (DRA-29).** Warnings and meteorites are drawn after the starfield and before the ship, so the player's ship stays on top where they cross.
 - **Popups over the drifters (DRA-62).** The points popups are drawn after every drifter, so they show over the other drifters, by Director decision, and before the ship, which stays on top as it does over every drifter. Source: scope report DRA-62, Limits and Decision log (Q5, Director override of Objection 1); systems/run.md, Presentation.
 - **`below_overlay`** is `mode is RunMode.DEBUG`, fixed for the run. Never `overlay_visible`: in debug mode the HUD stays below the overlay's place while F3 hides it, so the readout never jumps. Source: scope report DRA-13, HUD layout.
 - `pygame.QUIT`: log INFO `quit` and leave the loop. That only happens on desktop.
 - **Arrow keys** (Up, Down, Left, Right): on `KEYDOWN` log DEBUG `key down key=%s x=%.2f y=%.2f`, on `KEYUP` log DEBUG `key up key=%s x=%.2f y=%.2f`, with names `up`, `down`, `left`, `right` and the ship's `x` and `y` (`run.ship.x`, `run.ship.y` from DRA-23) at the moment the event is read (before this frame's ticks). Example: `key down key=up x=320.00 y=240.00`. No other arrow event is logged. Source: game/CONTEXT.md, Logging (a key pressed or released is an event). 01-vision.md, locked decision 1. Director decision (DRA-6: the integration check compares y between key-down and key-up).
 - **F3.** In debug mode, on `KEYDOWN` of `pygame.K_F3`: flip `overlay_visible` and log DEBUG `overlay visible=%s`. `KEYUP` of F3 does nothing. In normal mode F3 does nothing and logs nothing. F3 never retries: only `thrust`, built from the four arrows, reaches `step_run` (02-game-flow.md, retry_key, locked). Source: 10-ui.md, debug_overlay_toggle (guess) and rule 7.
-- **Log by event.** The frame loop logs only on the events in these rules: quit, arrow keys, F3 and the cap. Never a line per tick or per frame. Ship events (wall hit, top-line stop) are logged by `core.ship`, the scroll start by `core.scroll`, and the run's events (life lost, respawn, wait end, invulnerable end, game over, new run, and from DRA-29 drifter spawn, active, touch and gone) by `core.run`, not by the app. The app's only drifter lines are the one `tuning loaded` line at startup and, in debug mode, the one `debug spawns loaded` line after it (DRA-39). Source for the run's lines: systems/run.md, Logging (DRA-23). Source: 15-tech-constraints.md, rule 9; systems/ship.md, Rules, Logging.
+- **Log by event.** The frame loop logs only on the events in these rules: quit, arrow keys, F3 and the cap. Never a line per tick or per frame. Ship events (wall hit, top-line stop) are logged by `core.ship`, the scroll start by `core.scroll`, and the run's events (life lost, respawn, wait end, invulnerable end, game over, new run, and from DRA-29 drifter spawn, active, touch and gone) by `core.run`, not by the app. The app's only drifter lines are the one `tuning loaded` line at startup and, in debug mode, the one `debug spawns loaded` line after it (DRA-39). From DRA-76 it also logs the one `waves loaded` line at startup; the wave events (`wave start`, `wave end`, `level up`, `rest start`) are `core.waves`' own. Source for the run's lines: systems/run.md, Logging (DRA-23). Source: 15-tech-constraints.md, rule 9; systems/ship.md, Rules, Logging.
 - **Catch-up cap.** One frame runs at most `MAX_TICKS_PER_FRAME` (5) ticks. If, after the 5th tick, the accumulator still holds one tick or more, set it to 0.0: the owed time is dropped, never run later. The game carries on from where it was. Source: 15-tech-constraints.md, max_ticks_per_frame (guess) and rule 2; 91-decision-log.md, row 21.
 - **Cap log, by event.** Log DEBUG `tick cap hit, dropped %.3f s` (the seconds dropped) on a frame where the cap drops time and the frame before didn't. While frames keep hitting the cap, log nothing more. The next capped frame after an uncapped one logs again. Source: 15-tech-constraints.md, rule 9.
 - No `time.sleep`, no thread, no blocking call. Source: 15-tech-constraints.md, rule 1.
@@ -513,19 +563,26 @@ Tuning loader (`app/tuning.py`, DRA-29). Source: scope report DRA-29, Limits; ga
 
 Debug test spawn list (`app/debug_spawns.py`). Source: scope report DRA-39, Feature, Limits and Values needed (temporary stand-ins, debug mode only, not in the GDD); 15-tech-constraints.md, rule 7; 91-decision-log.md, row 38:
 - **File.** `app.tuning.TUNING_DIR / SPAWN_LIST_FILE` (`game/tuning/debug_spawns.json`), read once at startup in debug mode, UTF-8, `json.loads`. The Director edits it by hand; a change shows on the next page load.
-- **Checks**, by hand, every rule of `docs/contracts/schemas/debug-spawn-list.schema.json`: `rows` required, a list (may be empty); `mode` and `loop_ticks` optional; no unknown field anywhere; types exact, never a `bool` for a number. Each row: `type` required; `x`, `y` optional numbers (DRA-56: a row may leave out both; the drifter decides what it needs); `variant` a string matching `^[a-z][a-z0-9_]*$`; `invert` a boolean; `speed` a number > 0. `loop_ticks` an `int` ≥ 1.
+- **Checks**, by hand, every rule of `docs/contracts/schemas/debug-spawn-list.schema.json`: `rows` required, a list (may be empty); `play` (DRA-76), `mode` and `loop_ticks` optional; no unknown field anywhere; types exact, never a `bool` for a number. Each row: `type` required; `x`, `y` optional numbers (DRA-56: a row may leave out both; the drifter decides what it needs); `variant` a string matching `^[a-z][a-z0-9_]*$`; `invert` a boolean; `speed` a number > 0. `loop_ticks` an `int` ≥ 1.
 - **Checks the schema can't express.** `mode` is `"all"` or a `DrifterType` value. Each row's `type` is a `DrifterType` value. Then every row, in or out of play, is turned into a `Placement(drifter_type, x=..., y=..., variant=..., invert=..., speed=...)`, absent fields left at their `Placement` defaults, and spawned once with `spawn_drifter(placement, 1, tuning)`, and the result thrown away. Whatever that raises (a missing coordinate the drifter needs, an unknown variant, an invert the drifter lacks) is raised again as `ValueError` naming the row, e.g. `tuning/debug_spawns.json: rows[2]: satellite placement needs y`, `from` the original.
 - **Errors** name the file and the field like the tuning loader: `tuning/debug_spawns.json: mode must be "all" or a drifter type (meteorite, satellite)`, `tuning/debug_spawns.json: rows[0].speed must be a number > 0`. Invalid JSON and a missing file as in the tuning loader. Never a default for a missing file.
-- **Defaults.** `mode` left out: `DEFAULT_MODE`, `"all"`. `loop_ticks` left out: `DEFAULT_LOOP_TICKS`, 180. A row field left out: the drifter's default (`Placement`'s None or False). Source: scope report DRA-39, Values needed.
+- **Defaults.** `mode` left out: `DEFAULT_MODE`, `"all"`. `loop_ticks` left out: `DEFAULT_LOOP_TICKS`, 180. A row field left out: the drifter's default (`Placement`'s None or False). `play` left out: `DEFAULT_PLAY`, `"list"` (DRA-76). Source: scope report DRA-39, Values needed; scope report DRA-76, Not in GDD.
+- **What plays** (DRA-76). `play` is `"list"` or `"waves"`; anything else raises `ValueError`: `tuning/debug_spawns.json: play must be "list" or "waves"`. With `"list"` the rows play as below and the run has no waves. With `"waves"` the run plays the normal waves, as in normal mode, and no row is placed. Either way the whole file is read and checked, rows included, so switching `play` never reveals a broken row. One or the other, never both. Source: 10-ui.md, rule 7; 91-decision-log.md, row 73; scope report DRA-76, Limits ("The spawn list is kept as it is, with its modes and loop").
 - **Rows in play.** With mode `"all"`, every row. With a drifter type, only the rows of that type. File order is kept.
 - **Chain lightning rows** (DRA-47). `"type": "chain_lightning"` with `x` (required), and optionally `y`, `variant`, `invert` and `speed`; `"mode": "chain_lightning"` plays only those rows. No new code in this module: the type list, the mode check and the load-time spawn all go through `DrifterType` and `spawn_drifter`, so a chain lightning row without `x` fails with `chain_lightning placement needs x`. Its entry warning is settled by `add_drifters` in the run, not here. Source: scope report DRA-47, Limits.
 - **Fireball rows** (DRA-56). `"type": "fireball"`, and optionally `x`, `y`, `variant`, `invert` and `speed`; `"mode": "fireball"` plays only those rows. The position picks the entry: neither `x` nor `y` is the default corner (top-left, or top-right with `invert`), `x` alone an entry along the top, `y` alone a side entry (the left wall, or the right with `invert`). So the loader no longer requires `x` or `y` in a row: that check moves to the drifter's own `start_position`, through the load-time spawn. A meteorite or chain lightning row without `x` still fails with `<type> placement needs x`, a satellite row without `y` with `satellite placement needs y`. `speed` is the Level 1 speed along the fireball's path; hazard speed × applies on top. No other new code: the type list, the mode check and the load-time spawn go through `DrifterType` and `spawn_drifter`. Source: scope report DRA-56, Limits and Not in GDD (speed).
 - **Coin rows** (DRA-62). `"type": "coin"` with `x` (required) and optionally `y` and `variant`; `"mode": "coin"` plays only those rows. `x` alone starts it just above the top edge at that x; `x` and `y` place it at that spot, where it shows at once, with no warning. No new code in this module: the type list, the mode check and the load-time spawn go through `DrifterType` and `spawn_drifter`. So a coin row without `x` fails with `coin placement needs x`, one with `speed` with `coin has no speed`, and one with `invert: true` with `coin has no invert`, each named by its row as for every drifter. Source: scope report DRA-62, Limits ("coin rows set x and y, plus an optional variant. No speed. A coin-only mode") and Not in GDD (Director: "it shows position x and y"); 07-drifters.md, rule 14.
 - **Timing.** The `n` rows in play are spread evenly over one loop: row `i` (from 0) has offset `(i × loop_ticks) // n`. `debug_spawns_due` places a row on every tick where `(run.scroll.ticks - 1) % loop_ticks` equals its offset. So the first row in play is placed on the first tick of play (`run.scroll.ticks == 1`), and the loop repeats every `loop_ticks` ticks. Rows that share an offset (more rows than ticks) are placed on the same tick, in file order. With the three DRA-29 meteorite rows in play and `loop_ticks` 180, they are placed on ticks 1, 61 and 121, then again from 181, exactly as in DRA-29. Source: scope report DRA-39, Feature ("The list loops"), Decision log (rows need only type and position); this contract, Rationale.
 - The list counts the run's own ticks, so it freezes at game over and starts again with a retry.
-- **Log.** One INFO line after a good load: `debug spawns loaded mode=%s rows=%d loop_ticks=%d`, with the number of rows in play. INFO because it is startup. Nothing else, and nothing per tick.
+- **Log.** One INFO line after a good load: `debug spawns loaded mode=%s rows=%d loop_ticks=%d play=%s`, with the number of rows in play and, from DRA-76, `play` at the end. INFO because it is startup. Nothing else, and nothing per tick.
 - Called only in debug mode. Never in normal mode. Game rules stay the same in both modes; the list only places drifters.
-- Not a wave. No wave file, no wave clock, no wave picker. Waves replace it later. Source: scope report DRA-39, Out.
+- Not a wave. It has no wave clock and no level: while it plays the run has no waves, stays at Level 1, and the overlay reads `wave none`. Source: scope report DRA-39, Out; scope report DRA-76, Limits.
+
+Wave files (`app/waves.py`, DRA-76). Source: scope report DRA-76, Limits; game/CONTEXT.md, Error handling (validate at the edge); `docs/contracts/systems/waves.md`, Rules, The wave files:
+- **Files.** Every file in `WAVES_DIR` (`game/waves/`) whose name ends in `.json`, other than `PLAYLIST_FILE`, is a wave; its id is its name without `.json`. Files are read in name order. `PLAYLIST_FILE` is read after them. UTF-8, `json.loads`, once, at startup, in both modes. Plain `Path.glob` and `Path.read_text`: small local files, no network, no blocking beyond that. Files of any other kind in the folder are not read. In the browser the folder is listed in pygbag's packed file system; the integration check `waves loaded` proves it works there.
+- **Errors.** Invalid JSON: `ValueError("waves/<file name>: not valid JSON: <decoder message>")`, raised `from` the decode error. A missing `PLAYLIST_FILE` or folder: the `FileNotFoundError` rises as it is (it names the path). Never a default for a missing file. Everything else is checked by `core.wave_files.build_wave_book`, which names the file and the problem (`systems/waves.md`). The guard shows the error screen.
+- **Log.** One INFO line after a good load: `waves loaded waves=%d pool=%d`, the number of waves and of pool waves in the book. INFO because it is startup. Nothing else.
+- The app never reads, picks or steps a wave itself. It holds the book only to start the first run's waves.
 
 Error guard (`app/guard.py`):
 - The only `except Exception` in the game. Source: game/CONTEXT.md, Error handling.
@@ -550,7 +607,7 @@ Launch script (`game/scripts/start-driftward-ace.sh`):
 - Keep running pygbag from the repo root, so it reads `pygbag.ini`.
 
 Release package (`pygbag.ini`):
-- The package (`game.apk` inside `game/build/web.zip`, and the live build the start script serves) holds only runtime files: `main.py`, `app/`, `ui/`, `core/`, and later the asset and data files the game reads. From DRA-6, `core/*.py` must be in it. From DRA-29, `tuning/` with its JSON files must be in it, along with the subpackages `core/drifters/` and `ui/drifters/`. Source: Director decision (DRA-5 close-out, round 1 observations).
+- The package (`game.apk` inside `game/build/web.zip`, and the live build the start script serves) holds only runtime files: `main.py`, `app/`, `ui/`, `core/`, and later the asset and data files the game reads. From DRA-6, `core/*.py` must be in it. From DRA-29, `tuning/` with its JSON files must be in it, along with the subpackages `core/drifters/` and `ui/drifters/`. From DRA-76, `waves/` with its JSON files. Source: Director decision (DRA-5 close-out, round 1 observations).
 - Left out, at least: `tests/` (with its `CONTEXT.md` and `conftest.py`), `scripts/`, `CONTEXT.md`, `requirements.txt`, `ruff.toml`. Any non-runtime file added to `game/` later is left out the same way. Source: Director decision (DRA-5 close-out).
 - Configured only in `pygbag.ini` at the repo root, `[DEPENDENCIES]` section, `ignoreDirs` and `ignoreFiles`. Built by the Integration Engineer. Source: Director decision (DRA-5 close-out). docs/crew/roster.md, row 12.
 - No pygbag flag or template change. pygbag stays at 0.9.3. Source: 15-tech-constraints.md, web_build.
@@ -748,6 +805,36 @@ New checks:
 - **Bad coin file and bad coin rows (desktop, headless, `SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`):** no code change. In a scratch copy of `game/tuning/`, set `"popup_ticks": 0` in `drifters/coin.json`. Point `app.tuning.TUNING_DIR` at it and call `run()`. The log shows ERROR `unexpected error, showing the error screen` with a `ValueError` naming `tuning/drifters/coin.json` and `popup_ticks`. Repeat with the file as committed and, one at a time, these rows added to `debug_spawns.json`: `{"type": "coin", "x": 100, "speed": 1.5}` (message: `rows[<i>]` and `coin has no speed`), `{"type": "coin"}` (`coin placement needs x`), `{"type": "coin", "x": 100, "invert": true}` (`coin has no invert`). No `error screen failed` line. Source: this contract, Rules, Tuning loader and Debug test spawn list; systems/drifters.md, Rules, Spawner and Coin.
 - **Package contents:** as for DRA-61, and `core/popup.py`, `core/drifters/coin.py`, `ui/drifters/coin_view.py`, `ui/popup_view.py` and `tuning/drifters/coin.json` must be in `game.apk`.
 
+Integration checks for DRA-76, on top of the required browser checks and every earlier check above, as reworded below (all must still pass). Each check starts in a fresh page unless it says otherwise. Background: the placeholder content in `game/waves/` (scope report DRA-76, Values needed): `wave_0`, `l1_a` and `l1_b`, 1320 px each; the playlist plays fixed `[l1_a]` then 1 random at every level, and `l1_b` is the only pool wave. With no rest (`rest_gap_base` 0, no extra rest), the timeline in `systems/waves.md`, Diagram: `wave_0` until tick 1230 (about 20.5 s), `l1_a` until tick 2430 (40.5 s), `l1_b` until tick 3630 (60.5 s), then Level 2 with `l1_a` again. Level 1 scrolls 1.1 px a tick (66 px a second), Level 2 1.21 (72.6 px a second). The committed `game/tuning/debug_spawns.json` has no `play`, so debug mode plays the list. Checks marked **(waves debug)** need `"play": "waves"` in that file: the Director switches it, or allows the Integration Engineer to switch it for the run and put it back after.
+
+Earlier checks, reworded for DRA-76:
+- **Normal mode plays the waves.** Every check that read "nothing spawns in normal mode" (DRA-29, Normal mode spawns nothing, with its DRA-39 and DRA-62 color lists) is replaced by the new check "Normal mode plays the waves" below.
+- **Normal-mode checks (`/`) now run with the waves playing.** Where a check counts on falls only (DRA-23, Normal mode; DRA-23, Blink; DRA-13 and DRA-61 readout checks), a wave hazard may also take a life. A check passes when what it measures still holds; if a hit gets in the way, repeat it in a fresh page. The DRA-13 "Starfield moves" numbers (about 66 px a second) hold until the level rises at about 60.5 s.
+- **DRA-13, No overlap in debug mode:** the overlay text is six lines: `x`, `y`, `vx`, `vy`, `wave ...`, `level ...`. The readout sits below the sixth, with a gap and no shared pixel row, and stays put when F3 hides the overlay.
+- **DRA-39, Spawn list loaded:** the line ends with ` play=list` (` play=waves` in waves debug).
+- **Debug checks with the list (`?debug=1`)** keep every number: the list plays exactly as before, the run stays at Level 1, and no `wave ` line appears in the log after `waves loaded`.
+
+New checks:
+- **Waves loaded (`/` and `?debug=1`):** one INFO line `waves loaded waves=3 pool=1`, after `tuning loaded` and before the first `scroll start`. In the browser this also proves the wave folder is listed and read in pygbag's file system. Source: this contract, Rules, Wave files.
+- **Normal mode plays the waves (`/`):** within the first 20 s, drifters from `wave_0` show (meteorite grey (140, 140, 140) and coin pink (255, 80, 150) pixels, with their warnings first for the meteorites), and no (0, 255, 0) pixel at any point. Source: scope report DRA-76, Feature; 09-waves.md, rule 3.
+- **The list stays the default (`?debug=1`):** with the committed spawn file the overlay's fifth and sixth lines read `wave none` and `level 1` (green text matching reference text rendered with the game's default font at 16 px, right under `vy`), and stay so. The list's drifters play as in the DRA-29 to DRA-62 checks. Source: 10-ui.md, debug_overlay_layout and rule 7; systems/debug-overlay.md, Presentation.
+- **The wave flow (waves debug, `?debug=1`, hold ArrowUp from play start):** on the first frame the overlay reads `wave wave_0` and `level 1`. The log shows `wave start id=wave_0 level=1 random=False` before the first `scroll start`, and a `drifter spawn ... level=1` line for each `wave_0` placement as it comes due. At about 20.5 s: `wave end id=wave_0`, then `wave start id=l1_a level=1 random=False`, and the overlay reads `wave l1_a`. At about 40.5 s: `wave end id=l1_a`, then `wave start id=l1_b level=1 random=True`, and `wave l1_b`. At about 60.5 s: `wave end id=l1_b`, `level up level=2`, `wave start id=l1_a level=2 random=False`; the overlay reads `wave l1_a` and `level 2`; every `drifter spawn` line after it ends `level=2`. Never `wave rest` (no rest with these files). Source: scope report DRA-76, Player sees and Done when; systems/waves.md, Diagram and Logging.
+- **The stars speed up (same run):** two canvas reads 1 s apart at about 55 s show the stars about 66 px lower; two reads 1 s apart at about 65 s show them about 72.6 px lower. Source: 08-difficulty.md, Scroll speed × row; systems/scroll.md.
+- **If the run ends before 60.5 s:** the placeholder hazards may hit a ship held on the top line. Then record when, check the parts reached, and check the rest on desktop, headless (`SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`), with no code change: copy `game/waves/` to a scratch folder, remove every hazard placement from its three wave files (keep the coins), set `"play": "waves"` in a scratch copy of `game/tuning/` too, point `app.waves.WAVES_DIR` and `app.tuning.TUNING_DIR` at them from the command line, call `run()`, and read the log for about 70 s: the same `wave end`, `wave start` and `level up` lines at ticks 1230, 2430 and 3630 (about 20.5, 40.5 and 60.5 s), and `drifter spawn ... level=2` after the level rises. The Director's playtest is the browser check for the full flow.
+- **Retry restarts the waves (waves debug, `?debug=1`):** lose all three lives, then retry (release every arrow, then tap one). The log shows INFO `new run`, then `wave start id=wave_0 level=1 random=False`; the overlay reads `wave wave_0` and `level 1`; the stars move at the Level 1 speed again. Source: scope report DRA-76, Feature; systems/run.md, a game-over tick.
+- **Game over freezes the waves (waves debug, `?debug=1`):** on the Game Over box two canvas reads 2 s apart are identical, the overlay's wave and level lines included, and no `wave ` line appears. Source: 02-game-flow.md, rule 5.
+- **F3 (waves debug, `?debug=1`):** F3 hides the six text lines with the rest of the overlay and brings them back; the HUD doesn't move. Source: 10-ui.md, debug_overlay_toggle.
+- **Bad wave files (desktop, headless, `SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`, then again with no `DRIFTWARD_DEBUG`):** no code change. In a scratch copy of `game/waves/`, pointed at through `app.waves.WAVES_DIR`, make one change at a time and call `run()`. Each time the log shows the start line, then ERROR `unexpected error, showing the error screen` with a `ValueError` whose message is as listed, and no `error screen failed` line; the error screen is drawn and the process idles until stopped. Normal mode refuses the same files the same way.
+  1. A hazard's `at_px` set to 100 in `l1_a.json`: names `waves/l1_a.json`, the placement and the first 120 px.
+  2. `"wave_zero": "wave_00"` in `playlist.json`: names `waves/playlist.json` and `wave_00`.
+  3. `"min_level": 2` in `l1_b.json`: names `waves/playlist.json`, `level 1` and `random_count`.
+  4. A placement with `"speed": 2.0` in `wave_0.json`: names `waves/wave_0.json`, the placement and `speed`.
+  5. A placement with `"variant": "huge"` on a meteorite: names the file, the placement and `huge`.
+  6. `l1_a.json` cut to invalid JSON: names `waves/l1_a.json` and `not valid JSON`.
+  Source: this contract, Rules, Wave files; systems/waves.md, Rules, The wave files; scope report DRA-76, Limits.
+- **Bad `play` (desktop, headless, `SDL_VIDEODRIVER=dummy`, `DRIFTWARD_DEBUG=1`):** `"play": "both"` in a scratch copy of `debug_spawns.json`: the error names `tuning/debug_spawns.json` and `play`. Source: this contract, Rules, Debug test spawn list.
+- **Package contents:** as for DRA-62, and `core/waves.py`, `core/wave_files.py`, `app/waves.py`, `waves/playlist.json`, `waves/wave_0.json`, `waves/l1_a.json` and `waves/l1_b.json` must be in `game.apk`.
+
 ## Impact
 DRA-39 changes this frozen contract (v6). The tuning loader reads `hazards.json` and the satellite's own fields; the debug test spawn list moves from code into `game/tuning/debug_spawns.json`, with two modes and an editable loop length; `debug_spawns_due` takes the loaded list. The DRA-29 "Tuning loaded" check is reworded for the longer log line. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `load_tuning`, `debug_spawns`, `DEBUG_SPAWN`, `TUNING_DIR`, `frame_loop`, `add_drifters` and `pygbag`:
 
@@ -810,7 +897,28 @@ DRA-62 changes this frozen contract (v10). The tuning loader reads `coin.json` w
 
 Until integration, once `DrifterType.COIN` exists (task DRA-62-01), the game stops at startup with the error screen: the loader has no rules for `coin.json`. Tests are not affected. Popups exist in core from task DRA-62-02 but are not drawn until integration.
 
+DRA-76 changes this frozen contract (v11). The app loads the wave files in both modes, draws one seed, starts the run with waves (or without, when debug mode plays the list), adds the waves' due placements after every tick, reads `play` from the spawn list, and draws the overlay's wave lines; the earlier checks are reworded for waves in normal mode, the six overlay lines and the longer spawn list line. Grepping `game/` (tests included) for `start_run`, `add_drifters`, `debug_spawns`, `draw_debug_overlay`, `frame_loop`, `TUNING_DIR` and `pygbag`:
+
+| File | Change needed |
+|---|---|
+| `game/app/waves.py` (new) | `WAVES_DIR`, `PLAYLIST_FILE`, `load_wave_book`, the load line. Integration Engineer. |
+| `game/app/frame.py` | loads the book, `plays_list`, the seed and `start_run(waves=...)`; the tick's `add_drifters` with `run.wave_spawns_due` or the list; `draw_debug_wave_lines` after `draw_debug_overlay`; the module and `_run_ticks` docstrings. Integration Engineer. |
+| `game/app/debug_spawns.py` | `PLAY_LIST`, `PLAY_WAVES`, `DEFAULT_PLAY`, `DebugSpawnList.play`, the `play` check, the longer load line. Integration Engineer. |
+| `game/app/tuning.py`, `loop.py`, `guard.py`, `mode.py`, `log.py`, `settings.py`, `game/main.py`, `game/scripts/` | none. |
+| `pygbag.ini` | none expected: no rule leaves `waves/` out. The DRA-76 package check confirms it. |
+| `game/waves/wave_0.json`, `l1_a.json`, `l1_b.json`, `playlist.json` (new) | content, by the main session acting as Wave Designer and Wave Critic (`systems/waves.md`, Purpose), before integration. |
+| `game/tuning/debug_spawns.json` | none needed: `play` left out plays the list. The Director may add `"play": "waves"`. |
+| `game/tests/` | none from this contract. |
+
+Until integration the app calls `start_run()` with no waves: the game plays as before, with nothing spawning in normal mode and the list in debug mode, at Level 1. After task DRA-76-06 the HUD in debug mode sits two line-heights lower, below where the wave lines will be drawn. Every `check.sh` step passes in between.
+
 ## Rationale
+- **Wave files are read in the app and checked in core (DRA-76).** Reading files is the app's edge work, as for the tuning. The checks are wave rules (the seam, the pool) and must have permanent tests, which `check.sh` runs only for `core` and `ui`. So `app.waves` lists, reads and decodes; `core.wave_files` checks and builds.
+- **The wave folder is listed, not indexed (DRA-76).** Wave ids are content: the Wave Designer adds a wave by adding a file. A list of files to keep in step would be one more thing to forget. The ids are sorted, so the order never depends on the file system.
+- **Waves load in both modes (DRA-76).** The scope report asks for it, and it keeps one rule: a bad wave file stops the game the same way whatever plays, before the first frame.
+- **One seed per page load, from Python's `random` (DRA-76).** Core can't draw entropy and must stay replayable. The interpreter seeds `random` from the OS when it starts, in the browser too, so one draw makes each page load's picks new, and core makes each retry's picks new from it. No clock read, no extra code.
+- **`play` lives in the spawn list file (DRA-76).** 10-ui.md, rule 7 puts the choice in "a debug setting", and the scope report in the debug spawn file. The file is already debug-only, hand-edited, and read once at startup; normal mode never reads it, so the choice can't reach players. Left out, the list plays, so today's file keeps working.
+- **Both sources go through one `add_drifters` call (DRA-76).** The tick has one line that adds drifters, whichever source plays, so the two can never both add, and the run's order of log lines is the same for both.
 - **`choose_mode` is pure and returns the rejected value.** The WARNING for a bad switch must go out after logging is configured, and logging needs the mode first. Returning the rejected value lets `run()` set up logging and then warn, with one config call.
 - **`read_switch` runs before logging and outside the guard.** It only reads a string and has nothing to fail on in normal use. If it ever raises, Python prints the traceback to stdout. In the browser that is pygbag's hidden terminal, not the devtools console (D2), so the page stays blank. The same holds for the startup module imports and `setup_logging`. This gap is accepted because that code is stdlib only and small. The guard can't cover it, because the guard needs logging, and logging needs the mode.
 - **Heavy imports inside the guard.** In round 0, pygame failed while `main.py` imported `app.loop`, before the guard or logging existed. The page stayed blank and the console was empty. So the startup modules import only the stdlib, and everything that can realistically fail at import (pygame, `ui`, later `core` and assets) is first imported by `start()` inside the guard. `app.frame` is a separate module so that `app.loop` stays light and the loop code itself still imports pygame at the top, as usual.

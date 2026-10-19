@@ -1,18 +1,19 @@
 # Run: lives, score, coins, falls, hits, drifters, respawn wait, game over and retry
 Version: 6
-Status: frozen
-Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62
+Status: draft
+Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62, DRA-76
 Created by: architect
 
 ## Purpose
-One run of the game, from play start to game over, as one core state. It holds the ship, the world scroll, the drifters on the field, the points popups on screen, the lives, the coin points, the invulnerability timer, the respawn wait and the Game Over state, and steps them all once per tick. It gives the run's score: the meters flown plus the coin points. The score starts at 0, never goes down, freezes at game over and is 0 again after a retry. It applies the collect rule, the fall rule and the hit rule: the ship step reports where the ship is, the drifters report where they are and what a touch does, and the run decides what it pays or costs. A coin the ship touches is collected, invulnerable or not, but never while the ship stands in the respawn wait: its points go to the coin points, it disappears, and its points popup rises from where it was for 1 s. It tells the drifters how far the world scrolls each tick, marks when each drifter has entered the screen, starts and counts down each hazard's re-hit cooldown, and drops drifters that have left or been collected. It also starts a new run when the player retries.
+One run of the game, from play start to game over, as one core state. It holds the ship, the world scroll, the drifters on the field, the points popups on screen, the lives, the coin points, the invulnerability timer, the respawn wait, the Game Over state and the run's waves, and steps them all once per tick. The run's level is its waves' level: the scroll moves at that level's speed and new drifters are born at it. A run with no waves (the debug test spawn list) stays at Level 1. It gives the run's score: the meters flown plus the coin points. The score starts at 0, never goes down, freezes at game over and is 0 again after a retry. It applies the collect rule, the fall rule and the hit rule: the ship step reports where the ship is, the drifters report where they are and what a touch does, and the run decides what it pays or costs. A coin the ship touches is collected, invulnerable or not, but never while the ship stands in the respawn wait: its points go to the coin points, it disappears, and its points popup rises from where it was for 1 s. It tells the drifters how far the world scrolls each tick, marks when each drifter has entered the screen, starts and counts down each hazard's re-hit cooldown, and drops drifters that have left or been collected. It also starts a new run when the player retries: Wave 0 again, Level 1, new random picks.
 
-The app holds one `Run` and calls one step per tick. It may also hand the run new drifters through `add_drifters`, the only way a drifter enters a run. Each new drifter settles its entry warning there, from the ship at that moment.
+The app holds one `Run`, starts it with or without waves, and calls one step per tick. After each tick it hands the run new drifters through `add_drifters`, the only way a drifter enters a run: the placements the run's waves say are due, or in debug mode the test spawn list's. Each new drifter settles its entry warning there, from the ship at that moment.
 
 A life is lost by a fall or by a hit. No life-lost feedback plays: the blink is the only effect (scope report DRA-23, Limits; LD-08 stays open).
 
 Who builds what:
 - `game/core/run.py`: the Gameplay Implementer, task `DRA-23-01-gameplay-implementer`. Drifters, `add_drifters`, hits and drops: task `DRA-29-03-gameplay-implementer`. Entering, the re-hit cooldown and the end of `hit_ship`: task `DRA-39-01-gameplay-implementer`. `settle_warning` in `add_drifters`: task `DRA-47-02-gameplay-implementer`. `POINTS_PER_METER`, `coin_points` and `score`: task `DRA-61-01-gameplay-implementer`. The scroll in `TickContext`, `popups`, steps 3a and 5a: task `DRA-62-02-gameplay-implementer`.
+- `game/core/run.py`, the waves (`waves`, `level`, `wave_spawns_due`, `start_run(waves)`, steps 3, 5 and 9a, the retry): task `DRA-76-05-gameplay-implementer`. The waves themselves: `docs/contracts/systems/waves.md`. Tests for waves in the run: `game/tests/core/test_run_waves.py`, task `DRA-76-09-qa-engineer`.
 - `game/core/popup.py`, `PointsPopup` and `step_popups`: the Gameplay Implementer, task `DRA-62-01-gameplay-implementer` (the coin builds its popup from it).
 - `game/ui/popup_view.py`, the points popup's view: the UI Developer, task `DRA-62-04-ui-developer`.
 - `game/ui/game_over.py`, the Game Over box: the UI Developer, task `DRA-23-03-ui-developer`. The three-line layout and `draw_final_score`, the final score line: task `DRA-61-03-ui-developer`.
@@ -21,7 +22,7 @@ Who builds what:
 - The meters inside the score: `docs/contracts/systems/scroll.md`.
 - The drifters themselves, the spawner and their views: `docs/contracts/systems/drifters.md`.
 - The coin itself, what it pays and the popup it builds: `docs/contracts/systems/drifters.md`, Rules, Coin. How far the world scrolls each tick: `docs/contracts/systems/scroll.md`, `scroll_step_px`.
-- Calling `start_run` before the first frame, `step_run` once per tick, `add_drifters` for the debug test spawn list, drawing the drifters, then the popups, the ship only while `ship_visible`, and the Game Over box and its final score line from `run.score` while `game_over`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`.
+- Calling `start_run` (with the waves or without) before the first frame, `step_run` once per tick, `add_drifters` after each tick with the waves' due placements or the debug test spawn list's, drawing the drifters, then the popups, the ship only while `ship_visible`, and the Game Over box and its final score line from `run.score` while `game_over`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`.
 
 ## Diagram
 ```mermaid
@@ -46,15 +47,15 @@ flowchart TD
   G1 -- no --> G2["retry_armed = True"] --> GOUT["same ship, scroll, drifters, lives<br/>held = thrust"]
   G1 -- yes --> G3{"retry_armed?"}
   G3 -- no --> GOUT
-  G3 -- yes --> NEW["start_run(), held = thrust<br/>log INFO new run"]
+  G3 -- yes --> NEW["log INFO new run<br/>start_run(next_run_waves(waves) or None), held = thrust"]
   GO -- no --> P1["1 press = an arrow held now<br/>that was not held last tick"]
   P1 --> P2["2 protected = invuln_ticks_left > 0<br/>left = max(invuln_ticks_left - 1, 0)"]
-  P2 --> P3["3 drifters: each obj.update(TickContext(run.ship,<br/>scroll_step_px(run.scroll))).mark_entered()"]
+  P2 --> P3["3 drifters: each obj.update(TickContext(run.ship,<br/>scroll_step_px(run.scroll, run.level))).mark_entered()"]
   P3 --> P3A["3a popups = step_popups(run.popups)<br/>each one tick older; the finished ones go (DRA-62)"]
   P3A --> P4{"4 waiting and not press?"}
   P4 -- yes --> STAY["ship unchanged"]
   P4 -- no --> STEP["waiting = False<br/>ship = core.ship.step(ship, thrust)"]
-  STAY --> P5["5 scroll = step_scroll(scroll)"]
+  STAY --> P5["5 scroll = step_scroll(scroll, run.level)"]
   STEP --> P5
   P5 --> P5A{"5a ship stepped in 4 (not waiting)?<br/>(DRA-62)"}
   P5A -- yes --> COL["every ACTIVE COLLECT drifter overlapping ship_hitbox(ship):<br/>coin_points += collect_points()<br/>popups += collect_popup()<br/>phase = GONE"]
@@ -71,7 +72,10 @@ flowchart TD
   HI --> P8
   HG --> P8
   P8 --> P9["9 drop drifters that are GONE or off screen"]
-  P9 --> OUT["new Run, held = thrust"]
+  P9 --> P9A{"9a waves is not None?<br/>(DRA-76)"}
+  P9A -- yes --> WV["waves = step_waves(waves, scroll.distance_px)<br/>due placements, wave end, level rise, rest"]
+  P9A -- no --> OUT
+  WV --> OUT["new Run, held = thrust"]
 ```
 
 Invulnerability and blink after a respawn or a hit on tick T (`BLINK_SWAP_TICKS` = 6):
@@ -85,11 +89,21 @@ protected on tick       T+1 ....................................................
 Drifters entering, with the app's call after the tick (`docs/contracts/systems/app.md`):
 ```mermaid
 flowchart LR
-  T["run = step_run(run, thrust)"] --> D{"debug mode?"}
-  D -- yes --> A["run = add_drifters(run, debug_spawns_due(run.scroll.ticks), tuning)"]
-  D -- no --> X["nothing spawns yet"]
+  T["run = step_run(run, thrust)"] --> D{"the test spawn list plays?<br/>(debug mode, play: list)"}
+  D -- yes --> A["run = add_drifters(run, debug_spawns_due(spawn_list, run.scroll.ticks), tuning)"]
+  D -- "no (normal mode, or debug with play: waves)" --> W["run = add_drifters(run, run.wave_spawns_due, tuning)"]
 ```
-In debug mode `debug_spawns_due` takes the loaded spawn list too (`docs/contracts/systems/app.md`, Debug test spawn list).
+A run started with waves has a wave state; one started for the test spawn list has none, so `run.wave_spawns_due` is `()` there and `run.level` stays 1 (DRA-76).
+
+The level and the scroll around a level rise on tick T (DRA-76; `docs/contracts/systems/waves.md`):
+```
+tick                         T                          T+1
+run.level going in           1                          2
+scroll speed this tick       1.1 px (Level 1)           1.21 px (Level 2)
+step 9a                      the last wave of Level 1's playlist ends, level 2
+run.level after the tick     2                          2
+drifters added after it      at Level 2                 at Level 2
+```
 
 Re-hit cooldown of one hazard that hits on tick T, with `rehit_cooldown_ticks` 180 (`docs/contracts/systems/drifters.md`, Diagram):
 ```
@@ -129,7 +143,7 @@ The popup shows on exactly 60 drawn states. It rises up the screen and never mov
 ```python
 # game/core/run.py
 # Imports: stdlib, core.ship, core.scroll, core.collision, core.levels, core.drifters (DRA-29),
-# core.popup (DRA-62). Never pygame, ui or app. Every module-level constant is typing.Final.
+# core.popup (DRA-62), core.waves (DRA-76). Never pygame, ui or app. Every module-level constant is typing.Final.
 
 LIVES_START: Final[int] = 3  # 05-lives-and-damage.md, lives_start (locked)
 INVULN_TICKS: Final[int] = 30  # 05-lives-and-damage.md, invuln_ticks (locked)
@@ -163,6 +177,7 @@ class Run:
     next_uid: int = 1  # DRA-29. The uid the next added drifter gets
     coin_points: int = 0  # DRA-61. Points from coins this run, >= 0. Step 5a adds to it (DRA-62)
     popups: tuple[PointsPopup, ...] = ()  # DRA-62. Points popups on screen, oldest first
+    waves: WaveRun | None = None  # DRA-76. The run's waves (core.waves). None: no waves play
 
     @property
     def score(self) -> int:
@@ -182,14 +197,20 @@ class Run:
 
     @property
     def level(self) -> int:
-        ...  # DRA-29
-        # core.levels.level_at(scroll.meters). 1 while Levels 2 to 8 have no start (DF-05).
+        ...  # DRA-29, from DRA-76 the waves' level
+        # waves.level, or FIRST_LEVEL (1) when waves is None. 1 to 8.
+
+    @property
+    def wave_spawns_due(self) -> tuple[Placement, ...]:
+        ...  # DRA-76
+        # waves.spawns_due, or () when waves is None: the placements that came due on the last tick.
 
 
-def start_run() -> Run:
+def start_run(waves: WaveRun | None = None) -> Run:
     ...
-    # Run(ship=spawn(), scroll=start_scroll()). Every other field at its default: no drifters,
-    # next_uid 1, coin_points 0 (so score 0), no popups.
+    # Run(ship=spawn(), scroll=start_scroll(), waves=waves). Every other field at its default: no
+    # drifters, next_uid 1, coin_points 0 (so score 0), no popups. waves (DRA-76) is the app's
+    # core.waves.start_waves(book, seed), or None for no waves; left out, None.
 
 
 def step_run(run: Run, thrust: Thrust) -> Run:
@@ -205,7 +226,7 @@ def add_drifters(
     # (or its as_level), gives it the next uid, and appends it. Pure apart from event logging.
     # Raises what spawn_drifter raises (unknown variant, level out of range, ...).
 ```
-The code documents each `Run` field with the comment above. `Drifter`, `TickContext`, `Phase`, `TouchEffect` (`core.drifters.base`), `Placement`, `spawn_drifter` (`core.drifters.spawner`) and `DrifterTuning` (`core.drifters.tuning`) are in `docs/contracts/systems/drifters.md`. `ship_hitbox` is in `docs/contracts/systems/ship.md`; `hitboxes_overlap` in `drifters.md`; `scroll_step_px` in `docs/contracts/systems/scroll.md` (DRA-62).
+The code documents each `Run` field with the comment above. `Drifter`, `TickContext`, `Phase`, `TouchEffect` (`core.drifters.base`), `Placement`, `spawn_drifter` (`core.drifters.spawner`) and `DrifterTuning` (`core.drifters.tuning`) are in `docs/contracts/systems/drifters.md`. `ship_hitbox` is in `docs/contracts/systems/ship.md`; `hitboxes_overlap` in `drifters.md`; `scroll_step_px` in `docs/contracts/systems/scroll.md` (DRA-62). `WaveRun`, `step_waves` and `next_run_waves` (`core.waves`) are in `docs/contracts/systems/waves.md`; `FIRST_LEVEL` (`core.levels`) in `drifters.md` (DRA-76).
 
 ```python
 # game/core/popup.py (DRA-62)
@@ -286,7 +307,8 @@ The run's fields reach the screen in these places. Every fact shown is a core fi
 | `run.game_over` | the app calls `draw_game_over(surface)`, then `draw_final_score(surface, run.score)`, only on frames where it is True. Source: 02-game-flow.md, rule 5 |
 | `run.score` | the SCORE line at the top left, `score_text(run.score)`: see `docs/contracts/systems/hud.md`. At game over, also the score line on the Game Over box, through `draw_final_score`, below. From DRA-61. Source: 10-ui.md, hud_score (locked), rule 2; 02-game-flow.md, rule 5 ("Shows the final score") |
 | `run.lives` | the hearts at the top right. See `docs/contracts/systems/hud.md` |
-| `run.ship`, `run.scroll` | the ship view, the debug overlay and the starfield read them. The HUD reads the meters only through `run.score` |
+| `run.ship`, `run.scroll` | the ship view, the debug overlay and the starfield read them. The HUD reads the meters only through `run.score`. The stars move at the level's scroll speed through `run.scroll.distance_px` (DRA-76) |
+| `run.waves`, `run.level` | the debug overlay's `wave` and `level` lines (`docs/contracts/systems/debug-overlay.md`; `docs/contracts/systems/waves.md`, Presentation). Not on the HUD. From DRA-76. Source: 10-ui.md, debug_overlay, debug_overlay_layout (guess); scope report DRA-76, Out (the level on the HUD) |
 
 `draw_game_over` and `draw_final_score` read no core state and import no core module. `draw_final_score` gets the final score as a plain number from the app. `draw_game_over` draws the Box, the Title and the Prompt, in that order. `draw_final_score` draws only the Score line, over the box. Both place their lines by the same three-line layout (Vertical place), so the title and the prompt sit in the same place whether `draw_final_score` is called or not.
 - **Box.** A `BOX_SIZE` (320 × 120) rectangle filled with `BOX_COLOR`, black at alpha 90. No border. Its top-left corner is `((width - 320) // 2, (height - 120) // 2)` from `surface.get_size()`: (160, 180) on the 640 × 480 screen. Source: scope report DRA-23, Values needed (temporary stand-in; UI-04 is TBD).
@@ -309,15 +331,17 @@ The run's fields reach the screen in these places. Every fact shown is a core fi
 ## Rules
 Values: every constant above has its value and source on its line. `lives_start`, `invuln_ticks` and `points_per_meter` are locked. The blink and the box are temporary stand-ins the Director approved in chat (scope report DRA-23). The score line's text, look and place are the Director's (scope report DRA-61), not in the GDD (UI-01 and UI-04 are TBD). The popup's length (60 ticks) and color are `guess` in the GDD; its rise (0.5 px a tick), start (the coin's center), font, layer and end with no fade are Director approvals not in the GDD (scope report DRA-62, Not in GDD). Its length and rise come from the coin's tuning file, through the coin (`systems/drifters.md`, Rules, Coin).
 
-Step numbers changed in DRA-29: the DRA-23 steps 3 (wait), 4 (scroll), 5 (fall) and 6 (`held`) are now steps 4, 5, 6 and 10. Changed again in DRA-39: the DRA-29 steps 8 (drop) and 9 (`held`) are now steps 9 and 10, after the new step 8 (cool down). Closed task files and the earlier integration checks in `systems/app.md` use the old numbers. DRA-62 adds steps 3a (popups) and 5a (collect) and keeps every other number, so the code, `systems/drifters.md` and the DRA-39 to DRA-61 checks keep theirs.
+Step numbers changed in DRA-29: the DRA-23 steps 3 (wait), 4 (scroll), 5 (fall) and 6 (`held`) are now steps 4, 5, 6 and 10. Changed again in DRA-39: the DRA-29 steps 8 (drop) and 9 (`held`) are now steps 9 and 10, after the new step 8 (cool down). Closed task files and the earlier integration checks in `systems/app.md` use the old numbers. DRA-62 adds steps 3a (popups) and 5a (collect) and keeps every other number, so the code, `systems/drifters.md` and the DRA-39 to DRA-61 checks keep theirs. DRA-76 adds step 9a (waves) the same way.
+
+The level (DRA-76). `run.level` is read once going into the tick and used by steps 3 and 5: the whole tick moves at one speed. Step 9a may raise it; the raised level is in the returned run, so the next tick moves at its speed and the drifters `add_drifters` adds after this tick are born at it. Source: 08-difficulty.md, rule 1 and Edge cases; 91-decision-log.md, row 65; `systems/scroll.md`, Rationale (the new speed starts the tick after the level rises).
 
 A playing tick (`game_over` False), in this order:
 1. **Press.** `press` is True when an arrow is held in `thrust` and was not held in `run.held`. Source: 05-lives-and-damage.md, rule 2.5.
 2. **Invulnerability.** `protected = run.invuln_ticks_left > 0`, the state going into this tick. Then `left = max(run.invuln_ticks_left - 1, 0)`. It counts down every playing tick, waiting or not. Source: 05-lives-and-damage.md, invuln_ticks, rules 1.3, 2.4 and 4.
-3. **Drifters.** `ctx = TickContext(ship=run.ship, scroll_step_px=scroll_step_px(run.scroll))` (the scroll going into this tick: how far step 5 is about to move the world; DRA-62), then `drifters = tuple(obj.update(ctx).mark_entered() for obj in run.drifters)`, in order. A parked drifter (the coin) moves by `ctx.scroll_step_px`, so it ends the tick where the world has scrolled to; moving drifters don't read it. Source for the scroll: 03-world-and-camera.md, rule 9; systems/scroll.md, The next step's movement. Every playing tick, the wait included: the world keeps going. A drifter that turns ACTIVE on this tick can touch the ship on this tick. `mark_entered()` sets `has_entered` on a drifter that is ACTIVE and at least partly on screen after its update; it never touches anything else (DRA-39). Source: drifters.md, Rules (The base, Entering); 07-drifters.md, rules 9 ("When the warning ends, the drifter appears and can hit") and 12; 91-decision-log.md, row 58; 05-lives-and-damage.md, rule 2.5.
+3. **Drifters.** `ctx = TickContext(ship=run.ship, scroll_step_px=scroll_step_px(run.scroll, run.level))` (the scroll going into this tick: how far step 5 is about to move the world, at the run's level; DRA-62, level DRA-76), then `drifters = tuple(obj.update(ctx).mark_entered() for obj in run.drifters)`, in order. A parked drifter (the coin) moves by `ctx.scroll_step_px`, so it ends the tick where the world has scrolled to; moving drifters don't read it. Source for the scroll: 03-world-and-camera.md, rule 9; systems/scroll.md, The next step's movement. Every playing tick, the wait included: the world keeps going. A drifter that turns ACTIVE on this tick can touch the ship on this tick. `mark_entered()` sets `has_entered` on a drifter that is ACTIVE and at least partly on screen after its update; it never touches anything else (DRA-39). Source: drifters.md, Rules (The base, Entering); 07-drifters.md, rules 9 ("When the warning ends, the drifter appears and can hit") and 12; 91-decision-log.md, row 58; 05-lives-and-damage.md, rule 2.5.
 3a. **Popups** (DRA-62). `popups = step_popups(run.popups)`: every popup one tick older, in order; one whose new `age_ticks` reaches its `lifetime_ticks` is gone. Every playing tick, the wait and protected ticks included. So a popup that appears on tick C shows on the states after ticks C to C + `lifetime_ticks` − 1 (60 states) and is gone on the state after tick C + `lifetime_ticks`. Source: drifters/04-coin.md, popup (gone after 60 ticks); scope report DRA-62, Limits ("It vanishes after 60 ticks, with no fade").
 4. **Wait.** If `run.waiting` and not `press`: the ship is not stepped. Otherwise `waiting = False` and `ship = core.ship.step(run.ship, thrust)`. Source: 05-lives-and-damage.md, rule 2.5; 91-decision-log.md, rows 27 and 28.
-5. **Scroll.** `scroll = step_scroll(run.scroll)`. Source: 03-world-and-camera.md, rule 4.
+5. **Scroll.** `scroll = step_scroll(run.scroll, run.level)`: the world moves at the speed of the level going into the tick (DRA-76). Source: 03-world-and-camera.md, rule 4; 08-difficulty.md, rule 2.
 5a. **Collect** (DRA-62), only when the ship moved in step 4 (`waiting` is False after step 4). A ship standing in the respawn wait collects nothing; on the tick an arrow press ends the wait, the ship has moved and collects as usual.
    1. `collecting` = every drifter in `drifters` (from step 3) with phase ACTIVE and `effect_on_touch()` COLLECT whose `current_hitbox()` overlaps `ship_hitbox(ship)` (`hitboxes_overlap`, strict), with `ship` from step 4: where it moved to this tick, before step 6 can respawn it. So a ship that falls below the floor on this tick still collects what it touches on the way. Protection plays no part: an invulnerable ship collects. Source: drifters/04-coin.md, rule 4 ("An invulnerable ship collects it too", "A ship in the respawn wait never collects"); 06-scoring.md, rule 2; scope report DRA-62, Limits and Not in GDD (a coin touched on a fall tick pays: Director).
    2. For each drifter in `collecting`, in order: `coin_points += obj.collect_points()`; `obj.collect_popup()`, when not None, is appended to `popups` after the ones step 3a kept; the drifter is replaced in `drifters`, in its place, by `replace(obj, phase=Phase.GONE)`. Source: drifters/04-coin.md, rule 4 (pays, disappears, shows its popup); scope report DRA-62, Limits (the popup appears the moment the coin is collected, centered on the coin's center on that tick).
@@ -337,17 +361,18 @@ A playing tick (`game_over` False), in this order:
    6. Drifters that hit stay and keep moving. The run never removes a drifter for hitting. Source: 05-lives-and-damage.md, rule 1.5 ("The hazard that hit keeps going as normal: it doesn't vanish or change").
 8. **Cool down** (DRA-39). Every drifter whose cooldown did not start in step 7 on this tick, and whose `rehit_ticks_left` is above 0, gets `rehit_ticks_left - 1`. Every playing tick: protected ticks, ticks during the respawn wait and ticks with a fall included. So a hazard that hit on tick T can't hit on ticks T+1 to T+`rehit_cooldown_ticks`, has `rehit_ticks_left` 0 in the state after tick T+`rehit_cooldown_ticks`, and can hit again from the tick after. Source: 05-lives-and-damage.md, rule 1.5 ("can't hit the ship again for rehit_cooldown ticks"), rehit_cooldown (guess); the counting follows invulnerability (step 2, and Rationale).
 9. **Drop**. Remove every drifter whose phase is GONE (from DRA-62: a collected coin) or whose `is_off_screen()` is True. `is_off_screen()` is False for a drifter that has not yet entered (DRA-39). The rest keep their order. Source: 07-drifters.md, rule 12; 91-decision-log.md, row 58; drifters/01-meteorite.md and drifters/02-satellite.md, rule 5.
+9a. **Waves** (DRA-76), only when `run.waves` is not None: `waves = step_waves(run.waves, scroll.distance_px)`, with the scroll from step 5. It works out the placements due on this tick, ends waves, raises the level and runs the rest gap (`docs/contracts/systems/waves.md`, Rules, The wave clock). Every playing tick: during the respawn wait, on protected ticks, on a fall tick and on the tick lives reach 0, because the world keeps scrolling then. The run never spawns the due placements itself: they are in `run.wave_spawns_due` for the app's `add_drifters` call after the tick. With `waves` None nothing happens. Source: 09-waves.md, rules 2, 4 and 9; 08-difficulty.md, rule 1; 03-world-and-camera.md, rule 4; scope report DRA-76, Limits.
 10. `held = thrust` in the returned run.
 
-If nothing happened, the returned run has the new ship, scroll, drifters and popups, `invuln_ticks_left = left`, the `waiting` from step 4, the same `lives` and the same `coin_points`.
+If nothing happened, the returned run has the new ship, scroll, drifters, popups and waves, `invuln_ticks_left = left`, the `waiting` from step 4, the same `lives` and the same `coin_points`.
 
 A game-over tick (`game_over` True):
-- The ship, the scroll, the drifters, the popups, the coin points, the lives and the timer don't change. Nothing is updated, collected or dropped. Source: 02-game-flow.md, rule 5; 91-decision-log.md, row 30.
-- If no arrow is held: `retry_armed = True`. Else, if `run.retry_armed`: return `start_run()` with `held = thrust`: a new run with no drifters and `next_uid` 1. Else nothing changes but `held`. Source: 02-game-flow.md, rules 3 and 6; 91-decision-log.md, rows 30 and 31.
+- The ship, the scroll, the drifters, the popups, the coin points, the lives, the timer and the waves don't change. Nothing is updated, collected or dropped, and the wave clock doesn't run. Source: 02-game-flow.md, rule 5; 91-decision-log.md, row 30.
+- If no arrow is held: `retry_armed = True`. Else, if `run.retry_armed`: log `new run`, then return `start_run(waves=next_run_waves(run.waves))` with `held = thrust`, or `start_run()` when `run.waves` is None: a new run with no drifters and `next_uid` 1, and with waves, Wave 0 again at Level 1 with a new seed for its picks (DRA-76). Else nothing changes but `held`. Source: 02-game-flow.md, rules 3 and 6; 91-decision-log.md, rows 30 and 31; 09-waves.md, rules 3 and 4 (Wave 0 first every run, picks new every run); scope report DRA-76, Feature ("Retry starts a fresh run: Wave 0, Level 1, new random picks").
 
 `add_drifters(run, placements, tuning)` (DRA-29):
 - If `run.game_over` or `placements` is empty, return `run` unchanged. Nothing enters a frozen run. Source: 02-game-flow.md, rule 5.
-- Otherwise, for each placement in order: `obj = spawn_drifter(placement, run.level, tuning)`; then `replace(obj, uid=next_uid).settle_warning(TickContext(ship=run.ship))` and `next_uid += 1`. Append the new drifters after the existing ones. Return the run with the new `drifters` and `next_uid`. Nothing else changes. `settle_warning` (DRA-47) lets a drifter fix its entry warning from the ship as it is now, the state the warning is first drawn with; only the chain lightning uses it (the node nearest the ship), every other drifter comes back unchanged. The `drifter spawn` line logs the settled drifter; the warning's place is not logged. Source: drifters.md, Rules, Spawner and The base (Warning settle); drifters/03-chain-lightning.md, rule 2; scope report DRA-29, Limits ("a spawner is the only way a drifter is created").
+- Otherwise, for each placement in order: `obj = spawn_drifter(placement, run.level, tuning)` (from DRA-76 `run.level` is the waves' level after the tick, so a drifter added on a level-up tick is born at the new level; drifters already on the field keep their values); then `replace(obj, uid=next_uid).settle_warning(TickContext(ship=run.ship))` and `next_uid += 1`. Append the new drifters after the existing ones. Return the run with the new `drifters` and `next_uid`. Nothing else changes. `settle_warning` (DRA-47) lets a drifter fix its entry warning from the ship as it is now, the state the warning is first drawn with; only the chain lightning uses it (the node nearest the ship), every other drifter comes back unchanged. The `drifter spawn` line logs the settled drifter; the warning's place is not logged. Source: drifters.md, Rules, Spawner and The base (Warning settle); drifters/03-chain-lightning.md, rule 2; scope report DRA-29, Limits ("a spawner is the only way a drifter is created").
 - New drifters are in WARNING with `ticks_in_phase` 0. They are first updated on the next `step_run`. So a drifter added after tick T shows its warning on the states after ticks T to T + `warning_ticks` − 1.
 - It works the same during the respawn wait. It never reads the run mode. The app decides what to add (`docs/contracts/systems/app.md`).
 - An error from `spawn_drifter` rises. Core never catches it. Source: game/CONTEXT.md, Error handling.
@@ -359,7 +384,7 @@ Score (DRA-61):
 - **Start and retry.** `start_run()` gives `score` 0: the scroll is at 0 m and `coin_points` is 0. A retry returns `start_run()`, so the score is 0 again. Source: 02-game-flow.md, rules 3 and 6; 91-decision-log.md, row 30.
 - **Never goes down.** Meters never go down and nothing lowers `coin_points`. A fall, a hit, a respawn and the respawn wait don't lower the score; the meters keep counting through all of them, and a coin collected on any of those ticks still adds to it. Source: scope report DRA-61, Feature; 06-scoring.md, rule 1; 05-lives-and-damage.md, rule 2.5.
 - **Game over.** The score on the tick lives reach 0 is the final score, a coin collected on that tick included. A game-over tick changes neither the scroll nor `coin_points`, so the score stays frozen while the box shows. Source: 02-game-flow.md, rule 5; 91-decision-log.md, row 30.
-- **Level** still reads `scroll.meters`, never the score. Source: 08-difficulty.md, rule 1.
+- **Level** never reads the score or the meters: from DRA-76 it is the waves' level. Source: 08-difficulty.md, rule 1.
 - The score is a property, worked out from the state each time it is read. It is never stored apart from the meters and the coin points.
 
 Other rules:
@@ -369,7 +394,8 @@ Other rules:
 - No way to gain a life. Source: 05-lives-and-damage.md, rule 6.
 - Drifters never touch each other or the walls. Source: 07-drifters.md, rule 15.
 - Grazes are not counted or paid. Source: scope report DRA-29, Out (graze scoring).
-- `step_run` and `add_drifters` use no frame time and no randomness. Same input, same output. Source: 15-tech-constraints.md, rule 2.
+- `step_run` and `add_drifters` use no frame time. Their only randomness is the waves' random pick, drawn from a seed held in `run.waves` (`systems/waves.md`, Seeds). Same input, same output. Source: 15-tech-constraints.md, rule 2.
+- Whether a run has waves is fixed when it starts and kept by a retry. Source: scope report DRA-76, Limits (debug mode plays one or the other).
 - Core behaves the same in normal and debug mode. It never reads the run mode. Source: game/CONTEXT.md, Run modes.
 - Core never imports pygame, `ui` or `app`. Source: game/CONTEXT.md, Layout.
 
@@ -384,7 +410,7 @@ Logging (logger `core.run`, by event, never by tick). Source: game/CONTEXT.md, L
 - DEBUG `drifter gone id=%d type=%s x=%.2f y=%.2f`: once for each drifter dropped, with its last position. DRA-29.
 - INFO `new run`: on the retry tick.
 - DEBUG `drifter spawn id=%d type=%s variant=%s x=%.2f y=%.2f speed=%.2f level=%d`: from `add_drifters`, once per drifter, with the level used (the placement's `as_level`, else `run.level`). DRA-29.
-- Order inside one tick: `drifter active`, `respawn wait end`, the ship's own lines, the scroll's line, `invulnerable end`, the collect's `drifter touch` lines (DRA-62), then either the fall's `life lost` and `respawn from` or `game over`, or the hit's `drifter touch` lines, `life lost` and `game over`, then `drifter gone`. `drifter spawn` lines come from the app's `add_drifters` call after the tick.
+- Order inside one tick: `drifter active`, `respawn wait end`, the ship's own lines, the scroll's line, `invulnerable end`, the collect's `drifter touch` lines (DRA-62), then either the fall's `life lost` and `respawn from` or `game over`, or the hit's `drifter touch` lines, `life lost` and `game over`, then `drifter gone`, then the waves' lines from step 9a (`wave end`, `level up`, `rest start`, `wave start`, logger `core.waves`; DRA-76). `drifter spawn` lines come from the app's `add_drifters` call after the tick. On a retry tick: `new run`, then the new run's `wave start` for Wave 0 (from `next_run_waves`).
 - Nothing else. The score and the coin points log nothing: no line when they change (DRA-61, DRA-62), and `game over meters=%d` keeps its text. Popups log nothing. A hazard passing through an invulnerable ship logs nothing, and so does a cooldown starting or ending. A hazard's life logs exactly three lines, `drifter spawn`, `drifter active`, `drifter gone`, plus one `drifter touch` for each hit it takes part in. A coin never logs `drifter active` (it is born ACTIVE): a collected coin logs `drifter spawn`, `drifter touch ... effect=collect` and `drifter gone` (on the same tick, at the place it was collected); a coin that leaves logs `drifter spawn` and `drifter gone`. A drifter that never enters never logs `drifter gone` while the run lasts, unless it is collected.
 
 ## Impact
@@ -433,7 +459,25 @@ DRA-62 changes this frozen contract (v5). `Run` gains `popups` (default `()`); s
 | `game/tests/core/test_run.py`, `test_run_drifters.py`, `test_run_score.py`, `test_chain_lightning.py`, `test_fireball.py`, `game/tests/ui/test_hud.py` | none. They build `Run` by keyword and the new field has a default; their runs hold no coin, so `coin_points` still never changes in them and no `type=coin` line is logged. Must pass unchanged. |
 | `game/tests/core/test_coin.py` (new) | coins in the run, the collect rules, the popups. Task `DRA-62-06-qa-engineer`. |
 
+DRA-76 changes this frozen contract (v6). `Run` gains `waves` (default None) and `wave_spawns_due`; `level` reads the waves instead of the meters; `start_run` takes an optional `waves`; steps 3 and 5 pass the level; the new step 9a steps the waves; a retry restarts them. No other step, constant or log line of `core.run` changes; the waves log on their own logger. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.run`, `Run(`, `start_run`, `step_run`, `add_drifters`, `.level`, `level_at`, `step_scroll` and `scroll_step_px`:
+
+| File | Change needed |
+|---|---|
+| `game/core/run.py` | `waves`, `level`, `wave_spawns_due`, `start_run(waves)`, steps 3, 5 and 9a, the retry. Task `DRA-76-05-gameplay-implementer`. |
+| `game/core/levels.py` | `LEVEL_STARTS_M` and `level_at` removed in the same task (`systems/drifters.md`). |
+| `game/ui/debug_overlay.py` | reads `run.waves` and `run.level` for its new lines (`systems/debug-overlay.md`). Task `DRA-76-06-ui-developer`. |
+| `game/ui/hud.py`, `game/ui/game_over.py`, `game/ui/popup_view.py` | none. |
+| `game/app/frame.py` | starts the run with or without waves and adds `run.wave_spawns_due` after each tick (`systems/app.md`). Integration Engineer. Until then `start_run()` gives a run with no waves at Level 1, so the game plays exactly as before. |
+| `game/tests/core/test_run.py`, `test_run_drifters.py`, `test_run_score.py`, `test_chain_lightning.py`, `test_fireball.py`, `test_coin.py`, `game/tests/ui/test_hud.py`, `test_game_over.py` | none. They build `Run` by keyword and call `start_run()` with no argument: no waves, Level 1, the scroll at Level 1 speed, and a retry still returns `replace(start_run(), held=...)`. Must pass unchanged. |
+| `game/tests/core/test_drifters.py` | imports `level_at`: task `DRA-76-02-qa-engineer` removes that before this task (`systems/drifters.md`, Impact). |
+| `game/tests/core/test_run_waves.py` (new) | waves in the run. Task `DRA-76-09-qa-engineer`. |
+
 ## Rationale
+- **The waves are stepped inside `step_run`, last (DRA-76).** Game over must freeze them and a retry must restart them; `step_run` already owns both. Stepping them after the drop, with the scroll after step 5, gives the clock this tick's distance, and nothing else in the tick reads the waves, so no other step moves.
+- **The level is read once, going into the tick (DRA-76).** The whole tick moves the world and the drifters at one speed, and steps 3 and 5 agree, as `scroll_step_px` and `step_scroll` must (`systems/scroll.md`). A level raised in step 9a takes effect from the next tick and for every drifter added after this one.
+- **The app adds the waves' drifters (DRA-76).** `add_drifters` stays the one way in, called by the app after the tick (DRA-29). The run states what is due; it needs no tuning of its own, and `step_run` keeps its signature.
+- **A run's waves are chosen when it starts (DRA-76).** `start_run(waves)` takes a ready wave state or None. Core never reads the run mode; the app decides once, and a retry keeps the choice through `next_run_waves`. `start_run()` with no argument is exactly the old run, so every existing test and call still holds.
+- **The retry seeds the next run from this one (DRA-76).** Core can't draw entropy, and `step_run` gets no input but the keys. Drawing the next seed from the old run's seed gives new picks every retry with no app call, and the same picks for the same first seed, so a run can be replayed.
 - **A run state that holds the ship, the scroll and the drifters.** Game over freezes them together and a retry resets them together. Core owns rules, so core holds them together.
 - **The ship step stops at step 7, and the run applies falls and hits.** What a fall or a hit costs depends on lives and invulnerability, which neither the ship nor a drifter knows.
 - **A press is an arrow that wasn't held on the last tick.** Rule 2.5 says the wait lasts until "the first arrow key press". A key held through the fall was pressed before the respawn.
@@ -453,7 +497,7 @@ DRA-62 changes this frozen contract (v5). `Run` gains `popups` (default `()`); s
 - **`add_drifters` does nothing at game over (DRA-29).** Everything is frozen. It also keeps the app's debug list simple: it can call `add_drifters` every tick, and the frozen tick count never adds the same drifter twice.
 - **The warning settles in `add_drifters` (DRA-47).** The chain lightning's warning sits above the node nearest the ship "when the warning starts". The spawner never sees the ship, and the run is the one place that has both the new drifter and the ship at that moment. One call per new drifter, with a default that does nothing, keeps `step_run` unchanged.
 - **`uid` comes from the run (DRA-29).** Only the run sees every drifter enter. A counter in the run keeps `step_run` and `add_drifters` pure.
-- **`level` is a property (DRA-29).** It is a fact about the run (08-difficulty.md, rule 1), computed from the meters. The spawner gets it from `add_drifters` and is the only reader.
+- **`level` is a property (DRA-29).** It is a fact about the run (08-difficulty.md, rule 1). From DRA-76 it reads the waves, where the level is held, so it can't disagree with them. The spawner (through `add_drifters`), the scroll (through steps 3 and 5) and the debug overlay read it.
 - **Lifecycle logs in `core.run` (DRA-29).** The run sees each drifter's phase before and after the tick and owns the drop, so it can log each event once. The drifters stay pure.
 - **INFO for game over and a new run.** game/CONTEXT.md puts screen changes at INFO.
 - **The score is a property of the run (DRA-61).** It is a fact the HUD and the Game Over box show, so it lives in core (10-ui.md, How to extend). Worked out from the meters and the coin points, it can't disagree with them, and it freezes and resets with them for free: game over already freezes the scroll and a retry already returns `start_run()`.

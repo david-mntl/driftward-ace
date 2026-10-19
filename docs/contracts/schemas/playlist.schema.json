@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/playlist.schema.json",
+  "title": "Playlist",
+  "description": "The file game/waves/playlist.json: which wave is Wave 0, and each level's playlist. A run plays Wave 0 at Level 1, then each level's fixed waves in order and then random_count random picks, Level 1 to 8; after Level 8's playlist, random picks forever at Level 8. The level rises on the tick the last wave of its playlist ends (09-waves.md, rule 4; 08-difficulty.md, rule 1). A random pick is a pool wave whose min_level is at most the current level, never the wave that just played. Loaded at startup in both modes by game/app/waves.py and checked by core.wave_files.build_wave_book (docs/contracts/systems/waves.md, Rules, The wave files). Rules this schema can't express, also enforced by the loader: wave_zero and every fixed entry name a wave file in game/waves/; a level with random_count above 0 has at least one pool wave with min_level at most that level; at least one pool wave can play at Level 8. Owner of the schema: architect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["wave_zero", "levels"],
+  "properties": {
+    "wave_zero": {
+      "description": "The id of Wave 0, the wave every run opens with, at Level 1 (09-waves.md, rule 3). Its only hazard is the meteorite; it may hold coins (01-vision.md, Locked decisions, 7): a content rule, not checked by the loader.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "levels": {
+      "description": "Exactly 8 playlists, Level 1 first (08-difficulty.md, Playlist row; the values are DF-06).",
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/level" }
+    }
+  },
+  "$defs": {
+    "level": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixed", "random_count"],
+      "properties": {
+        "fixed": {
+          "description": "Wave ids played in this order at the start of the level. May be empty. A wave may appear in several levels, or more than once.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "random_count": {
+          "description": "Random picks after the fixed waves, >= 0.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
