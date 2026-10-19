@@ -1,10 +1,11 @@
 """The debug test spawn list: a file the Director edits by hand, played in a loop in debug mode.
 
 Reads `tuning/debug_spawns.json` once at startup, in debug mode only, checks every rule of its
-schema by hand, then checks every row by spawning it once. The rows in play (every row, or only
+schema by hand, then checks every row by spawning it once. Its `play` chooses what debug mode
+plays: these rows, or the normal waves. The rows in play (every row, or only
 one drifter type's) are spread evenly over one loop of `loop_ticks`, which repeats. A temporary
 stand-in kept in the scope reports, not in the GDD. Not a wave: no wave file, no wave clock, no
-picker. Waves replace it later.
+picker.
 Not a startup module: it imports core.drifters, so only app.frame imports it, inside the guard.
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Debug test spawn list;
@@ -29,6 +30,15 @@ SPAWN_LIST_FILE: str = "debug_spawns.json"
 ALL_ROWS: str = "all"
 """The mode that plays every row."""
 
+PLAY_LIST: str = "list"
+"""play: the rows play and the run has no waves. Source: schemas/debug-spawn-list.schema.json."""
+
+PLAY_WAVES: str = "waves"
+"""play: the normal waves play and no row is placed."""
+
+DEFAULT_PLAY: str = PLAY_LIST
+"""play when the file leaves it out. Source: scope report DRA-76, Not in GDD (Director)."""
+
 DEFAULT_MODE: str = ALL_ROWS
 """Mode when the file leaves it out. Source: scope report DRA-39, Values needed (stand-in)."""
 
@@ -39,8 +49,8 @@ needed (stand-in, kept from DRA-29)."""
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 """Drifter type, mode and variant names. Source: debug-spawn-list.schema.json."""
 
-_LIST_FIELDS: frozenset[str] = frozenset({"mode", "loop_ticks", "rows"})
-_LIST_OPTIONAL: frozenset[str] = frozenset({"mode", "loop_ticks"})
+_LIST_FIELDS: frozenset[str] = frozenset({"play", "mode", "loop_ticks", "rows"})
+_LIST_OPTIONAL: frozenset[str] = frozenset({"play", "mode", "loop_ticks"})
 _ROW_FIELDS: frozenset[str] = frozenset({"type", "x", "y", "variant", "invert", "speed"})
 _ROW_OPTIONAL: frozenset[str] = frozenset({"x", "y", "variant", "invert", "speed"})
 
@@ -48,6 +58,9 @@ _ROW_OPTIONAL: frozenset[str] = frozenset({"x", "y", "variant", "invert", "speed
 @dataclass(frozen=True, slots=True)
 class DebugSpawnList:
     """The checked list, ready to play."""
+
+    play: str
+    """PLAY_LIST or PLAY_WAVES: what debug mode plays."""
 
     mode: str
     """"all" or a DrifterType value."""
@@ -71,6 +84,7 @@ def load_debug_spawns(tuning: DrifterTuning) -> DebugSpawnList:
     """
     name, data = _read_json(Path(SPAWN_LIST_FILE))
     fields: dict[str, object] = _fields(name, "", data, _LIST_FIELDS, optional=_LIST_OPTIONAL)
+    play: str = _play(name, fields.get("play", DEFAULT_PLAY))
     mode: str = _mode(name, fields.get("mode", DEFAULT_MODE))
     loop_ticks: int = _loop_ticks(name, fields.get("loop_ticks", DEFAULT_LOOP_TICKS))
     rows: object = fields["rows"]
@@ -88,8 +102,10 @@ def load_debug_spawns(tuning: DrifterTuning) -> DebugSpawnList:
     schedule: tuple[tuple[int, Placement], ...] = tuple(
         ((index * loop_ticks) // count, placement) for index, placement in enumerate(in_play)
     )
-    log.info("debug spawns loaded mode=%s rows=%d loop_ticks=%d", mode, count, loop_ticks)
-    return DebugSpawnList(mode=mode, loop_ticks=loop_ticks, schedule=schedule)
+    log.info(
+        "debug spawns loaded mode=%s rows=%d loop_ticks=%d play=%s", mode, count, loop_ticks, play
+    )
+    return DebugSpawnList(play=play, mode=mode, loop_ticks=loop_ticks, schedule=schedule)
 
 
 def debug_spawns_due(spawn_list: DebugSpawnList, ticks: int) -> tuple[Placement, ...]:
@@ -115,6 +131,13 @@ def _drifter_type(value: object) -> DrifterType | None:
         if drifter_type.value == value:
             return drifter_type
     return None
+
+
+def _play(name: str, value: object) -> str:
+    """Return play if it is "list" or "waves", else raise."""
+    if value not in (PLAY_LIST, PLAY_WAVES):
+        raise ValueError(f'{name}: play must be "{PLAY_LIST}" or "{PLAY_WAVES}"')
+    return str(value)
 
 
 def _mode(name: str, value: object) -> str:
