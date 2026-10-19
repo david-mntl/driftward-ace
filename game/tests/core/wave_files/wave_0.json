@@ -1,0 +1,11 @@
+{
+  "length_px": 1320,
+  "kind": "fixed",
+  "placements": [
+    { "at_px": 600, "type": "meteorite", "x": 100 },
+    { "at_px": 0, "type": "coin", "x": 320, "variant": "rare" },
+    { "at_px": 300, "type": "meteorite", "x": 20, "variant": "small" },
+    { "at_px": 150.5, "type": "meteorite", "x": 30 },
+    { "at_px": 300, "type": "meteorite", "x": 10 }
+  ]
+}

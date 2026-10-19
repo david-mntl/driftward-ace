@@ -1,0 +1,10 @@
+{
+  "length_px": 900.5,
+  "kind": "fixed",
+  "extra_rest_ticks": 30,
+  "placements": [
+    { "at_px": 120, "type": "satellite", "y": 200, "variant": "flat", "invert": true },
+    { "at_px": 400, "type": "meteorite", "x": 500, "variant": "big", "as_level": 3, "specialty": false },
+    { "at_px": 50, "type": "coin", "x": 100, "y": 60 }
+  ]
+}

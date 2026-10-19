@@ -1,0 +1,13 @@
+{
+  "wave_zero": "wave_0",
+  "levels": [
+    { "fixed": ["l1_a"], "random_count": 1 },
+    { "fixed": [], "random_count": 2 },
+    { "fixed": ["l1_a", "l1_a"], "random_count": 0 },
+    { "fixed": ["l1_a"], "random_count": 1 },
+    { "fixed": [], "random_count": 1 },
+    { "fixed": ["l1_a"], "random_count": 2 },
+    { "fixed": ["l1_a"], "random_count": 0 },
+    { "fixed": ["l1_a"], "random_count": 1 }
+  ]
+}
