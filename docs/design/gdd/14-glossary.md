@@ -19,6 +19,7 @@ None. Terms only.
 | Drifter | Anything that appears in the ship's path during a run, good or bad: a hazard, a pickup or a blocker. It names a role, not a movement; some drifters never move. See [07-drifters.md](07-drifters.md). |
 | Entry warning | The marker that shows where a hazard will enter, before it does. See [07-drifters.md](07-drifters.md). |
 | Fall | Dropping off the floor. Costs a life; the ship respawns at the screen center. See [05-lives-and-damage.md](05-lives-and-damage.md). |
+| Fixed wave | A wave played where a level's playlist names it. See [09-waves.md](09-waves.md). |
 | Floor | The bottom edge of the screen. |
 | Graze | Leaving a hazard's graze zone without touching it. Pays points. See [06-scoring.md](06-scoring.md). |
 | Graze zone | Each shape of a hazard's hitbox, grown by the graze margin. See [06-scoring.md](06-scoring.md). |
@@ -26,12 +27,14 @@ None. Terms only.
 | Hit | Touching a hazard while not invulnerable. Costs a life. The ship keeps moving. |
 | Invulnerable | A period after a hit or fall when hazards can't hurt the ship. The ship blinks. |
 | Life-lost feedback | The flash, HUD life break and ship burst-and-rebuild that play when a life is lost. |
-| Level | Difficulty step set by meters flown. See [08-difficulty.md](08-difficulty.md). |
+| Level | Difficulty step. It rises when the level's playlist ends. See [08-difficulty.md](08-difficulty.md). |
 | Meter (m) | 10 px of distance. |
 | Moving drifter | A drifter that moves on its own. Its speed is its on-screen speed; the scroll doesn't add to it. See [03-world-and-camera.md](03-world-and-camera.md). |
 | Parked drifter | A drifter that sits still in the world and slides down with the scroll. |
 | Pickup | A drifter that rewards: touching it pays. The coin. See [07-drifters.md](07-drifters.md). |
-| Rest gap | The pause between two waves. Shrinks with level. |
+| Playlist | A level's list of waves: fixed waves in order, then a number of random pool waves. See [09-waves.md](09-waves.md). |
+| Pool wave | A wave that can be picked for a random slot, from its `min_level` on. See [09-waves.md](09-waves.md). |
+| Rest gap | The pause between two waves. Shrinks with level. A wave may add a fixed extra rest after itself. |
 | Scroll | The world sliding down past the fixed screen. See [03-world-and-camera.md](03-world-and-camera.md). |
 | Seam | Where one wave ends and the next starts. Must be clear (wave_check). |
 | Specialty | An optional extra behavior a drifter has on top of its movement (a pull, a lunge, a pulse). Can be on or off. See [07-drifters.md](07-drifters.md). |
@@ -42,7 +45,7 @@ None. Terms only.
 | Top line | Screen line 35% down. A ceiling: the ship can't go above it. |
 | Variant | A named version of a drifter (small, medium, big) that changes its values, never its behavior. See [07-drifters.md](07-drifters.md). |
 | Wave | A hand-authored JSON group of hazards and coins. See [09-waves.md](09-waves.md). |
-| Wave 0 | The fixed, meteorites-only wave that opens every run. |
+| Wave 0 | The fixed wave that opens every run. Its only hazard is the meteorite; it may hold coins. |
 | wave_check | The headless tool that tests a wave for fairness at Level 8. |
 
 ## Edge cases

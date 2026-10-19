@@ -48,19 +48,14 @@ Status: `open`, or `blocking` (stops other work now).
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | DF-01 | Which drifters are in Tier 1, Tier 2 and Tier 3? | 08-difficulty.md | Waves | open |
-| DF-02 | Base rest gap between waves at Level 1, in ticks. | 08-difficulty.md, 09-waves.md | Waves | open |
-| DF-03 | What "Cap" means at Level 8. For example: no more levels, Level 8 values forever. | 08-difficulty.md | Levels | open |
-| DF-04 | A level change during a wave: apply at once, or at the next wave? | 08-difficulty.md | Levels | open |
-| DF-05 | Each level is designed one by one and sets its own start distance. Where does each of Levels 2 to 8 start? | 08-difficulty.md | Levels | open |
+| DF-02 | Base rest gap between waves at Level 1, in ticks. 0 for now (guess). | 08-difficulty.md, 09-waves.md | Waves | open |
+| DF-06 | Each level's playlist: which fixed waves, in what order, and `random_count`. | 08-difficulty.md, 09-waves.md | Wave content | open |
 
 ## Waves
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| WV-01 | After Wave 0, how is the next wave chosen: fixed order, or random from the waves the current tier allows? | 09-waves.md | Endless mode | open |
-| WV-02 | After the last wave, what happens: loop, reshuffle, or something else? | 09-waves.md | Endless mode | open |
 | WV-03 | How many waves for the MVP? | 09-waves.md | Wave work | open |
-| WV-04 | Are wave coordinates and trigger distances relative to the wave's start, or absolute? | 09-waves.md | Wave schema | open |
-| WV-05 | Wave 0: how many meteorites, where, and how long it lasts. | 09-waves.md | Wave 0 | open || WV-06 | Confirm "120 px clear seams": 120 px of empty world between the end of one wave and the start of the next? | 09-waves.md | wave_check | open |
+| WV-05 | Wave 0: how many meteorites, where, and how long it lasts. | 09-waves.md | Wave 0 | open |
 
 ## UI
 | ID | Question | File | Blocks | Status |

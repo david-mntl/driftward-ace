@@ -33,7 +33,7 @@ The screen is a fixed 640×480 view. It never follows the ship. The world scroll
 | play_area | TBD | px | — | TBD | WC-07 |
 
 ## Rules
-1. **Coordinates.** World: x to the right, y **up**. Screen: pygame, y **down**. Wave files use world coordinates. Source: Director. The exact conversion is a technical detail, not a design rule.
+1. **Coordinates.** World: x to the right, y **up**. Screen: pygame, y **down**. Wave placements count from the wave's start ([09-waves.md](09-waves.md) rule 2). Source: Director. The exact conversion is a technical detail, not a design rule.
 2. **Top line.** Screen y = `screen_h × top_line_ratio` = 168. It is a ceiling. The ship's top edge is the point that counts. When the ship pushes past it, the top edge is clamped to the line and `vy` becomes 0, the same way the side walls stop `vx`.
 3. **The screen never moves.** It doesn't follow the ship, up or down. Source: [01-vision.md](01-vision.md), Locked decisions.
 4. **Scroll.** Every tick, the world scrolls down by `scroll_base × scroll multiplier` for the current level ([08-difficulty.md](08-difficulty.md)). The ship never changes the scroll. It starts `scroll_start_delay` ticks after play starts and never stops until game over, including right after a fall.
