@@ -18,10 +18,11 @@ from core.collision import Hitbox, hitboxes_overlap
 from core.drifters.base import Drifter, Phase, TickContext, TouchEffect
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning
-from core.levels import level_at
+from core.levels import FIRST_LEVEL
 from core.popup import PointsPopup, step_popups
 from core.scroll import Scroll, scroll_step_px, start_scroll, step_scroll
 from core.ship import Ship, Thrust, is_below_floor, ship_hitbox, spawn, step
+from core.waves import WaveRun, next_run_waves, step_waves
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +86,10 @@ class Run:
     popups: tuple[PointsPopup, ...] = ()
     """Points popups on screen, oldest first. Source: systems/run.md, Interface (DRA-62)."""
 
+    waves: WaveRun | None = None
+    """The run's waves (core.waves). None: no waves play. Source: systems/run.md, Interface
+    (DRA-76)."""
+
     @property
     def score(self) -> int:
         """The run's score in whole points: meters flown times POINTS_PER_METER plus coin points.
@@ -114,18 +119,34 @@ class Run:
 
     @property
     def level(self) -> int:
-        """The level of the run, 1 to 8, from the meters. Source: 08-difficulty.md, rule 1."""
-        return level_at(self.scroll.meters)
+        """The level of the run, 1 to 8: its waves' level, or FIRST_LEVEL with no waves.
+
+        Source: 08-difficulty.md, rule 1; systems/run.md, Interface (DRA-76).
+        """
+        if self.waves is None:
+            return FIRST_LEVEL
+        return self.waves.level
+
+    @property
+    def wave_spawns_due(self) -> tuple[Placement, ...]:
+        """The placements that came due on the last tick, or () with no waves.
+
+        The app hands them to `add_drifters`. Source: systems/run.md, Interface (DRA-76).
+        """
+        if self.waves is None:
+            return ()
+        return self.waves.spawns_due
 
 
-def start_run() -> Run:
+def start_run(waves: WaveRun | None = None) -> Run:
     """Return a new run: the ship at spawn, the scroll at tick 0, every other field default.
 
-    No drifters, next_uid 1, coin_points 0 (so the score is 0) and no popups.
+    No drifters, next_uid 1, coin_points 0 (so the score is 0) and no popups. `waves` is the
+    run's wave state from `core.waves.start_waves`, or None for a run with no waves.
 
     Source: 02-game-flow.md, rule 3; systems/run.md, Interface.
     """
-    return Run(ship=spawn(), scroll=start_scroll())
+    return Run(ship=spawn(), scroll=start_scroll(), waves=waves)
 
 
 def add_drifters(run: Run, placements: Sequence[Placement], tuning: DrifterTuning) -> Run:
@@ -190,10 +211,10 @@ def _is_press(thrust: Thrust, held: Thrust) -> bool:
 
 def _step_playing(run: Run, thrust: Thrust) -> Run:
     """A playing tick: press, timer, drifters, popups, wait, ship, scroll, collect, fall or hit,
-    cooldowns, drops.
+    cooldowns, drops, waves.
 
-    A hit is tested only when the ship did not fall. Source: systems/run.md, Rules, a playing
-    tick, steps 1 to 10 with 3a and 5a.
+    A hit is tested only when the ship did not fall. The level is read once, going into the tick.
+    Source: systems/run.md, Rules, a playing tick, steps 1 to 10 with 3a, 5a and 9a.
     """
     press: bool = _is_press(thrust, run.held)
     protected: bool = run.invulnerable
@@ -204,7 +225,7 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
         log.debug("respawn wait end")
     stands: bool = run.waiting and not press
     ship: Ship = run.ship if stands else step(run.ship, thrust)
-    scroll: Scroll = step_scroll(run.scroll)
+    scroll: Scroll = step_scroll(run.scroll, run.level)
     if run.invuln_ticks_left == 1:
         log.debug("invulnerable end")
     stepped = replace(
@@ -222,7 +243,7 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
         outcome: Run = _apply_fall(collected, protected, thrust)
     else:
         outcome = _apply_hit(collected, protected, thrust)
-    return _drop_drifters(_cool_down(outcome, collected.drifters))
+    return _step_run_waves(_drop_drifters(_cool_down(outcome, collected.drifters)))
 
 
 def _update_drifters(run: Run) -> tuple[Drifter, ...]:
@@ -231,7 +252,7 @@ def _update_drifters(run: Run) -> tuple[Drifter, ...]:
     Each updated drifter is then marked entered when it is on screen. Logs each drifter that
     turns from WARNING to ACTIVE.
     """
-    ctx = TickContext(ship=run.ship, scroll_step_px=scroll_step_px(run.scroll))
+    ctx = TickContext(ship=run.ship, scroll_step_px=scroll_step_px(run.scroll, run.level))
     updated: tuple[Drifter, ...] = tuple(
         drifter.update(ctx).mark_entered() for drifter in run.drifters
     )
@@ -418,6 +439,16 @@ def _drop_drifters(run: Run) -> Run:
     return replace(run, drifters=tuple(kept))
 
 
+def _step_run_waves(run: Run) -> Run:
+    """Step the run's waves with this tick's scroll distance (step 9a). No waves: unchanged.
+
+    Source: systems/run.md, Rules, step 9a.
+    """
+    if run.waves is None:
+        return run
+    return replace(run, waves=step_waves(run.waves, run.scroll.distance_px))
+
+
 def _log_respawn(fell_from: Ship, *, waits: bool) -> None:
     """Log a respawn with the position the ship fell from and whether it waits."""
     log.debug("respawn from x=%.2f y=%.2f wait=%s", fell_from.x, fell_from.y, waits)
@@ -426,12 +457,20 @@ def _log_respawn(fell_from: Ship, *, waits: bool) -> None:
 def _step_game_over(run: Run, thrust: Thrust) -> Run:
     """A game-over tick: everything frozen, until every arrow is released and one is pressed.
 
-    The retry press does not thrust: the new run is exactly `start_run()`.
+    The retry press does not thrust: the new run is `start_run()`, or with waves, a run whose
+    waves restart from Wave 0 at Level 1 with a new seed (`next_run_waves`).
     Source: 02-game-flow.md, rules 5 and 6; 91-decision-log.md, rows 30 and 31.
     """
     if not _any_arrow(thrust):
         return replace(run, retry_armed=True, held=thrust)
     if run.retry_armed:
         log.info("new run")
-        return replace(start_run(), held=thrust)
+        return replace(start_run(_next_waves(run.waves)), held=thrust)
     return replace(run, held=thrust)
+
+
+def _next_waves(waves: WaveRun | None) -> WaveRun | None:
+    """Return the waves of the next run: restarted from `waves`, or None when the run has none."""
+    if waves is None:
+        return None
+    return next_run_waves(waves)
