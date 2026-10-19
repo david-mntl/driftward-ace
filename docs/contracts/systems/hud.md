@@ -1,6 +1,6 @@
 # HUD
-Version: 3
-Status: draft
+Version: 4
+Status: frozen
 Features: DRA-13, DRA-23, DRA-61, DRA-76
 Created by: architect
 

@@ -3,7 +3,7 @@ Created by: architect
 Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/debug-overlay.md
-Status: open
+Status: done
 Linear: DRA-82
 
 ## Read in the contract

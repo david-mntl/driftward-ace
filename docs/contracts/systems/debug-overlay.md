@@ -1,6 +1,6 @@
 # Debug overlay
-Version: 4
-Status: draft
+Version: 5
+Status: frozen
 Features: DRA-6, DRA-13, DRA-19, DRA-29, DRA-76
 Created by: architect
 

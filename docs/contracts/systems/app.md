@@ -1,6 +1,6 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
-Version: 11
-Status: draft
+Version: 12
+Status: frozen
 Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61, DRA-62, DRA-76
 Created by: architect
 

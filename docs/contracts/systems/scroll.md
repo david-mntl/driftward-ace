@@ -1,6 +1,6 @@
 # Scroll: world scroll, distance and starfield
-Version: 5
-Status: draft
+Version: 6
+Status: frozen
 Features: DRA-13, DRA-19, DRA-23, DRA-61, DRA-62, DRA-76
 Created by: architect
 

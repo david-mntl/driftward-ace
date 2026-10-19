@@ -3,7 +3,7 @@ Created by: architect
 Assignee: qa-engineer
 Writes to: game/tests/
 Contract: docs/contracts/systems/waves.md
-Status: open
+Status: done
 Linear: DRA-83
 
 ## Read in the contract

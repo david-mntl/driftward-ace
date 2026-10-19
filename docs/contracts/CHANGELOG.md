@@ -117,3 +117,14 @@
 - `systems/run.md`: 5 to 6, frozen.
 - `systems/scroll.md`: 4 to 5, frozen.
 - The coin drifter: a pickup that moves only with the scroll, pays points when the ship touches it and shows a points popup. Adds the coin tuning file and schema, the popup in core and UI, the coin view, and coin rows in the debug spawn list.
+
+## DRA-76, 2026-10-19
+- `systems/app.md`: 11 to 12, frozen.
+- `systems/debug-overlay.md`: 4 to 5, frozen.
+- `systems/drifters.md`: 5 to 6, frozen.
+- `systems/hud.md`: 3 to 4, frozen.
+- `systems/run.md`: 6 to 7, frozen.
+- `systems/scroll.md`: 5 to 6, frozen.
+- `systems/waves.md`: 0 to 1, frozen.
+- Waves and playlists: hand-authored wave files and an 8-level playlist, a wave clock that plays Wave 0 and then each level's fixed and random waves and raises the level when a playlist ends, and checked loading at startup with named errors.
+
