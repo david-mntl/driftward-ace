@@ -8,11 +8,14 @@ Tests a wave against the GDD rules ([09-waves.md](../../docs/design/gdd/09-waves
 
 ```
 python tools/wave_check/wave_check.py --wave game/waves/l1_a.json   # one wave, always runs
-python tools/wave_check/wave_check.py --changed                     # changed in git, or no fresh pass
+python tools/wave_check/wave_check.py --changed                     # only waves git sees as changed or new
+python tools/wave_check/wave_check.py --changed --base origin/main  # only waves changed since a ref (CI)
 python tools/wave_check/wave_check.py --all                         # every wave; fresh passes are skipped
 ```
 
-Options: `--level N` (repeatable, replaces the config levels), `--force` (ignore remembered passes), `--no-record` (do not write `passes.json`), `--json` (machine-readable report), `--config FILE`.
+`--changed` checks nothing else: if no wave changed it says so and exits 0. It reads git, and if git cannot answer it exits 2, so a broken git never reads as "nothing changed". A tuning change does not count as a changed wave: use `--all` for that.
+
+Options: `--level N` (repeatable, replaces the config levels), `--force` (ignore remembered passes), `--no-record` (do not write `passes.json`), `--json` (machine-readable report), `--config FILE`, `--base REF` (with `--changed` only).
 
 Exit code: 0 all passed, 1 a check failed, 2 a usage, config or game file error.
 
@@ -25,7 +28,7 @@ Each drifter is played alone with the game's physics (ship held at the start spo
 | placement | a drifter never enters the screen, or a hazard turns active on top of the ship at a start spot (left, center, right) |
 | telegraph | a telegraph is under `telegraph_min` at the tested level. Only the chain lightning charge is a telegraph (an entry warning is not). It compares the charge before the game's own floor, because the game clamps it and would hide a bad tuning value. |
 | coin_near | a coin never comes within `coin_near_ship_widths` x 32 px (96) of a hazard's hitbox while both are on screen |
-| seam | a hazard is on screen in the wave's first or last `seam_clear_px` (120). An entry warning counts as on screen. |
+| seam | a hazard is on screen in the wave's first `seam_clear_px` (120). An entry warning counts as on screen. The end of a wave is not checked: `extra_rest_ticks` covers it. |
 | gap, bot | part 2 |
 | lava, per-drifter notes | not in the game yet / no extra notes for the types in the game |
 

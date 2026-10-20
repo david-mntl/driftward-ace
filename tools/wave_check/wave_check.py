@@ -1,7 +1,8 @@
 """wave_check: tests a wave against the GDD's rules by running the game's own physics headless.
 
     python tools/wave_check/wave_check.py --wave game/waves/l1_a.json
-    python tools/wave_check/wave_check.py --changed
+    python tools/wave_check/wave_check.py --changed               # only waves git sees as changed
+    python tools/wave_check/wave_check.py --changed --base REF    # only waves changed since REF
     python tools/wave_check/wave_check.py --all
 
 Part 1: placement sanity, telegraph, coin near a hazard, seam. The bot checks (zero-hit path,
@@ -40,6 +41,9 @@ PART_TWO: str = (
 
 def main(argv: list[str] | None = None) -> int:
     args: argparse.Namespace = _parser().parse_args(argv)
+    if args.base and not args.changed:
+        print("wave_check: --base only works with --changed", file=sys.stderr)
+        return 2
     try:
         config: Config = load_config(
             Path(args.config) if args.config else TOOL_DIR / "config.json"
@@ -49,6 +53,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as err:
         print(f"wave_check: {err}", file=sys.stderr)
         return 2
+    if args.changed and not paths:
+        print(json.dumps([]) if args.json else "no wave changed, nothing to check")
+        return 0
     levels: tuple[int, ...] = tuple(args.level) if args.level else config.levels
     passes: dict[str, str] = store.read()
     reports: list[dict[str, Any]] = []
@@ -79,13 +86,18 @@ def _parser() -> argparse.ArgumentParser:
     mode.add_argument(
         "--changed",
         action="store_true",
-        help="waves changed in git, or with no fresh pass",
+        help="only the waves git sees as changed or new (always run, nothing else is)",
     )
     mode.add_argument(
         "--all", action="store_true", help="every wave, passes that are fresh skip"
     )
     parser.add_argument(
         "--level", action="append", type=int, help="level to test (default: config)"
+    )
+    parser.add_argument(
+        "--base",
+        metavar="REF",
+        help="with --changed: waves changed since REF (git diff REF...HEAD), not in the working tree",
     )
     parser.add_argument("--force", action="store_true", help="ignore remembered passes")
     parser.add_argument(
@@ -106,27 +118,44 @@ def _pick(args: argparse.Namespace) -> list[Path]:
     every: list[Path] = sorted(
         p for p in WAVES_DIR.glob("*.json") if p.name != PLAYLIST_FILE
     )
-    if args.all:
-        return every
+    if args.changed:
+        changed: set[Path] = _changed_waves(args.base)
+        return [p for p in every if p.resolve() in changed]
     return every
 
 
-def _changed_in_git() -> set[str]:
-    """Ids of the wave files git sees as changed or new. Empty if git is not there."""
+def _git_lines(*git_args: str) -> list[str]:
     try:
         out: str = subprocess.run(
-            ["git", "-C", str(ROOT), "status", "--porcelain", "--", "game/waves"],
+            ["git", "-C", str(ROOT), *git_args],
             capture_output=True,
             text=True,
             check=True,
         ).stdout
-    except (OSError, subprocess.CalledProcessError):
-        return set()
-    return {
-        Path(line[3:].strip()).stem
-        for line in out.splitlines()
-        if line.endswith(".json")
-    }
+    except (OSError, subprocess.CalledProcessError) as err:
+        detail: str = getattr(err, "stderr", "") or str(err)
+        raise ValueError(f"cannot read the changed waves from git: {detail.strip()}")
+    return [line for line in out.splitlines() if line]
+
+
+def _changed_waves(base: str | None) -> set[Path]:
+    """The wave files git sees as changed or new, as absolute paths.
+
+    Without `base`: the working tree against HEAD, new files included. With `base`: what changed
+    since that ref. A deleted file is not listed. Raises ValueError if git cannot answer, so a
+    broken git never reads as "nothing changed".
+    """
+    folder: str = WAVES_DIR.resolve().relative_to(ROOT).as_posix()
+    if base:
+        names: list[str] = _git_lines(
+            "diff", "--name-only", "--diff-filter=d", f"{base}...HEAD", "--", folder
+        )
+    else:
+        names = _git_lines(
+            "diff", "--name-only", "--diff-filter=d", "HEAD", "--", folder
+        )
+        names += _git_lines("ls-files", "--others", "--exclude-standard", "--", folder)
+    return {(ROOT / name).resolve() for name in names if name.endswith(".json")}
 
 
 def _check_wave(
@@ -144,11 +173,10 @@ def _check_wave(
         wave: Wave = _build_wave(wave_id, document, tuning)
     except (ValueError, OSError) as err:
         return [_loader_failure(wave_id, err)]
-    changed: bool = args.changed and wave_id in _changed_in_git()
     reports: list[dict[str, Any]] = []
     for level in levels:
         print_: str = store.fingerprint(document, config)
-        if not (args.force or args.wave or changed) and store.is_fresh(
+        if not (args.force or args.wave or args.changed) and store.is_fresh(
             passes, wave_id, level, print_
         ):
             reports.append(

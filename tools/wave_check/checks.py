@@ -220,19 +220,13 @@ def _frame_at(track: Track, tick: int) -> Frame | None:
 
 
 def check_seam(ctx: Context) -> Result:
-    """No hazard is on screen in the wave's first or last seam_clear px. A warning counts."""
+    """No hazard is on screen in the wave's first seam_clear px. A warning counts."""
     clear: float = ctx.config.seam_clear_px
-    length: float = ctx.wave.length_px
     found: list[Finding] = []
     for track in ctx.tracks:
         if not _is_hazard(track):
             continue
         first_px: float = ctx.px(track.start_tick)
-        last_tick: int = track.end_tick
-        last_px: float = ctx.px(last_tick)
-        last: Frame = track.frames[
-            min(last_tick - track.start_tick, len(track.frames) - 1)
-        ]
         if first_px < clear:
             found.append(
                 Finding(
@@ -243,18 +237,7 @@ def check_seam(ctx: Context) -> Result:
                     (track.name,),
                 )
             )
-        if last_px > length - clear:
-            found.append(
-                Finding(
-                    f"{track.name} is still on screen at {last_px:g} px, inside the last "
-                    f"{clear:g} px of a {length:g} px wave",
-                    last_tick,
-                    last_px,
-                    (last.x, last.y),
-                    (track.name,),
-                )
-            )
-    return _result("seam", f"seam clear {clear:g} px at both ends", found)
+    return _result("seam", f"seam clear {clear:g} px at the start", found)
 
 
 # ---- running them -----------------------------------------------------------------------

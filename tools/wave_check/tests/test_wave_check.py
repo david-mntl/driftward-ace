@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -58,11 +59,10 @@ def test_a_fair_wave_passes_part_one() -> None:
     assert status["bot"] == status["gap"] == "SKIP"
 
 
-def test_seam_fails_for_a_hazard_still_on_screen_at_the_end() -> None:
+def test_seam_does_not_check_the_end_of_a_wave() -> None:
+    # Still on screen at the end of a 450 px wave: fine, the wave's extra rest covers it.
     late = wave(450, {"at_px": 300, "type": "meteorite", "x": 300})
-    messages = findings(late, "seam")
-    assert len(messages) == 1
-    assert "last 120 px" in messages[0]
+    assert run(late)["seam"] == "PASS"
 
 
 def test_seam_counts_the_entry_warning() -> None:
@@ -181,12 +181,14 @@ def test_command_line_exit_codes_and_pass_skipping(
     good = tmp_path / "good_wave.json"
     good.write_text(json.dumps(GOOD))
     bad = tmp_path / "bad_wave.json"
-    bad.write_text(json.dumps(wave(450, {"at_px": 300, "type": "meteorite", "x": 300})))
+    bad.write_text(
+        json.dumps(wave(450, {"at_px": 300, "type": "coin", "x": 300, "y": 200}))
+    )
     assert wave_check.main(["--wave", str(good)]) == 0
     assert wave_check.main(["--wave", str(bad)]) == 1
     out = capsys.readouterr().out
-    assert "FAIL seam clear" in out
-    assert "inside the last 120 px" in out
+    assert "FAIL every coin near a hazard" in out
+    assert "no hazard is on screen" in out
     assert wave_check.main(["--wave", str(tmp_path / "nope.json")]) == 2
     data = json.loads((tmp_path / "passes.json").read_text())
     assert list(data["passes"]) == ["good_wave@8"]
@@ -196,3 +198,68 @@ def test_the_loader_refusing_a_wave_is_a_failure(tmp_path: Path) -> None:
     broken = tmp_path / "broken.json"
     broken.write_text(json.dumps({"length_px": 100}))
     assert wave_check.main(["--wave", str(broken), "--no-record"]) == 1
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+
+@pytest.fixture
+def waves_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A throwaway git repo with game/waves/{a,b}.json committed, standing in for the real one."""
+    folder = tmp_path / "game" / "waves"
+    folder.mkdir(parents=True)
+    for name in ("a", "b"):
+        (folder / f"{name}.json").write_text(json.dumps(GOOD))
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-q", "-m", "start")
+    monkeypatch.setattr(wave_check, "ROOT", tmp_path.resolve())
+    monkeypatch.setattr(wave_check, "WAVES_DIR", folder)
+    monkeypatch.setattr(store, "STORE_FILE", tmp_path / "passes.json")
+    return tmp_path
+
+
+def test_changed_checks_nothing_when_no_wave_changed(
+    waves_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert wave_check.main(["--changed"]) == 0
+    assert "no wave changed" in capsys.readouterr().out
+
+
+def test_changed_checks_only_the_waves_git_sees_as_changed_or_new(
+    waves_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = waves_repo / "game" / "waves"
+    (folder / "a.json").write_text(
+        json.dumps(wave(450, {"at_px": 300, "type": "coin", "x": 300, "y": 200}))
+    )
+    (folder / "c.json").write_text(json.dumps(GOOD))
+    assert wave_check.main(["--changed", "--no-record"]) == 1
+    out = capsys.readouterr().out
+    assert "wave a  " in out and "wave c  " in out
+    assert "wave b" not in out
+
+
+def test_changed_with_base_reads_what_changed_since_that_ref(
+    waves_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = waves_repo / "game" / "waves"
+    (folder / "b.json").write_text(
+        json.dumps(wave(450, {"at_px": 300, "type": "coin", "x": 300, "y": 200}))
+    )
+    _git(waves_repo, "commit", "-q", "-am", "change b")
+    assert wave_check.main(["--changed"]) == 0  # the working tree is clean
+    assert wave_check.main(["--changed", "--base", "HEAD~1", "--no-record"]) == 1
+    out = capsys.readouterr().out
+    assert "wave b  " in out and "wave a" not in out
+
+
+def test_changed_fails_loudly_when_git_cannot_answer(waves_repo: Path) -> None:
+    assert wave_check.main(["--changed", "--base", "no-such-ref"]) == 2
+    assert wave_check.main(["--base", "HEAD", "--all"]) == 2

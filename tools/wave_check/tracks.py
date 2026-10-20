@@ -52,12 +52,6 @@ class Track:
         variant: str = self.item.placement.variant or ""
         return f"#{self.index + 1} {self.kind} {variant}".strip()
 
-    @property
-    def end_tick(self) -> int:
-        """Last tick, from the wave's start, on which it is on screen."""
-        seen: list[int] = [f.age for f in self.frames if f.visible]
-        return self.start_tick + (seen[-1] if seen else 0)
-
 
 def start_tick(at_px: float, level: int) -> int:
     """The tick, from the wave's start, on which a trigger distance comes due."""
