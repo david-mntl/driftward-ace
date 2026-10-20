@@ -36,7 +36,7 @@ None. Terms only.
 | Pool wave | A wave that can be picked for a random slot, from its `min_level` on. See [09-waves.md](09-waves.md). |
 | Rest gap | The pause between two waves. Shrinks with level. A wave may add a fixed extra rest after itself. |
 | Scroll | The world sliding down past the fixed screen. See [03-world-and-camera.md](03-world-and-camera.md). |
-| Seam | Where one wave ends and the next starts. Must be clear (wave_check). |
+| Seam | The first 120 px of a wave. No hazard is on screen there (wave_check). |
 | Specialty | An optional extra behavior a drifter has on top of its movement (a pull, a lunge, a pulse). Can be on or off. See [07-drifters.md](07-drifters.md). |
 | Telegraph | A hazard's warning before it strikes (a charge line, a glow). |
 | Tick | One fixed game step, 1/60 s. |

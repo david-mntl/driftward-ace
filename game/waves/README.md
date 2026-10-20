@@ -160,7 +160,6 @@ At load, the game refuses:
 It does not check these. They are the Wave Critic's job and the `wave_check` tool's:
 
 - gaps, telegraph time, coin distance, and whether a bot can survive the wave
-- the clear seam at the end of a wave
 - Wave 0 holding only meteorites as hazards
 - a placement past the wave's `length_px`. It never plays.
 

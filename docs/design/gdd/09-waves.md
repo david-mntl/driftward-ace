@@ -11,7 +11,7 @@ Waves are hand-authored JSON files that place hazards and coins. Every run opens
 | check_level | 8 | level | — | locked | Director |
 | telegraph_min | see [07-drifters.md](07-drifters.md#values) | — | — | locked | — |
 | gap_min | 2.5 | × ship_w | — | locked | Director |
-| seam_clear | 120 | px of scroll, at the start and at the end of every wave | — | locked | Director |
+| seam_clear | 120 | px of scroll, at the start of every wave | — | locked | Director |
 | coin_near_max | 3 | × ship_w, gap from the coin's hitbox to the nearest hazard hitbox | — | guess | Director (picked by guardian on request) |
 | wave_count_mvp | TBD | waves | — | TBD | WV-03 |
 
@@ -26,7 +26,7 @@ Waves are hand-authored JSON files that place hazards and coins. Every run opens
    1. Every telegraph lasts ≥ `telegraph_min` ticks.
    2. Every gap the ship must pass is ≥ `gap_min` × `ship_w` ([04-ship.md](04-ship.md)), which is 80 px at the guessed ship width.
    3. A bot using arrow-key thrust and the real physics finds a path with zero hits.
-   4. In the wave's first and last `seam_clear` px of scroll, none of its hazards is on screen. An entry warning counts as on screen. So two waves meet with 2 × `seam_clear` px of clear scroll, plus the rest gap. Source: Director.
+   4. In the wave's first `seam_clear` px of scroll, none of its hazards is on screen. An entry warning counts as on screen. The end of a wave has no such rule: a wave that needs a clear stretch before the next one sets an extra rest (rule 11). Source: Director.
    5. A hazard with random timing (lava walls) passes for every outcome its random range allows.
    6. Every coin comes within `coin_near_max` × `ship_w` of a hazard's hitbox, at some tick while both are on screen.
    7. No coin sits inside a floating island. Gaps between islands, and between an island and a wall, count for check 2. The bot's physics includes islands blocking ([drifters/05-floating-islands.md](drifters/05-floating-islands.md) rule 4).
@@ -40,7 +40,7 @@ Waves are hand-authored JSON files that place hazards and coins. Every run opens
 ## Edge cases
 - A tuning change (for example lower `thrust_up`) makes an old wave fail: the wave must be fixed before it ships again.
 - **Provisional waves.** Until `wave_check` exists, a wave checked by hand against rule 7 and playtested by the Director counts as provisional. Every provisional wave must pass `wave_check` before the MVP ships.
-- Seam pacing: 2 × `seam_clear` is about 3.6 s of clear scroll at Level 1 and 2.1 s at Level 8. Kept for now; the Director may revisit it.
+- Seam pacing: `seam_clear` is about 1.8 s of clear scroll at Level 1 and 1 s at Level 8. A wave's end has no clear stretch of its own; the rest gap and the extra rest give it.
 
 ## Open
 - WV-03, WV-05, DF-01, DF-02, DF-06.
