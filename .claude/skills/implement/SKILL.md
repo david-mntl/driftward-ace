@@ -62,14 +62,21 @@ Its review report: `docs/reports/review/<base name>.md`.
 3. Start `qa-engineer` with: "Re-test mode. QA report: `<QA report path>`." Then read line 1 again.
 4. After 2 failed fix rounds, stop.
 
-## 3. Integrate
-When every task has passed QA, start `integration-engineer` once with: "Integrate mode. Feature: `$ARGUMENTS`." Then read line 1 of `docs/reports/integration/$ARGUMENTS.md`. On `Verdict: pass` the feature is ready for close-out. Never run the close-out yourself: the Director decides it.
+## 3. Wave check
+When every task has passed QA, run `python tools/wave_check/wave_check.py --changed --no-record` yourself. It checks only the waves git sees as changed, and writes nothing. If no wave changed it says so: go on.
+- Exit 0: go on.
+- Exit 1: stop. Read the report for the failing wave and checks.
+- Exit 2: stop. The tool could not run.
+
+## 4. Integrate
+Start `integration-engineer` once with: "Integrate mode. Feature: `$ARGUMENTS`." Then read line 1 of `docs/reports/integration/$ARGUMENTS.md`. On `Verdict: pass` the feature is ready for close-out. Never run the close-out yourself: the Director decides it.
 
 ## When to stop
 Stop the chain and tell the Director when:
 - an agent reports `blocked`, or a pending documentation difference
 - the review report is `Status: blocked`
 - a `## Review fix` section is blocked
+- `wave_check` exits 1 or 2
 - the integration report is `Verdict: fail` or `Verdict: blocked`
 - QA still fails after 2 fix rounds
 - a bug belongs to an agent without a Fix mode
@@ -79,6 +86,7 @@ Say which task you stopped on, at which step, and the report path to read.
 ## Final message
 Keep it short:
 - each task, and its implementation, review and QA report paths
+- the wave check result, one line: passed, failed, or no wave changed
 - the integration report path, its line 1, and how to open the build in the browser
 - on pass, the next step for the Director: `scripts/close-out.sh $ARGUMENTS`. It shows the open review findings and the integration Observations before anything closes. Suggest running it in a fresh session.
 - anything an agent listed as unsure, or any open review finding: the findings the Re-check left open, and every "Not fixable" answer with its reason
