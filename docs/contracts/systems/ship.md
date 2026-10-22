@@ -1,6 +1,6 @@
 # Ship
-Version: 6
-Status: draft
+Version: 7
+Status: frozen
 Features: DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-86, DRA-96
 Created by: architect
 
