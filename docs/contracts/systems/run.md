@@ -1,7 +1,7 @@
 # Run: lives, score, coins, falls, hits, drifters, respawn wait, game over and retry
 Version: 9
-Status: frozen
-Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96
+Status: draft
+Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104
 Created by: architect
 
 ## Purpose
@@ -413,7 +413,7 @@ Other rules:
 - **Islands never hit and never pay** (DRA-86). A BLOCK drifter is never in `collecting` (step 5a) or `touching` (step 7), so it logs no `drifter touch`, costs no life, starts no cooldown and adds no points. It only shapes where the ship can be (steps 4 and 6). Source: drifters/05-floating-islands.md, rule 5; systems/drifters.md, Rules, The base (Block).
 - **Planets** (DRA-96). A planet's body is a HIT drifter: steps 7 and 8 treat it like every hazard (the hit, one life, the re-hit cooldown, the dim look), and its field never hits. Its field only pulls, through the wells of step 4. A planet's field pulls the ship only, never another drifter: drifters never read the wells. Source: drifters/08-planet.md, rules 4 and 6, Edge cases; 05-lives-and-damage.md, rules 1.5 and 2.7.
 - Grazes are not counted or paid. Source: scope report DRA-29, Out (graze scoring).
-- `step_run` and `add_drifters` use no frame time. Their only randomness is the waves' random pick, drawn from a seed held in `run.waves` (`systems/waves.md`, Seeds). Same input, same output. Source: 15-tech-constraints.md, rule 2.
+- `step_run` and `add_drifters` use no frame time. Their only randomness is the waves' random pick, drawn from a seed held in `run.waves` (`systems/waves.md`, Seeds), and a seeded drifter's own draws, from a seed held in that drifter (the UFO's weave, `systems/drifters.md`, Rules, The base, Seeded; DRA-104). Same input, same output. Source: 15-tech-constraints.md, rule 2.
 - Whether a run has waves is fixed when it starts and kept by a retry. Source: scope report DRA-76, Limits (debug mode plays one or the other).
 - Core behaves the same in normal and debug mode. It never reads the run mode. Source: game/CONTEXT.md, Run modes.
 - Core never imports pygame, `ui` or `app`. Source: game/CONTEXT.md, Layout.
@@ -434,6 +434,8 @@ Logging (logger `core.run`, by event, never by tick). Source: game/CONTEXT.md, L
 - Nothing else. The score and the coin points log nothing: no line when they change (DRA-61, DRA-62), and `game over meters=%d` keeps its text. Popups log nothing. A hazard passing through an invulnerable ship logs nothing, and so does a cooldown starting or ending. A hazard's life logs exactly three lines, `drifter spawn`, `drifter active`, `drifter gone`, plus one `drifter touch` for each hit it takes part in. A coin never logs `drifter active` (it is born ACTIVE): a collected coin logs `drifter spawn`, `drifter touch ... effect=collect` and `drifter gone` (on the same tick, at the place it was collected); a coin that leaves logs `drifter spawn` and `drifter gone`. A floating island (DRA-86) is born ACTIVE and never touched for a hit or a collect: it logs `drifter spawn` and `drifter gone` only; the ship's `island contact` line is `core.ship`'s. A planet (DRA-96) logs like every hazard: `drifter spawn`, `drifter active`, `drifter gone`, and one `drifter touch ... effect=hit` per hit it takes part in; its pull logs nothing. A drifter that never enters never logs `drifter gone` while the run lasts, unless it is collected.
 
 ## Impact
+DRA-104 changes one sentence of this frozen contract (v9): Other rules now name the seeded drifter's draws next to the waves' pick as the run's only randomness. No rule, field, step or log line changes: the run adds, steps, hits, cools and drops a UFO like every hazard, and passes `TickContext` as before. No file in `game/` or `tools/` needs a change from it.
+
 DRA-96 changes this frozen contract (v8). New: `gravity_wells`; step 4 gathers the wells and passes them to `step`. No `Run` field, property, constant, log line or other step changes; with no planet on the field every tick is exactly as before. Every file in `game/` and `tools/` that depends on it, found by grepping `game/` (tests included) and `tools/` for `core.run`, `step_run`, `island_ground`, `step(` and `Run(`:
 
 | File | Change needed |
