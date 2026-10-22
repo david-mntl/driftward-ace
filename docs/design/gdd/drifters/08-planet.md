@@ -27,6 +27,9 @@ A planet drifts down with the world, wrapped in a gravity field you can see. Ins
 | look_pick | random, each time a planet appears. Looks only; the game plays the same | — | — | locked | Director |
 | look_reference | Purple sphere with faint rings showing the pull radius | — | — | guess | Director |
 | placeholder_look | planet: filled circle in purple (140, 70, 200). Field: a 1 px ring at `pull_radius` and two faint 1 px rings that drift inward from it and fade, in (180, 120, 255) | RGB | — | guess | Director |
+| field_ring_trip | 120: each inner ring slides at a steady speed from `pull_radius` to the planet's surface in this many ticks, then starts again at `pull_radius` | ticks | — | guess | Director |
+| field_ring_gap | 60: the second inner ring runs this many ticks behind the first | ticks | — | guess | Director |
+| field_ring_fade | 50 at `pull_radius`, falling in a straight line to 0 at the surface | % opacity | — | guess | Director |
 
 ## Rules
 1. **Appears:** at its placed x, just above the top edge, then scrolls into view. Its entry warning shows first, at its x against the top edge ([../07-drifters.md](../07-drifters.md) rule 9). Its field is on from the tick it appears.
@@ -38,7 +41,7 @@ A planet drifts down with the world, wrapped in a gravity field you can see. Ins
 7. **Leaves:** once the planet is fully below the floor ([../07-drifters.md](../07-drifters.md) rule 12). Its field goes with it.
 8. **Scales:** nothing. Pull, size and field never change with level. A faster scroll only brings it sooner.
 9. **Placing:** its x, and y if it should start somewhere else. No look field: the look is random (`look_pick`).
-10. **Looks and sounds:** placeholder until the art is drawn. Every skin fills the hitbox circle exactly. The field rings are looks only. Sound: none yet.
+10. **Looks and sounds:** placeholder until the art is drawn. Every skin fills the hitbox circle exactly. The field rings are looks only: the inner rings show where the field is, not how strong the pull is. Their motion never scales with level (rule 8). Sound: none yet.
 11. **wave_check notes:** the bot's physics includes the pull. Gaps next to a planet are measured from its body, not its field.
 
 ## Edge cases
