@@ -1,0 +1,16 @@
+{
+  "default_variant": "standard",
+  "variants": {
+    "standard": { "disc_width": 40, "disc_height": 10, "dome_radius": 9 }
+  },
+  "speed_ratio": 0.3,
+  "entry_warning_ticks": 60,
+  "weave_change_ticks_min": 60,
+  "weave_change_ticks_max": 96,
+  "weave_step_min": 40,
+  "weave_step_max": 120,
+  "weave_speed_max": 1.6,
+  "weave_turn": 0.1,
+  "band_top": 188,
+  "band_bottom": 440
+}
