@@ -1,0 +1,9 @@
+{
+  "length_px": 1000,
+  "kind": "pool",
+  "min_level": 3,
+  "extra_rest_ticks": 0,
+  "placements": [
+    { "at_px": 130, "type": "meteorite", "x": 320 }
+  ]
+}

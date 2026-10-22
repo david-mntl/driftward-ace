@@ -1,4 +1,5 @@
 {
+  "play": "waves",
   "mode": "coin",
   "loop_ticks": 180,
   "rows": [

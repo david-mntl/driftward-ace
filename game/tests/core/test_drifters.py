@@ -31,7 +31,13 @@ from core.drifters.tuning import (
     PlaytestSwitches,
     VariantTuning,
 )
-from core.levels import check_level, hazard_speed_mult, level_at, timer_mult
+from core.levels import (
+    check_level,
+    hazard_speed_mult,
+    rest_gap_mult,
+    scroll_mult,
+    timer_mult,
+)
 from core.ship import Ship, spawn
 
 THRUST_SIDE: float = 0.42
@@ -64,6 +70,12 @@ HAZARD_SPEED: tuple[float, ...] = (1.00, 1.06, 1.12, 1.18, 1.24, 1.30, 1.36, 1.4
 
 TIMER: tuple[float, ...] = (1.00, 0.94, 0.89, 0.85, 0.81, 0.77, 0.74, 0.70)
 """Timer × for Levels 1 to 8. Source: 08-difficulty.md, level table (guess)."""
+
+SCROLL: tuple[float, ...] = (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7)
+"""Scroll speed × for Levels 1 to 8. Source: 08-difficulty.md, level table (locked)."""
+
+REST_GAP: tuple[float, ...] = (1.00, 0.90, 0.81, 0.73, 0.66, 0.59, 0.53, 0.48)
+"""Rest gap × for Levels 1 to 8. Source: 08-difficulty.md, level table (locked)."""
 
 REHIT_COOLDOWN: int = 180
 """ticks. Source: 05-lives-and-damage.md, rehit_cooldown (guess)."""
@@ -150,6 +162,8 @@ def test_level_table_matches_the_gdd() -> None:
     for level in range(1, 9):
         assert hazard_speed_mult(level) == pytest.approx(HAZARD_SPEED[level - 1])
         assert timer_mult(level) == pytest.approx(TIMER[level - 1])
+        assert scroll_mult(level) == pytest.approx(SCROLL[level - 1])
+        assert rest_gap_mult(level) == pytest.approx(REST_GAP[level - 1])
         check_level(level)
     for bad in (0, 9, -1, 100):
         with pytest.raises(ValueError, match=str(bad)):
@@ -157,10 +171,11 @@ def test_level_table_matches_the_gdd() -> None:
         with pytest.raises(ValueError, match=str(bad)):
             timer_mult(bad)
         with pytest.raises(ValueError, match=str(bad)):
+            scroll_mult(bad)
+        with pytest.raises(ValueError, match=str(bad)):
+            rest_gap_mult(bad)
+        with pytest.raises(ValueError, match=str(bad)):
             check_level(bad)
-    # Only Level 1 has a start (0 m), so every distance is Level 1.
-    for meters in (0, 1, 500, 10_000, 1_000_000):
-        assert level_at(meters) == 1
 
 
 def test_default_placement_gets_default_variant_and_start_y() -> None:

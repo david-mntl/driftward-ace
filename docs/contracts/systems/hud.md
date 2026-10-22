@@ -1,7 +1,7 @@
 # HUD
-Version: 3
+Version: 4
 Status: frozen
-Features: DRA-13, DRA-23, DRA-61
+Features: DRA-13, DRA-23, DRA-61, DRA-76
 Created by: architect
 
 ## Purpose
@@ -40,6 +40,8 @@ Debug mode, overlay shown or hidden by F3:
   | y 240.00                                                       |
   | vx 0.00                                                        |
   | vy 0.00                                                        |  overlay line 4
+  | wave l1_a                                                      |  overlay line 5 (DRA-76)
+  | level 1                                                        |  overlay line 6 (DRA-76)
   |                                                                |  overlay_text_bottom()
   | SCORE 1 234                                                    |  hud top = overlay_text_bottom() + HUD_OVERLAY_GAP
   | (line 2, empty)                                                |  hud top + HUD_LINE_SPACING
@@ -73,7 +75,7 @@ HUD_FONT_SIZE: int = 16                             # scope report DRA-13, HUD t
 HUD_MARGIN: int = 4                                 # scope report DRA-13, HUD left margin
 HUD_LINE_SPACING: int = 20                          # scope report DRA-13, HUD line spacing (16 px font + 4 px)
 HUD_TOP: int = 4                                    # scope report DRA-13, normal mode: first line at y 4
-HUD_OVERLAY_GAP: int = 4                            # scope report DRA-13, debug mode: 4 px below the overlay's fourth line
+HUD_OVERLAY_GAP: int = 4                            # scope report DRA-13, debug mode: 4 px below the overlay's last text line
 HEART_COLOR: tuple[int, int, int] = (255, 255, 255) # scope report DRA-23, hearts: white (temporary stand-in)
 HEART_SIZE: int = 24                                # scope report DRA-23, hearts: 24 × 24 px each
 HEART_GAP: int = 8                                  # scope report DRA-23, hearts: 8 px apart
@@ -83,11 +85,10 @@ def draw_hud(surface: pygame.Surface, run: Run, below_overlay: bool) -> None: ..
 ```
 
 ```python
-# game/ui/debug_overlay.py. Unchanged.
+# game/ui/debug_overlay.py. Set in docs/contracts/systems/debug-overlay.md.
 def overlay_text_bottom() -> int: ...
-    # The first screen row below every pixel the overlay's four text lines can cover.
-    # = OVERLAY_MARGIN + 3 * linesize + max(linesize, font height), with the overlay's own font.
-    # Needs pygame.font initialized. Uses the same cached font as the overlay.
+    # The first screen row below every pixel the overlay's text lines can cover: six lines from
+    # DRA-76 (OVERLAY_TEXT_LINES). Needs pygame.font initialized. Uses the overlay's cached font.
 ```
 
 ## Presentation
@@ -125,8 +126,8 @@ Both:
 - The HUD only draws. It never fills, never flips, never logs per frame, never catches an error, never changes the run, never reads the run mode or a key. Source: 10-ui.md, rule 5; game/CONTEXT.md, Run modes.
 
 `overlay_text_bottom()`:
-- Line 4 of the overlay text has its top at `OVERLAY_MARGIN + 3 × linesize`. Its rendered height is the font's height. The function returns the row just below the lower of the two: the end of line 4's line slot or the end of its rendered text. So no overlay text pixel is on that row or below it.
-- It changes nothing the overlay shows. Source: scope report DRA-13, Limits (no new overlay content); 10-ui.md, debug_overlay_layout.
+- Its formula and lines are set in `docs/contracts/systems/debug-overlay.md`, Interface and Presentation: from DRA-76 it is the row below the overlay's sixth text line (`level <n>`). No overlay text pixel is on that row or below it. The HUD only reads it.
+- So in debug mode the SCORE line sits `HUD_OVERLAY_GAP` below the six lines, two line-heights lower than with four. Its line 2 still ends far above the top line on row 168. Source: scope report DRA-13, HUD layout; 10-ui.md, debug_overlay_layout (six lines, guess).
 
 ## Rules
 - The HUD shows SCORE and the lives as hearts. No meters readout, no LV, GRAZE or BEST. Source: scope report DRA-61, Limits and Out; scope report DRA-23, Limits.
@@ -163,7 +164,17 @@ DRA-61 changes this frozen contract (v2). The SCORE line takes HUD line 1 and th
 | `game/tests/ui/test_hud.py` | would break once SCORE is on line 1: `test_hud_normal_layout_leaves_line_one_empty` (ink on line 1) and `test_hud_keeps_the_gap_below_the_overlay` (expects the HUD's first ink one line spacing lower). The other tests read the white HUD text wherever it is and should still pass. So the change comes in two steps. First, before the SCORE line lands, task `DRA-61-05-qa-engineer` rewords those two tests to hold with the meters readout on line 2 and with SCORE on line 1. In normal mode, the HUD's ink starts at or right of `HUD_MARGIN` and at or below `HUD_TOP`. In debug mode, its first ink is at or below `overlay_text_bottom() + HUD_OVERLAY_GAP`. Then task `DRA-61-06-ui-developer` moves the HUD to SCORE, and task `DRA-61-07-qa-engineer` adds the exact SCORE line tests. |
 | `game/tests/ui/test_score_text.py` (new) | the format. Task `DRA-61-05-qa-engineer`. |
 
+DRA-76 changes this frozen contract (v3) in its text only: the overlay has six text lines, so `overlay_text_bottom()` is two line-heights lower and the HUD follows it in debug mode. No code, constant, signature or rule of the HUD changes. Grepping `game/` (tests included) for `overlay_text_bottom`, `HUD_OVERLAY_GAP` and `draw_hud`:
+
+| File | Change needed |
+|---|---|
+| `game/ui/hud.py` | none: it already reads `overlay_text_bottom()`. |
+| `game/ui/debug_overlay.py` | the six-line bottom (`systems/debug-overlay.md`). Task `DRA-76-06-ui-developer`. |
+| `game/tests/ui/test_hud.py` | none: every debug-mode place it checks is worked out from `overlay_text_bottom()`. Must pass unchanged. |
+| `game/app/frame.py` | none from this contract. |
+
 ## Rationale
+- **The HUD contract no longer restates the overlay's formula (DRA-76).** One fact, one home: the overlay owns its lines and their bottom. The HUD only reads the bottom, so a new overlay line moves the HUD with no HUD change.
 - **`draw_hud` takes the run (DRA-23).** The HUD reads two core fields, `score` and `lives`, both on the run. Passing the run gives it one source, and LV can join later without another signature change.
 - **SCORE on line 1, line 2 left empty (DRA-61).** Line 1 was kept for SCORE from DRA-13. Leaving line 2's slot keeps the place for LV and GRAZE (10-ui.md, hud_level_grazes), so they land without moving SCORE. Collapsing it now would only move things again later.
 - **Core gives the number, UI gives the text (DRA-61).** The score is a rule, so it is a core field. Grouping digits and adding a label is a look, so it lives in `ui`. No view works out the score.

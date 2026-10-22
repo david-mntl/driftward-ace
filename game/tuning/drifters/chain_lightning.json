@@ -171,13 +171,13 @@
       "invert_mirror": "top_bottom"
     }
   },
-  "speed_ratio": 0.375,
+  "speed_ratio": 0.09,
   "entry_warning_ticks": 60,
   "node_spacing": 128,
   "node_size": 12,
   "arc_width": 6,
-  "charge_ticks": 120,
-  "fire_ticks": 120,
+  "charge_ticks": 90,
+  "fire_ticks": 80,
   "charge_rays": 4,
   "ray_length": 6,
   "ray_width": 1,

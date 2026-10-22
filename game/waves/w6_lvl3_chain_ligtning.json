@@ -1,0 +1,21 @@
+{
+  "length_px": 1320,
+  "kind": "pool",
+  "extra_rest_ticks": 100,
+  "min_level": 3,
+  "placements": [
+    { "at_px": 120, "type": "chain_lightning", "x": 110, "variant": "pair_flat" },
+    { "at_px": 120, "type": "chain_lightning", "x": 340, "variant": "pair_flat" },
+    { "at_px": 120, "type": "chain_lightning", "x": 564, "variant": "pair_flat" },
+    { "at_px": 350, "type": "chain_lightning", "x": 176, "variant": "pair_vertical" },
+    { "at_px": 350, "type": "chain_lightning", "x": 433, "variant": "pair_vertical" },
+    { "at_px": 350, "type": "chain_lightning", "x": 627, "variant": "pair_vertical" },
+    { "at_px": 490, "type": "chain_lightning", "x": 305, "variant": "trio_line" },
+    { "at_px": 750, "type": "chain_lightning", "x": 99, "variant": "trio_triangle" },
+    { "at_px": 750, "type": "chain_lightning", "x": 433, "variant": "trio_line" },
+    { "at_px": 800, "type": "coin", "x": 100, "y": 0, "variant": "common" },
+    { "at_px": 990, "type": "chain_lightning", "x": 247, "variant": "trio_triangle", "invert": true },
+    { "at_px": 990, "type": "chain_lightning", "x": 431, "variant": "trio_triangle" },
+    { "at_px": 1000, "type": "coin", "x": 305, "y": 0, "variant": "rare" }
+  ]
+}

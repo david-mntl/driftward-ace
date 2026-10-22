@@ -1,0 +1,30 @@
+{
+  "length_px": 1000,
+  "kind": "pool",
+  "min_level": 2,
+  "placements": [
+    { "at_px": 120, "type": "satellite", "y": 78, "variant": "flat" },
+    { "at_px": 150, "type": "satellite", "y": 175, "variant": "flat", "invert": true },
+    { "at_px": 190, "type": "satellite", "y": 434, "variant": "flat", "invert": true },
+    { "at_px": 230, "type": "satellite", "y": 264, "variant": "flat" },
+    { "at_px": 260, "type": "satellite", "y": 131, "variant": "flat" },
+    { "at_px": 340, "type": "satellite", "y": 354, "variant": "flat" },
+    { "at_px": 360, "type": "satellite", "y": 223, "variant": "flat" },
+    { "at_px": 510, "type": "satellite", "y": 82, "variant": "flat" },
+    { "at_px": 510, "type": "satellite", "y": 128, "variant": "flat", "invert": true },
+    { "at_px": 510, "type": "satellite", "y": 218, "variant": "flat", "invert": true },
+    { "at_px": 510, "type": "coin", "x": 179, "y": 6, "variant": "common" },
+    { "at_px": 510, "type": "coin", "x": 525, "y": 2, "variant": "common" },
+    { "at_px": 530, "type": "satellite", "y": 367, "variant": "flat", "invert": true },
+    { "at_px": 550, "type": "satellite", "y": 172, "variant": "flat" },
+    { "at_px": 550, "type": "satellite", "y": 310, "variant": "flat" },
+    { "at_px": 690, "type": "satellite", "y": 454, "variant": "flat" },
+    { "at_px": 690, "type": "satellite", "y": 124, "variant": "flat" },
+    { "at_px": 780, "type": "satellite", "y": 351, "variant": "flat" },
+    { "at_px": 850, "type": "satellite", "y": 242, "variant": "flat", "invert": true },
+    { "at_px": 900, "type": "satellite", "y": 241, "variant": "flat" },
+    { "at_px": 900, "type": "satellite", "y": 137, "variant": "flat" },
+    { "at_px": 900, "type": "satellite", "y": 310, "variant": "flat" },
+    { "at_px": 1060, "type": "satellite", "y": 406, "variant": "flat", "invert": true }
+  ]
+}

@@ -1,12 +1,13 @@
 """The async frame loop on the fixed 60 Hz tick. Imported only by app.loop.start, inside the guard.
 
-Before the first frame it loads and checks the drifter tuning (both modes) and, in debug mode
-only, the debug test spawn list. Each frame: read events, build the thrust from the held arrow
-keys, run up to MAX_TICKS_PER_FRAME ticks (one core.run.step_run each, then in debug mode the
-debug test spawn list's due drifters through core.run.add_drifters), draw the starfield, the
-drifters, the points popups, the ship while the run shows it, the debug outlines and overlay if
-visible, the Game Over box with the final score at game over and the HUD, flip, then yield to
-the browser.
+Before the first frame it loads and checks the drifter tuning and the wave files (both modes)
+and, in debug mode only, the debug test spawn list. The run plays the waves, except in debug
+mode when the spawn list plays (its `play` is "list", the default). Each frame: read events,
+build the thrust from the held arrow keys, run up to MAX_TICKS_PER_FRAME ticks (one
+core.run.step_run each, then the due drifters, the waves' or the spawn list's, through
+core.run.add_drifters), draw the starfield, the drifters, the points popups, the ship while the
+run shows it, the debug outlines and overlay with the wave and level lines if visible, the Game
+Over box with the final score at game over and the HUD, flip, then yield to the browser.
 The app holds one Run; core does the ship, the scroll, the drifters, the lives, the respawn
 wait, game over and retry.
 Source: docs/contracts/systems/app.md, Rules, Frame loop. 15-tech-constraints.md, rules 1 and 2.
@@ -14,19 +15,24 @@ Source: docs/contracts/systems/app.md, Rules, Frame loop. 15-tech-constraints.md
 
 import asyncio
 import logging
+import random
 import time
+from collections.abc import Sequence
 
 import pygame
 
-from app.debug_spawns import DebugSpawnList, debug_spawns_due, load_debug_spawns
+from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.mode import RunMode
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
 from app.tuning import load_tuning
+from app.waves import load_wave_book
+from core.drifters.spawner import Placement
 from core.drifters.tuning import DrifterTuning
 from core.run import Run, add_drifters, start_run, step_run
 from core.ship import Thrust
+from core.waves import WaveBook, start_waves
 from core.world import SCREEN_H, SCREEN_W
-from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay
+from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay, draw_debug_wave_lines
 from ui.drifters.registry import render_drifter
 from ui.game_over import draw_final_score, draw_game_over
 from ui.hud import draw_hud
@@ -54,8 +60,10 @@ async def frame_loop(mode: RunMode) -> None:
     surface: pygame.Surface = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     debug: bool = mode is RunMode.DEBUG
     tuning: DrifterTuning = load_tuning()
+    book: WaveBook = load_wave_book(tuning)
     spawn_list: DebugSpawnList | None = load_debug_spawns(tuning) if debug else None
-    run: Run = start_run()
+    list_plays: bool = spawn_list is not None and spawn_list.play == PLAY_LIST
+    run: Run = start_run(waves=None if list_plays else start_waves(book, random.getrandbits(64)))
     overlay_visible: bool = debug
     accumulator: float = 0.0
     was_capped: bool = False
@@ -68,7 +76,7 @@ async def frame_loop(mode: RunMode) -> None:
         now: float = time.perf_counter()
         accumulator += now - previous
         previous = now
-        run, accumulator = _run_ticks(run, thrust, accumulator, spawn_list, tuning)
+        run, accumulator = _run_ticks(run, thrust, accumulator, spawn_list, list_plays, tuning)
         was_capped = _apply_cap(accumulator, was_capped)
         if was_capped:
             accumulator = 0.0
@@ -119,19 +127,25 @@ def _run_ticks(
     thrust: Thrust,
     accumulator: float,
     spawn_list: DebugSpawnList | None,
+    list_plays: bool,
     tuning: DrifterTuning,
 ) -> tuple[Run, float]:
     """Run one tick per whole TICK_SECONDS in the accumulator, at most MAX_TICKS_PER_FRAME.
 
-    Each tick is one step_run call. In debug mode only (spawn_list is not None), right after
-    it, the spawn list's due placements go in through add_drifters. Returns (run, accumulator
-    left). Source: 15-tech-constraints.md, rules 2 and 7; systems/app.md, Rules, Tick.
+    Each tick is one step_run call. Right after it the due placements go in through one
+    add_drifters call: the spawn list's when list_plays, else the run's waves'. Never both.
+    Returns (run, accumulator left). Source: 15-tech-constraints.md, rules 2 and 7;
+    systems/app.md, Rules, Tick.
     """
     ticks: int = 0
     while accumulator >= TICK_SECONDS and ticks < MAX_TICKS_PER_FRAME:
         run = step_run(run, thrust)
-        if spawn_list is not None:
-            run = add_drifters(run, debug_spawns_due(spawn_list, run.scroll.ticks), tuning)
+        due: Sequence[Placement] = (
+            debug_spawns_due(spawn_list, run.scroll.ticks)
+            if spawn_list is not None and list_plays
+            else run.wave_spawns_due
+        )
+        run = add_drifters(run, due, tuning)
         accumulator -= TICK_SECONDS
         ticks += 1
     return run, accumulator
@@ -151,8 +165,8 @@ def _apply_cap(accumulator: float, was_capped: bool) -> bool:
 
 def _draw(surface: pygame.Surface, run: Run, overlay_visible: bool, debug: bool) -> None:
     """Fill the background, then draw the starfield, the drifters, the points popups, the ship
-    while shown, the debug outlines and overlay if visible, the Game Over box and its final
-    score line at game over, and the HUD last.
+    while shown, the debug outlines, overlay and wave lines if visible, the Game Over box and its
+    final score line at game over, and the HUD last.
 
     Drifters sit behind the ship, and the popups over the drifters and behind the ship. The HUD
     sits below the overlay's place for the whole run in debug mode, even while F3 hides the
@@ -169,6 +183,7 @@ def _draw(surface: pygame.Surface, run: Run, overlay_visible: bool, debug: bool)
     if overlay_visible:
         draw_debug_hitboxes(surface, run)
         draw_debug_overlay(surface, run.ship)
+        draw_debug_wave_lines(surface, run)
     if run.game_over:
         draw_game_over(surface)
         draw_final_score(surface, run.score)

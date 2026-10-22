@@ -1,7 +1,8 @@
 """Debug overlay: the ship's numbers, the lines the rules use, hitboxes and labels.
 
-`draw_debug_overlay` draws the lines and the four text lines. `draw_debug_hitboxes` outlines
-every hitbox and graze zone and labels every drifter. Both draw on top of the frame.
+`draw_debug_overlay` draws the lines and the first four text lines. `draw_debug_wave_lines`
+draws text lines 5 and 6, the wave and the level. `draw_debug_hitboxes` outlines every hitbox
+and graze zone and labels every drifter. All three draw on top of the frame.
 
 Source: docs/contracts/systems/debug-overlay.md, Interface and Presentation;
 10-ui.md, debug_overlay, debug_overlay_layout, debug_text_font, debug_overlay_color.
@@ -34,6 +35,15 @@ OVERLAY_MARGIN: int = 4
 Source: 10-ui.md, debug_overlay_layout (guess).
 """
 
+OVERLAY_TEXT_LINES: int = 6
+"""Text lines the overlay can show: x, y, vx, vy, wave, level.
+
+Source: 10-ui.md, debug_overlay_layout (guess); systems/debug-overlay.md, Interface (DRA-76).
+"""
+
+FIRST_WAVE_LINE: int = 4
+"""Index of text line 5, the first line `draw_debug_wave_lines` draws (line 1 is index 0)."""
+
 
 def draw_debug_overlay(surface: pygame.Surface, ship: Ship) -> None:
     """Draw the top-line and floor lines, then the ship's x, y, vx and vy, on ``surface``.
@@ -47,16 +57,27 @@ def draw_debug_overlay(surface: pygame.Surface, ship: Ship) -> None:
     _draw_text(surface, ship)
 
 
-def overlay_text_bottom() -> int:
-    """Return the first screen row below every pixel the four text lines can cover. Draws nothing.
+def draw_debug_wave_lines(surface: pygame.Surface, run: Run) -> None:
+    """Draw text line 5 (``wave <id>``, ``wave rest`` or ``wave none``) and line 6 (``level <n>``).
 
-    Value: OVERLAY_MARGIN + 3 * linesize + max(linesize, font height), from the overlay's own
-    cached font. Units: pixels. Needs ``pygame.font`` initialized.
-    Source: docs/contracts/systems/debug-overlay.md, Interface and Presentation (DRA-13).
+    Same column, font and color as lines 1 to 4, one line-height each below ``vy``.
+    ``wave none``: the run has no waves. ``wave rest``: the waves have no current wave id.
+    Needs ``pygame.font`` initialized. Source: systems/debug-overlay.md, Presentation (DRA-76).
+    """
+    _draw_text_line(surface, f"wave {_wave_name(run)}", FIRST_WAVE_LINE)
+    _draw_text_line(surface, f"level {run.level}", FIRST_WAVE_LINE + 1)
+
+
+def overlay_text_bottom() -> int:
+    """Return the first screen row below every pixel the six text lines can cover. Draws nothing.
+
+    Value: OVERLAY_MARGIN + (OVERLAY_TEXT_LINES - 1) * linesize + max(linesize, font height),
+    from the overlay's own cached font. Units: pixels. Needs ``pygame.font`` initialized.
+    Source: docs/contracts/systems/debug-overlay.md, Interface and Presentation (DRA-13, DRA-76).
     """
     font: pygame.font.Font = _overlay_font()
     linesize: int = font.get_linesize()
-    return OVERLAY_MARGIN + 3 * linesize + max(linesize, font.get_height())
+    return OVERLAY_MARGIN + (OVERLAY_TEXT_LINES - 1) * linesize + max(linesize, font.get_height())
 
 
 def draw_debug_hitboxes(surface: pygame.Surface, run: Run) -> None:
@@ -122,7 +143,6 @@ def _draw_text(surface: pygame.Surface, ship: Ship) -> None:
     The ``z`` option turns a value that rounds to zero into ``0.00``, never ``-0.00``.
     Source: 10-ui.md, debug_overlay_layout (guess); DRA-19 scope report, item 3.
     """
-    font: pygame.font.Font = _overlay_font()
     readings: tuple[tuple[str, float], ...] = (
         ("x", ship.x),
         ("y", ship.y),
@@ -130,9 +150,22 @@ def _draw_text(surface: pygame.Surface, ship: Ship) -> None:
         ("vy", ship.vy),
     )
     for index, (name, value) in enumerate(readings):
-        line: pygame.Surface = font.render(f"{name} {value:z.2f}", True, OVERLAY_COLOR)
-        top: int = OVERLAY_MARGIN + index * font.get_linesize()
-        surface.blit(line, (OVERLAY_MARGIN, top))
+        _draw_text_line(surface, f"{name} {value:z.2f}", index)
+
+
+def _wave_name(run: Run) -> str:
+    """Return the id of the playing wave, ``rest`` when none plays, ``none`` with no waves."""
+    if run.waves is None:
+        return "none"
+    wave_id: str | None = run.waves.current_wave_id
+    return "rest" if wave_id is None else wave_id
+
+
+def _draw_text_line(surface: pygame.Surface, text: str, index: int) -> None:
+    """Render ``text`` as text line ``index`` (0 is line 1): left margin, one line-height apart."""
+    font: pygame.font.Font = _overlay_font()
+    line: pygame.Surface = font.render(text, True, OVERLAY_COLOR)
+    surface.blit(line, (OVERLAY_MARGIN, OVERLAY_MARGIN + index * font.get_linesize()))
 
 
 @cache

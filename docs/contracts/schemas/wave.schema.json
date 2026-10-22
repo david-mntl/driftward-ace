@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/wave.schema.json",
+  "title": "Wave",
+  "description": "One hand-authored wave: the file game/waves/<wave id>.json. The wave id is the file name without .json and matches ^[a-z][a-z0-9_]*$; the file holds no id of its own. The file playlist.json in the same folder is the playlist, not a wave (playlist.schema.json). A wave is a scroll distance, length_px; each placement comes due when the world has scrolled at_px since the wave's start, so the wave keeps its layout at every level and just arrives faster (09-waves.md, rules 2 and 9). The spawn spot (x, y) is in screen px, y down, the same as the debug test spawn list and every drifter's placement (07-drifters.md, rule 13). Drifter values are never set here: only placement fields (09-waves.md, rule 12). Loaded at startup in both modes by game/app/waves.py and checked by core.wave_files.build_wave_book (docs/contracts/systems/waves.md, Rules, The wave files). Rules this schema can't express, also enforced by the loader: type is a built drifter type (a DrifterType value); every placement is spawned once at load, so a missing coordinate, an unknown variant, or an invert or specialty the drifter refuses is refused naming the placement; a hazard (a drifter whose touch is a hit) may not have at_px below 120, the seam_clear of 09-waves.md (pickups may). Not checked at load: the seam at the wave's end, gaps, coin distances and the bot path (wave_check, later; 09-waves.md, rule 7). Owner of the schema: architect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["length_px", "kind", "placements"],
+  "properties": {
+    "length_px": {
+      "description": "The wave's length, px of scroll, > 0. The wave ends on the tick the world has scrolled this far since its start (09-waves.md, rule 9). Example: 30 s at Level 1 is 1980.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "kind": {
+      "description": "\"fixed\": played where a playlist names it. \"pool\": picked for random slots (09-waves.md, rule 10).",
+      "enum": ["fixed", "pool"]
+    },
+    "min_level": {
+      "description": "Pool waves only, and required for them: the lowest level the wave may be picked at, 1 to 8. Refused on a fixed wave.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "extra_rest_ticks": {
+      "description": "Ticks added to the rest gap after this wave, >= 0. Left out: 0. Never scales with level (09-waves.md, rule 11; 08-difficulty.md, rule 6).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "placements": {
+      "description": "The wave's drifters, in any order; the loader sorts them by at_px, ties kept in file order. May be empty.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/placement" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "kind": { "const": "pool" } },
+        "required": ["kind"]
+      },
+      "then": { "required": ["min_level"] },
+      "else": { "not": { "required": ["min_level"] } }
+    }
+  ],
+  "$defs": {
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at_px", "type"],
+      "properties": {
+        "at_px": {
+          "description": "Trigger: px of scroll from the wave's start, >= 0. The drifter enters the run on the first tick the wave has scrolled this far. A hazard needs at least 120 (09-waves.md, seam_clear and rule 7.4).",
+          "type": "number",
+          "minimum": 0
+        },
+        "type": {
+          "description": "The drifter type value, e.g. \"meteorite\", \"satellite\", \"chain_lightning\", \"fireball\" or \"coin\".",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "x": {
+          "description": "Center x, screen px. Required for the meteorite, the chain lightning and the coin. Left out for a satellite (just outside the wall it enters from). For a fireball: as in the debug test spawn list (x alone an entry along the top; neither x nor y its corner entry).",
+          "type": "number"
+        },
+        "y": {
+          "description": "Center y, screen px, y down. Required for the satellite. Left out for a meteorite, a chain lightning, a fireball or a coin: just above the top edge. A coin with x and y shows at that spot at once.",
+          "type": "number"
+        },
+        "variant": {
+          "description": "A variant name from the drifter's tuning file. Left out: the drifter's default variant.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "invert": {
+          "description": "The drifter's invert (07-drifters.md, rule 13). Left out: false. A drifter without one refuses true.",
+          "type": "boolean"
+        },
+        "specialty": {
+          "description": "The specialty switch (07-drifters.md, rule 11). Left out: the drifter's default. A drifter without a specialty refuses true.",
+          "type": "boolean"
+        },
+        "as_level": {
+          "description": "A level, 1 to 8, whose hazard speed and Timer values this drifter uses instead of the run's level (08-difficulty.md, rule 3). Left out: the run's level when it comes due.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        }
+      }
+    }
+  }
+}

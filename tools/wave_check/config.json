@@ -1,0 +1,12 @@
+{
+  "levels": [8],
+  "skip": [],
+  "start_spots": { "left": 100, "center": 320, "right": 540 },
+  "limits": {
+    "seam_clear_px": 120,
+    "coin_near_ship_widths": 3,
+    "gap_min_ship_widths": 2.5
+  },
+  "track_ticks_max": 2400,
+  "bot": { "mode": "perfect", "reaction_ticks": 0, "lookahead_ticks": null }
+}

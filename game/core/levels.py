@@ -1,4 +1,4 @@
-"""The level table: hazard speed and Timer multipliers per level, and where levels start.
+"""The level table: the per-level multipliers for hazard speed, Timer, scroll speed and Rest gap.
 
 Levels are 1 to 8. Stdlib only, pure, no frame time, no randomness.
 
@@ -13,18 +13,20 @@ log = logging.getLogger(__name__)
 LEVEL_COUNT: Final[int] = 8
 """Number of levels. Source: 08-difficulty.md, level table (locked)."""
 
+FIRST_LEVEL: Final[int] = 1
+"""The level a run starts at. Source: 08-difficulty.md, rule 1."""
+
 HAZARD_SPEED_MULT: Final[tuple[float, ...]] = (1.00, 1.06, 1.12, 1.18, 1.24, 1.30, 1.36, 1.42)
 """Hazard speed multiplier per level, Level 1 first. Source: 08-difficulty.md (locked)."""
 
 TIMER_MULT: Final[tuple[float, ...]] = (1.00, 0.94, 0.89, 0.85, 0.81, 0.77, 0.74, 0.70)
 """Timer multiplier per level, Level 1 first. Source: 08-difficulty.md (guess)."""
 
-LEVEL_STARTS_M: Final[tuple[int, ...]] = (0,)
-"""Distance in meters where each level starts, Level 1 first.
+SCROLL_MULT: Final[tuple[float, ...]] = (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7)
+"""Scroll speed multiplier per level, Level 1 first. Source: 08-difficulty.md (locked)."""
 
-Only Level 1 (0 m) is known. Levels 2 to 8 are TBD (DF-05) and join here when set.
-Source: 08-difficulty.md, Starts at row.
-"""
+REST_GAP_MULT: Final[tuple[float, ...]] = (1.00, 0.90, 0.81, 0.73, 0.66, 0.59, 0.53, 0.48)
+"""Rest gap multiplier per level, Level 1 first. Source: 08-difficulty.md (locked)."""
 
 
 def check_level(level: int) -> None:
@@ -45,6 +47,13 @@ def timer_mult(level: int) -> float:
     return TIMER_MULT[level - 1]
 
 
-def level_at(meters: int) -> int:
-    """Return the highest level whose start is at or below `meters`, never less than 1."""
-    return max(1, sum(1 for start in LEVEL_STARTS_M if start <= meters))
+def scroll_mult(level: int) -> float:
+    """Return the scroll speed multiplier of `level`, 1 to LEVEL_COUNT."""
+    check_level(level)
+    return SCROLL_MULT[level - 1]
+
+
+def rest_gap_mult(level: int) -> float:
+    """Return the Rest gap multiplier of `level`, 1 to LEVEL_COUNT."""
+    check_level(level)
+    return REST_GAP_MULT[level - 1]

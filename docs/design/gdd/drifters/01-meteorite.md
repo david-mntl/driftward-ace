@@ -3,7 +3,7 @@ Status: draft
 Depends on: [../07-drifters.md](../07-drifters.md) (shared hazard rules), [../04-ship.md](../04-ship.md) (top sideways speed)
 
 ## Summary
-A rock that falls straight down from the top. It has no logic: it just falls. It's the first hazard every player meets, and Wave 0 uses only meteorites.
+A rock that falls straight down from the top. It has no logic: it just falls. It's the first hazard every player meets, and the only hazard in Wave 0.
 
 ## Values
 | Key | Value | Unit | Range | Status | Source |

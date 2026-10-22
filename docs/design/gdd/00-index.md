@@ -34,7 +34,7 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 | Score, meters, coins, graze | [06-scoring.md](06-scoring.md) |
 | Which drifters exist, their priority, rules shared by all hazards | [07-drifters.md](07-drifters.md) |
 | How one drifter behaves | the file [07-drifters.md](07-drifters.md) routes to, in `drifters/` |
-| Levels, speed multipliers, rest gap, tier unlocks | [08-difficulty.md](08-difficulty.md) |
+| Levels, playlists, speed multipliers, rest gap, tier unlocks | [08-difficulty.md](08-difficulty.md) |
 | Waves, Wave 0, wave order, wave_check rules | [09-waves.md](09-waves.md) |
 | HUD, control card, game over screen | [10-ui.md](10-ui.md) |
 | Saves, nickname, top 10 (stretch) | [11-save-data.md](11-save-data.md) |
