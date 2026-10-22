@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/floating-island-tuning.schema.json",
+  "title": "Floating island tuning file",
+  "description": "The file game/tuning/drifters/floating_island.json. Built on drifter-tuning.schema.json: the same default_variant and variant names, but no speed_ratio and no entry_warning_ticks, because the floating island is a parked blocker: it moves only with the scroll and has no entry warning (drifters/05-floating-islands.md, scroll_kind and entry_warning, both locked). Each variant gives its shape kind and its size, instead of a hitbox. The loader works the hitbox out from them and the type's arm with core.drifters.floating_island.island_hitbox, un-inverted: rectangle one box; l_shape a bar along the bottom (full width, arm tall) and an upright at the left end (arm wide, full height); t_shape a bar along the top and a stem centered under it (arm wide, full height); triangle one polygon, base along the bottom, straight side on the left, slope from the top-left to the bottom-right corner (docs/contracts/systems/drifters.md, Rules, Floating island). Values from drifters/05-floating-islands.md (all guess) and scope report DRA-86: default_variant rectangle; arm 40; variants rectangle (rectangle, 320 x 120), box (rectangle, 120 x 120), l_shape (l_shape, 320 x 120), t_shape (t_shape, 320 x 120), triangle (triangle, 320 x 120). Key mapping to the GDD: the variant names and shape kinds are the Shapes table's Variant and Shape columns (the box is a filled square, so the rectangle kind); width and height are its Size (w x h); arm is the arm row. Sizes and arm are even whole px so every edge and corner falls on a whole px when the view draws at the rounded center (docs/contracts/systems/drifters.md, Rationale). Colors and the 2 px edge are not here: they stay in the view. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Rules this schema can't express, also enforced by the loader: default_variant is one of the variant names; for an l_shape or t_shape variant, arm < width and arm < height. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, Floating island.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["default_variant", "variants", "arm"],
+  "properties": {
+    "default_variant": {
+      "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants. rectangle.",
+      "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+    },
+    "variants": {
+      "description": "Named shapes and sizes (05-floating-islands.md, Shapes). A new size is a new entry here and needs no code; a new shape kind needs code (05-floating-islands.md, How to extend).",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "drifter-tuning.schema.json#/$defs/variant_name" },
+      "additionalProperties": { "$ref": "#/$defs/variant" }
+    },
+    "arm": {
+      "description": "The thickness of the L's and the T's arms, px: the bar's height and the upright's or stem's width. Even. 40. Not read for a rectangle or a triangle.",
+      "$ref": "#/$defs/even_size"
+    }
+  },
+  "$defs": {
+    "even_size": {
+      "type": "integer",
+      "minimum": 2,
+      "multipleOf": 2
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "width", "height"],
+      "properties": {
+        "shape": {
+          "description": "The shape kind, a core.drifters.floating_island.IslandShape value. invert flips l_shape, t_shape and triangle upside down and is refused on a rectangle (05-floating-islands.md, rule 9).",
+          "enum": ["rectangle", "l_shape", "t_shape", "triangle"]
+        },
+        "width": {
+          "description": "The width of the box around the shape, px, centered on the island's position. Even. 320, or 120 for the box.",
+          "$ref": "#/$defs/even_size"
+        },
+        "height": {
+          "description": "The height of the box around the shape, px. Even. 120.",
+          "$ref": "#/$defs/even_size"
+        }
+      }
+    }
+  }
+}

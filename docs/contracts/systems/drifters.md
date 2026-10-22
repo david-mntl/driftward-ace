@@ -1,11 +1,11 @@
-# Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite, the chain lightning, the fireball, the coin and their views
+# Drifters: base, hitboxes, levels, spawner, the meteorite, the satellite, the chain lightning, the fireball, the coin, the floating island and their views
 Version: 6
-Status: frozen
-Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62, DRA-76
+Status: draft
+Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62, DRA-76, DRA-86
 Created by: architect
 
 ## Purpose
-Every drifter in the game, hazards and pickups, is built on one shared base. This contract holds that base, the hitbox shapes (circle, box and line) and their overlap test, the level table (the spawner reads its hazard speed × and Timer ×, the scroll its scroll speed ×, the waves its Rest gap ×), the spawner (the only way a drifter is created), the drifters built so far (four hazards: the meteorite, the satellite, the chain lightning and the fireball; one pickup: the coin), and the views that draw drifters and their entry warnings.
+Every drifter in the game, hazards, pickups and blockers, is built on one shared base. This contract holds that base, the hitbox shapes (circle, box, line and convex polygon), their overlap test and the push-out measure the ship's island block uses, the level table (the spawner reads its hazard speed × and Timer ×, the scroll its scroll speed ×, the waves its Rest gap ×), the spawner (the only way a drifter is created), the drifters built so far (four hazards: the meteorite, the satellite, the chain lightning and the fireball; one pickup: the coin; one blocker: the floating island), and the views that draw drifters and their entry warnings. How an island blocks the ship is the ship's rule (`docs/contracts/systems/ship.md`); this contract holds the island itself and the geometry the block is measured with.
 
 The base holds the rules every drifter shares: the entry warning (where it shows, what its copy looks like), the hitbox, the graze zone, the parts of the drifter that are drawn, when a drifter has entered the screen and when it has left it (judged on those drawn parts), the re-hit cooldown with its dim look, how a timer scales with level, whether the drifter is parked (it moves only with the scroll) or moving, and what a pickup pays when it is collected (its points and its points popup). A drifter carries final numbers only. The spawner reads the level and the shared hazard values once, at birth, and sets the drifter's speed, its timer factor and its cooldown length; a parked drifter gets no speed of its own. The drifter never knows the level. Each tick it may read the ship and how far the world scrolls on that tick (`TickContext`). The run (`docs/contracts/systems/run.md`) holds the drifters, lets each fix its warning from the ship when it is added, updates them every tick, marks when each has entered, collects the pickups the ship touches, tests the hazards against the ship, starts and counts down their cooldowns, and drops them when they leave or are collected.
 
@@ -25,9 +25,15 @@ Who builds what:
 - `game/ui/shapes.py`: the UI Developer, task `DRA-29-04-ui-developer`. The line shape: task `DRA-47-04-ui-developer`.
 - The package `game/ui/drifters/` (`__init__.py`, `registry.py`, `entry_warning.py`, `meteorite_view.py`): task `DRA-29-05-ui-developer`. Brightness, `dim_color` and the tilted warning copy: task `DRA-39-02-ui-developer`. `satellite_view.py`: task `DRA-39-04-ui-developer`. The warning drawn from `warning_copy()`: task `DRA-47-05-ui-developer`. `chain_lightning_view.py`: task `DRA-47-06-ui-developer`. `fireball_view.py`: task `DRA-56-02-ui-developer`. `coin_view.py`: task `DRA-62-03-ui-developer`.
 - The points popup a coin leaves and its view (`game/ui/popup_view.py`): `docs/contracts/systems/run.md` (task `DRA-62-04-ui-developer`).
-- Hitbox and graze outlines and drifter labels in the debug overlay: `docs/contracts/systems/debug-overlay.md` (task `DRA-29-06`). No change in DRA-39, DRA-47, DRA-56 or DRA-62: line outlines come from `ui.shapes`; the coin's box is outlined like any box, and it has no graze zone.
+- The polygon shape, its overlap, place and grow rules, `deeply_overlaps`, `push_directions` and `exit_distance` in `game/core/collision.py`: task `DRA-86-01-gameplay-implementer`.
+- `DrifterType.FLOATING_ISLAND`, `TouchEffect.BLOCK`, `game/core/drifters/floating_island.py` and its import: task `DRA-86-02-gameplay-implementer`.
+- The island block in the ship step and the respawn out of an island: `docs/contracts/systems/ship.md` (task `DRA-86-03-gameplay-implementer`) and `docs/contracts/systems/run.md` (task `DRA-86-04-gameplay-implementer`).
+- The polygon in `game/ui/shapes.py`: task `DRA-86-05-ui-developer`. `game/ui/drifters/floating_island_view.py` and its import: task `DRA-86-06-ui-developer`.
+- Hitbox and graze outlines and drifter labels in the debug overlay: `docs/contracts/systems/debug-overlay.md` (task `DRA-29-06`). No change in DRA-39, DRA-47, DRA-56, DRA-62 or DRA-86: line and polygon outlines come from `ui.shapes`; the coin's box and the island's shapes are outlined like any shape, and neither has a graze zone.
+- Tests for DRA-86: `DRA-86-07-qa-engineer` (collision with polygons, the push-out measure, the ship against every island variant), `DRA-86-08-qa-engineer` (the island block in the ship step and the respawn spot) and `DRA-86-09-qa-engineer` (the island, and islands in the run).
+- The island's tuning file `game/tuning/drifters/floating_island.json` (`docs/contracts/schemas/floating-island-tuning.schema.json`, DRA-86) is content, like the other drifter files.
 - Tests: the QA Engineer. DRA-29: tasks `DRA-29-07` to `DRA-29-09`. DRA-39: `DRA-39-05-qa-engineer` (collision), `DRA-39-06-qa-engineer` (base, spawner, meteorite, satellite) and `DRA-39-07-qa-engineer` (drifters in the run). DRA-47: `DRA-47-07-qa-engineer` (collision with lines, the ship against every chain lightning variant) and `DRA-47-08-qa-engineer` (the chain lightning, the new base hooks, chain lightnings in the run). DRA-56: `DRA-56-03-qa-engineer` (the ship against every fireball variant) and `DRA-56-04-qa-engineer` (the fireball, drawn parts, fireballs in the run). DRA-62: `DRA-62-05-qa-engineer` (the ship against every coin variant) and `DRA-62-06-qa-engineer` (the coin, its popup, coins in the run).
-- The data files, by whoever the Director names (DRA-29: the main session). They are content, so no task file: `game/tuning/drifters/meteorite.json` (`docs/contracts/schemas/drifter-tuning.schema.json`), `game/tuning/drifters/satellite.json` (`docs/contracts/schemas/satellite-tuning.schema.json`), `game/tuning/drifters/chain_lightning.json` (`docs/contracts/schemas/chain-lightning-tuning.schema.json`, DRA-47), `game/tuning/drifters/fireball.json` (`docs/contracts/schemas/fireball-tuning.schema.json`, DRA-56), `game/tuning/drifters/coin.json` (`docs/contracts/schemas/coin-tuning.schema.json`, DRA-62), `game/tuning/playtest.json` (`docs/contracts/schemas/playtest-switches.schema.json`), `game/tuning/hazards.json` (`docs/contracts/schemas/hazards.schema.json`) and `game/tuning/debug_spawns.json` (`docs/contracts/schemas/debug-spawn-list.schema.json`).
+- The data files, by whoever the Director names (DRA-29: the main session). They are content, so no task file: `game/tuning/drifters/meteorite.json` (`docs/contracts/schemas/drifter-tuning.schema.json`), `game/tuning/drifters/satellite.json` (`docs/contracts/schemas/satellite-tuning.schema.json`), `game/tuning/drifters/chain_lightning.json` (`docs/contracts/schemas/chain-lightning-tuning.schema.json`, DRA-47), `game/tuning/drifters/fireball.json` (`docs/contracts/schemas/fireball-tuning.schema.json`, DRA-56), `game/tuning/drifters/coin.json` (`docs/contracts/schemas/coin-tuning.schema.json`, DRA-62), `game/tuning/drifters/floating_island.json` (`docs/contracts/schemas/floating-island-tuning.schema.json`, DRA-86), `game/tuning/playtest.json` (`docs/contracts/schemas/playtest-switches.schema.json`), `game/tuning/hazards.json` (`docs/contracts/schemas/hazards.schema.json`) and `game/tuning/debug_spawns.json` (`docs/contracts/schemas/debug-spawn-list.schema.json`).
 - Loading and checking the data files, the debug test spawn list, and calling `add_drifters` and `render_drifter`: the Integration Engineer, in `game/app/`, from `docs/contracts/systems/app.md`. No task file.
 
 ## Diagram
@@ -113,11 +119,17 @@ classDiagram
     collect_points() int
     collect_popup() PointsPopup
   }
+  class FloatingIsland {
+    parked = True
+    shape, invert, arm
+    born(birth)$ Self
+  }
   Drifter <|-- Meteorite
   Drifter <|-- Satellite
   Drifter <|-- ChainLightning
   Drifter <|-- Fireball
   Drifter <|-- Coin
+  Drifter <|-- FloatingIsland
   Drifter o-- Specialty : 0..1
 ```
 
@@ -125,7 +137,7 @@ Life of one drifter:
 ```mermaid
 stateDiagram-v2
     [*] --> WARNING: spawn_drifter()<br/>ticks_in_phase 0, no hitbox
-    [*] --> ACTIVE: spawn_drifter() for a pickup (the coin, DRA-62)<br/>no entry warning, ticks_in_phase 0
+    [*] --> ACTIVE: spawn_drifter() for a pickup (the coin, DRA-62) or a blocker (the floating island, DRA-86)<br/>no entry warning, ticks_in_phase 0
     WARNING --> WARNING: update(), ticks_in_phase + 1
     WARNING --> ACTIVE: update() when ticks_in_phase + 1 reaches warning_ticks<br/>appears at its x, y, can hit
     ACTIVE --> ACTIVE: update(), moves<br/>run: mark_entered() sets has_entered once partly on screen
@@ -277,12 +289,64 @@ warning            none, ever
 ```
 At T its crystal's bottom edge is on the top edge: on no state is a pixel of it drawn before T+1. On T+454 the crystal's top edge is at 479.40, still on screen; on T+455 it is at 480.50 and the ring's at 486.50: every part is off, so the run drops it. Placed on tick 1, before the scroll starts, it stays at y −10 on the states after ticks 1 to 30 and first moves on tick 31. Placed at (440, 210): it is on screen at once, enters on its first update, and is dropped on n = 255 (y 490.50). At Level 8 it moves exactly the same: hazard speed × and Timer × never touch it.
 
+Floating island (DRA-86). One drifter, parked like the coin, born ACTIVE with no warning. Its hitbox is its shape: boxes, or one convex polygon for the triangle. Offsets from the center, y down, at the file's sizes (320 × 120, `arm` 40; the box 120 × 120). `island_hitbox` builds them:
+```
+rectangle                          box
++----------------------------+     +----------+
+|                            |     |          |
+|            (0,0)           |     |  (0,0)   |
++----------------------------+     +----------+
+Box(0, 0, 320, 120)                Box(0, 0, 120, 120)
+
+l_shape                            l_shape, invert
++---+                              +----------------------------+
+|   |                              |  bar                       |
+|   +------------------------+     +---+------------------------+
+|   bar                      |     |   |
++----------------------------+     +---+
+bar Box(0, 40, 320, 40)            bar Box(0, -40, 320, 40)
+upright Box(-140, 0, 40, 120)      upright Box(-140, 0, 40, 120)
+
+t_shape                            t_shape, invert
++----------------------------+                   +---+
+|  bar                       |                   |   |
++------------+---+-----------+     +-------------+   +---------+
+             |   |                 |  bar                      |
+             +---+                 +---------------------------+
+bar Box(0, -40, 320, 40)           bar Box(0, 40, 320, 40)
+stem Box(0, 0, 40, 120)            stem Box(0, 0, 40, 120)
+
+triangle                           triangle, invert
+(-160,-60)                         (-160,-60)          (160,-60)
+ |\                                 +-------------------/
+ |   \                              |              /
+ |       \                          |         /
+ |           \                      |    /
+ +--------------\ (160,60)          |/
+(-160,60)                          (-160,60)
+Polygon(((-160,-60), (160,60), (-160,60)))    Polygon(((-160,60), (160,-60), (-160,-60)))
+slope's outward normal (120, -320) / 341.76   slope's outward normal (120, 320) / 341.76
+  = (0.3511, -0.9363): up and right             = (0.3511, 0.9363): down and right
+```
+The L's upright and the T's stem are full height, so the two boxes overlap in an `arm` × `arm` square. Their union is the shape drawn. `invert` mirrors the shape top to bottom: every box's `cy` and every polygon point's y is negated (the triangle's point order turns round; collision accepts either order).
+
+Island timeline, rectangle, Level 1, placed with x 320 and no y, added at the end of tick T with the world already scrolling (`scroll_step_px` 1.1 on every later tick). `n` counts ticks after T:
+```
+state after tick   T        T+1      T+n                T+545     T+546
+phase              ACTIVE   ACTIVE   ACTIVE             ACTIVE    dropped
+y                  -60.00   -58.90   -60 + n × 1.1      539.50    540.60
+hitbox             Box 320 × 120, centered, on every ACTIVE state
+has_entered        no       yes      yes                yes
+warning            none, ever
+```
+At T its bottom edge is on the top edge. On T+545 its top edge is at 479.50, still on screen; on T+546 it is at 480.60 and the run drops it. Placed on screen (a `y` given), it shows there at once. At Level 8 it moves 1.87 px a tick, only because the scroll does: hazard speed × and Timer × never touch it.
+
 Views:
 ```mermaid
 flowchart LR
   APP["app.frame"] -- "each obj in run.drifters" --> R["ui.drifters.registry.render_drifter"]
   R -- "WARNING" --> W["ui.drifters.entry_warning.draw_entry_warning<br/>(the view of obj.warning_copy() scaled to a 14 px longest side,<br/>full brightness, turned by warning_tilt_degrees())"]
-  R -- "ACTIVE" --> V["registered view at obj.brightness()<br/>render_meteorite, render_satellite,<br/>render_chain_lightning, render_fireball,<br/>render_coin (DRA-62)"]
+  R -- "ACTIVE" --> V["registered view at obj.brightness()<br/>render_meteorite, render_satellite,<br/>render_chain_lightning, render_fireball,<br/>render_coin (DRA-62), render_floating_island (DRA-86)"]
   R -- "GONE" --> N["nothing"]
 ```
 
@@ -324,14 +388,28 @@ class Line:  # DRA-47
     thickness: float  # full thickness, px, > 0. Every point within thickness / 2 of segment AB
 
 
-Shape = Circle | Box | Line  # Line from DRA-47
+@dataclass(frozen=True, slots=True)
+class Polygon:  # DRA-86
+    """A convex polygon hitbox shape: a filled shape with straight edges, px."""
+
+    points: tuple[tuple[float, float], ...]  # its corners in order around the edge, either way
+    # round, at least 3. Offsets from the owner's center in a variant's hitbox; screen px once
+    # placed, y down. Convex, no two points the same, no three neighbours on one line. Trusted:
+    # core builds every polygon (island_hitbox), nothing reads one from a file
+
+
+Shape = Circle | Box | Line | Polygon  # Line from DRA-47, Polygon from DRA-86
 Hitbox = tuple[Shape, ...]  # one or more shapes. Empty () = touches nothing
+Direction = tuple[float, float]  # DRA-86. A unit vector, screen px, y down: (0.0, -1.0) is up
+
+SURFACE_TOLERANCE: Final[float] = 1e-9  # DRA-86. px. An overlap this deep or less counts as
+# touching for deeply_overlaps and exit_distance. Not a game value (Rationale)
 
 
 def place_hitbox(hitbox: Hitbox, x: float, y: float) -> Hitbox:
     ...
     # Every shape moved by (x, y): offsets from the owner's center become screen positions.
-    # A line moves both ends.
+    # A line moves both ends; a polygon every point.
 
 
 def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool:
@@ -343,10 +421,37 @@ def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox:
     ...
     # Each shape grown by margin on every side: Circle r + margin; Box w + 2 margin, h + 2 margin;
     # Line thickness + 2 margin, ends unchanged (it grows on each side and at both ends).
+    # Polygon (DRA-86): the polygon itself, then one Line per edge, point i to point i + 1 (the
+    # last to the first), thickness 2 × margin. So a hitbox may come back with more shapes.
 
 
 # All three raise TypeError("unknown shape kind '<class name>'") for an object that is not a
-# Circle, a Box or a Line (DRA-39, Line from DRA-47). Nothing is ever treated as a box by default.
+# Circle, a Box, a Line or a Polygon (DRA-39, Line from DRA-47, Polygon from DRA-86). Nothing is
+# ever treated as a box by default.
+
+
+def deeply_overlaps(moving: Hitbox, solid: Hitbox) -> bool:
+    ...  # DRA-86
+    # True when some shape of moving overlaps some shape of solid by more than SURFACE_TOLERANCE
+    # (Rules, Push-out). Both placed. Pure.
+
+
+def push_directions(moving: Hitbox, solid: Hitbox) -> tuple[Direction, ...]:
+    ...  # DRA-86
+    # The directions the push-out tries, in order: up, down, left, right, then each polygon
+    # edge's outward and inward normal, solid's polygons first, then moving's, with no repeats
+    # (Rules, Push-out). Pure.
+
+
+def exit_distance(moving: Hitbox, solid: Hitbox, direction: Direction) -> float:
+    ...  # DRA-86
+    # px >= 0: how far moving must move along direction until no shape of it overlaps a shape of
+    # solid at all. 0.0 when deeply_overlaps(moving, solid) is False. Both placed. Pure.
+
+
+# deeply_overlaps, push_directions and exit_distance take boxes and polygons only: any other shape
+# raises TypeError("<function name> takes boxes and polygons, not '<class name>'"), e.g.
+# "exit_distance takes boxes and polygons, not 'Circle'". DRA-86.
 ```
 
 ### game/core/levels.py
@@ -410,6 +515,7 @@ class DrifterType(Enum):
     CHAIN_LIGHTNING = "chain_lightning"  # drifters/03-chain-lightning.md. DRA-47
     FIREBALL = "fireball"  # drifters/06-fireball.md. DRA-56
     COIN = "coin"  # drifters/04-coin.md. DRA-62
+    FLOATING_ISLAND = "floating_island"  # drifters/05-floating-islands.md. DRA-86
 
 
 class Phase(Enum):
@@ -421,6 +527,8 @@ class Phase(Enum):
 class TouchEffect(Enum):
     HIT = "hit"  # touching it is a hit (05-lives-and-damage.md, rule 1)
     COLLECT = "collect"  # touching it collects it: it pays and goes (06-scoring.md, rule 2). The coin. DRA-62
+    BLOCK = "block"  # touching it neither hurts nor pays: it is ground the ship can't enter
+    # (07-drifters.md, Summary, Blocker). The floating island. DRA-86
     NONE = "none"  # touching it does nothing
 
 
@@ -970,11 +1078,68 @@ class Coin(Drifter):
 ```
 The fields have defaults so `born_drifter` can build the coin before `born` sets them. Sizes are whole px (the schema asks for even integers), so the view's pixels match the boxes exactly (Rationale). `app.tuning` imports `CoinVariantExtra`, `CoinTypeExtra` and `coin_hitbox` to build the tuning records, so the hitbox is worked out in one place.
 
+### game/core/drifters/floating_island.py (DRA-86)
+```python
+# Imports: stdlib, core.collision, core.drifters.base, core.drifters.registry.
+
+class IslandShape(Enum):
+    """The shape kinds an island variant can have. drifters/05-floating-islands.md, Shapes."""
+    RECTANGLE = "rectangle"   # a filled rectangle; the box variant is one too, 120 x 120
+    L_SHAPE = "l_shape"       # a bar along the bottom, an upright at the left end, full height
+    T_SHAPE = "t_shape"       # a bar along the top, a stem centered under it, full height
+    TRIANGLE = "triangle"     # a right triangle: base along the bottom, straight side on the left
+
+INVERTIBLE_SHAPES: Final[frozenset[IslandShape]] = frozenset(
+    {IslandShape.L_SHAPE, IslandShape.T_SHAPE, IslandShape.TRIANGLE}
+)  # drifters/05-floating-islands.md, rule 9: invert is for the L, the T and the triangle only
+
+@dataclass(frozen=True, slots=True)
+class IslandVariantExtra(VariantExtra):
+    """The island's per-variant value: its shape kind."""
+    shape: IslandShape
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class IslandTypeExtra(DrifterTypeExtra):
+    """The island's values that hold for every variant. Final numbers, px."""
+    arm: float                # the L's and the T's arm thickness, px, > 0
+
+def island_hitbox(shape: IslandShape, width: float, height: float, arm: float,
+                  invert: bool) -> Hitbox: ...
+    # Offsets from the island's center (Diagram, Floating island), with hw = width / 2,
+    # hh = height / 2, offset = (height - arm) / 2, and s = -1 with invert, else 1:
+    # RECTANGLE: (Box(0, 0, width, height),)
+    # L_SHAPE:   (Box(0, s × offset, width, arm), Box(-(width - arm) / 2, 0, arm, height))  bar, upright
+    # T_SHAPE:   (Box(0, -s × offset, width, arm), Box(0, 0, arm, height))                  bar, stem
+    # TRIANGLE:  (Polygon(((-hw, -s × hh), (hw, s × hh), (-hw, s × hh))),)
+    # Every number a float. Pure.
+
+@register_drifter
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FloatingIsland(Drifter):
+    """Forced-path blocker. Sits still in the world and moves down only with the scroll.
+    Touching it neither hurts nor pays: it blocks the ship. drifters/05-floating-islands.md."""
+    drifter_type: ClassVar[DrifterType] = DrifterType.FLOATING_ISLAND
+    parked: ClassVar[bool] = True
+    shape: IslandShape = IslandShape.RECTANGLE   # from the variant
+    invert: bool = False                         # the placement's invert: the shape upside down
+    arm: float = 0.0                             # from the type, px
+
+    @classmethod
+    def born(cls, birth: Birth) -> Self: ...          # ACTIVE from birth: no entry warning
+    @classmethod
+    def start_position(cls, x: float | None, y: float | None, width: float, height: float,
+                       invert: bool) -> tuple[float, float]: ...
+        # x is required: None raises ValueError("floating_island placement needs x"). y None: -height / 2.
+    def update(self, ctx: TickContext) -> Self: ...   # y += ctx.scroll_step_px while ACTIVE
+    def effect_on_touch(self) -> TouchEffect: ...     # TouchEffect.BLOCK
+```
+The fields have defaults so `born_drifter` can build the island before `born` sets them. Sizes and `arm` are whole even px (the schema asks for even integers), so every box edge and every triangle corner falls on a whole px once the center is rounded (Rationale). `app.tuning` imports `IslandShape`, `IslandVariantExtra`, `IslandTypeExtra` and `island_hitbox` to build the tuning records, so the hitbox is worked out in one place. It uses the base `drawn_parts` (the footprint holds the whole look) and the base `collect_points` and `collect_popup`.
+
 ### game/core/drifters/__init__.py
-Imports every drifter module once (`meteorite`, `satellite` from DRA-39, `chain_lightning` from DRA-47, `fireball` from DRA-56, `coin` from DRA-62), so each class registers when anything under `core.drifters` is first imported. A package docstring and nothing else. A new drifter adds one import line here.
+Imports every drifter module once (`meteorite`, `satellite` from DRA-39, `chain_lightning` from DRA-47, `fireball` from DRA-56, `coin` from DRA-62, `floating_island` from DRA-86), so each class registers when anything under `core.drifters` is first imported. A package docstring and nothing else. A new drifter adds one import line here.
 
 ### game/ui/shapes.py
-The line shape from DRA-47. Signatures unchanged.
+The line shape from DRA-47, the polygon from DRA-86. Signatures unchanged.
 ```python
 # Imports: pygame, math, core.collision. Never app.
 def draw_shape(
@@ -982,7 +1147,8 @@ def draw_shape(
 ) -> None:
     ...
     # One placed shape. width 0 fills it; width 1 draws a 1 px outline. Raises
-    # TypeError("unknown shape kind '<class name>'") for anything not a Circle, a Box or a Line (DRA-47).
+    # TypeError("unknown shape kind '<class name>'") for anything not a Circle, a Box, a Line or a
+    # Polygon (DRA-47, Polygon from DRA-86).
 
 
 def draw_hitbox(
@@ -1127,9 +1293,22 @@ def render_coin(surface: pygame.Surface, obj: Drifter, center: tuple[float, floa
     # ValueError("render_coin draws at full size only") when scale is not 1.0: a coin has no
     # entry warning, so render_drifter never asks for a smaller copy.
 
+# game/ui/drifters/floating_island_view.py (DRA-86). Imports: pygame, core.collision,
+# core.drifters.base, core.drifters.floating_island, ui.shapes, ui.drifters.registry. Never app.
+ISLAND_FILL_COLOR: Final[tuple[int, int, int]] = (70, 160, 80)   # drifters/05-floating-islands.md, placeholder_look (guess)
+ISLAND_EDGE_COLOR: Final[tuple[int, int, int]] = (35, 90, 45)    # same: the darker edge
+ISLAND_EDGE_WIDTH: Final[int] = 2  # same: the edge is 2 px, drawn inside the shape (guess)
+
+@register_view(DrifterType.FLOATING_ISLAND)
+def render_floating_island(surface: pygame.Surface, obj: Drifter, center: tuple[float, float],
+                           scale: float, brightness: float) -> None: ...
+    # Raises TypeError("render_floating_island draws a FloatingIsland") for any other drifter, and
+    # ValueError("render_floating_island draws at full size only") when scale is not 1.0: an
+    # island has no entry warning, so render_drifter never asks for a smaller copy.
+
 # game/ui/drifters/__init__.py: imports every view module once (meteorite_view, satellite_view
-# from DRA-39, chain_lightning_view from DRA-47, fireball_view from DRA-56, coin_view from DRA-62),
-# so each view registers. A package docstring and nothing else.
+# from DRA-39, chain_lightning_view from DRA-47, fireball_view from DRA-56, coin_view from DRA-62,
+# floating_island_view from DRA-86), so each view registers. A package docstring and nothing else.
 ```
 
 ## Presentation
@@ -1147,10 +1326,11 @@ Every fact a view shows is a core field or a core method. No view works out a ru
 | `obj.nodes`, `obj.node_size` | the chain lightning's nodes: where each sits around `center`, and how big (DRA-47). Source: drifters/03-chain-lightning.md, placeholder_look, node_size |
 | `obj.firing_arcs()`, `obj.arcs`, `obj.arc_width` | which arc bands are drawn, between which nodes, how thick (DRA-47). Source: drifters/03-chain-lightning.md, rules 5 and 9, placeholder_look |
 | `obj.charge_ray_count()`, `obj.charge_rays`, `obj.ray_length`, `obj.ray_width` | how many rays each node shows now, how they are spread, how long and how thick (DRA-47). Source: drifters/03-chain-lightning.md, telegraph, charge_rays, ray_length, placeholder_look |
-| `obj.brightness()` | the share of normal brightness the look is drawn at: `rehit_dim` (0.75) during the re-hit cooldown, 1.0 otherwise. Source: 05-lives-and-damage.md, rule 1.5, rehit_dim (guess) (DRA-39). A coin never takes part in a hit, so it is always 1.0 |
+| `obj.brightness()` | the share of normal brightness the look is drawn at: `rehit_dim` (0.75) during the re-hit cooldown, 1.0 otherwise. Source: 05-lives-and-damage.md, rule 1.5, rehit_dim (guess) (DRA-39). A coin and a floating island never take part in a hit, so they are always 1.0 |
 | `obj.width`, `obj.height`, `obj.body_height` (coin) | the crystal: 12 wide, 20 tall, its middle rectangle 10 tall, so each point 5 tall (DRA-62). Source: drifters/04-coin.md, crystal_size (guess) |
 | `obj.ring_width`, `obj.ring_height` (coin) | the ring's 22 × 8 ellipse across the crystal's middle (DRA-62). Source: drifters/04-coin.md, placeholder_look (guess) |
 | `obj.glint`, `obj.glint_size`, `obj.glint_left`, `obj.glint_top` (coin) | whether the glint shows (the rare coin), and its 2 × 2 square with its top-left at (3, 3) in the crystal's 12 × 20 box (DRA-62). Source: drifters/04-coin.md, placeholder_look; scope report DRA-62, Not in GDD (rare glint, Director approval) |
+| `obj.hitbox`, `obj.width`, `obj.height` (floating island) | the island's look: its shapes filled, their union exactly, with a 2 px darker edge inside it (DRA-86). Its hitbox is the shape drawn, so the ship stops where the ground is drawn. Source: drifters/05-floating-islands.md, hitbox, placeholder_look (guess), rule 10 |
 | `obj.uid` | the seed for the warning's spikes, so they are random per drifter and steady while it shows. Source: 07-drifters.md, entry_warning_spikes |
 | `obj.drifter_type` | which registered view draws it |
 | `obj.variant` | not drawn by these views. The debug label shows it (`docs/contracts/systems/debug-overlay.md`) |
@@ -1182,6 +1362,24 @@ Every fact a view shows is a core field or a core method. No view works out a ru
 - Full size, common, at (440, 210): lit (200, 30, 90) in columns 435 to 439, shade (70, 0, 60) in 440 to 444, pink (255, 80, 150) on the outline (434 and 445 in the body's rows) and on the ring, which reaches columns 429 to 450 on rows 206 to 213; no (255, 220, 240) pixel. Rare: the same plus a (255, 220, 240) square on columns 437 to 438, rows 203 to 204.
 - No galaxy core, no cloud, no swirl, no shine, no glint animation, no sound (scope report DRA-62, Limits and Out). The galaxy core color (15, 0, 20) in the palette is not drawn by the placeholder.
 
+**Floating island** (`render_floating_island`, DRA-86). Any drifter that is not a `FloatingIsland` raises `TypeError`; a `scale` other than 1.0 raises `ValueError`. The look is one image per island look, built once and blitted each frame:
+- **Image.** A `pygame.SRCALPHA` surface of `round(obj.width) × round(obj.height)`, fully transparent, kept in a dict keyed by `(obj.hitbox, obj.width, obj.height, brightness)` (the hitbox already holds `invert`). Built the first time that key is drawn, never rebuilt, never per frame. With `(hw, hh) = (obj.width / 2, obj.height / 2)`, in this order:
+  1. **Edge.** Every shape of `place_hitbox(obj.hitbox, hw, hh)`, filled with `ui.shapes.draw_shape(image, dim_color(ISLAND_EDGE_COLOR, brightness), shape)`: (35, 90, 45) at full brightness. This is the whole shape.
+  2. **Fill.** Every shape of the inset hitbox, placed the same way, filled in `dim_color(ISLAND_FILL_COLOR, brightness)`: (70, 160, 80). With `e = ISLAND_EDGE_WIDTH` (2): a `Box(cx, cy, w, h)` insets to `Box(cx, cy, w − 2e, h − 2e)`; a `Polygon` insets to the polygon whose every edge line is moved `e` px toward the inside along its inward unit normal, its corner `i` where the moved lines of edges `i − 1` and `i` meet.
+  So the edge is every pixel of the shape that no inset shape covers: 2 px along every outer side, and never along the seam where the L's or the T's two boxes overlap (their insets overlap there too). Source: drifters/05-floating-islands.md, placeholder_look ("a 2 px edge ... drawn inside the shape", guess); scope report DRA-86, Limits ("The edge never draws outside the hitbox").
+- **Place.** The image's top-left at `(round(center[0] − obj.width / 2), round(center[1] − obj.height / 2))`. The sizes are even whole px, so this is the rounded center minus the half size, and every box edge and triangle corner lands on a whole px. Every pixel lies inside the footprint `Box(x, y, width, height)` moved by the center's rounding, which is at most 0.5 px: those are `obj.drawn_parts()` (Rules, Floating island, Drawn parts).
+- **Examples**, full size, centered at (320, 300), footprint columns 160 to 479 and rows 240 to 359:
+  - rectangle: (35, 90, 45) on columns 160, 161, 478, 479 and on rows 240, 241, 358, 359; (70, 160, 80) at every pixel of columns 162 to 477 and rows 242 to 357, e.g. (320, 300). Nothing drawn at (159, 300) or (320, 360).
+  - l_shape: the upright is columns 160 to 199, the bar rows 320 to 359. (199, 250) and (198, 320) are edge; (198, 330) and (300, 340) are fill; (200, 250) is not drawn (inside the L's notch). With `invert`: the bar is rows 240 to 279, and (300, 250) is fill, (300, 300) not drawn.
+  - t_shape: the bar is rows 240 to 279, the stem columns 300 to 339. (320, 330) is fill, (301, 330) edge, (250, 330) not drawn.
+  - triangle: row 240 has one pixel, (160, 240), edge. Row 355 runs from column 160 to 467: (461, 355) fill, (462, 355) to (467, 355) edge, (468, 355) not drawn. Row 359 runs from 160 to 478, all edge. (170, 350) is fill. With `invert`, the same mirrored top to bottom: row 359 has one pixel, (160, 359); row 244 (the mirror of 355) runs from 160 to 467.
+- No grass, no rock texture, no shadow, no sound (scope report DRA-86, Out: final art and sound).
+
+**Polygon shape** (`ui.shapes.draw_shape`, DRA-86). Every pixel is drawn by the pixel-center rule, so what is drawn matches the shape to within half a pixel and a polygon with whole-px corners never spills past its edges:
+- `width` 0 (filled): every pixel whose center lies inside or on the polygon. For each pixel row `r` from `ceil(min_y − 0.5)` to `floor(max_y − 0.5)` (`min_y`, `max_y` the polygon's lowest and highest point y), with `yc = r + 0.5`: `xl` and `xr` are the leftmost and rightmost x where the line `y = yc` meets the polygon (interpolated along each edge that reaches `yc`; a flat edge on `yc` gives both its ends); the row's pixels are the columns `ceil(xl − 0.5)` to `floor(xr − 0.5)`, drawn as one `pygame.draw.rect(surface, color, pygame.Rect(c0, r, c1 − c0 + 1, 1))` when `c1 ≥ c0`. A polygon with whole-px corners and straight up-and-down and across edges fills exactly the pixels a box with the same edges fills.
+- `width` 1 (outline): `pygame.draw.polygon(surface, color, [(round(px), round(py)) for each point], 1)`. The debug overlay's polygon outlines come from this, with no change to the overlay.
+- Source: 07-drifters.md, rule 8 (a polygon is a filled shape with straight edges); drifters/05-floating-islands.md, rule 10 ("fill the shape exactly").
+
 **Line shape** (`ui.shapes.draw_shape`, DRA-47). With `t = thickness` and `n` the unit normal of AB:
 - `width` 0 (filled): the rectangle with corners `A + n t/2`, `B + n t/2`, `B − n t/2`, `A − n t/2`, through `pygame.draw.polygon` (float corners), then a filled circle at A and at B, center `(round(x), round(y))`, radius `round(t / 2)`. With A equal to B, the circle only.
 - `width` 1 (outline): the two long sides, `A + n t/2` to `B + n t/2` and `A − n t/2` to `B − n t/2`, as 1 px lines, and the outer half of each end circle (radius `round(t / 2)`) as a 1 px arc. With A equal to B, a 1 px circle outline. The debug overlay's line outlines and graze zones come from this, with no change to the overlay.
@@ -1200,21 +1398,34 @@ Rules for every view:
 - The app calls `render_drifter` for every drifter in `run.drifters`, in order, after the starfield and before the ship (`docs/contracts/systems/app.md`, Draw).
 
 ## Rules
-Values. Every constant above has its value and source on its line. Variant sizes, hitboxes, angles, layouts, speed, warning length, the chain lightning's sizes and timers, the fireball's head widths, angle and tail size, `rehit_cooldown`, `rehit_dim` and every look value are `guess` in the GDD. `DRAW_MARGIN` is not a game value (Rationale). The level table's Hazard speed row, `graze_margin`, `telegraph_min` and the chain lightning's `entry_warning_icon` are locked. Variant, angle, layout, size, timer, ray and speed values are not in code: they come from the tuning files (Tuning files, below). `rehit_cooldown`, `rehit_dim` and `telegraph_min` (DRA-47) have their defaults in `core/drifters/base.py` and may be set in `game/tuning/hazards.json`. Colors stay constants in the views, as for every placeholder look so far (see Rationale). The coin's values (DRA-62) are all `guess` but `common` 50 and its locked rows; its popup rise (0.5 px a tick) and its glint are Director approvals not in the GDD (scope report DRA-62, Not in GDD); all of them come from `game/tuning/drifters/coin.json`.
+Values. Every constant above has its value and source on its line. Variant sizes, hitboxes, angles, layouts, speed, warning length, the chain lightning's sizes and timers, the fireball's head widths, angle and tail size, `rehit_cooldown`, `rehit_dim` and every look value are `guess` in the GDD. `DRAW_MARGIN` is not a game value (Rationale). The level table's Hazard speed row, `graze_margin`, `telegraph_min` and the chain lightning's `entry_warning_icon` are locked. Variant, angle, layout, size, timer, ray and speed values are not in code: they come from the tuning files (Tuning files, below). `rehit_cooldown`, `rehit_dim` and `telegraph_min` (DRA-47) have their defaults in `core/drifters/base.py` and may be set in `game/tuning/hazards.json`. Colors stay constants in the views, as for every placeholder look so far (see Rationale). The coin's values (DRA-62) are all `guess` but `common` 50 and its locked rows; its popup rise (0.5 px a tick) and its glint are Director approvals not in the GDD (scope report DRA-62, Not in GDD); all of them come from `game/tuning/drifters/coin.json`. The floating island's values (DRA-86) are all `guess` but its locked rows (archetype, enters_from, kind, scroll_kind, entry_warning, telegraph, specialty, graze); its sizes, shapes and `arm` come from `game/tuning/drifters/floating_island.json`; its colors and its 2 px edge stay in its view.
 
 Collision (`core/collision.py`). Source: 07-drifters.md, rule 8; 06-scoring.md, rule 3; 91-decision-log.md, row 35:
-- A hitbox is one or more circles, upright boxes and lines (lines from DRA-47). Each shape's position (`cx`, `cy`; a line's `ax`, `ay`, `bx`, `by`) is an offset from the owner's center until `place_hitbox` moves it to a screen position. Polygons (07-drifters.md, rule 8) are not built yet; they come with floating islands (scope report DRA-47, Out).
+- A hitbox is one or more circles, upright boxes, lines (from DRA-47) and convex polygons (from DRA-86). Each shape's position (`cx`, `cy`; a line's `ax`, `ay`, `bx`, `by`; a polygon's `points`) is an offset from the owner's center until `place_hitbox` moves it to a screen position.
 - Two shapes overlap when they share area. Shapes that only touch at an edge or a point don't overlap: the tests are strict (`<`). Accepted by the Director (scope report DRA-29, Decision log, 2026-10-15). Circle and circle: distance between centers < r1 + r2. Box and box: |Δcx| < (w1 + w2) / 2 and |Δcy| < (h1 + h2) / 2. Circle and box: the box point nearest the circle's center is at a distance < r.
 - **Line** (DRA-47). A line is every point within `thickness / 2` of the segment AB: straight, at any angle, with round ends. A line whose A and B are the same point is a circle of radius `thickness / 2`. With `h = thickness / 2`. Source: 07-drifters.md, rule 8; 91-decision-log.md, rows 47 and 60:
   - Line and circle: the shortest distance from the circle's center to segment AB < h + r.
   - Line and line: the shortest distance between the two segments < h1 + h2. Segments that cross or touch are at distance 0.
   - Line and box: the shortest distance between segment AB and the box (the filled rectangle) < h. A segment that meets the box, inside or on its edge, is at distance 0.
   - Distances are compared squared, with no square root: the point-to-segment distance uses the clamped projection `t = clamp(((P − A) · (B − A)) / |B − A|², 0, 1)` (or P to A when A equals B), and a crossing is found with cross-product signs. When segments don't meet, their shortest distance is the smallest of the four end-to-other-segment distances; a segment that doesn't meet a box is closest at one of its two ends or at one of the box's four corners. So whole numbers, halves and 3-4-5 triangles give exact results, as for the other shapes.
+- **Polygon** (DRA-86). A polygon is the filled convex shape inside its corners, edges included. Its edges run from point `i` to point `i + 1`, the last back to the first. A box counts as the polygon of its four corners. Source: 07-drifters.md, rule 8; drifters/05-floating-islands.md, hitbox:
+  - Polygon and polygon, polygon and box: separating axes. The axes are the edge normals of both shapes, `(−dy, dx)` for each edge `(dx, dy)`, not made unit (the test compares projections, so length doesn't matter, and whole numbers stay exact). They overlap when, on every axis, the two projection ranges share more than a point: `max(min_a, min_b) < min(max_a, max_b)`.
+  - Polygon and circle: the circle's center lies inside or on the polygon, or the shortest distance from the center to an edge segment is < r.
+  - Polygon and line: with `h = thickness / 2`, an end of the line lies inside or on the polygon, or the segment AB meets an edge segment, or the shortest distance between AB and an edge segment is < h.
+  - Distances are compared squared and crossings found with cross-product signs, as for the line. "Inside or on" for a point is: every edge's cross product with the point has the polygon's own sign, or 0. The polygon's sign is the sign of its area (twice the area is `Σ (x_i × y_(i+1) − x_(i+1) × y_i)`); it may be either, so either point order works.
 - The result never depends on the order: `hitboxes_overlap(a, b) == hitboxes_overlap(b, a)`.
 - `hitboxes_overlap(a, b)` is True when any shape of `a` overlaps any shape of `b`. An empty hitbox overlaps nothing.
-- `grow_hitbox` grows each shape by the margin on every side: a circle's radius grows by it, a box grows by it on all four sides (w and h by twice the margin), a line's thickness grows by twice the margin, so it grows on each side and at both ends (DRA-47). Centers and line ends don't move. Source: 06-scoring.md, rule 3; 91-decision-log.md, row 47.
-- **Unknown shape kind** (DRA-39). `place_hitbox`, `grow_hitbox` and `hitboxes_overlap` raise `TypeError("unknown shape kind '<class name>'")` for any shape that is not a `Circle`, a `Box` or a `Line`. A new shape kind must be handled in all three, and gets its own collision cases (test tasks DRA-39-05, DRA-47-07). Source: scope report DRA-39, Limits (collision tests and guards).
+- `grow_hitbox` grows each shape by the margin on every side: a circle's radius grows by it, a box grows by it on all four sides (w and h by twice the margin), a line's thickness grows by twice the margin, so it grows on each side and at both ends (DRA-47). Centers and line ends don't move. A polygon (DRA-86) becomes itself plus one line per edge, from corner to corner, of thickness twice the margin, in edge order right after it: together exactly every point within the margin of the polygon, with round corners. So `grow_hitbox` returns one shape per circle, box and line, and `1 + edges` shapes per polygon, each shape's results in its place. Source: 06-scoring.md, rule 3; 91-decision-log.md, row 47.
+- **Unknown shape kind** (DRA-39). `place_hitbox`, `grow_hitbox` and `hitboxes_overlap` raise `TypeError("unknown shape kind '<class name>'")` for any shape that is not a `Circle`, a `Box`, a `Line` or a `Polygon`. A new shape kind must be handled in all three, and gets its own collision cases (test tasks DRA-39-05, DRA-47-07, DRA-86-07). Source: scope report DRA-39, Limits (collision tests and guards).
 - Pure. No logging, no randomness.
+
+Push-out (`core/collision.py`, DRA-86). The measure the ship's island block and the respawn spot use (`docs/contracts/systems/ship.md`, Rules, Islands). It works on boxes and polygons only, the shapes of the ship and the islands. Source: drifters/05-floating-islands.md, rule 4 ("moved out the shortest way, just to the surface"); 05-lives-and-damage.md, rule 2.3 ("the nearest clear spot straight above or below"); scope report DRA-39, Decision log ("collision that can tell how deep and which way to push the ship out"):
+- **Pairs and axes.** For each shape `p` of `moving` and each shape `q` of `solid`, both as polygons, the axes are the outward unit normals of every edge of `p` and of `q`. On an axis `a`, a shape's range is `[min, max]` of its corners' dot products with `a`. The overlap of the pair on `a` is `min(max_p, max_q) − max(min_p, min_q)`, and the pair's depth is the smallest overlap over its axes (negative or 0 when they are apart). An outward normal of edge `(dx, dy)` is `(dy, −dx) / length` when the polygon's area sign (Polygon, above) is positive, else `(−dy, dx) / length`: for the box from (0, 0) to (1, 1) the top edge's outward normal is (0, −1), up.
+- **`deeply_overlaps(moving, solid)`** is True when some pair's depth is > `SURFACE_TOLERANCE`. So an overlap of a billionth of a px, which a push can leave behind in floating point, counts as touching. `hitboxes_overlap` keeps its strict rule; only the push-out uses the tolerance.
+- **`exit_distance(moving, solid, direction)`.** With `moving` moved by `t × direction`, `t ≥ 0`, a pair overlaps on axis `a` while `max_p + t × k > min_q` and `min_p + t × k < max_q`, with `k = direction · a`. Each axis with `k ≠ 0` keeps `t` inside one open interval; an axis with `k = 0` keeps every `t` or none. The pair's blocked span is the intersection of its axes' intervals: one open interval `(low, high)`, maybe empty. Then: 0.0 when `deeply_overlaps(moving, solid)` is False. Otherwise `t = 0`, and while some pair's span has `low < t < high`, `t` becomes that span's `high`; the result is the last `t`. So it steps through spans that chain into each other, the L's two boxes or two overlapping islands, and stops at the first spot where no shape overlaps at all (an edge touching is clear). The result is exact for whole and half px on boxes moved up, down, left or right.
+- **`push_directions(moving, solid)`**, in this order: `(0.0, −1.0)` up, `(0.0, 1.0)` down, `(−1.0, 0.0)` left, `(1.0, 0.0)` right; then, for each polygon of `solid` in hitbox order and each of its edges in order, its outward unit normal, then that normal turned round (inward); then the same for each polygon of `moving`. A direction within `SURFACE_TOLERANCE` of an earlier one on both components is left out. Boxes add no direction past the first four. For the ship against any island this is the four axis directions, plus the triangle's three normals both ways round, less the ones already there (its flat sides' normals are axis directions): up, down, left, right, the slope's outward normal, the slope's inward normal.
+- These three raise `TypeError("<function name> takes boxes and polygons, not '<class name>'")` for any other shape, in either hitbox. Pure.
+- What a push is for, and which direction is used, is the ship's rule (`systems/ship.md`).
 
 Levels (`core/levels.py`). Source: 08-difficulty.md:
 - Levels are 1 to 8. Any other level raises `ValueError` naming it, in every function that takes a level.
@@ -1225,7 +1436,7 @@ Levels (`core/levels.py`). Source: 08-difficulty.md:
 
 The base (`core/drifters/base.py`):
 - **Position.** `x`, `y` are the drifter's center in screen px, y down. Source: scope report DRA-29, Limits.
-- **Phase.** Every hazard is born in WARNING with `ticks_in_phase` 0. A pickup has no entry warning: the coin is born ACTIVE (Coin, Born; DRA-62). In WARNING it can't touch anything: `current_hitbox()` is `()`. `tick_warning` adds one tick; once `ticks_in_phase + 1` reaches `warning_ticks`, the drifter turns ACTIVE with `ticks_in_phase` 0, at its placed position, and can touch from that tick on. So the warning shows on exactly `warning_ticks` states. Entry warnings never scale with level. Source: 07-drifters.md, rules 1 and 9; 08-difficulty.md, rule 4.
+- **Phase.** Every hazard is born in WARNING with `ticks_in_phase` 0. A pickup has no entry warning: the coin is born ACTIVE (Coin, Born; DRA-62). Neither has a blocker: the floating island is born ACTIVE (Floating island, Born; DRA-86). In WARNING it can't touch anything: `current_hitbox()` is `()`. `tick_warning` adds one tick; once `ticks_in_phase + 1` reaches `warning_ticks`, the drifter turns ACTIVE with `ticks_in_phase` 0, at its placed position, and can touch from that tick on. So the warning shows on exactly `warning_ticks` states. Entry warnings never scale with level. Source: 07-drifters.md, rules 1 and 9; 08-difficulty.md, rule 4.
 - **Hitbox.** In ACTIVE, `current_hitbox()` is the variant's hitbox placed at (x, y). In WARNING and GONE it is `()`. Source: 07-drifters.md, rules 8 and 9.
 - **Graze zone.** `graze_zone()` is the current hitbox grown by `GRAZE_MARGIN` (14 px), only for a drifter whose `effect_on_touch()` is HIT. Others have `()`. It is computed and drawn in the debug overlay only; nothing pays for it yet. Source: 06-scoring.md, rules 3 and 5; scope report DRA-39, Out (graze scoring).
 - **Drawn parts** (DRA-56). `drawn_parts()` returns upright boxes, in screen px, that together hold every pixel the drifter's view draws while ACTIVE. The base returns one box, the footprint: `Box(x, y, width, height)`. That holds the whole look of the meteorite (a disc as wide as it) and the satellite (its two boxes inside 36 × 12). A drifter whose look reaches outside its footprint overrides it (the fireball: its tail). The chain lightning keeps the footprint: its rays reach up to `ray_length` past its nodes' box, the one exception 07-drifters.md, rule 12 names, kept as it is (drifters/03-chain-lightning.md, rule 7: it leaves once every node is below the floor). Entering and leaving are judged on these boxes, so a drifter is fully off screen only when nothing of it that is drawn is still on screen. Source: 07-drifters.md, rule 12; 91-decision-log.md, row 64.
@@ -1242,6 +1453,7 @@ The base (`core/drifters/base.py`):
 - **Parked and moving** (DRA-62). A drifter is moving (the default, `parked` False: its speed is its on-screen speed, and the scroll doesn't add to it) or parked (`parked` True: it sits still in the world and moves down the screen only with the scroll). A parked drifter has no speed of its own: the spawner gives it 0.0, and in `update` it moves down by `ctx.scroll_step_px` and nothing else, so it moves exactly with the starfield, stands still before the scroll starts, and hazard speed × never touches it. Source: 03-world-and-camera.md, rule 9; drifters/04-coin.md, kind (locked) and rule 3.
 - **Per-tick facts** (DRA-62). `TickContext` holds the ship as it was at the start of the tick and `scroll_step_px`, the px the world scrolls down on this tick (`core.scroll.scroll_step_px` of the scroll going into the tick, `systems/scroll.md`). The run builds it in step 3 (`systems/run.md`). Moving drifters never read `scroll_step_px`. A `TickContext` built with the ship alone (tests, `settle_warning` in `add_drifters`) has 0.0, the world standing still. Source: 03-world-and-camera.md, rules 4 and 9.
 - **Collect** (DRA-62). A drifter whose `effect_on_touch()` is COLLECT is a pickup. The run collects it when the ship's hitbox overlaps its `current_hitbox()` (`systems/run.md`, step 5a): it adds `collect_points()` to the run's coin points, shows `collect_popup()` if it isn't None, and sets the drifter GONE, so it is dropped on the same tick. The base returns 0 and None; the coin overrides both. A pickup has no graze zone (`graze_zone()` is () for anything but HIT) and never starts a re-hit cooldown. Source: 07-drifters.md, Summary (Pickup); 06-scoring.md, rules 2 and 5; drifters/04-coin.md, rule 4.
+- **Block** (DRA-86). A drifter whose `effect_on_touch()` is BLOCK is a blocker: ground the ship can't enter. The run never tests it for a hit or a collect; it gathers every ACTIVE blocker's `current_hitbox()` into the ground the ship step pushes the ship out of (`systems/run.md`, step 4; `systems/ship.md`, Islands). A blocker has no graze zone (`graze_zone()` is () for anything but HIT), never starts a re-hit cooldown, never pays. Every blocker so far is parked, so the ground moves exactly with the scroll. Source: 07-drifters.md, Summary (Blocker); drifters/05-floating-islands.md, kind (locked), rules 4 to 6.
 - **Specialty.** The slot exists; no specialty is built. Nothing calls `Specialty.update` or `effect_on_ship` yet. The first feature with a specialty designs where they run in the tick. Source: 07-drifters.md, rule 11; scope report DRA-29, Limits and Out.
 - **Variants** change values only (size, hitbox, speed, angle), never behavior. A new variant is a new entry in the drifter's tuning file and needs no code. Source: 07-drifters.md, rule 10; drifters/02-satellite.md, How to extend.
 - `update` never mutates its input and uses no frame time, no randomness. Same drifter and context in, same drifter out. Source: 15-tech-constraints.md, rule 2.
@@ -1357,8 +1569,24 @@ Coin (`core/drifters/coin.py`, DRA-62). Source: drifters/04-coin.md; scope repor
 - **Values** (all guess but `common` 50 and the locked rows): points 50 and 100; crystal 12 × 20, body 10; ring 22 × 8; glint 2 × 2 at (3, 3); `popup_ticks` 60; `popup_rise_per_tick` 0.5. Source: Values table; scope report DRA-62, Not in GDD (rise 0.5 px a tick and the glint, both Director approvals).
 - It accepts `x`, `y`, `variant` and `as_level`. `invert`, a specialty and `speed` are refused. Drifters pass over it with no effect, and it never blocks. Source: 07-drifters.md, rules 13 and 15; drifters/04-coin.md, Edge cases.
 
+Floating island (`core/drifters/floating_island.py`, DRA-86). Source: drifters/05-floating-islands.md; scope report DRA-86:
+- **Archetype:** Forced-path blocker. A parked drifter: it doesn't move on its own, only down with the scroll. Source: archetype, kind, scroll_kind (locked); rule 3; 03-world-and-camera.md, rule 9.
+- **Variants:** `rectangle`, the default, 320 × 120; `box`, 120 × 120; `l_shape`, `t_shape` and `triangle`, each 320 × 120. Every size is the box around the shape, centered on the island's position. A variant is a shape kind (`IslandShape`) and a size; the box is a rectangle kind. The tuning file gives each variant's `shape`, `width` and `height`, and `arm` (40) once for the type; `app.tuning` builds each variant's un-inverted hitbox with `island_hitbox`. Source: variants, default_variant, the Shapes table, arm (guess); scope report DRA-86, Decision log (Q2: "All five, listed sizes").
+- **Hitbox:** the shape itself, exactly as drawn (Diagram, Floating island). The rectangle and the box: one box. The L: the bar along the bottom, full width and `arm` tall, and the upright at the left end, `arm` wide and full height. The T: the bar along the top and the stem centered under it, full height. The triangle: one polygon, its base along the bottom, its straight side up the left edge, its slope from the top-left corner to the bottom-right. `island_hitbox` is the one place that rule lives. Source: hitbox (guess); 07-drifters.md, rule 8.
+- **Born:** refuses a specialty (`ValueError("floating_island has no specialty")`). Reads `birth.variant_extra`, which must be an `IslandVariantExtra`, else `ValueError("floating_island variant '<name>' has no shape")`, and `birth.type_extra`, which must be an `IslandTypeExtra`, else `ValueError("floating_island tuning has no type values")`. `birth.invert` True on a shape not in `INVERTIBLE_SHAPES` raises `ValueError("floating_island variant '<name>' has no invert")`. Then `replace(born_drifter(cls, birth), phase=Phase.ACTIVE, ticks_in_phase=0, shape=..., invert=birth.invert, arm=type_extra.arm, hitbox=island_hitbox(shape, birth.width, birth.height, arm, birth.invert))`. Its `speed` is the spawner's 0.0 and its `warning_ticks` the file's 0. Source: entry_warning (locked: none); rule 9 (`invert` for the L, the T and the triangle only); specialty (locked: none).
+- **No warning of any kind.** It is ACTIVE on the state it is added, so nothing is drawn for it before the island itself scrolls in. No telegraph. Source: entry_warning, telegraph (locked); rules 1 and 2; scope report DRA-86, Feature ("with no warning of any kind").
+- **Start:** `start_position`: x is the placement's (required: `ValueError("floating_island placement needs x")` without it). y is the placement's, or `-height / 2` (−60 at 120 tall) when None: its bottom edge on the top edge, fully off screen. Source: enters_from (locked); rule 1; 07-drifters.md, rules 13 and 14.
+- **Update:** in ACTIVE, `y += ctx.scroll_step_px` and `ticks_in_phase + 1`; `x` never changes. In WARNING and GONE, unchanged. The ship in `ctx` is never read. Before the scroll starts it stands still; then it moves exactly as the starfield and the coins do. Source: rule 3.
+- **Touch:** `effect_on_touch()` is BLOCK. Touching it never hits and never pays, invulnerable or not: no `drifter touch` line, no life, no cooldown, no points (The base, Block). It blocks the ship (`systems/ship.md`, Islands), in the respawn wait too, and moves the fall respawn spot (`systems/run.md`, step 6). Source: rules 4 to 6; 05-lives-and-damage.md, rule 2.3.
+- **Drawn parts:** the base footprint, `Box(x, y, width, height)`: the look is the union of its shapes, which fills at most that box. Source: 07-drifters.md, rule 12.
+- **Leaving:** the base rule on that box. It starts fully above the top edge, so it is never removed before it has entered; once it has, it is removed when its top edge is at or below the floor (y ≥ 540 at 120 tall). Placed on screen near a side, it is never fully past a side, as it never moves sideways. Source: rule 7; 07-drifters.md, rule 12.
+- **Scales:** nothing. Its size and shape never change with level; `as_level` is accepted and changes nothing. Source: rule 8.
+- It accepts `x`, `y`, `variant`, `invert` (L, T, triangle) and `as_level`. A specialty and `speed` are refused (the spawner's parked rule: `floating_island has no speed`). Drifters pass through it with no effect: only the ship collides with it. Source: rule 9; 07-drifters.md, rules 13 and 15.
+- **For wave_check** (built in `tools/wave_check/` outside this contract's tasks; 09-waves.md, rule 7). An island is told apart by its type, `drifter_type is DrifterType.FLOATING_ISLAND` (a track's kind `"floating_island"`), or by `effect_on_touch() is TouchEffect.BLOCK`, which every blocker shares. For check 7, a coin sits inside an island on a tick where both are ACTIVE and `hitboxes_overlap(coin.current_hitbox(), island.current_hitbox())` is True: the strict test, the triangle's polygon included, so a coin touching an island's edge from outside passes and any shared area fails. Both are parked, so once both are on the field their places relative to each other never change, and one tick with both present decides it. For the coin-near check, an island's `grow_hitbox` is exact for its polygon too. The bot's island physics is `core.ship.step(ship, thrust, ground)` with the ground `core.run.island_ground` builds (`systems/run.md`). Source: 09-waves.md, rule 7.7 and the hazard note under rule 7; scope report DRA-86, Limits (wave_check).
+
 Tuning files (loaded by `app.tuning`, `docs/contracts/systems/app.md`). Source: scope report DRA-29, Limits and Decision log; scope report DRA-39, Limits:
-- One JSON file per drifter type, `game/tuning/drifters/<drifter_type value>.json`. A drifter with no fields of its own follows `docs/contracts/schemas/drifter-tuning.schema.json` (the meteorite). A drifter with its own fields follows `docs/contracts/schemas/<drifter_type value>-tuning.schema.json` (the satellite: `satellite-tuning.schema.json`, which adds `angle_degrees` to each variant and requires exactly two boxes, body first; the chain lightning: `chain-lightning-tuning.schema.json`, file `chain_lightning.json`, DRA-47; the fireball: `fireball-tuning.schema.json`, file `fireball.json`, DRA-56; the coin: `coin-tuning.schema.json`, file `coin.json`, DRA-62).
+- One JSON file per drifter type, `game/tuning/drifters/<drifter_type value>.json`. A drifter with no fields of its own follows `docs/contracts/schemas/drifter-tuning.schema.json` (the meteorite). A drifter with its own fields follows `docs/contracts/schemas/<drifter_type value>-tuning.schema.json` (the satellite: `satellite-tuning.schema.json`, which adds `angle_degrees` to each variant and requires exactly two boxes, body first; the chain lightning: `chain-lightning-tuning.schema.json`, file `chain_lightning.json`, DRA-47; the fireball: `fireball-tuning.schema.json`, file `fireball.json`, DRA-56; the coin: `coin-tuning.schema.json`, file `coin.json`, DRA-62; the floating island: `floating-island-tuning.schema.json`, file `floating_island.json`, DRA-86).
+- **The floating island's file** (DRA-86). `default_variant`, `variants` and its own type value `arm`. Each variant gives `shape` (an `IslandShape` value), `width` and `height`, and no `hitbox`. It has no `speed_ratio` and no `entry_warning_ticks`: a parked blocker has neither. `app.tuning` builds from it: per variant, `VariantTuning(width=float(width), height=float(height), hitbox=island_hitbox(IslandShape(shape), width, height, arm, False), extra=IslandVariantExtra(shape=IslandShape(shape)))`; for the type, `DrifterTypeTuning(..., speed_ratio=0.0, entry_warning_ticks=0, extra=IslandTypeExtra(arm=float(arm)))`, the two zeros never read as tuning (Spawner, step 4; Floating island, Born). The file's values: `default_variant` rectangle; `arm` 40; `rectangle` rectangle 320 × 120; `box` rectangle 120 × 120; `l_shape` l_shape 320 × 120; `t_shape` t_shape 320 × 120; `triangle` triangle 320 × 120. Every size the island uses is in this file; none is in code. Only the look's two colors and its 2 px edge stay in the view (Rationale). Source: drifters/05-floating-islands.md, Values and Shapes; scope report DRA-86, Limits ("Every value in the tuning file, never hard-coded").
 - **The coin's file** (DRA-62). Its own type values (`crystal_width`, `crystal_height`, `body_height`, `ring_width`, `ring_height`, `glint_size`, `glint_left`, `glint_top`, `popup_ticks`, `popup_rise_per_tick`) sit next to `default_variant` and `variants`, and each variant gives `points` and `glint` only. It has no `speed_ratio` and no `entry_warning_ticks`: a parked pickup has neither. `app.tuning` builds from it: per variant, `VariantTuning(width=crystal_width, height=crystal_height, hitbox=coin_hitbox(crystal_width, body_height), extra=CoinVariantExtra(points=..., glint=...))`; for the type, `DrifterTypeTuning(..., speed_ratio=0.0, entry_warning_ticks=0, extra=CoinTypeExtra(...))`, the two zeros never read as tuning (Spawner, step 4; Coin, Born). The file's values: `default_variant` common; `common` 50 and no glint, `rare` 100 with the glint; `crystal_width` 12; `crystal_height` 20; `body_height` 10; `ring_width` 22; `ring_height` 8; `glint_size` 2; `glint_left` 3; `glint_top` 3; `popup_ticks` 60; `popup_rise_per_tick` 0.5. Every size, point value and timing the coin uses is in this file; none is in code. Only the look's colors, the 1 px line width of the rim and the ring, and the popup's font stay in the views (Rationale). Source: drifters/04-coin.md, Values; scope report DRA-62, Limits ("Every value in the tuning file, never hard-coded").
 - **The fireball's file** (DRA-56). Its own type values (`angle_degrees`, `tail_ratio`) sit next to the shared ones, and each variant gives `head_width` only, instead of `width`, `height` and `hitbox`. `app.tuning` builds from it: per variant, `VariantTuning(width=head_width, height=head_width, hitbox=fireball_hitbox(head_width, tail_ratio, angle_degrees, False), extra=None)`; for the type, `DrifterTypeTuning.extra = FireballTypeExtra(angle_degrees=..., tail_ratio=...)`. The file's values: `default_variant` small; `small` 21 and `big` 32; `speed_ratio` 0.47; `entry_warning_ticks` 60; `angle_degrees` 35; `tail_ratio` 0.5. Every number the fireball uses is in this file or in `hazards.json`; none is in code. Source: drifters/06-fireball.md, Values (guess); scope report DRA-56, Limits ("Every value in the tuning file, never hard-coded").
 - **The chain lightning's file** (DRA-47). Its own type values (`node_spacing`, `node_size`, `arc_width`, `charge_ticks`, `fire_ticks`, `charge_rays`, `ray_length`, `ray_width`, `entry_warning_icon`) sit next to the shared ones, and each variant gives `nodes`, `arcs` and `invert_mirror` instead of `width`, `height` and `hitbox`. `app.tuning` builds from it: per variant, `ChainLayout` (nodes × `node_spacing`), `VariantTuning(width, height, hitbox, extra=ChainLightningVariantExtra(layout))` with `layout_size` and `chain_hitbox`; for the type, `DrifterTypeTuning.extra = ChainLightningTypeExtra(...)` with `warning_layout` the layout of the variant `entry_warning_icon` names. The file's values are the Layout table and Values at Level 1 above. Every number the chain lightning uses is in this file or in `hazards.json`; none is in code. Source: scope report DRA-47, Limits ("Every value in the tuning file, never hard-coded").
@@ -1368,7 +1596,7 @@ Tuning files (loaded by `app.tuning`, `docs/contracts/systems/app.md`). Source: 
 
 Logging: `core.collision`, `core.levels`, `core.popup` and `core.drifters.*` log nothing. The run logs spawn, active, touch (a hit or a collect) and gone, by event (`systems/run.md`, Logging). Source: 15-tech-constraints.md, rule 9.
 
-How to add a drifter (later features): add a `DrifterType` member; a subclass module with `@register_drifter`, imported in `core/drifters/__init__.py`, with its `start_position`, `update` and `effect_on_touch` (and `parked = True` for a drifter that moves only with the scroll; `collect_points` and `collect_popup` for a pickup); a tuning file in `game/tuning/drifters/` (with its own schema and `VariantExtra` or `DrifterTypeExtra` subclass if it has fields of its own, read by `app.tuning`); a view module with `@register_view`, imported in `ui/drifters/__init__.py`. The guard test fails until all four exist. The ship-against-every-variant collision cases pick the new drifter up from its tuning file with no new test code when its variants list a `hitbox`; a drifter whose hitbox is built from other values (the chain lightning, the fireball) has its own branch there. A drifter whose look reaches outside its footprint overrides `drawn_parts`.
+How to add a drifter (later features): add a `DrifterType` member; a subclass module with `@register_drifter`, imported in `core/drifters/__init__.py`, with its `start_position`, `update` and `effect_on_touch` (and `parked = True` for a drifter that moves only with the scroll; `collect_points` and `collect_popup` for a pickup; `TouchEffect.BLOCK`, boxes and polygons only, for a blocker); a tuning file in `game/tuning/drifters/` (with its own schema and `VariantExtra` or `DrifterTypeExtra` subclass if it has fields of its own, read by `app.tuning`); a view module with `@register_view`, imported in `ui/drifters/__init__.py`. The guard test fails until all four exist. The ship-against-every-variant collision cases pick the new drifter up from its tuning file with no new test code when its variants list a `hitbox`; a drifter whose hitbox is built from other values (the chain lightning, the fireball, the coin, the floating island) has its own branch there. A drifter whose look reaches outside its footprint overrides `drawn_parts`.
 
 ## Impact
 DRA-39 changes this frozen contract (v1). New: `DrifterType.SATELLITE`, the satellite module and view, `VariantExtra`, `HazardRules`, `born_drifter`, the base fields `has_entered`, `rehit_cooldown_ticks`, `rehit_dim`, `rehit_ticks_left`, the base methods `is_partly_on_screen`, `mark_entered`, `warning_tilt_degrees`, `brightness`, the abstract `start_position`, the `Birth` fields `invert`, `variant_extra`, `rehit_cooldown_ticks`, `rehit_dim`, the `Placement` fields `invert` and `speed`, the `VariantTuning.extra` and `DrifterTuning.hazards` fields, the view argument `brightness` and `dim_color`. Changed: `Placement.x` becomes optional; `is_off_screen` needs `has_entered`; `may_hit_ship` becomes a concrete shared rule; collision raises for unknown shapes; the warning cache key gains the tilt. Removed: `hit_ship`, `default_y`, the meteorite's own `may_hit_ship`. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.drifters`, `core.collision`, `ui.drifters`, `ui.shapes`, `hit_ship`, `may_hit_ship`, `default_y`, `is_off_screen`, `Placement(`, `DrifterTuning(`, `VariantTuning(` and `Meteorite(`:
@@ -1459,6 +1687,28 @@ DRA-76 changes this frozen contract (v5), in `core/levels.py` only. New: `FIRST_
 | `game/tests/core/test_drifters.py` | breaks once `level_at` is gone: it imports it, and one test checks it. Task `DRA-76-02-qa-engineer` drops that check and its import and adds the two new rows to the level table test, before task DRA-76-05 removes `level_at`. |
 | every other test | none. |
 
+DRA-86 changes this frozen contract (v6). New: the `Polygon` shape with its overlap, place and grow rules, `Direction`, `SURFACE_TOLERANCE`, `deeply_overlaps`, `push_directions` and `exit_distance` in `core.collision`; `DrifterType.FLOATING_ISLAND`; `TouchEffect.BLOCK`; the island module (`IslandShape`, `INVERTIBLE_SHAPES`, `IslandVariantExtra`, `IslandTypeExtra`, `island_hitbox`, `FloatingIsland`) and its view (`render_floating_island` and its constants); the polygon in `ui.shapes`; the island's tuning file and schema. Changed: `Shape` gains `Polygon`; `grow_hitbox` returns more shapes than it gets for a polygon. Nothing removed, and no existing drifter changes behavior. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.collision`, `Shape`, `grow_hitbox`, `DrifterType`, `TouchEffect`, `draw_shape`, `draw_hitbox`, `available_drifters`, `registered_views`, `tuning/drifters` and `not a drifter type`:
+
+| File | Change needed |
+|---|---|
+| `game/core/collision.py` | `Polygon`, its cases in the three shape functions, the push-out functions and their constants. Task `DRA-86-01-gameplay-implementer`. |
+| `game/core/drifters/base.py` | the `FLOATING_ISLAND` member and `TouchEffect.BLOCK`. Task `DRA-86-02-gameplay-implementer`. |
+| `game/core/drifters/floating_island.py` (new), `game/core/drifters/__init__.py` | the island and its import. Task `DRA-86-02-gameplay-implementer`. |
+| `game/core/ship.py`, `game/core/run.py` | the ground, the block and the respawn spot (`systems/ship.md`, `systems/run.md`). Tasks `DRA-86-03-gameplay-implementer` and `DRA-86-04-gameplay-implementer`. |
+| `game/core/drifters/meteorite.py`, `satellite.py`, `chain_lightning.py`, `fireball.py`, `coin.py`, `registry.py`, `spawner.py`, `tuning.py`, `game/core/levels.py`, `world.py`, `scroll.py`, `waves.py`, `popup.py` | none. The spawner's parked rule already serves the island, and no other drifter makes a polygon. |
+| `game/core/wave_files.py` | none in code: islands are a `DrifterType`, so wave files accept them, and the type list in its message grows by `floating_island` on its own. A BLOCK drifter is not a hazard to its seam check, so an island may trigger anywhere at load, like a coin; wave_check counts it for the seam (09-waves.md, rule 7). |
+| `game/ui/shapes.py` | the polygon, filled and outlined. Task `DRA-86-05-ui-developer`. Until then an island's outline in the debug overlay raises `TypeError`; no island is on the field before integration. |
+| `game/ui/drifters/floating_island_view.py` (new), `game/ui/drifters/__init__.py` | the view and its import. Task `DRA-86-06-ui-developer`. |
+| `game/ui/drifters/registry.py`, `entry_warning.py`, the five other views, `game/ui/debug_overlay.py`, `ship_view.py` | none. An island is never in WARNING; the overlay outlines its shapes through `ui.shapes` and draws no graze outline for it. The five views read only their own drifter's shapes. |
+| `game/app/tuning.py` | the island's file, built with `IslandShape`, `IslandVariantExtra`, `IslandTypeExtra` and `island_hitbox` (`systems/app.md`). Integration Engineer. Once `DrifterType.FLOATING_ISLAND` exists (task DRA-86-02), `load_tuning` raises at startup until the file and its loader exist. Its own shape types are `Circle | Box`, so mypy is not affected by `Polygon`. |
+| `game/app/debug_spawns.py`, `game/app/frame.py`, `game/app/waves.py` | none: island rows and the `floating_island` mode go through `DrifterType` and `spawn_drifter`; islands are drawn by `render_drifter`. |
+| `game/tuning/drifters/floating_island.json` (new), `game/tuning/debug_spawns.json` | content, by whoever the Director names: the new file to its schema with the values in Rules, Tuning files; the island rows in `systems/app.md`, Integration checks for DRA-86. |
+| `game/tests/core/test_collision.py` | breaks: the guard test finds `Polygon` with no table; mypy fails in `moved` and `anchor`, which read box fields from any shape that is not a circle or a line; `load_variant_cases` fails the first ship test naming `floating_island` while its file is missing, and reads `raw["hitbox"]` from it once it exists, which has none (an error at collection). Task `DRA-86-07-qa-engineer`. |
+| `game/tests/core/test_wave_files.py` | breaks: the unknown-type refusal expects the type list `(meteorite, satellite, chain_lightning, fireball, coin)`, which gains `floating_island`. Task `DRA-86-09-qa-engineer`. |
+| `game/tests/ui/test_drifter_registry.py` | no change. Fails from task DRA-86-02 until `floating_island_view.py` (task DRA-86-06) and `game/tuning/drifters/floating_island.json` exist, as it should. |
+| `game/tests/core/test_chain_lightning.py` | none: its helpers raise for a shape they don't expect, and no chain lightning holds a polygon. |
+| every other test | none. They never make a polygon, and their drifters are not blockers. |
+
 ## Rationale
 - **The scroll and rest gap rows join the level table (DRA-76).** The four rows are one table in 08-difficulty.md. One module with one check keeps every per-level value in one place, and the scroll and the waves read it the same way the spawner does.
 - **A thin abstract base, one subclass per drifter (Director).** Each drifter reads as one file. Abstract `start_position`, `update` and `effect_on_touch` make a half-built subclass fail at registration (`inspect.isabstract`), not mid-run.
@@ -1481,7 +1731,7 @@ DRA-76 changes this frozen contract (v5), in `core/levels.py` only. New: `FIRST_
 - **Unknown shapes raise (DRA-39).** Before DRA-39 an unknown shape fell through to the box test. When the line shape arrives, a missing case would then pass silently as a box. Raising makes it fail on first use, and the guard test makes it fail before that.
 - **Strict overlap, the graze zone as a method, the level table in core, `speed_ratio` per drifter, the switches beating `as_level`, the specialty interface only, `TouchEffect.COLLECT` reserved, the registry in its own module, the glow at 0.75 of the warning's radius, the warning image cached and dropped when the drifter appears, `width` and `height` on the drifter, `uid` from the run.** As in DRA-29; unchanged. The glow's radius is a placeholder choice with no rule depending on it: the glow must be wider than the copy (14 px) and narrower than `R` so the spikes can reach out of it.
 - **The tilt joins the warning cache key (DRA-39).** The image depends on it. uids repeat across runs, so a key without the tilt could, in principle, hand one drifter another's turned copy.
-- **Room for the next drifters (not built).** Islands: parked like the coin (`parked`, `scroll_step_px`), plus the polygon shape and collision that reports depth and direction. Electric ball: its pulse is a telegraph, so `scale_telegraph` serves it.
+- **Room for the next drifters (not built).** Electric ball: its pulse is a telegraph, so `scale_telegraph` serves it.
 - **The line is a capsule, measured squared (DRA-47).** 07-drifters.md, rule 8 and 91-decision-log.md, row 60 give it round ends, so "every point within thickness / 2 of AB" is the whole definition, and each overlap is a distance test against the segment. Comparing squared distances and finding crossings with cross-product signs keeps whole numbers, halves and 3-4-5 cases exact, so the line's collision tables can hold exact edge cases like the circle's and the box's. Growing it is one number, which is also what row 47 asks of its graze zone.
 - **Nodes in units of `node_spacing` (DRA-47).** The GDD gives one spacing for every layout. Units make it one knob: changing 128 rescales all seven layouts with no other edit. The loader checks that every arc is 1 unit long and that the nodes are centered, so a hand-edited layout can't drift from 03, rule 1 and the spacing rule. Diagonal and triangle coordinates are irrational; 8 decimals put them well inside the 1e-6 check.
 - **A variant is data: nodes, arcs and `invert_mirror` (DRA-47).** 07-drifters.md, rule 10 says variants change values only, and 03, How to extend says a new layout is a new row. The GDD's With invert column is not one rule for all (the triangle turns upside down, the rest mirror left to right), so each layout names its mirror. A new layout needs no code.
@@ -1519,5 +1769,18 @@ DRA-76 changes this frozen contract (v5), in `core/levels.py` only. New: `FIRST_
 - **The coin's 12 × 20 is drawn on exactly 12 columns and 20 rows (DRA-62).** An even width has no middle pixel, so each point ends in a 2-px tip and the sides run at 45°. That keeps the two halves 6 columns each ("split down the middle"), the body 10 rows, each point 5 rows, and the glint the Director approved, at (3, 3), one pixel clear of the rim.
 - **The rim and ring line width and the colors stay in the view (DRA-62).** The scope report asks for every value in the tuning file, and every size, point value and timing is there. Colors are placeholder look values kept in views, as for every drifter. The 1 px line width is part of the same look, and a wider rim would draw outside the boxes `drawn_parts` promises, so it isn't a free knob. The popup's font is the HUD's look, kept in its view like the HUD's own font size.
 - **No art task (DRA-62).** The galaxy, the cloud, the shine, the glint animation and sound are out of scope (scope report DRA-62, Out). The look is a placeholder drawn in code.
+- **Polygons are convex, and core builds them (DRA-86).** 07-drifters.md, rule 8 names "a diamond or a triangle", both convex. Convex shapes keep every test a short separating-axis or distance test with an exact answer, and a concave island is two convex shapes, as the L and the T already are. Only `island_hitbox` makes a polygon, so no file can hand core a bad one, and the loader needs no polygon checks.
+- **The separating-axis test uses raw edge normals (DRA-86).** Comparing projections on `(−dy, dx)` needs no square root, so whole-number corners give exact answers, as the box and line tables do. Only the push-out needs unit normals, because there the overlap is a distance.
+- **A grown polygon is the polygon plus its edges as lines (DRA-86).** Growing a convex shape by a margin on every side gives round corners. A line with round ends along each edge, as thick as twice the margin, covers exactly what is added, so the result is exact and needs no new shape. No island has a graze zone; wave_check's coin-near check grows island hitboxes, and `grow_hitbox` must not raise on them.
+- **The push-out measures one direction at a time, over every shape at once (DRA-86).** The ship is two boxes and an island is up to two shapes; islands may overlap each other. Pushing out of one shape at a time catches the ship on the seam inside an L or between two islands. Measuring, for each direction, how far the whole ship must go before it is clear of every shape lets a chain of shapes count as one surface. The candidate directions are the separating axes, so for one convex shape the shortest exit is the true shortest one.
+- **`SURFACE_TOLERANCE` (DRA-86).** A push puts the ship exactly on the surface, and floating point can leave it a billionth of a px inside. Without a tolerance the next tick would push it again by that hair, and a ship standing still on an island would log a contact every tick. A billionth of a px is far below a pixel and below any speed a rule uses, so it changes nothing the player sees and is not a tuning value.
+- **The island's sizes and `arm` are even whole px (DRA-86).** The view draws at the rounded center, so with even sizes every box edge and triangle corner is a whole px from it, and the drawn pixels are exactly the shape's pixels. That is what lets the edge stay inside the hitbox to the pixel.
+- **A variant is a shape kind and a size (DRA-86).** 05-floating-islands.md says a new shape or size is a new variant. The size is data; the box is the rectangle kind at 120 × 120. A new shape kind needs a new `IslandShape` and its case in `island_hitbox`, which is a new look, so a code change is right there.
+- **`invert` is refused on the rectangle and the box (DRA-86).** Rule 9 lists `invert` for the L, the T and the triangle only. The shape table's "the same" for the rectangle says a flipped rectangle would look no different, so a placement that sets it is a mistake, refused as the other drifters refuse what they lack. Decided by Architect, Director to confirm.
+- **`BLOCK` is its own touch effect (DRA-86).** The run picks what a touch does from `effect_on_touch()` and must not know which drifter is an island. A third effect keeps the hit and collect steps exactly as they were (they never see a blocker) and gives the run and wave_check one test for "ground".
+- **The island's look is pre-rendered (DRA-86).** A 320 × 120 shape drawn row by row, or two boxes and two insets, every frame for every island would cost far more than one blit. The image depends only on its key, which never changes in an island's life, so it is built once.
+- **The edge is the shape less its inset (DRA-86).** Outlining each box would draw a line across the L's and the T's joint, inside the island. Filling the whole shape in the edge color and then the inset shapes in the fill color draws the edge along the outer sides only, and never outside the shape.
+- **Colors and the 2 px edge stay in the view (DRA-86).** As for every drifter so far (DRA-47 and DRA-62 Rationale): colors are placeholder look values, and a wider edge changes nothing but the look. Every size and the `arm`, which decide where the ship stops, are in the tuning file.
+- **No art task (DRA-86).** Final art and sound are out of scope (scope report DRA-86, Out). The look is a placeholder drawn in code.
 - **No spawn on the ship (07-drifters.md, rule 3) is not checked at runtime.** Meteorites start above the top line and satellites outside a wall, where the ship can't be. For waves, it is a wave-design rule that wave_check will enforce.
 - **No art task.** Sprite art is out of scope (scope report DRA-39, Out). Every look is a placeholder drawn in code.
