@@ -1,6 +1,6 @@
 {
-  "play": "waves",
-  "mode": "coin",
+  "play": "list",
+  "mode": "floating_island",
   "loop_ticks": 180,
   "rows": [
     {
@@ -128,6 +128,49 @@
       "x": 320,
       "y": 230,
       "variant": "rare"
+    },
+    {
+      "type": "floating_island",
+      "x": 320,
+      "y": 330
+    },
+    {
+      "type": "floating_island",
+      "x": 160,
+      "variant": "box"
+    },
+    {
+      "type": "floating_island",
+      "x": 480,
+      "variant": "l_shape"
+    },
+    {
+      "type": "floating_island",
+      "x": 160,
+      "variant": "l_shape",
+      "invert": true
+    },
+    {
+      "type": "floating_island",
+      "x": 480,
+      "variant": "t_shape"
+    },
+    {
+      "type": "floating_island",
+      "x": 160,
+      "variant": "t_shape",
+      "invert": true
+    },
+    {
+      "type": "floating_island",
+      "x": 480,
+      "variant": "triangle"
+    },
+    {
+      "type": "floating_island",
+      "x": 160,
+      "variant": "triangle",
+      "invert": true
     }
   ]
 }

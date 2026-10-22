@@ -1,0 +1,11 @@
+{
+  "default_variant": "rectangle",
+  "variants": {
+    "rectangle": { "shape": "rectangle", "width": 320, "height": 120 },
+    "box": { "shape": "rectangle", "width": 120, "height": 120 },
+    "l_shape": { "shape": "l_shape", "width": 320, "height": 120 },
+    "t_shape": { "shape": "t_shape", "width": 320, "height": 120 },
+    "triangle": { "shape": "triangle", "width": 320, "height": 120 }
+  },
+  "arm": 40
+}
