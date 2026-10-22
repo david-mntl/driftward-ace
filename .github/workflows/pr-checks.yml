@@ -1,6 +1,6 @@
 # Runs the QA gate and the browser build on every pull request to main and every push to main.
 # Lint and tests run through game/tests/check.sh, the same command used locally.
-# The wave check runs only the waves the change touched. Run `wave_check.py --all` locally for all.
+# The wave check and the bot check run only the waves the change touched. Run `wave_check.py --all` (and `--all --bot`) locally for all.
 # Actions are pinned to a commit SHA. The comment names the release.
 name: PR checks
 
@@ -89,3 +89,12 @@ jobs:
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
         run: python tools/wave_check/wave_check.py --changed --base "$BASE" --force --no-record
+
+      # The bot flies each changed wave from every start spot, about 10 to 20 s a wave.
+      # It runs even when the step above fails, so one push shows both results.
+      - name: Bot check the changed waves
+        if: ${{ !cancelled() }}
+        timeout-minutes: 8
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: python tools/wave_check/wave_check.py --changed --base "$BASE" --bot --force --no-record
