@@ -3,7 +3,7 @@ Created by: architect
 Assignee: gameplay-implementer
 Writes to: game/core/
 Contract: docs/contracts/systems/run.md, docs/contracts/systems/ship.md
-Status: open
+Status: done
 Linear: DRA-99
 
 ## Read in the contract
