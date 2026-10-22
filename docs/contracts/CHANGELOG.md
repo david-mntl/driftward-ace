@@ -128,3 +128,9 @@
 - `systems/waves.md`: 0 to 1, frozen.
 - Waves and playlists: hand-authored wave files and an 8-level playlist, a wave clock that plays Wave 0 and then each level's fixed and random waves and raises the level when a playlist ends, and checked loading at startup with named errors.
 
+## DRA-86, 2026-10-22
+- `systems/app.md`: 12 to 13, frozen.
+- `systems/drifters.md`: 6 to 7, frozen.
+- `systems/run.md`: 7 to 8, frozen.
+- `systems/ship.md`: 5 to 6, frozen.
+- Floating islands: solid drifters the ship can stand on and ride, in five shapes, with their own tuning file and debug-spawn rows.
