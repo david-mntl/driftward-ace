@@ -1,12 +1,13 @@
-"""Hitbox overlap tables, collision invariants, the shape guards and the ship's hitbox tests.
+"""Hitbox overlap tables, collision invariants, the shape guards, the push-out and the ship tests.
 
-Contract: docs/contracts/systems/drifters.md, Rules, Collision and Chain lightning;
+Contract: docs/contracts/systems/drifters.md, Rules, Collision, Push-out and Chain lightning;
 docs/contracts/systems/ship.md, Rules, Hitbox. Tasks: docs/contracts/DRA-29/tasks/DRA-29-07-qa-
 engineer.md (the two ship tests at the end), docs/contracts/DRA-39/tasks/DRA-39-05-qa-engineer.md
 (circle and box tables, guards) and docs/contracts/DRA-47/tasks/DRA-47-07-qa-engineer.md (the line
 tables, the chain lightning ship cases) and docs/contracts/DRA-56/tasks/DRA-56-03-qa-engineer.md
 (the fireball ship cases, the tail alone) and docs/contracts/DRA-62/tasks/DRA-62-05-qa-engineer.md
-(the coin ship cases).
+(the coin ship cases) and docs/contracts/DRA-86/tasks/DRA-86-07-qa-engineer.md (the polygon
+tables, the push-out, the island ship cases).
 
 Every expected number is exact in binary (whole numbers, halves, sixteenths, 3-4-5 triangles) or
 comes from the GDD values below or from `game/tuning/drifters/*.json`. The ship-against-every-
@@ -26,14 +27,20 @@ import pytest
 
 from core import collision
 from core.collision import (
+    SURFACE_TOLERANCE,
     Box,
     Circle,
+    Direction,
     Hitbox,
     Line,
+    Polygon,
     Shape,
+    deeply_overlaps,
+    exit_distance,
     grow_hitbox,
     hitboxes_overlap,
     place_hitbox,
+    push_directions,
 )
 from core.drifters.base import Drifter, DrifterType, Phase, TickContext, TouchEffect
 from core.drifters.chain_lightning import (
@@ -47,6 +54,12 @@ from core.drifters.chain_lightning import (
 )
 from core.drifters.coin import CoinTypeExtra, CoinVariantExtra, coin_hitbox
 from core.drifters.fireball import FireballTypeExtra, fireball_hitbox
+from core.drifters.floating_island import (
+    IslandShape,
+    IslandTypeExtra,
+    IslandVariantExtra,
+    island_hitbox,
+)
 from core.drifters.satellite import SatelliteVariantExtra
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning, DrifterTypeTuning, PlaytestSwitches, VariantTuning
@@ -551,6 +564,195 @@ BOX_LINE: tuple[Case, ...] = (
     Case("far apart on one axis", Box(0, 0, 10, 10), Line(0, 1000, 10, 1000, 2), False),
 )
 
+
+def moved(shape: Shape, dx: float, dy: float) -> Shape:
+    """Return `shape` moved by (dx, dy), built here, not with `place_hitbox`."""
+    if isinstance(shape, Circle):
+        return Circle(shape.cx + dx, shape.cy + dy, shape.r)
+    if isinstance(shape, Line):
+        return Line(shape.ax + dx, shape.ay + dy, shape.bx + dx, shape.by + dy, shape.thickness)
+    if isinstance(shape, Polygon):
+        return Polygon(tuple((x + dx, y + dy) for x, y in shape.points))
+    return Box(shape.cx + dx, shape.cy + dy, shape.w, shape.h)
+
+
+# Polygon tables (DRA-86). Most cases are built round one right triangle, TRI: its top-left corner
+# (0, 0), its bottom-right corner (40, 30), its bottom-left corner (0, 30). Its slope runs from
+# (0, 0) to (40, 30): direction (4, 3), length 50, outward normal (3, -4) / 5, up and right. The
+# point (20, 15) is on the slope, and a shape at 3-4-5 distances from a corner or from the slope
+# gives an exact answer, as for the circles and the lines.
+TRI: Polygon = Polygon(((0, 0), (40, 30), (0, 30)))
+DIAMOND: Polygon = Polygon(((0, -10), (10, 0), (0, 10), (-10, 0)))
+
+
+@dataclass(frozen=True, slots=True)
+class Touch:
+    """A shape touching TRI at one place (an edge or a corner), and the hair step into it."""
+
+    where: str
+    shape: Shape
+    step: tuple[float, float]
+    """Moves the shape a hair into TRI: the two shapes then share area."""
+
+
+TRI_TOUCHES: tuple[Touch, ...] = (
+    # Boxes.
+    Touch("box, slope: a corner on it", Box(25, 10, 10, 10), (-HAIR, 0)),
+    Touch("box, slope: a corner on it, stepped up and down", Box(25, 10, 10, 10), (0, HAIR)),
+    Touch("box, left side", Box(-5, 15, 10, 10), (HAIR, 0)),
+    Touch("box, left side, longer than it", Box(-5, 15, 10, 100), (HAIR, 0)),
+    Touch("box, base", Box(20, 35, 10, 10), (0, -HAIR)),
+    Touch("box, top-left corner", Box(-5, -5, 10, 10), (HAIR, HAIR)),
+    Touch("box, bottom-right corner", Box(45, 35, 10, 10), (-HAIR, -HAIR)),
+    Touch("box, bottom-left corner", Box(-5, 35, 10, 10), (HAIR, -HAIR)),
+    # Circles, at 3-4-5 distances.
+    Touch("circle, slope", Circle(23, 11, 5), (-HAIR, 0)),
+    Touch("circle, left side", Circle(-5, 15, 5), (HAIR, 0)),
+    Touch("circle, base", Circle(20, 35, 5), (0, -HAIR)),
+    Touch("circle, top-left corner", Circle(-3, -4, 5), (HAIR, 0)),
+    Touch("circle, bottom-right corner", Circle(43, 34, 5), (-HAIR, 0)),
+    Touch("circle, bottom-left corner", Circle(-3, 34, 5), (HAIR, 0)),
+    Touch("circle, past the slope's end on its line", Circle(46, 38, 10), (-HAIR, 0)),
+    # Lines: round sides and round ends.
+    Touch("line, slope: parallel to it", Line(11, 2, 35, 20, 10), (-HAIR, 0)),
+    Touch("line, left side", Line(-5, 0, -5, 30, 10), (HAIR, 0)),
+    Touch("line, base", Line(10, 35, 30, 35, 10), (0, -HAIR)),
+    Touch("line, top-left corner", Line(-3, -4, -30, -40, 10), (HAIR, 0)),
+    Touch("line, slope extended past its top-left end", Line(-16, -12, -4, -3, 10), (HAIR, 0)),
+    Touch("line, bottom-right corner, along the base", Line(41, 30, 60, 30, 2), (-HAIR, 0)),
+    Touch("line, bottom-left corner", Line(-3, 34, -30, 60, 10), (HAIR, 0)),
+    Touch("line, along the base", Line(10, 31, 30, 31, 2), (0, -HAIR)),
+    # Polygons.
+    Touch("polygon, slope: a corner on it", Polygon(((20, 15), (30, 5), (30, 15))), (-HAIR, 0)),
+    Touch(
+        "polygon, slope: sharing the whole edge", Polygon(((0, 0), (40, 0), (40, 30))), (-HAIR, 0)
+    ),
+    Touch("polygon, left side", Polygon(((-10, 0), (0, 0), (0, 30))), (HAIR, 0)),
+    Touch("polygon, base", Polygon(((0, 30), (40, 30), (20, 50))), (0, -HAIR)),
+    Touch("polygon, top-left corner", Polygon(((-10, -10), (0, -10), (0, 0))), (HAIR, HAIR)),
+    Touch("polygon, bottom-right corner", Polygon(((40, 30), (50, 20), (50, 30))), (-HAIR, 0)),
+    Touch("polygon, bottom-left corner", Polygon(((-10, 30), (0, 30), (-10, 40))), (HAIR, -HAIR)),
+)
+"""Every way a shape touches TRI that must not overlap, and the hair step that makes it overlap."""
+
+
+def touch_cases(kind: type) -> tuple[Case, ...]:
+    """Return TRI's touching, hair-inside and hair-outside cases for the shapes of one kind."""
+    cases: list[Case] = []
+    for touch in TRI_TOUCHES:
+        if not isinstance(touch.shape, kind):
+            continue
+        dx, dy = touch.step
+        cases += [
+            Case(f"{touch.where}: touching", TRI, touch.shape, False),
+            Case(f"{touch.where}: hair inside", TRI, moved(touch.shape, dx, dy), True),
+            Case(f"{touch.where}: hair outside", TRI, moved(touch.shape, -dx, -dy), False),
+        ]
+    return tuple(cases)
+
+
+# Polygon and polygon. A is TRI unless it says otherwise.
+POLYGON_POLYGON: tuple[Case, ...] = (
+    *touch_cases(Polygon),
+    Case("diamonds: corner touch", DIAMOND, moved(DIAMOND, 20, 0), False),
+    Case("diamonds: corner hair inside", DIAMOND, moved(DIAMOND, 20 - HAIR, 0), True),
+    Case("diamonds: corner hair outside", DIAMOND, moved(DIAMOND, 20 + HAIR, 0), False),
+    Case("diamonds: edge touch, sharing a whole edge", DIAMOND, moved(DIAMOND, 10, 10), False),
+    Case(
+        "diamonds: edge hair inside",
+        DIAMOND,
+        moved(DIAMOND, 10 - HAIR, 10 - HAIR),
+        True,
+    ),
+    Case(
+        "diamonds: edge hair outside",
+        DIAMOND,
+        moved(DIAMOND, 10 + HAIR, 10 + HAIR),
+        False,
+    ),
+    Case("diamonds: edge touch, one side only", DIAMOND, moved(DIAMOND, 10, -10), False),
+    Case("diamond and the triangle: apart", TRI, moved(DIAMOND, 60, 15), False),
+    Case(
+        "in the empty top-right corner: boxes overlap, shapes don't",
+        TRI,
+        Polygon(((30, 0), (40, 0), (40, 10))),
+        False,
+    ),
+    Case("identical", TRI, TRI, True),
+    Case("one inside the other", TRI, Polygon(((5, 20), (10, 20), (5, 25))), True),
+    Case(
+        "crossing: a corner of each inside the other",
+        TRI,
+        Polygon(((20, 10), (60, 10), (20, 50))),
+        True,
+    ),
+    Case("diamond across the left side", TRI, moved(DIAMOND, 0, 15), True),
+    Case("far apart", TRI, Polygon(((100, 100), (140, 130), (100, 130))), False),
+    Case("far apart on one axis", TRI, Polygon(((0, 1000), (40, 1030), (0, 1030))), False),
+)
+
+# Polygon and box. A is the polygon, B the box.
+POLYGON_BOX: tuple[Case, ...] = (
+    *touch_cases(Box),
+    Case(
+        "slope's line, past its end: the box is beyond the corner", TRI, Box(65, 40, 10, 10), False
+    ),
+    Case("in the empty top-right corner", TRI, Box(35, 5, 10, 10), False),
+    Case("across the slope", TRI, Box(20, 15, 10, 10), True),
+    Case("box inside the triangle", TRI, Box(10, 25, 4, 4), True),
+    Case("triangle inside the box", TRI, Box(20, 15, 100, 100), True),
+    Case("diamond: tip touch", DIAMOND, Box(15, 0, 10, 10), False),
+    Case("diamond: tip hair inside", DIAMOND, Box(15 - HAIR, 0, 10, 10), True),
+    Case("diamond: tip hair outside", DIAMOND, Box(15 + HAIR, 0, 10, 10), False),
+    Case("diamond: a corner on its edge", DIAMOND, Box(10, 10, 10, 10), False),
+    Case("diamond: a corner hair over its edge", DIAMOND, Box(10 - HAIR, 10 - HAIR, 10, 10), True),
+    Case(
+        "diamond: a corner hair clear of its edge",
+        DIAMOND,
+        Box(10 + HAIR, 10 + HAIR, 10, 10),
+        False,
+    ),
+    Case("diamond: the box's corner in the empty corner", DIAMOND, Box(9, 9, 6, 6), False),
+    Case("far apart", TRI, Box(100, 100, 10, 10), False),
+    Case("far apart on one axis", TRI, Box(20, 1000, 10, 10), False),
+)
+
+# Polygon and circle. A is the polygon, B the circle.
+POLYGON_CIRCLE: tuple[Case, ...] = (
+    *touch_cases(Circle),
+    Case("in the empty top-right corner", TRI, Circle(40, 0, 5), False),
+    Case("center on the slope", TRI, Circle(20, 15, 1), True),
+    Case("center on a corner", TRI, Circle(40, 30, 1), True),
+    Case("center on the left side", TRI, Circle(0, 15, 1), True),
+    Case("center inside", TRI, Circle(10, 25, 1), True),
+    Case("circle covers the triangle", TRI, Circle(20, 20, 100), True),
+    Case("circle covers a corner, center outside", TRI, Circle(-3, -4, 6), True),
+    Case("diamond: tip touch", DIAMOND, Circle(15, 0, 5), False),
+    Case("diamond: tip hair inside", DIAMOND, Circle(15 - HAIR, 0, 5), True),
+    Case("diamond: center on its edge", DIAMOND, Circle(5, 5, 1), True),
+    Case("far apart", TRI, Circle(100, 100, 5), False),
+    Case("far apart on one axis", TRI, Circle(20, 1000, 5), False),
+)
+
+# Polygon and line. A is the polygon, B the line.
+POLYGON_LINE: tuple[Case, ...] = (
+    *touch_cases(Line),
+    Case("an end inside", TRI, Line(10, 25, 100, 200, 2), True),
+    Case("both ends inside", TRI, Line(5, 25, 10, 25, 2), True),
+    Case("crossing, both ends outside", TRI, Line(-10, 15, 50, 15, 2), True),
+    Case("through a corner", TRI, Line(-10, 10, 10, -10, 2), True),
+    Case("an end on the slope", TRI, Line(20, 15, 60, 15, 2), True),
+    Case("an end on a corner", TRI, Line(40, 30, 60, 50, 2), True),
+    Case("an end on the left side", TRI, Line(0, 15, -30, 15, 2), True),
+    Case("pointing at the triangle, stopping short", TRI, Line(50, 15, 100, 15, 2), False),
+    Case("in the empty top-right corner", TRI, Line(30, 0, 40, 10, 2), False),
+    Case("diamond: crossing", DIAMOND, Line(-20, 0, 20, 0, 2), True),
+    Case("diamond: tip touch", DIAMOND, Line(11, -5, 11, 5, 2), False),
+    Case("diamond: tip hair inside", DIAMOND, Line(11 - HAIR, -5, 11 - HAIR, 5, 2), True),
+    Case("far apart", TRI, Line(100, 100, 140, 130, 2), False),
+    Case("far apart on one axis", TRI, Line(0, 1000, 40, 1030, 2), False),
+)
+
 TABLES: dict[frozenset[type], tuple[Case, ...]] = {
     frozenset({Circle}): CIRCLE_CIRCLE,
     frozenset({Box}): BOX_BOX,
@@ -558,6 +760,10 @@ TABLES: dict[frozenset[type], tuple[Case, ...]] = {
     frozenset({Line}): LINE_LINE,
     frozenset({Circle, Line}): CIRCLE_LINE,
     frozenset({Box, Line}): BOX_LINE,
+    frozenset({Polygon}): POLYGON_POLYGON,
+    frozenset({Polygon, Box}): POLYGON_BOX,
+    frozenset({Polygon, Circle}): POLYGON_CIRCLE,
+    frozenset({Polygon, Line}): POLYGON_LINE,
 }
 """One table per unordered pair of shape kinds."""
 
@@ -580,19 +786,12 @@ def overlap_both_ways(a: Hitbox, b: Hitbox) -> bool:
     return forward
 
 
-def moved(shape: Shape, dx: float, dy: float) -> Shape:
-    """Return `shape` moved by (dx, dy), built here, not with `place_hitbox`."""
-    if isinstance(shape, Circle):
-        return Circle(shape.cx + dx, shape.cy + dy, shape.r)
-    if isinstance(shape, Line):
-        return Line(shape.ax + dx, shape.ay + dy, shape.bx + dx, shape.by + dy, shape.thickness)
-    return Box(shape.cx + dx, shape.cy + dy, shape.w, shape.h)
-
-
 def anchor(shape: Shape) -> tuple[float, float]:
-    """Return a point of `shape`: its center, or a line's end A."""
+    """Return a point of `shape`: its center, a line's end A or a polygon's first corner."""
     if isinstance(shape, Line):
         return shape.ax, shape.ay
+    if isinstance(shape, Polygon):
+        return shape.points[0]
     return shape.cx, shape.cy
 
 
@@ -688,9 +887,128 @@ def test_a_line_with_both_ends_on_one_point_acts_as_a_circle(case_id: str, case:
     assert overlap_both_ways((case.a,), (b,)) is case.overlaps, case_id
 
 
+def other_point_orders(polygon: Polygon) -> tuple[Polygon, ...]:
+    """Return the polygon's own corners in other orders: reversed, and each started elsewhere."""
+    points: tuple[tuple[float, float], ...] = polygon.points
+    backwards: tuple[tuple[float, float], ...] = points[::-1]
+    return (
+        Polygon(backwards),
+        Polygon(points[1:] + points[:1]),
+        Polygon(points[2:] + points[:2]),
+        Polygon(backwards[1:] + backwards[:1]),
+    )
+
+
+POLYGON_CASES: tuple[tuple[str, Case], ...] = tuple(
+    entry
+    for entry in ALL_CASES
+    if isinstance(entry[1].a, Polygon) or isinstance(entry[1].b, Polygon)
+)
+"""The table cases that hold a polygon."""
+
+
+@pytest.mark.parametrize("touch", TRI_TOUCHES, ids=[t.where for t in TRI_TOUCHES])
+def test_a_triangle_shares_area_with_a_shape_on_its_slope_corners_and_sides_only_when_it_overlaps(
+    touch: Touch,
+) -> None:
+    dx, dy = touch.step
+    for triangle in (TRI, *other_point_orders(TRI)):
+        for ox, oy in ((0.0, 0.0), *OFFSETS):
+            placed: Hitbox = (moved(triangle, ox, oy),)
+            touching: Hitbox = (moved(touch.shape, ox, oy),)
+            inside: Hitbox = (moved(touch.shape, ox + dx, oy + dy),)
+            outside: Hitbox = (moved(touch.shape, ox - dx, oy - dy),)
+            where: tuple[str, float, float] = (touch.where, ox, oy)
+            assert not overlap_both_ways(placed, touching), where
+            assert overlap_both_ways(placed, inside), where
+            assert not overlap_both_ways(placed, outside), where
+
+
+@pytest.mark.parametrize(("case_id", "case"), POLYGON_CASES, ids=[c[0] for c in POLYGON_CASES])
+def test_a_polygon_given_in_another_point_order_gives_the_same_results(
+    case_id: str, case: Case
+) -> None:
+    a_orders: tuple[Shape, ...] = (
+        other_point_orders(case.a) if isinstance(case.a, Polygon) else (case.a,)
+    )
+    b_orders: tuple[Shape, ...] = (
+        other_point_orders(case.b) if isinstance(case.b, Polygon) else (case.b,)
+    )
+    for a in a_orders:
+        assert overlap_both_ways((a,), (case.b,)) is case.overlaps, (case_id, a)
+    for b in b_orders:
+        assert overlap_both_ways((case.a,), (b,)) is case.overlaps, (case_id, b)
+    for a in a_orders:
+        for b in b_orders:
+            assert overlap_both_ways((a,), (b,)) is case.overlaps, (case_id, a, b)
+
+
+def test_a_grown_polygon_is_itself_then_one_line_per_edge_of_twice_the_margin() -> None:
+    for polygon in (TRI, DIAMOND, *other_point_orders(TRI)):
+        points: tuple[tuple[float, float], ...] = polygon.points
+        for margin in MARGINS:
+            lines: tuple[Shape, ...] = tuple(
+                Line(a[0], a[1], b[0], b[1], 2 * margin)
+                for a, b in zip(points, points[1:] + points[:1], strict=True)
+            )
+            assert grow_hitbox((polygon,), margin) == (polygon, *lines)
+    # Each shape's results stay in its place; a polygon placed by an offset grows from where it is.
+    mixed: Hitbox = (Circle(0, 0, 3), TRI, Box(5, 5, 4, 4))
+    assert grow_hitbox(mixed, 0.5) == (
+        Circle(0, 0, 3.5),
+        TRI,
+        Line(0, 0, 40, 30, 1.0),
+        Line(40, 30, 0, 30, 1.0),
+        Line(0, 30, 0, 0, 1.0),
+        Box(5, 5, 5, 5),
+    )
+    placed: Hitbox = place_hitbox((TRI,), 100.5, -20.25)
+    assert grow_hitbox(placed, 2.0) == (
+        Polygon(((100.5, -20.25), (140.5, 9.75), (100.5, 9.75))),
+        Line(100.5, -20.25, 140.5, 9.75, 4.0),
+        Line(140.5, 9.75, 100.5, 9.75, 4.0),
+        Line(100.5, 9.75, 100.5, -20.25, 4.0),
+    )
+
+
+def test_a_grown_polygon_meets_a_shape_within_the_margin_of_a_corner_and_not_beyond() -> None:
+    margin: float = 10.0
+    radius: float = 5.0
+    placed: Hitbox = place_hitbox((TRI,), 100, 50)
+    grown: Hitbox = grow_hitbox(placed, margin)
+    # name, circle center, hair step toward the polygon. Each center is margin + radius (15) from
+    # the corner or the side, at 3-4-5 distances, so the circle just touches the grown edge.
+    places: tuple[tuple[str, float, float, float, float], ...] = (
+        ("top-left corner", 100 - 9, 50 - 12, HAIR, 0),
+        ("bottom-right corner", 100 + 40 + 9, 50 + 30 + 12, -HAIR, 0),
+        ("bottom-left corner", 100 - 9, 50 + 30 + 12, HAIR, 0),
+        ("left side", 100 - 15, 50 + 15, HAIR, 0),
+        ("base", 100 + 20, 50 + 30 + 15, 0, -HAIR),
+        ("slope", 100 + 29, 50 + 3, -HAIR, 0),
+    )
+    for name, x, y, step_x, step_y in places:
+        touching: Hitbox = (Circle(x, y, radius),)
+        assert not overlap_both_ways(placed, touching), name
+        assert not overlap_both_ways(grown, touching), name
+        assert overlap_both_ways(grown, (Circle(x + step_x, y + step_y, radius),)), name
+        assert not overlap_both_ways(grown, (Circle(x - step_x, y - step_y, radius),)), name
+    # A box meets the round corner by its own corner: (-3, -4) is 5 from the corner at (0, 0).
+    near: Hitbox = grow_hitbox(place_hitbox((TRI,), 100, 50), 5.0)
+    for step_x, expect in ((0.0, False), (HAIR, True), (-HAIR, False)):
+        box: Hitbox = (Box(100 - 8 + step_x, 50 - 9, 10, 10),)
+        assert overlap_both_ways(near, box) is expect, step_x
+    # The other point order grows to the same reach.
+    for triangle in other_point_orders(TRI):
+        flipped: Hitbox = grow_hitbox(place_hitbox((triangle,), 100, 50), margin)
+        assert not overlap_both_ways(flipped, (Circle(100 - 9, 50 - 12, radius),))
+        assert overlap_both_ways(flipped, (Circle(100 - 9 + HAIR, 50 - 12, radius),))
+
+
 def test_every_shape_kind_and_every_pair_of_kinds_has_a_table() -> None:
     kinds: set[type] = set(typing.get_args(collision.Shape))
-    assert kinds == {Circle, Box, Line}, "a new shape kind needs its tables and its test updates"
+    assert kinds == {Circle, Box, Line, Polygon}, (
+        "a new shape kind needs its tables and its test updates"
+    )
     pairs: set[frozenset[type]] = {
         frozenset(pair) for pair in combinations_with_replacement(kinds, 2)
     }
@@ -708,6 +1026,8 @@ def test_every_shape_kind_and_every_pair_of_kinds_has_a_table() -> None:
         lambda bad: hitboxes_overlap((Box(0, 0, 10, 10),), bad),
         lambda bad: hitboxes_overlap(bad, (Line(0, 0, 5, 5, 2),)),
         lambda bad: hitboxes_overlap((Line(0, 0, 5, 5, 2),), bad),
+        lambda bad: hitboxes_overlap(bad, (TRI,)),
+        lambda bad: hitboxes_overlap((TRI,), bad),
         lambda bad: hitboxes_overlap(bad, ()),
         lambda bad: hitboxes_overlap((), bad),
         lambda bad: place_hitbox(bad, 1.0, 2.0),
@@ -718,6 +1038,8 @@ def test_every_shape_kind_and_every_pair_of_kinds_has_a_table() -> None:
         "overlap-second",
         "overlap-first-vs-line",
         "overlap-second-vs-line",
+        "overlap-first-vs-polygon",
+        "overlap-second-vs-polygon",
         "overlap-first-vs-empty",
         "overlap-second-vs-empty",
         "place",
@@ -732,6 +1054,8 @@ def test_an_unknown_shape_kind_raises_type_error(call: Callable[[Hitbox], object
             cast(Hitbox, (bad_shape, Box(0, 0, 10, 10))),
             cast(Hitbox, (Line(0, 0, 5, 5, 2), bad_shape)),
             cast(Hitbox, (bad_shape, Line(0, 0, 5, 5, 2))),
+            cast(Hitbox, (TRI, bad_shape)),
+            cast(Hitbox, (bad_shape, TRI)),
         ):
             with pytest.raises(TypeError, match="unknown shape kind"):
                 call(bad)
@@ -745,6 +1069,248 @@ def test_an_unknown_shape_kind_error_names_the_kind() -> None:
         place_hitbox(bad, 0.0, 0.0)
     with pytest.raises(TypeError, match="unknown shape kind 'Triangle'"):
         grow_hitbox(bad, 1.0)
+
+
+UP: Direction = (0.0, -1.0)
+DOWN: Direction = (0.0, 1.0)
+LEFT: Direction = (-1.0, 0.0)
+RIGHT: Direction = (1.0, 0.0)
+AXES: tuple[Direction, ...] = (UP, DOWN, LEFT, RIGHT)
+"""The first four directions `push_directions` gives. Source: drifters.md, Rules, Push-out."""
+
+SLOPE_UNIT: Direction = (0.6, -0.8)
+"""TRI's slope's outward unit normal: its edge (40, 30) is 50 long, so (30, -40) / 50."""
+
+
+def test_deeply_overlaps_ignores_touching_and_a_hair_deep_overlap_and_sees_a_deeper_one() -> None:
+    assert SURFACE_TOLERANCE == 1e-9
+    shallow: float = SURFACE_TOLERANCE / 2
+    deeper: float = SURFACE_TOLERANCE * 2
+    box: Hitbox = (Box(0, 0, 10, 10),)
+    # Boxes: touching on each side and corner is not deep, in both argument orders.
+    for x, y in ((10, 0), (-10, 0), (0, 10), (0, -10), (10, 10), (-10, -10), (10, -10)):
+        other: Hitbox = (Box(x, y, 10, 10),)
+        assert not deeply_overlaps(box, other), (x, y)
+        assert not deeply_overlaps(other, box), (x, y)
+    # Apart is not deep. Clearly inside is.
+    assert not deeply_overlaps(box, (Box(10 + HAIR, 0, 10, 10),))
+    assert not deeply_overlaps(box, (Box(500, 500, 10, 10),))
+    assert deeply_overlaps(box, (Box(5, 0, 10, 10),))
+    assert deeply_overlaps(box, (Box(0, 0, 2, 2),))
+    # An overlap no deeper than the tolerance is touching, deeper is not, on each side.
+    for sx, sy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        hair: Hitbox = (Box(sx * (10 - shallow), sy * (10 - shallow), 10, 10),)
+        deeper_box: Hitbox = (Box(sx * (10 - deeper), sy * (10 - deeper), 10, 10),)
+        assert not deeply_overlaps(box, hair), (sx, sy)
+        assert not deeply_overlaps(hair, box), (sx, sy)
+        assert deeply_overlaps(box, deeper_box), (sx, sy)
+        assert deeply_overlaps(deeper_box, box), (sx, sy)
+    # A polygon's flat side, and its slope: there the depth is the overlap along the unit normal
+    # (0.6 of a step across), so a step of 1.0 x tolerance is 0.6 x tolerance deep, and 2.0 x
+    # tolerance is 1.2 x. A normal that was not made unit would count both as deep.
+    tolerance: float = SURFACE_TOLERANCE
+    for triangle in (TRI, *other_point_orders(TRI)):
+        solid: Hitbox = (triangle,)
+        side_hair: Hitbox = (Box(-5 + shallow, 15, 10, 10),)
+        side_deep: Hitbox = (Box(-5 + deeper, 15, 10, 10),)
+        slope_hair: Hitbox = (Box(25 - tolerance, 10, 10, 10),)
+        slope_deep: Hitbox = (Box(25 - 2 * tolerance, 10, 10, 10),)
+        slope_touch: Hitbox = (Box(25, 10, 10, 10),)
+        sharing: Hitbox = (Polygon(((0, 0), (40, 0), (40, 30))),)
+        sharing_hair: Hitbox = (moved(sharing[0], -tolerance, 0),)
+        sharing_deep: Hitbox = (moved(sharing[0], -2 * tolerance, 0),)
+        for hitbox, is_deep in (
+            (side_hair, False),
+            (side_deep, True),
+            (slope_touch, False),
+            (slope_hair, False),
+            (slope_deep, True),
+            (sharing, False),
+            (sharing_hair, False),
+            (sharing_deep, True),
+        ):
+            assert deeply_overlaps(hitbox, solid) is is_deep, (triangle, hitbox)
+            assert deeply_overlaps(solid, hitbox) is is_deep, (triangle, hitbox)
+    # A hitbox of several shapes is deep when any pair is.
+    assert deeply_overlaps((Box(500, 500, 2, 2), Box(0, 0, 10, 10)), (Box(5, 0, 10, 10),))
+    assert not deeply_overlaps((), box)
+    assert not deeply_overlaps(box, ())
+
+
+@dataclass(frozen=True, slots=True)
+class Exit:
+    """A direction, and how far a hitbox must go along it to clear another."""
+
+    direction: Direction
+    distance: float
+
+
+def test_exit_distance_of_a_box_out_of_a_box_in_each_direction() -> None:
+    moving: Hitbox = (Box(0, 0, 10, 10),)
+    # Whole numbers: the solid's edges are at x -7 and 13, y -4 and 8.
+    whole: tuple[Exit, ...] = (Exit(UP, 9.0), Exit(DOWN, 13.0), Exit(LEFT, 12.0), Exit(RIGHT, 18.0))
+    # Half numbers: the solid's edges are at x -9.5 and 10.5, y -4.5 and 7.5.
+    halves: tuple[Exit, ...] = (
+        Exit(UP, 9.5),
+        Exit(DOWN, 12.5),
+        Exit(LEFT, 14.5),
+        Exit(RIGHT, 15.5),
+    )
+    for solid, exits in (
+        ((Box(3, 2, 20, 12),), whole),
+        ((Box(0.5, 1.5, 20, 12),), halves),
+        # The contract's example: a box below, 2 px up or 18 px down.
+        (
+            (Box(0, 8, 20, 10),),
+            (Exit(UP, 2.0), Exit(DOWN, 18.0), Exit(LEFT, 15.0), Exit(RIGHT, 15.0)),
+        ),
+    ):
+        for step in exits:
+            assert exit_distance(moving, solid, step.direction) == step.distance, (solid, step)
+            for ox, oy in OFFSETS:
+                placed_solid: Hitbox = tuple(moved(shape, ox, oy) for shape in solid)
+                dx, dy = step.direction
+                start: Hitbox = tuple(moved(shape, ox, oy) for shape in moving)
+                assert exit_distance(start, placed_solid, step.direction) == step.distance
+                # Moved out by that distance the box only touches the solid: nothing is left to
+                # push. Half a px short of it, it is still held.
+                out: Hitbox = tuple(
+                    moved(shape, ox + dx * step.distance, oy + dy * step.distance)
+                    for shape in moving
+                )
+                assert not hitboxes_overlap(out, placed_solid), (solid, step)
+                assert exit_distance(out, placed_solid, step.direction) == 0.0, (solid, step)
+                short: Hitbox = tuple(
+                    moved(shape, ox + dx * (step.distance - 0.5), oy + dy * (step.distance - 0.5))
+                    for shape in moving
+                )
+                assert exit_distance(short, placed_solid, step.direction) == 0.5, (solid, step)
+
+
+def test_exit_distance_runs_through_shapes_that_chain_into_each_other() -> None:
+    moving: Hitbox = (Box(0, 0, 10, 10),)
+    # Two overlapping boxes: moving up it clears the first at 2 px, is still inside the second,
+    # and clears it at 16. Down it is the first that holds it longest.
+    below: Box = Box(0, 8, 20, 10)
+    above: Box = Box(0, -6, 20, 10)
+    for pair in ((below, above), (above, below)):
+        assert exit_distance(moving, pair, UP) == 16.0
+        assert exit_distance(moving, pair, DOWN) == 18.0
+        assert exit_distance(moving, pair, LEFT) == 15.0
+        assert exit_distance(moving, pair, RIGHT) == 15.0
+    assert exit_distance(moving, (below,), UP) == 2.0
+    # The L's two boxes: the bar along the bottom, the upright at the left end.
+    ell: Hitbox = (Box(0, 40, 320, 40), Box(-140, 0, 40, 120))
+    assert island_hitbox(IslandShape.L_SHAPE, 320, 120, 40, False) == ell
+    inner: Hitbox = (Box(-115, 15, 20, 20),)  # 5 px into the upright and 5 px into the bar
+    for solid in (ell, ell[::-1]):
+        assert deeply_overlaps(inner, solid)
+        # Up: 5 px clears the bar, but the upright goes on to y -60. Right: 5 px clears the
+        # upright, but the bar goes on to x 160.
+        assert exit_distance(inner, solid, UP) == 85.0
+        assert exit_distance(inner, solid, DOWN) == 55.0
+        assert exit_distance(inner, solid, LEFT) == 55.0
+        assert exit_distance(inner, solid, RIGHT) == 285.0
+    # In the upright alone the way right is the upright's own width.
+    alone: Hitbox = (Box(-115, -5, 20, 20),)
+    assert exit_distance(alone, ell, RIGHT) == 5.0
+    assert exit_distance(alone, ell, UP) == 65.0
+
+
+def test_exit_distance_is_zero_when_the_shapes_are_not_deep() -> None:
+    moving: Hitbox = (Box(0, 0, 10, 10),)
+    shallow: float = SURFACE_TOLERANCE / 2
+    for solid in (
+        (Box(10, 0, 10, 10),),  # edges touching
+        (Box(0, -10, 10, 10),),
+        (Box(10, 10, 10, 10),),  # corners touching
+        (Box(10 - shallow, 0, 10, 10),),  # a hair overlap
+        (Box(0, 10 - shallow, 10, 10),),
+        (Box(100, 100, 10, 10),),  # apart
+        (Polygon(((0, 5), (40, 35), (0, 35))),),  # a polygon touching the box's bottom edge
+        (),
+    ):
+        for direction in (*AXES, SLOPE_UNIT, (-0.6, 0.8)):
+            assert exit_distance(moving, solid, direction) == 0.0, (solid, direction)
+    assert exit_distance((), (Box(0, 0, 10, 10),), UP) == 0.0
+
+
+def test_exit_distance_along_a_slope_normal_is_the_depth_across_the_slope() -> None:
+    # TRI's slope: a box whose bottom-left corner is at (15, 15), 3 px across the slope.
+    for triangle in (TRI, *other_point_orders(TRI)):
+        solid: Hitbox = (triangle,)
+        dipping: Hitbox = (Box(20, 10, 10, 10),)
+        assert deeply_overlaps(dipping, solid)
+        assert exit_distance(dipping, solid, SLOPE_UNIT) == pytest.approx(3.0, abs=1e-9)
+        # The way straight up is longer than the way along the normal: 3 / 0.8.
+        assert exit_distance(dipping, solid, UP) == pytest.approx(3.75, abs=1e-9)
+        assert exit_distance(dipping, solid, RIGHT) == pytest.approx(5.0, abs=1e-9)
+        assert exit_distance(dipping, solid, LEFT) == pytest.approx(25.0, abs=1e-9)
+        assert exit_distance(dipping, solid, DOWN) == pytest.approx(25.0, abs=1e-9)
+        # The island's triangle, 320 x 120, in both ways round: a box whose corner is `v` px
+        # below the slope has depth 8 v / sqrt(73), where the normal is (3, -8) / sqrt(73).
+        length: float = math.sqrt(73)
+        for invert in (False, True):
+            points: tuple[tuple[float, float], ...] = (
+                ((-160, 60), (160, -60), (-160, -60))
+                if invert
+                else ((-160, -60), (160, 60), (-160, 60))
+            )
+            island: Hitbox = place_hitbox((Polygon(points),), 400, 330)
+            normal: Direction = (3 / length, 8 / length) if invert else (3 / length, -8 / length)
+            for v in (1.0, 4.0, 8.0):
+                # The box's near corner is on the vertical line x 80 from the center, v px past
+                # the slope's point there (y 30, or -30 inverted); the box lies beyond it.
+                sign: float = -1.0 if invert else 1.0
+                ship: Hitbox = (Box(400 + 85, 330 + sign * (25 + v), 10, 10),)
+                assert deeply_overlaps(ship, island), (invert, v)
+                assert exit_distance(ship, island, normal) == pytest.approx(
+                    8 * v / length, abs=1e-9
+                ), (invert, v)
+
+
+def test_push_directions_list_the_solid_polygons_before_the_moving_ones_without_repeats() -> None:
+    steeper: Polygon = Polygon(((0, 0), (30, 40), (0, 40)))  # slope normal (4, -3) / 5
+    first: tuple[Direction, ...] = (SLOPE_UNIT, (-0.6, 0.8))
+    second: tuple[Direction, ...] = ((0.8, -0.6), (-0.8, 0.6))
+    for tri in (TRI, *other_point_orders(TRI)):
+        for st in (steeper, *other_point_orders(steeper)):
+            for solid, moving, order in (
+                ((tri,), (st,), (first, second)),
+                ((st,), (tri,), (second, first)),
+            ):
+                got: tuple[Direction, ...] = push_directions(moving, solid)
+                want: tuple[Direction, ...] = (*AXES, *order[0], *order[1])
+                assert len(got) == len(want), got
+                for a, b in zip(got, want, strict=True):
+                    assert a == pytest.approx(b, abs=1e-9)
+    # The same polygon on both sides adds its normals once. Boxes add nothing.
+    assert len(push_directions((TRI,), (TRI,))) == 6
+    assert len(push_directions((TRI,), (moved(TRI, 7, 9),))) == 6
+    assert push_directions((Box(0, 0, 10, 10),), (Box(3, 3, 10, 10),)) == AXES
+    assert push_directions((), ()) == AXES
+
+
+PUSH_OUT_CALLS: dict[str, Callable[[Hitbox, Hitbox], object]] = {
+    "deeply_overlaps": deeply_overlaps,
+    "push_directions": push_directions,
+    "exit_distance": lambda moving, solid: exit_distance(moving, solid, UP),
+}
+"""The three push-out functions, each as a call taking the two hitboxes."""
+
+
+@pytest.mark.parametrize("name", list(PUSH_OUT_CALLS))
+@pytest.mark.parametrize("bad", [Circle(0, 0, 5), Line(0, 0, 5, 5, 2)], ids=["circle", "line"])
+@pytest.mark.parametrize("side", ["moving", "solid"])
+def test_the_push_out_functions_raise_type_error_for_a_circle_or_a_line(
+    name: str, bad: Shape, side: str
+) -> None:
+    good: Hitbox = (Box(0, 0, 10, 10), TRI)
+    moving: Hitbox = (bad, *good) if side == "moving" else good
+    solid: Hitbox = (bad, *good) if side == "solid" else good
+    with pytest.raises(TypeError) as raised:
+        PUSH_OUT_CALLS[name](moving, solid)
+    assert str(raised.value) == f"{name} takes boxes and polygons, not '{type(bad).__name__}'"
 
 
 def shape_from_json(raw: dict[str, object]) -> Circle | Box:
@@ -790,6 +1356,16 @@ class CoinFacts:
 
 
 @dataclass(frozen=True, slots=True)
+class IslandFacts:
+    """One floating island variant as its tuning file states it, px."""
+
+    shape: IslandShape
+    width: float
+    height: float
+    arm: float
+
+
+@dataclass(frozen=True, slots=True)
 class VariantCase:
     """One variant of one drifter type, as its tuning file states it."""
 
@@ -807,6 +1383,9 @@ class VariantCase:
 
     coin: CoinFacts | None = None
     """Set for a coin variant: its hitbox is built from the crystal's width and body height."""
+
+    island: IslandFacts | None = None
+    """Set for a floating island variant: its hitbox is built from its shape, size and `arm`."""
 
 
 def chain_layout(raw: dict[str, object], spacing: float) -> ChainLayout:
@@ -1006,11 +1585,67 @@ def load_coin_cases(data: dict[str, object]) -> list[VariantCase]:
     ]
 
 
+def load_island_cases(data: dict[str, object]) -> list[VariantCase]:
+    """Return one case per variant and `invert` value its shape allows of the island's file.
+
+    The records are built the way `app.tuning` builds them (contract, Tuning files, the island's
+    file), here: per variant `VariantTuning(width, height, hitbox=island_hitbox(shape, width,
+    height, arm, False), extra=IslandVariantExtra(shape))`, and for the type `speed_ratio` 0.0,
+    `entry_warning_ticks` 0 and an `IslandTypeExtra(arm)`. A rectangle has no `invert`
+    (05-floating-islands.md, rule 9); the L, the T and the triangle get both values.
+    """
+    arm: float = float(cast(float, data["arm"]))
+    raw_variants: dict[str, dict[str, object]] = cast(
+        dict[str, dict[str, object]], data["variants"]
+    )
+    facts: dict[str, IslandFacts] = {
+        name: IslandFacts(
+            shape=IslandShape(str(raw["shape"])),
+            width=float(cast(float, raw["width"])),
+            height=float(cast(float, raw["height"])),
+            arm=arm,
+        )
+        for name, raw in raw_variants.items()
+    }
+    tuning: DrifterTuning = DrifterTuning(
+        drifters={
+            DrifterType.FLOATING_ISLAND: DrifterTypeTuning(
+                variants={
+                    name: VariantTuning(
+                        width=f.width,
+                        height=f.height,
+                        hitbox=island_hitbox(f.shape, f.width, f.height, arm, False),
+                        extra=IslandVariantExtra(shape=f.shape),
+                    )
+                    for name, f in facts.items()
+                },
+                default_variant=str(data["default_variant"]),
+                speed_ratio=0.0,
+                entry_warning_ticks=0,
+                extra=IslandTypeExtra(arm=arm),
+            )
+        },
+        switches=PlaytestSwitches(),
+    )
+    return [
+        VariantCase(
+            DrifterType.FLOATING_ISLAND,
+            name,
+            tuning,
+            (),
+            invert=invert,
+            island=f,
+        )
+        for name, f in facts.items()
+        for invert in ((False,) if f.shape is IslandShape.RECTANGLE else (False, True))
+    ]
+
+
 def load_variant_cases() -> list[VariantCase]:
     """Return one case per variant of every drifter type, from `game/tuning/drifters/`.
 
-    The chain lightning and the fireball get one case per variant and `invert` value. The coin
-    gets one case per variant.
+    The chain lightning, the fireball and the floating island get one case per variant and
+    `invert` value. The coin gets one case per variant.
     """
     cases: list[VariantCase] = []
     for drifter_type in DrifterType:
@@ -1027,6 +1662,9 @@ def load_variant_cases() -> list[VariantCase]:
             continue
         if drifter_type is DrifterType.COIN:
             cases.extend(load_coin_cases(data))
+            continue
+        if drifter_type is DrifterType.FLOATING_ISLAND:
+            cases.extend(load_island_cases(data))
             continue
         raw_variants: dict[str, dict[str, object]] = cast(
             dict[str, dict[str, object]], data["variants"]
@@ -1067,7 +1705,9 @@ def load_variant_cases() -> list[VariantCase]:
 
 VARIANT_CASES: list[VariantCase] = load_variant_cases()
 
-SHAPE_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.chain is None and c.coin is None]
+SHAPE_CASES: list[VariantCase] = [
+    c for c in VARIANT_CASES if c.chain is None and c.coin is None and c.island is None
+]
 """Types whose tuning file lists a hitbox, and any type with no file (it fails by name)."""
 
 CHAIN_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.chain is not None]
@@ -1081,6 +1721,9 @@ FIREBALL_CASES: list[VariantCase] = [
 
 COIN_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.coin is not None]
 """The coin, per variant. Born ACTIVE, so it has its own tests, not the WARNING ones."""
+
+ISLAND_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.island is not None]
+"""The floating island, per variant and `invert` value. Born ACTIVE, so it has its own tests."""
 
 
 def case_id(case: VariantCase) -> str:
@@ -1469,6 +2112,219 @@ def test_a_coin_touch_is_a_collect_never_a_hit(case: VariantCase) -> None:
         assert coin.effect_on_touch() is not TouchEffect.HIT
         assert coin.graze_zone() == ()
         assert overlap_both_ways(coin.current_hitbox(), ship) is (x == SPAWN_X)
+
+
+def diagram_hitbox(facts: IslandFacts, invert: bool) -> Hitbox:
+    """Return the island's shapes from the contract's Diagram, Floating island, built here.
+
+    `invert` mirrors the shape top to bottom: every box's `cy` and every point's y is negated.
+    """
+    width: float = facts.width
+    height: float = facts.height
+    sign: float = -1.0 if invert else 1.0
+    bar_offset: float = (height - facts.arm) / 2
+    if facts.shape is IslandShape.RECTANGLE:
+        return (Box(0.0, 0.0, width, height),)
+    if facts.shape is IslandShape.L_SHAPE:
+        return (
+            Box(0.0, sign * bar_offset, width, facts.arm),
+            Box(-(width - facts.arm) / 2, 0.0, facts.arm, height),
+        )
+    if facts.shape is IslandShape.T_SHAPE:
+        return (Box(0.0, -sign * bar_offset, width, facts.arm), Box(0.0, 0.0, facts.arm, height))
+    assert facts.shape is IslandShape.TRIANGLE
+    return (
+        Polygon(
+            (
+                (-width / 2, -sign * height / 2),
+                (width / 2, sign * height / 2),
+                (-width / 2, sign * height / 2),
+            )
+        ),
+    )
+
+
+def triangle_places(facts: IslandFacts, invert: bool) -> list[Place]:
+    """Return where the island's triangle just touches the ship, and where it is 0.5 px inside.
+
+    Four sides: the island right of the ship (its straight side on the ship's foot), left of the
+    ship (its tip on the foot), and above or below it, where one is the flat side (the base, or
+    the top inverted) and the other the slope. On the slope the ship's corner nearest it, found
+    from the ship's own boxes, sits on the slope's line.
+    """
+    ship: Hitbox = ship_hitbox(spawn())
+    bar: Box = cast(Box, ship[0])
+    foot: Box = cast(Box, ship[1])
+    width: float = facts.width
+    height: float = facts.height
+    sign: float = -1.0 if invert else 1.0
+    foot_left: float = foot.cx - foot.w / 2
+    foot_right: float = foot.cx + foot.w / 2
+    foot_bottom: float = foot.cy + foot.h / 2
+    bar_top: float = bar.cy - bar.h / 2
+    corners: list[tuple[float, float]] = [
+        (box.cx + dx * box.w / 2, box.cy + dy * box.h / 2)
+        for box in (bar, foot)
+        for dx in (-1, 1)
+        for dy in (-1, 1)
+    ]
+    # The slope runs through the island's center with direction (width, sign * height). A point
+    # (x, y) is outside it, on the ship's side, when height * (x - cx) - sign * width * (y - cy)
+    # is above 0. The corner with the least of it meets the slope first.
+    slope_x: float = SPAWN_X
+    near_x, near_y = min(corners, key=lambda c: height * (c[0] - slope_x) - sign * width * c[1])
+    slope_y: float = near_y - height * (near_x - slope_x) / (sign * width)
+    places: list[Place] = []
+    for into, hit, label in ((0.0, False, "touching"), (INSIDE, True, "0.5 px inside")):
+        flat_y: float = foot_bottom + height / 2 - into if invert else bar_top - height / 2 + into
+        places += [
+            Place(
+                f"right of the ship, straight side, {label}",
+                foot_right + width / 2 - into,
+                foot.cy,
+                hit,
+            ),
+            Place(
+                f"left of the ship, tip, {label}",
+                foot_left - width / 2 + into,
+                foot.cy - sign * height / 2,
+                hit,
+            ),
+            Place(f"flat side, {label}", SPAWN_X, flat_y, hit),
+            Place(f"slope, {label}", slope_x, slope_y - sign * into, hit),
+        ]
+    return places
+
+
+def island_places(facts: IslandFacts, invert: bool) -> list[Place]:
+    """Return the places that just touch the ship (no overlap) and that are 0.5 px inside it.
+
+    Boxes only: each box of the island in turn is put on the ship's center line, and the island
+    is met from each side at the touching distance worked out from the shapes' own edges. A
+    distance may be negative: an L's upright met from the left has the island's center right of
+    the ship. The triangle has `triangle_places`.
+    """
+    shapes: Hitbox = diagram_hitbox(facts, invert)
+    if any(isinstance(shape, Polygon) for shape in shapes):
+        return triangle_places(facts, invert)
+    boxes: tuple[Circle | Box, ...] = circles_and_boxes(shapes)
+    places: list[Place] = []
+    for index, box in enumerate(boxes):
+        for name, toward in DIRECTIONS.items():
+            # Put the box on the ship's center line: the island's center moves across the line.
+            on_x: bool = toward[0] != 0
+            shift: tuple[float, float] = (0.0, -box.cy) if on_x else (-box.cx, 0.0)
+            shifted: tuple[Circle | Box, ...] = circles_and_boxes(
+                tuple(moved(shape, shift[0], shift[1]) for shape in boxes)
+            )
+            distance, exact = touching_distance(shifted, toward)
+            assert exact, name
+            for gap, hit, label in (
+                (distance, False, "touching"),
+                (distance - INSIDE, True, "0.5 px inside"),
+            ):
+                places.append(
+                    Place(
+                        f"{name}, box {index} on the line, {label}",
+                        SPAWN_X - toward[0] * gap + shift[0],
+                        SPAWN_Y - toward[1] * gap + shift[1],
+                        hit,
+                    )
+                )
+    return places
+
+
+def interior_point(shape: Shape) -> tuple[float, float]:
+    """Return a point inside the shape: a box's center, or the mean of a polygon's corners."""
+    if isinstance(shape, Polygon):
+        count: int = len(shape.points)
+        return (
+            sum(x for x, _ in shape.points) / count,
+            sum(y for _, y in shape.points) / count,
+        )
+    assert isinstance(shape, Box)
+    return shape.cx, shape.cy
+
+
+@pytest.mark.parametrize("case", ISLAND_CASES, ids=[case_id(c) for c in ISLAND_CASES])
+def test_ship_meets_every_island_variant_at_its_own_touching_distance(case: VariantCase) -> None:
+    facts: IslandFacts | None = case.island
+    assert facts is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    shapes: Hitbox = diagram_hitbox(facts, case.invert)
+    for place in island_places(facts, case.invert):
+        where: str = f"{place.name} at ({place.x}, {place.y})"
+        island: Drifter = drifter_at(case, place.x, place.y)
+        # Born ACTIVE: no WARNING state to wait through, and the shape is the Diagram's.
+        assert island.phase is Phase.ACTIVE, where
+        assert (island.x, island.y) == (place.x, place.y), where
+        assert island.current_hitbox() == place_hitbox(shapes, place.x, place.y), where
+        assert overlap_both_ways(island.current_hitbox(), ship) is place.hit, where
+
+
+@pytest.mark.parametrize("case", ISLAND_CASES, ids=[case_id(c) for c in ISLAND_CASES])
+def test_an_island_overlaps_the_ship_on_the_state_it_is_spawned_on(case: VariantCase) -> None:
+    facts: IslandFacts | None = case.island
+    assert facts is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    shapes: Hitbox = diagram_hitbox(facts, case.invert)
+    # The island put so that the ship's center is inside its first shape (the L's bar, the T's
+    # bar, the triangle), then 10 px to the side.
+    inner_x, inner_y = interior_point(shapes[0])
+    for shift in (0.0, 10.0):
+        x: float = SPAWN_X - inner_x + shift
+        y: float = SPAWN_Y - inner_y
+        island: Drifter = drifter_at(case, x, y)
+        assert island.phase is Phase.ACTIVE
+        assert island.ticks_in_phase == 0
+        assert island.warning_ticks == 0
+        assert island.current_hitbox() != ()
+        assert island.current_hitbox() == place_hitbox(shapes, x, y)
+        assert overlap_both_ways(island.current_hitbox(), ship), shift
+
+
+@pytest.mark.parametrize("case", ISLAND_CASES, ids=[case_id(c) for c in ISLAND_CASES])
+def test_an_island_touch_is_a_block_and_it_has_no_graze_zone(case: VariantCase) -> None:
+    facts: IslandFacts | None = case.island
+    assert facts is not None
+    shapes: Hitbox = diagram_hitbox(facts, case.invert)
+    inner_x, inner_y = interior_point(shapes[0])
+    ship: Hitbox = ship_hitbox(spawn())
+    for x, y in ((SPAWN_X - inner_x, SPAWN_Y - inner_y), (SPAWN_X + 300.0, SPAWN_Y - 200.0)):
+        island: Drifter = drifter_at(case, x, y)
+        assert island.effect_on_touch() is TouchEffect.BLOCK
+        assert island.effect_on_touch() is not TouchEffect.HIT
+        assert island.effect_on_touch() is not TouchEffect.COLLECT
+        assert island.graze_zone() == ()
+        assert overlap_both_ways(island.current_hitbox(), ship) is (x == SPAWN_X - inner_x)
+
+
+@pytest.mark.parametrize("case", ISLAND_CASES, ids=[case_id(c) for c in ISLAND_CASES])
+def test_push_directions_of_the_ship_against_an_island_variant(case: VariantCase) -> None:
+    facts: IslandFacts | None = case.island
+    assert facts is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    expected: list[Direction] = list(AXES)
+    if facts.shape is IslandShape.TRIANGLE:
+        # The slope's outward normal, then the same turned round (Diagram, Floating island):
+        # (h, -w) / length up and right, and (h, w) / length down and right when inverted.
+        length: float = math.hypot(facts.width, facts.height)
+        sign: float = -1.0 if case.invert else 1.0
+        out: Direction = (facts.height / length, -sign * facts.width / length)
+        expected += [out, (-out[0], -out[1])]
+    for x, y in ((SPAWN_X, SPAWN_Y), (SPAWN_X + 10.5, SPAWN_Y - 3.25), (0.0, 0.0)):
+        island: Drifter = drifter_at(case, x, y)
+        directions: tuple[Direction, ...] = push_directions(ship, island.current_hitbox())
+        assert len(directions) == len(expected), (x, y, directions)
+        assert directions[:4] == AXES
+        for got, want in zip(directions, expected, strict=True):
+            assert got == pytest.approx(want, abs=1e-9), (x, y)
+        for index, one in enumerate(directions):
+            for other in directions[index + 1 :]:
+                assert abs(one[0] - other[0]) > 1e-9 or abs(one[1] - other[1]) > 1e-9, directions
+            assert math.hypot(one[0], one[1]) == pytest.approx(1.0, abs=1e-12)
+        # The ship has no polygon: the same list whichever way the arguments go.
+        assert push_directions(island.current_hitbox(), ship) == directions
 
 
 def test_ship_hitbox_is_an_inverted_t_at_the_ship_center() -> None:

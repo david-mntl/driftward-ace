@@ -356,7 +356,7 @@ REFUSALS: Final[list[Refusal]] = [
             f"placement type {value!r}",
             (Edit("wave_0", ("placements", 2, "type"), value),),
             f"waves/wave_0.json: placements[2].type '{value}' is not a drifter type "
-            "(meteorite, satellite, chain_lightning, fireball, coin)",
+            "(meteorite, satellite, chain_lightning, fireball, coin, floating_island)",
         )
         for value in ("ufo", "Meteorite", "")
     ],
