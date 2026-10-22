@@ -1,7 +1,7 @@
 """Ship state and its one-tick physics step.
 
-The step runs on the fixed 60 Hz tick: thrust, gravity, drag, fall cap, move, side walls,
-floating islands, the top-line ceiling. It never respawns the ship. The floor check is
+The step runs on the fixed 60 Hz tick: thrust, gravity, planet pull, drag, fall cap, move, side
+walls, floating islands, the top-line ceiling. It never respawns the ship. The floor check is
 `is_below_floor`, used by `core.run`, which decides what a fall costs. It never mutates its
 input, never reads frame time, randomness or the run mode.
 
@@ -13,10 +13,15 @@ Floating islands are ground, handed in as one `Ground`. `block_ship` moves the s
 shortest way and drops the speed into the surface, measured against the ground's own motion.
 `spawn_clear` gives the fall respawn spot moved straight up or down out of the ground.
 
+Planets pull. The run hands the step every planet's field as a `GravityWell`; `well_pull` sums
+their pull on the ship's center and the step adds it to the speed right after gravity.
+`check_escapable_pull` refuses a `pull_max` the ship's thrust can't beat.
+
 Source: docs/contracts/systems/ship.md, Interface and Rules.
 """
 
 import logging
+import math
 from dataclasses import dataclass, replace
 from typing import Final, Literal, NamedTuple
 
@@ -143,6 +148,30 @@ NO_GROUND: Final[Ground] = Ground()
 """No island: the step is exactly the step without ground."""
 
 
+@dataclass(frozen=True, slots=True)
+class GravityWell:
+    """One planet's gravity field this tick. Screen px, y down."""
+
+    x: float
+    """The field's center x, screen px: the planet's center."""
+
+    y: float
+    """The field's center y, screen px."""
+
+    surface_radius: float
+    """Px from the center where the pull reaches `pull_max`: the planet's surface, > 0."""
+
+    pull_radius: float
+    """Px from the center where the pull is 0: the field's edge, > `surface_radius`."""
+
+    pull_max: float
+    """The pull at the surface and inside it, px/tick², > 0."""
+
+
+NO_WELLS: Final[tuple[GravityWell, ...]] = ()
+"""No planet: the step is exactly the step without wells."""
+
+
 class _Push(NamedTuple):
     """A way out of the ground: the unit direction and how far along it, px."""
 
@@ -177,15 +206,73 @@ def spawn_clear(ground: Ground) -> Ship:
     return replace(ship, y=SPAWN_Y + down)
 
 
-def step(ship: Ship, thrust: Thrust, ground: Ground = NO_GROUND) -> Ship:
+def well_pull(ship: Ship, wells: tuple[GravityWell, ...]) -> tuple[float, float]:
+    """Return (pull_x, pull_y), px/tick², the sum of every well's pull on the ship's center.
+
+    Each well pulls toward its center: 0 at `pull_radius` and beyond, a straight line up to
+    `pull_max` at `surface_radius`, `pull_max` inside it, nothing at the exact center.
+    (0.0, 0.0) when no well holds the ship. Pure, no logging.
+    Source: systems/ship.md, Rules, Planet pull; drifters/08-planet.md, rule 4.
+    """
+    pull_x: float = 0.0
+    pull_y: float = 0.0
+    for well in wells:
+        dx: float = well.x - ship.x
+        dy: float = well.y - ship.y
+        distance: float = math.hypot(dx, dy)
+        if distance >= well.pull_radius or distance == 0.0:
+            continue
+        strength: float = _pull_strength(well, distance)
+        pull_x += strength * dx / distance
+        pull_y += strength * dy / distance
+    return pull_x, pull_y
+
+
+def _pull_strength(well: GravityWell, distance: float) -> float:
+    """Return the well's pull, px/tick², at `distance` px from its center (0 < distance < edge).
+
+    Never more than `pull_max`. Source: systems/ship.md, Rules, Planet pull, rule 4.
+    """
+    if distance <= well.surface_radius:
+        return well.pull_max
+    ramp: float = well.pull_radius - well.surface_radius
+    return well.pull_max * (well.pull_radius - distance) / ramp
+
+
+def check_escapable_pull(pull_max: float) -> None:
+    """Raise ValueError when the ship's thrust can't beat a pull of `pull_max`, px/tick².
+
+    Up thrust must beat pull plus gravity, side thrust must beat the pull, both strictly. Reads
+    GRAVITY, THRUST_UP and THRUST_SIDE at call time. Pure, no logging.
+    Source: systems/ship.md, Rules, Escape; 04-ship.md, rule 5.
+    """
+    if pull_max + GRAVITY >= THRUST_UP:
+        raise ValueError(
+            "pull_max is too strong: pull_max + gravity must stay below thrust_up "
+            f"({pull_max:g} + {GRAVITY:g} >= {THRUST_UP:g})"
+        )
+    if pull_max >= THRUST_SIDE:
+        raise ValueError(
+            "pull_max is too strong: pull_max must stay below thrust_side "
+            f"({pull_max:g} >= {THRUST_SIDE:g})"
+        )
+
+
+def step(
+    ship: Ship,
+    thrust: Thrust,
+    ground: Ground = NO_GROUND,
+    wells: tuple[GravityWell, ...] = NO_WELLS,
+) -> Ship:
     """Advance the ship one 60 Hz tick and return the new ship. Never mutates the input.
 
+    The planet pull is measured from the ship as it came in and added right after gravity.
     Pure apart from DEBUG event logging on `core.ship`: a line when wall, island or top-line
     contact starts, in that order. No line on a tick where nothing happened. Never respawns the
     ship, even past the floor: `is_below_floor` reports that and `core.run` applies the fall.
     Source: 04-ship.md, rule 2 (tick order); systems/ship.md, Rules and Logging.
     """
-    vx, vy = _accelerate(ship.vx, ship.vy, thrust)
+    vx, vy = _accelerate(ship.vx, ship.vy, thrust, well_pull(ship, wells))
     x: float = ship.x + vx
     y: float = ship.y + vy
     x, vx, wall = _clamp_to_walls(x, vx)
@@ -283,11 +370,13 @@ def _drop_speed_into_surface(ship: Ship, ground: Ground, normal: Direction) -> t
     )
 
 
-def _accelerate(vx: float, vy: float, thrust: Thrust) -> tuple[float, float]:
-    """Steps 1 to 4: thrust, gravity, drag on vx, fall cap on vy. Returns (vx, vy), px/tick.
+def _accelerate(
+    vx: float, vy: float, thrust: Thrust, pull: tuple[float, float]
+) -> tuple[float, float]:
+    """Steps 1 to 4: thrust, gravity and planet pull, drag on vx, fall cap on vy.
 
-    Opposite keys cancel. No drag on vy, no cap on upward speed.
-    Source: 04-ship.md, rules 2.1 to 2.4 and 7, Edge cases.
+    Returns (vx, vy), px/tick. `pull` is the wells' sum, px/tick². Opposite keys cancel. No drag
+    on vy, no cap on upward speed. Source: 04-ship.md, rules 2.1 to 2.4 and 7, Edge cases.
     """
     if thrust.left:
         vx -= THRUST_SIDE
@@ -298,6 +387,8 @@ def _accelerate(vx: float, vy: float, thrust: Thrust) -> tuple[float, float]:
     if thrust.down:
         vy += THRUST_DOWN
     vy += GRAVITY
+    vx += pull[0]
+    vy += pull[1]
     vx *= DRAG_X
     return vx, min(vy, FALL_CAP)
 

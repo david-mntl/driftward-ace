@@ -17,7 +17,7 @@ from typing import ClassVar, Final, Self
 
 from core.collision import Box, Hitbox, grow_hitbox, place_hitbox
 from core.popup import PointsPopup
-from core.ship import Ship
+from core.ship import GravityWell, Ship
 from core.world import SCREEN_H, SCREEN_W
 
 log = logging.getLogger(__name__)
@@ -64,6 +64,9 @@ class DrifterType(Enum):
 
     FLOATING_ISLAND = "floating_island"
     """Source: drifters/05-floating-islands.md."""
+
+    PLANET = "planet"
+    """Source: drifters/08-planet.md."""
 
 
 class Phase(Enum):
@@ -366,6 +369,25 @@ class Drifter(ABC):
         None here: no popup. Source: drifters/04-coin.md, popup.
         """
         return None
+
+    def gravity_well(self) -> GravityWell | None:
+        """Return the gravity field this drifter pulls the ship with on this tick, or None.
+
+        None here: no field. The field is placed at the drifter's center, screen px.
+        Source: drifters/08-planet.md, rule 4; 04-ship.md, rule 2, step 2.
+        """
+        return None
+
+    @classmethod
+    def start_size(
+        cls, width: float, height: float, variant_extra: VariantExtra | None
+    ) -> tuple[float, float]:
+        """Return the (width, height), px, the spawner hands `start_position`.
+
+        The box around everything the drifter draws while ACTIVE. The variant's own size here:
+        the footprint. Source: 07-drifters.md, rules 12 and 14; scope report DRA-96, Decision log.
+        """
+        return width, height
 
     @classmethod
     def born(cls, birth: Birth) -> Self:

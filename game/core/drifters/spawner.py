@@ -95,9 +95,8 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
     check_level(use_level)
     speed_level: int = use_level if tuning.switches.hazard_speed_scaling else BASE_LEVEL
     timer_level: int = use_level if tuning.switches.timer_scaling else BASE_LEVEL
-    x, y = cls.start_position(
-        placement.x, placement.y, variant.width, variant.height, placement.invert
-    )
+    start_width, start_height = cls.start_size(variant.width, variant.height, variant.extra)
+    x, y = cls.start_position(placement.x, placement.y, start_width, start_height, placement.invert)
     return cls.born(
         Birth(
             x=x,
