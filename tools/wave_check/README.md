@@ -28,6 +28,8 @@ A floating island counts as a hazard here (09-waves.md, rule 7), though in play 
 
 A planet is a hazard like any other. Coin near and the bot use its body, never its field (drifters/08-planet.md, rule 11). The game's wave loader already refuses a planet inside the seam.
 
+A UFO is a hazard like any other. Its path comes from its seed, never from the ship, so it has one track to check. With no `seed` it gets a default from the wave id (the file name) and its index in the file, the same one the game gives it. The game's wave loader refuses a UFO placed outside its band and two UFOs with the same seed in one wave, so either shows as a `loader` FAIL (drifters/07-ufo.md, rule 12).
+
 Each drifter is played alone with the game's physics (ship held at the start spot, world scrolling at the level's speed). The tracks are lined up by trigger tick, so two drifters can be compared at the same moment.
 
 | Check | Fails when |
@@ -39,7 +41,7 @@ Each drifter is played alone with the game's physics (ship held at the start spo
 | seam | a hazard is on screen in the wave's first `seam_clear_px` (120). An entry warning counts as on screen. The end of a wave is not checked: `extra_rest_ticks` covers it. |
 | bot (`--bot`) | from a start spot, no path gets through the wave with zero hits (09-waves.md, rule 7.3). See [The bot](#the-bot). |
 | gap | not built yet |
-| lava, per-drifter notes | lava is not in the game yet. Floating island: coin inside is its own check above. Planet: measured from its body, as above. Gaps and the bot's island and planet physics are not built. |
+| lava, per-drifter notes | lava is not in the game yet. Floating island: coin inside is its own check above. Planet: measured from its body, as above. UFO: band checked by the game's loader, as above. Gaps and the bot's island and planet physics are not built. |
 
 Every finding names the tick (counted from the wave's start), the scroll distance in px, the position and the drifters involved. A coin that fails also names the nearest hazard.
 
