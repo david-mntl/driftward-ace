@@ -43,7 +43,7 @@ Big chunks of floating ground that drift down with the world. They don't hurt. T
 3. **Moves:** never on its own. It moves down with the scroll, like the world under it. Hazard speed and Timer × don't touch it.
 4. **Blocks:** the ship can't enter an island. Every tick, right after the side walls ([../04-ship.md](../04-ship.md) rule 2, step 6):
    1. If the ship overlaps an island, it is moved out the shortest way, just to the surface.
-   2. The part of its speed going into the surface becomes 0. The part along the surface stays, so the ship slides along a slope. No bounce.
+   2. The part of its speed going into the surface, measured against the island's own movement, becomes 0. The part along the surface stays, so the ship slides along a slope. No bounce.
    3. **On top:** the ship can stand on an island and rides down with it. It lifts off when it thrusts up.
    4. **Underneath:** the island's underside holds the ship down and carries it at the island's own speed, never faster. There is no shove. The ship can always slide out sideways.
 5. **Hits:** never. Touching an island costs no life and pays nothing. A ship carried off the floor has fallen like any other fall ([../05-lives-and-damage.md](../05-lives-and-damage.md) rule 2).

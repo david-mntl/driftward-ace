@@ -31,6 +31,7 @@ Waves are hand-authored JSON files that place hazards and coins. Every run opens
    6. Every coin comes within `coin_near_max` × `ship_w` of a hazard's hitbox, at some tick while both are on screen.
    7. No coin sits inside a floating island. Gaps between islands, and between an island and a wall, count for check 2. The bot's physics includes islands blocking ([drifters/05-floating-islands.md](drifters/05-floating-islands.md) rule 4).
    8. Every drifter's own wave_check notes in its spec hold.
+   For wave_check, a floating island counts as a hazard: it counts for the seam (check 4), placement and coin near (check 6). In play it still never hurts ([drifters/05-floating-islands.md](drifters/05-floating-islands.md) rule 5). Source: Director.
 8. `wave_check` reruns on any wave change or tuning change. Source: Director.
 9. **Length.** Each wave sets its length in px of scroll. The wave ends when the world has scrolled that far since its start. Triggers are distances, so a wave keeps its layout at every level and just arrives faster. Example: 30 s at Level 1 is 1980 px. Source: Director.
 10. **Fixed or pool.** Each wave is `fixed` (played where a playlist names it) or `pool` (picked for random slots). A pool wave sets `min_level`, the lowest level it may play at. Source: Director.
