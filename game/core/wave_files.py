@@ -17,7 +17,8 @@ from dataclasses import dataclass
 from typing import Final, TypeGuard
 
 from core.drifters.base import Drifter, DrifterType, TouchEffect
-from core.drifters.spawner import Placement, spawn_drifter
+from core.drifters.registry import drifter_class
+from core.drifters.spawner import MAX_SEED, Placement, placement_seed, spawn_drifter
 from core.drifters.tuning import DrifterTuning
 from core.levels import FIRST_LEVEL, LEVEL_COUNT
 from core.waves import LevelPlaylist, Wave, WaveBook, WaveKind, WavePlacement
@@ -42,7 +43,7 @@ _WAVE_FIELDS: Final[frozenset[str]] = frozenset(
     {"length_px", "kind", "min_level", "extra_rest_ticks", "placements"}
 )
 _PLACEMENT_FIELDS: Final[frozenset[str]] = frozenset(
-    {"at_px", "type", "x", "y", "variant", "invert", "specialty", "as_level"}
+    {"at_px", "type", "x", "y", "variant", "invert", "specialty", "as_level", "seed"}
 )
 _PLAYLIST_FIELDS: Final[frozenset[str]] = frozenset({"wave_zero", "levels"})
 _LEVEL_FIELDS: Final[frozenset[str]] = frozenset({"fixed", "random_count"})
@@ -141,6 +142,10 @@ def _is_non_negative_integer(value: object) -> TypeGuard[int]:
     return _is_integer(value) and value >= 0
 
 
+def _is_seed(value: object) -> TypeGuard[int]:
+    return _is_integer(value) and 0 <= value <= MAX_SEED
+
+
 def _is_level(value: object) -> TypeGuard[int]:
     return _is_integer(value) and FIRST_LEVEL <= value <= LEVEL_COUNT
 
@@ -204,8 +209,9 @@ def _build_wave(wave_id: str, document: object, tuning: DrifterTuning) -> Wave:
         where, data, "extra_rest_ticks", _is_non_negative_integer, "an integer >= 0"
     )
     placements: list[WavePlacement] = [
-        _build_placement(file, index, item, tuning) for index, item in enumerate(items)
+        _build_placement(wave_id, index, item, tuning) for index, item in enumerate(items)
     ]
+    _check_one_path_per_seed(file, placements)
     placements.sort(key=lambda wave_placement: wave_placement.at_px)
     return Wave(
         wave_id=wave_id,
@@ -229,9 +235,15 @@ def _read_min_level(where: _Where, data: Mapping[str, object], kind: WaveKind) -
     return _checked(where, data, "min_level", _is_level, f"an integer {level_range}")
 
 
-def _build_placement(file: str, index: int, item: object, tuning: DrifterTuning) -> WavePlacement:
-    """Check one placement, spawn it once as a test, and return it with its trigger."""
-    where: _Where = _Where(file, f"placements[{index}]")
+def _build_placement(
+    wave_id: str, index: int, item: object, tuning: DrifterTuning
+) -> WavePlacement:
+    """Check one placement, spawn it once as a test, and return it with its trigger.
+
+    `index` is the placement's place in the file's list. A seeded drifter that the file gives no
+    seed gets `placement_seed(wave_id, index)`.
+    """
+    where: _Where = _Where(f"{WAVES_FOLDER}/{wave_id}.json", f"placements[{index}]")
     data: Mapping[str, object] = _as_object(where, item, "an object")
     _refuse_unknown_fields(where, data, _PLACEMENT_FIELDS)
     at_px: float = _checked(where, data, "at_px", _is_non_negative_number, "a number >= 0")
@@ -243,6 +255,11 @@ def _build_placement(file: str, index: int, item: object, tuning: DrifterTuning)
     as_level: int | None = _checked_optional(
         where, data, "as_level", _is_level, f"an integer from {FIRST_LEVEL} to {LEVEL_COUNT}"
     )
+    seed: int | None = _checked_optional(
+        where, data, "seed", _is_seed, f"an integer from 0 to {MAX_SEED}"
+    )
+    if seed is None and drifter_class(drifter_type).seeded:
+        seed = placement_seed(wave_id, index)
     placement: Placement = Placement(
         drifter_type,
         x=_checked_optional(where, data, "x", _is_number, "a number"),
@@ -251,9 +268,26 @@ def _build_placement(file: str, index: int, item: object, tuning: DrifterTuning)
         as_level=as_level,
         specialty_enabled=_checked_optional(where, data, "specialty", _is_boolean, "a boolean"),
         invert=bool(invert),
+        seed=seed,
     )
     _check_spawns_clear_of_seam(where, placement, at_px, tuning)
     return WavePlacement(at_px=float(at_px), placement=placement)
+
+
+def _check_one_path_per_seed(file: str, placements: list[WavePlacement]) -> None:
+    """Raise for the first placement, by file index, whose seed an earlier one already uses.
+
+    Source: drifters/07-ufo.md, seed (two UFOs in one wave never share a path).
+    """
+    first_user: dict[int, int] = {}
+    for index, wave_placement in enumerate(placements):
+        seed: int | None = wave_placement.placement.seed
+        if seed is None:
+            continue
+        if seed in first_user:
+            where: _Where = _Where(file, f"placements[{index}]")
+            raise where.error(f"seed {seed} is already used by placements[{first_user[seed]}]")
+        first_user[seed] = index
 
 
 def _read_drifter_type(where: _Where, data: Mapping[str, object]) -> DrifterType:

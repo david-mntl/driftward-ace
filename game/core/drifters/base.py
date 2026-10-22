@@ -68,6 +68,9 @@ class DrifterType(Enum):
     PLANET = "planet"
     """Source: drifters/08-planet.md."""
 
+    UFO = "ufo"
+    """Source: drifters/07-ufo.md."""
+
 
 class Phase(Enum):
     """Where a drifter is in its life."""
@@ -179,6 +182,13 @@ class Birth:
     telegraph_min_ticks: int
     """The shortest a scaled telegraph may get, ticks."""
 
+    hazard_speed_mult: float = 1.0
+    """The hazard speed multiplier the spawner applied to `speed`: the level's, or Level 1's with
+    the playtest switch off. For a drifter's own speeds (the UFO's weave)."""
+
+    seed: int | None = None
+    """The placement's seed, for a seeded drifter. None for any other."""
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Specialty(ABC):
@@ -206,6 +216,10 @@ class Drifter(ABC):
     parked: ClassVar[bool] = False
     """True: the drifter sits still in the world and moves only with the scroll (the coin). Read
     by the spawner. Source: 03-world-and-camera.md, rule 9."""
+
+    seeded: ClassVar[bool] = False
+    """True: the drifter's path comes from a seed, and every placement of it carries one (the
+    UFO). Read by the spawner and the loaders. Source: drifters/07-ufo.md, seed (locked)."""
 
     uid: int = 0
     """Unique within a run, from 1. Set by `core.run.add_drifters`. 0 before that."""
