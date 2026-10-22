@@ -14,7 +14,7 @@ from typing import Any
 from app import tuning as tuning_module
 from settings import Config
 
-SUITE: str = "part1"
+SUITE: str = "part1-islands"
 """Which checks ran. A pass from a smaller suite never counts for a bigger one."""
 BOT_SUITE: str = "bot1"
 """The bot check's own suite. Raise it when the bot changes how it searches."""

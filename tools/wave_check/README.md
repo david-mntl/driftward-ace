@@ -24,6 +24,8 @@ Exit code: 0 all passed, 1 a check failed, 2 a usage, config or game file error.
 
 ## What it checks
 
+A floating island counts as a hazard here (09-waves.md, rule 7), though in play it never hurts: it counts for placement, coin near and the seam.
+
 Each drifter is played alone with the game's physics (ship held at the start spot, world scrolling at the level's speed). The tracks are lined up by trigger tick, so two drifters can be compared at the same moment.
 
 | Check | Fails when |
@@ -31,6 +33,7 @@ Each drifter is played alone with the game's physics (ship held at the start spo
 | placement | a drifter never enters the screen, or a hazard turns active on top of the ship at a start spot (left, center, right) |
 | telegraph | a telegraph is under `telegraph_min` at the tested level. Only the chain lightning charge is a telegraph (an entry warning is not). It compares the charge before the game's own floor, because the game clamps it and would hide a bad tuning value. |
 | coin_near | a coin never comes within `coin_near_ship_widths` x 32 px (96) of a hazard's hitbox while both are on screen |
+| coin_in_island | a coin's hitbox shares area with a floating island's hitbox at some tick (09-waves.md, rule 7.7). Touching an edge from outside passes. The triangle uses its slope, not its box. |
 | seam | a hazard is on screen in the wave's first `seam_clear_px` (120). An entry warning counts as on screen. The end of a wave is not checked: `extra_rest_ticks` covers it. |
 | bot (`--bot`) | from a start spot, no path gets through the wave with zero hits (09-waves.md, rule 7.3). See [The bot](#the-bot). |
 | gap | not built yet |

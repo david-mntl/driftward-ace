@@ -26,7 +26,7 @@ The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor i
 2. **Fall.** The ship drops fully below the floor ([03-world-and-camera.md](03-world-and-camera.md) rule 5).
    1. Lose 1 life.
    2. Play the **life-lost feedback** (rule 3).
-   3. Respawn at `fall_respawn`: x 320, y 240, `vx = vy = 0`. If a floating island covers that point, the ship respawns at the nearest clear spot straight above or below it. If the spot above would put the ship's top edge past the top line, it goes below ([drifters/05-floating-islands.md](drifters/05-floating-islands.md)).
+   3. Respawn at `fall_respawn`: x 320, y 240, `vx = vy = 0`. If a floating island would overlap the ship at that point, the ship respawns at the nearest clear spot straight above or below it. If the spot above would put the ship's top edge past the top line, it goes below ([drifters/05-floating-islands.md](drifters/05-floating-islands.md)).
    4. Become invulnerable for `invuln_ticks`, blinking.
    5. The ship stands at `fall_respawn`, at rest, until the first arrow key press. Invulnerability counts down during this wait. An arrow held through the fall does not count; the player releases it and presses again. The respawn completes at that press. That press also thrusts the ship on the same tick. Gravity and drag apply from then on. The world keeps scrolling during the wait. The wait has no time limit.
    6. **Fall while invulnerable.** The fall costs no life. The ship respawns at `fall_respawn`, at rest, and does not wait for a key. The invulnerability timer keeps running. No life-lost feedback plays.

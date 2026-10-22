@@ -21,7 +21,18 @@ from core.drifters.tuning import DrifterTuning
 from core.levels import FIRST_LEVEL
 from core.popup import PointsPopup, step_popups
 from core.scroll import Scroll, scroll_step_px, start_scroll, step_scroll
-from core.ship import Ship, Thrust, is_below_floor, ship_hitbox, spawn, step
+from core.ship import (
+    NO_GROUND,
+    Ground,
+    Ship,
+    Thrust,
+    block_ship,
+    is_below_floor,
+    ship_hitbox,
+    spawn,
+    spawn_clear,
+    step,
+)
 from core.waves import WaveRun, next_run_waves, step_waves
 
 log = logging.getLogger(__name__)
@@ -179,6 +190,23 @@ def add_drifters(run: Run, placements: Sequence[Placement], tuning: DrifterTunin
     return replace(run, drifters=run.drifters + tuple(added), next_uid=run.next_uid + len(added))
 
 
+def island_ground(drifters: Sequence[Drifter], scroll_step_px: float) -> Ground:
+    """Return the ground the ship can't enter: the shapes of every ACTIVE BLOCK drifter, joined.
+
+    The ground moves down by `scroll_step_px` (px/tick), the step the islands just moved by.
+    NO_GROUND when no drifter blocks. Pure, no logging. Source: systems/run.md, Interface.
+    """
+    shapes: Hitbox = tuple(
+        shape
+        for drifter in drifters
+        if drifter.phase is Phase.ACTIVE and drifter.effect_on_touch() is TouchEffect.BLOCK
+        for shape in drifter.current_hitbox()
+    )
+    if not shapes:
+        return NO_GROUND
+    return Ground(hitbox=shapes, velocity_x=0.0, velocity_y=scroll_step_px)
+
+
 def step_run(run: Run, thrust: Thrust) -> Run:
     """Advance the run one fixed 60 Hz tick and return the new run. Never mutates the input.
 
@@ -210,8 +238,8 @@ def _is_press(thrust: Thrust, held: Thrust) -> bool:
 
 
 def _step_playing(run: Run, thrust: Thrust) -> Run:
-    """A playing tick: press, timer, drifters, popups, wait, ship, scroll, collect, fall or hit,
-    cooldowns, drops, waves.
+    """A playing tick: press, timer, drifters, popups, ground and ship, scroll, collect, fall or
+    hit, cooldowns, drops, waves.
 
     A hit is tested only when the ship did not fall. The level is read once, going into the tick.
     Source: systems/run.md, Rules, a playing tick, steps 1 to 10 with 3a, 5a and 9a.
@@ -219,12 +247,14 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
     press: bool = _is_press(thrust, run.held)
     protected: bool = run.invulnerable
     left: int = max(run.invuln_ticks_left - 1, 0)
-    drifters: tuple[Drifter, ...] = _update_drifters(run)
+    scroll_px: float = scroll_step_px(run.scroll, run.level)
+    drifters: tuple[Drifter, ...] = _update_drifters(run, scroll_px)
     ended_wait: bool = run.waiting and press
     if ended_wait:
         log.debug("respawn wait end")
     stands: bool = run.waiting and not press
-    ship: Ship = run.ship if stands else step(run.ship, thrust)
+    ground: Ground = island_ground(drifters, scroll_px)
+    ship: Ship = block_ship(run.ship, ground) if stands else step(run.ship, thrust, ground)
     scroll: Scroll = step_scroll(run.scroll, run.level)
     if run.invuln_ticks_left == 1:
         log.debug("invulnerable end")
@@ -240,19 +270,19 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
     )
     collected: Run = stepped if stands else _apply_collect(stepped)
     if is_below_floor(ship):
-        outcome: Run = _apply_fall(collected, protected, thrust)
+        outcome: Run = _apply_fall(collected, protected, thrust, ground)
     else:
         outcome = _apply_hit(collected, protected, thrust)
     return _step_run_waves(_drop_drifters(_cool_down(outcome, collected.drifters)))
 
 
-def _update_drifters(run: Run) -> tuple[Drifter, ...]:
+def _update_drifters(run: Run, scroll_px: float) -> tuple[Drifter, ...]:
     """Update every drifter once with the ship as it was at the start of the tick (step 3).
 
-    Each updated drifter is then marked entered when it is on screen. Logs each drifter that
-    turns from WARNING to ACTIVE.
+    `scroll_px` is how far the world scrolls this tick, px. Each updated drifter is then marked
+    entered when it is on screen. Logs each drifter that turns from WARNING to ACTIVE.
     """
-    ctx = TickContext(ship=run.ship, scroll_step_px=scroll_step_px(run.scroll, run.level))
+    ctx = TickContext(ship=run.ship, scroll_step_px=scroll_px)
     updated: tuple[Drifter, ...] = tuple(
         drifter.update(ctx).mark_entered() for drifter in run.drifters
     )
@@ -316,24 +346,28 @@ def _apply_collect(stepped: Run) -> Run:
     )
 
 
-def _apply_fall(stepped: Run, protected: bool, thrust: Thrust) -> Run:
+def _apply_fall(stepped: Run, protected: bool, thrust: Thrust, ground: Ground) -> Run:
     """Apply a fall to the run after its ship and scroll stepped.
 
     A protected fall respawns the ship with no wait and no life lost. An unprotected fall
     costs a life and respawns it waiting with fresh invulnerability, or ends the run on the
-    last life.
-    Source: 05-lives-and-damage.md, rules 2.1 to 2.6 and 5; systems/run.md, Rules, step 6.
+    last life. The respawn spot is the one nearest the respawn point that `ground` doesn't hold.
+    Source: 05-lives-and-damage.md, rules 2.1 to 2.7 and 5; systems/run.md, Rules, step 6.
     """
     fell = stepped.ship
     if protected:
         _log_respawn(fell, waits=False)
-        return replace(stepped, ship=spawn(), waiting=False)
+        return replace(stepped, ship=_respawn_ship(ground), waiting=False)
     lives: int = stepped.lives - 1
     log.debug("life lost lives=%d", lives)
     if lives > 0:
         _log_respawn(fell, waits=True)
         return replace(
-            stepped, lives=lives, ship=spawn(), waiting=True, invuln_ticks_left=INVULN_TICKS
+            stepped,
+            lives=lives,
+            ship=_respawn_ship(ground),
+            waiting=True,
+            invuln_ticks_left=INVULN_TICKS,
         )
     return _end_run(stepped, thrust)
 
@@ -447,6 +481,14 @@ def _step_run_waves(run: Run) -> Run:
     if run.waves is None:
         return run
     return replace(run, waves=step_waves(run.waves, run.scroll.distance_px))
+
+
+def _respawn_ship(ground: Ground) -> Ship:
+    """Return the respawn ship clear of `ground`. Logs when the spot moved off the respawn point."""
+    ship: Ship = spawn_clear(ground)
+    if ship.y != spawn().y:
+        log.debug("respawn clear of island y=%.2f", ship.y)
+    return ship
 
 
 def _log_respawn(fell_from: Ship, *, waits: bool) -> None:

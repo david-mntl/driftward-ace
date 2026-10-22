@@ -53,9 +53,9 @@ GOOD = wave(
 
 def test_a_fair_wave_passes_part_one() -> None:
     status = run(GOOD)
-    assert [status[k] for k in ("placement", "telegraph", "coin_near", "seam")] == [
-        "PASS"
-    ] * 4
+    assert [
+        status[k] for k in ("placement", "telegraph", "coin_near", "coin_in_island", "seam")
+    ] == ["PASS"] * 5
     assert status["bot"] == status["gap"] == "SKIP"
 
 
@@ -88,6 +88,43 @@ def test_coin_far_from_the_hazard_fails_and_names_the_nearest() -> None:
     messages = findings(far, "coin_near")
     assert len(messages) == 1
     assert "meteorite" in messages[0]
+
+
+def island(at_px: float, x: float, y: float, variant: str = "rectangle") -> dict[str, Any]:
+    return {"at_px": at_px, "type": "floating_island", "x": x, "y": y, "variant": variant}
+
+
+def coin(at_px: float, x: float, y: float) -> dict[str, Any]:
+    return {"at_px": at_px, "type": "coin", "x": x, "y": y}
+
+
+def test_coin_inside_an_island_fails() -> None:
+    # Rectangle 320 x 120 at (320, 150) spans y 90 to 210. Both parked, so they stay overlapped.
+    inside = wave(1400, island(300, 320, 150), coin(300, 320, 150))
+    assert findings(inside, "coin_in_island") == ["#2 coin sits inside #1 floating_island rectangle"]
+
+
+def test_coin_touching_an_island_edge_passes() -> None:
+    # The coin's 12 x 10 box ends at y 210, the island's bottom edge: touching is not inside.
+    touching = wave(1400, island(300, 320, 150), coin(300, 320, 215))
+    status = run(touching)
+    assert status["coin_in_island"] == "PASS"
+
+
+def test_coin_inside_the_triangle_uses_its_slope() -> None:
+    # Triangle 320 x 120 at (320, 150): slope from (160, 90) down to (480, 210).
+    above_slope = wave(1400, island(300, 320, 150, "triangle"), coin(300, 400, 120))
+    below_slope = wave(1400, island(300, 320, 150, "triangle"), coin(300, 200, 190))
+    assert run(above_slope)["coin_in_island"] == "PASS"
+    assert len(findings(below_slope, "coin_in_island")) == 1
+
+
+def test_an_island_counts_as_a_hazard_for_the_seam_and_coin_near() -> None:
+    # 09-waves.md, rule 7: for wave_check an island counts as a hazard.
+    early = wave(1400, island(0, 320, 150))
+    assert run(early)["seam"] == "FAIL"
+    near = wave(1400, island(300, 320, 150), coin(300, 320, 240))
+    assert run(near)["coin_near"] == "PASS"
 
 
 def test_a_hazard_that_never_enters_the_screen_fails() -> None:

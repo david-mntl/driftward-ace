@@ -62,6 +62,9 @@ class DrifterType(Enum):
     COIN = "coin"
     """Source: drifters/04-coin.md."""
 
+    FLOATING_ISLAND = "floating_island"
+    """Source: drifters/05-floating-islands.md."""
+
 
 class Phase(Enum):
     """Where a drifter is in its life."""
@@ -84,6 +87,10 @@ class TouchEffect(Enum):
 
     COLLECT = "collect"
     """Touching it collects it: it pays and goes. The coin. Source: 06-scoring.md, rule 2."""
+
+    BLOCK = "block"
+    """Touching it neither hurts nor pays: it is ground the ship can't enter. The floating
+    island. Source: 07-drifters.md, Summary (Blocker)."""
 
     NONE = "none"
     """Nothing happens."""
