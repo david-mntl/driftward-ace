@@ -13,7 +13,7 @@ from typing import Any
 from app import tuning as tuning_module
 from settings import Config
 
-SUITE: str = "part1"
+SUITE: str = "part1-islands"
 """Which checks ran. A pass from a smaller suite never counts for a bigger one."""
 STORE_FILE: Path = Path(__file__).resolve().parent / "passes.json"
 

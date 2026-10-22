@@ -1,4 +1,5 @@
-"""The wave_check checks of part 1: placement sanity, telegraph, coin near a hazard, seam.
+"""The wave_check checks of part 1: placement sanity, telegraph, coin near a hazard, coin
+inside an island, seam.
 
 Each check takes a `Context` (the wave, the level, the tuning and every drifter's track) and
 returns a `Result` with a status and findings. A finding names the tick, the scroll distance, the
@@ -61,7 +62,12 @@ class Context:
 
 
 def _is_hazard(track: Track) -> bool:
+    # A floating island counts as a hazard here, though it never hurts (09-waves.md, rule 7).
     return track.kind != DrifterType.COIN.value
+
+
+def _is_island(track: Track) -> bool:
+    return track.kind == DrifterType.FLOATING_ISLAND.value
 
 
 def _result(name: str, title: str, findings: list[Finding], note: str = "") -> Result:
@@ -108,7 +114,7 @@ def check_placements(ctx: Context) -> Result:
         "placement",
         "placement: enters the screen, not on the ship",
         found,
-        "UFO band and islands are not in the game yet",
+        "the UFO band is not in the game yet",
     )
 
 
@@ -210,6 +216,40 @@ def check_coins(ctx: Context) -> Result:
     return _result("coin_near", "every coin near a hazard", found, note)
 
 
+def check_coin_in_island(ctx: Context) -> Result:
+    """No coin sits inside a floating island. Touching an island's edge from outside passes."""
+    islands: list[Track] = [t for t in ctx.tracks if _is_island(t)]
+    found: list[Finding] = []
+    for coin in (t for t in ctx.tracks if not _is_hazard(t)):
+        for frame in coin.frames:
+            if not frame.hitbox:
+                continue
+            tick: int = coin.start_tick + frame.age
+            inside: Track | None = next(
+                (
+                    island
+                    for island in islands
+                    if (other := _frame_at(island, tick)) is not None
+                    and other.hitbox
+                    and hitboxes_overlap(frame.hitbox, other.hitbox)
+                ),
+                None,
+            )
+            if inside is not None:
+                found.append(
+                    Finding(
+                        f"{coin.name} sits inside {inside.name}",
+                        tick,
+                        ctx.px(tick),
+                        (frame.x, frame.y),
+                        (coin.name, inside.name),
+                    )
+                )
+                break
+    note: str = f"{len(islands)} island(s)"
+    return _result("coin_in_island", "no coin inside an island", found, note)
+
+
 def _frame_at(track: Track, tick: int) -> Frame | None:
     """The track's frame on `tick` counted from the wave's start, or None if it is not alive."""
     age: int = tick - track.start_tick
@@ -257,7 +297,7 @@ NOT_YET: tuple[Result, ...] = (
         "notes",
         "per-drifter notes",
         "SKIP",
-        note="no extra notes for the types in the game",
+        note="floating island: coin inside is its own check; gaps and the bot are part 2",
     ),
 )
 
@@ -268,6 +308,7 @@ def run_checks(ctx: Context) -> list[Result]:
         check_placements(ctx),
         check_telegraph(ctx),
         check_coins(ctx),
+        check_coin_in_island(ctx),
         check_seam(ctx),
         *NOT_YET,
     ]

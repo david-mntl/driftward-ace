@@ -2,7 +2,7 @@
 
 Tests a wave against the GDD rules ([09-waves.md](../../docs/design/gdd/09-waves.md), rule 7) by running the game's own physics headless. It reads the game and never changes it. The Director owns `config.json`.
 
-**Part 1 is built:** placement sanity, telegraph, coin near a hazard, seam. The bot checks (zero-hit path, gap) are part 2. They show as SKIP, so a part 1 pass is not the full pass.
+**Part 1 is built:** placement sanity, telegraph, coin near a hazard, coin inside an island, seam. The bot checks (zero-hit path, gap) are part 2. They show as SKIP, so a part 1 pass is not the full pass.
 
 ## Run
 
@@ -21,6 +21,8 @@ Exit code: 0 all passed, 1 a check failed, 2 a usage, config or game file error.
 
 ## What it checks
 
+A floating island counts as a hazard here (09-waves.md, rule 7), though in play it never hurts: it counts for placement, coin near and the seam.
+
 Each drifter is played alone with the game's physics (ship held at the start spot, world scrolling at the level's speed). The tracks are lined up by trigger tick, so two drifters can be compared at the same moment.
 
 | Check | Fails when |
@@ -28,9 +30,10 @@ Each drifter is played alone with the game's physics (ship held at the start spo
 | placement | a drifter never enters the screen, or a hazard turns active on top of the ship at a start spot (left, center, right) |
 | telegraph | a telegraph is under `telegraph_min` at the tested level. Only the chain lightning charge is a telegraph (an entry warning is not). It compares the charge before the game's own floor, because the game clamps it and would hide a bad tuning value. |
 | coin_near | a coin never comes within `coin_near_ship_widths` x 32 px (96) of a hazard's hitbox while both are on screen |
+| coin_in_island | a coin's hitbox shares area with a floating island's hitbox at some tick (09-waves.md, rule 7.7). Touching an edge from outside passes. The triangle uses its slope, not its box. |
 | seam | a hazard is on screen in the wave's first `seam_clear_px` (120). An entry warning counts as on screen. The end of a wave is not checked: `extra_rest_ticks` covers it. |
 | gap, bot | part 2 |
-| lava, per-drifter notes | not in the game yet / no extra notes for the types in the game |
+| lava, per-drifter notes | lava is not in the game yet. The floating island's notes: coin inside is its own check above; its gaps and the bot's island physics are part 2. |
 
 Every finding names the tick (counted from the wave's start), the scroll distance in px, the position and the drifters involved. A coin that fails also names the nearest hazard.
 
@@ -51,7 +54,7 @@ The coin check grows the coin's hitbox by the limit and tests for overlap, so ne
 
 ## Remembered passes
 
-A pass is stored in `passes.json` as `<wave>@<level>` with a fingerprint of the wave (whitespace ignored), every tuning file, the config and the suite name. Change any of them and the pass is stale, so a tuning change reruns every wave. A failing wave drops its old pass. When part 2 arrives the suite name changes, so every part 1 pass goes stale. `--wave` and `--force` always run.
+A pass is stored in `passes.json` as `<wave>@<level>` with a fingerprint of the wave (whitespace ignored), every tuning file, the config and the suite name. Change any of them and the pass is stale, so a tuning change reruns every wave. A failing wave drops its old pass. The suite name changed to `part1-islands` with the coin-inside-island check. When part 2 arrives it changes again, so every part 1 pass goes stale. `--wave` and `--force` always run.
 
 ## Tests
 
