@@ -69,7 +69,7 @@ The bot can wrongly fail a wave that a person could fly, since it doesn't try ev
 | `cell_px`, `cell_speed` | ships closer than this in position (px) and speed (px/tick) count as one | 8, 1 |
 | `spread_px`, `spread_speed` | screen square (px) and sideways speed step (px/tick) the kept ships are spread over | 64, 3 |
 | `safe_px` | room to the nearest hazard, or to the floor, past which a ship counts as safe | 96 |
-| `margin_px` | grows every hazard hitbox for the bot only. 0 is the game's hitbox. Raise it to ask for room to spare. | 0 |
+| `margin_px` | grows every hazard hitbox for the bot only, so it keeps room to spare like a person would. 0 is the game's exact hitbox. | 6 |
 
 The tracks play each drifter with the ship held at the spawn. No drifter in the game moves or hits by where the ship is (the chain lightning only places its warning by it), so the bot sees exactly what the game does. A future drifter that chases the ship would need the bot to play the whole game instead.
 

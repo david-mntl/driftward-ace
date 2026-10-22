@@ -54,7 +54,8 @@ def test_a_wall_with_no_way_through_fails_from_every_start_spot() -> None:
     for spot, finding in zip(("left", "center", "right"), result.findings, strict=True):
         assert f"start spot '{spot}'" in finding.message
         assert finding.tick is not None and finding.px is not None
-        assert any("meteorite big" in name for name in finding.drifters)
+        # The last ships die on the wall, or on the floor while ducking under it.
+        assert "meteorite big" in finding.message or "the floor" in finding.message
 
 
 @pytest.mark.parametrize(

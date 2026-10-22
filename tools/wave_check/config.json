@@ -17,6 +17,6 @@
     "spread_px": 64,
     "spread_speed": 3,
     "safe_px": 96,
-    "margin_px": 0
+    "margin_px": 6
   }
 }

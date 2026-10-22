@@ -38,7 +38,7 @@ class BotConfig:
     """Sideways speed step the kept ships are spread over, px/tick."""
     safe_px: float = 96.0
     """Room to the nearest hazard past which a ship counts as safe, px."""
-    margin_px: float = 0.0
+    margin_px: float = 6.0
     """Grows every hazard hitbox by this much, px, for the bot only. 0 is the game's hitbox."""
 
 
