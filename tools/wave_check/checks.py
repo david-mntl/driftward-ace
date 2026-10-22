@@ -2,7 +2,8 @@
 
 Each check takes a `Context` (the wave, the level, the tuning and every drifter's track) and
 returns a `Result` with a status and findings. A finding names the tick, the scroll distance, the
-position and the drifters involved. The bot checks (zero-hit path, gap) are part 2.
+position and the drifters involved. The bot check (zero-hit path) is in `bot.py` and runs on its
+own (`--bot`). The gap check is not built yet.
 """
 
 from dataclasses import dataclass, field
@@ -247,10 +248,13 @@ NOT_YET: tuple[Result, ...] = (
         "gap",
         "gap >= gap_min along the bot's path",
         "SKIP",
-        note="part 2, needs the bot",
+        note="not built yet",
     ),
     Result(
-        "bot", "the bot finds a zero-hit path", "SKIP", note="part 2, needs the bot"
+        "bot",
+        "the bot finds a zero-hit path",
+        "SKIP",
+        note="runs on its own: wave_check.py --bot",
     ),
     Result("lava", "lava walls", "SKIP", note="lava is not defined yet"),
     Result(

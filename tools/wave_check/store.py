@@ -2,7 +2,8 @@
 
 A pass is stored under `<wave id>@<level>` with a fingerprint of everything the check reads: the
 wave, every tuning file, the config and the suite version. Change any of them and the pass is
-stale. Part 2 raises SUITE, so every part 1 pass goes stale when the bot checks arrive.
+stale. The bot check (`--bot`) keeps its own passes, `<wave id>@<level>/bot`, and its fingerprint
+also holds the ship's physics code, since the bot flies it.
 """
 
 import hashlib
@@ -15,13 +16,18 @@ from settings import Config
 
 SUITE: str = "part1"
 """Which checks ran. A pass from a smaller suite never counts for a bigger one."""
+BOT_SUITE: str = "bot1"
+"""The bot check's own suite. Raise it when the bot changes how it searches."""
+SHIP_CODE: Path = tuning_module.TUNING_DIR.parent / "core" / "ship.py"
 STORE_FILE: Path = Path(__file__).resolve().parent / "passes.json"
 
 
-def fingerprint(wave_document: Any, config: Config) -> str:
+def fingerprint(wave_document: Any, config: Config, suite: str = SUITE) -> str:
     """Hash the wave and the values it is checked against. Whitespace does not matter."""
     digest = hashlib.sha256()
-    digest.update(SUITE.encode())
+    digest.update(suite.encode())
+    if suite == BOT_SUITE:
+        digest.update(SHIP_CODE.read_bytes())
     digest.update(_canonical(wave_document))
     digest.update(_canonical(config.raw))
     folder: Path = tuning_module.TUNING_DIR
@@ -37,8 +43,8 @@ def _canonical(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
 
-def _key(wave_id: str, level: int) -> str:
-    return f"{wave_id}@{level}"
+def _key(wave_id: str, level: int, suite: str = SUITE) -> str:
+    return f"{wave_id}@{level}" if suite == SUITE else f"{wave_id}@{level}/bot"
 
 
 def read(path: Path | None = None) -> dict[str, str]:
@@ -57,18 +63,25 @@ def read(path: Path | None = None) -> dict[str, str]:
     )
 
 
-def is_fresh(passes: dict[str, str], wave_id: str, level: int, print_: str) -> bool:
-    return passes.get(_key(wave_id, level)) == print_
+def is_fresh(
+    passes: dict[str, str], wave_id: str, level: int, print_: str, suite: str = SUITE
+) -> bool:
+    return passes.get(_key(wave_id, level, suite)) == print_
 
 
 def remember(
-    passes: dict[str, str], wave_id: str, level: int, print_: str, ok: bool
+    passes: dict[str, str],
+    wave_id: str,
+    level: int,
+    print_: str,
+    ok: bool,
+    suite: str = SUITE,
 ) -> None:
     """Keep a pass, or drop the old one when the wave now fails."""
     if ok:
-        passes[_key(wave_id, level)] = print_
+        passes[_key(wave_id, level, suite)] = print_
     else:
-        passes.pop(_key(wave_id, level), None)
+        passes.pop(_key(wave_id, level, suite), None)
 
 
 def write(passes: dict[str, str], path: Path | None = None) -> None:

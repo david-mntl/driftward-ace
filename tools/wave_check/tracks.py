@@ -9,7 +9,7 @@ import math
 from dataclasses import dataclass
 
 from core.collision import Hitbox
-from core.drifters.base import Phase, TickContext
+from core.drifters.base import Phase, TickContext, TouchEffect
 from core.drifters.spawner import spawn_drifter
 from core.drifters.tuning import DrifterTuning
 from core.scroll import scroll_speed
@@ -30,6 +30,8 @@ class Frame:
     """Placed hitbox, () unless ACTIVE."""
     visible: bool
     """An entry warning counts as on screen, as the seam rule says."""
+    hits: bool = False
+    """Touching it now is a hit: ACTIVE, a HIT on touch, and a hitbox to touch."""
 
 
 @dataclass(frozen=True)
@@ -72,14 +74,16 @@ def build_tracks(
             on_screen: bool = drifter.is_partly_on_screen()
             active: bool = drifter.phase is Phase.ACTIVE
             entered = entered or (active and on_screen)
+            hitbox: Hitbox = drifter.current_hitbox()
             frames.append(
                 Frame(
                     age,
                     drifter.phase,
                     drifter.x,
                     drifter.y,
-                    drifter.current_hitbox(),
+                    hitbox,
                     drifter.phase is Phase.WARNING or on_screen,
+                    bool(hitbox) and drifter.effect_on_touch() is TouchEffect.HIT,
                 )
             )
             drifter = drifter.update(context).mark_entered()

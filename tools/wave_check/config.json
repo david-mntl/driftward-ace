@@ -8,5 +8,15 @@
     "gap_min_ship_widths": 2.5
   },
   "track_ticks_max": 2400,
-  "bot": { "mode": "perfect", "reaction_ticks": 0, "lookahead_ticks": null }
+  "bot": {
+    "start_spots": [],
+    "decision_ticks": 4,
+    "beam_width": 60,
+    "cell_px": 8,
+    "cell_speed": 1,
+    "spread_px": 64,
+    "spread_speed": 3,
+    "safe_px": 96,
+    "margin_px": 6
+  }
 }

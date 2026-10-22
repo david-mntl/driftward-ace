@@ -4,9 +4,10 @@
     python tools/wave_check/wave_check.py --changed               # only waves git sees as changed
     python tools/wave_check/wave_check.py --changed --base REF    # only waves changed since REF
     python tools/wave_check/wave_check.py --all
+    python tools/wave_check/wave_check.py --changed --bot         # the bot check alone
 
-Part 1: placement sanity, telegraph, coin near a hazard, seam. The bot checks (zero-hit path,
-gap) are part 2 and show as SKIP, so a pass here is not the full pass yet.
+Part 1: placement sanity, telegraph, coin near a hazard, seam. The bot check (zero-hit path) is
+slower and runs on its own with --bot. The gap check is not built yet.
 Reads the game, never changes it. The Director owns `config.json`. Exit code: 0 all passed,
 1 a check failed, 2 a usage, config or game file error.
 """
@@ -26,6 +27,7 @@ sys.path.insert(0, str(TOOL_DIR))
 import store
 from app import tuning as tuning_module
 from app.waves import PLAYLIST_FILE, WAVES_DIR
+from bot import check_bot
 from checks import Context, Result, run_checks, ships_at_spots
 from core.drifters.tuning import DrifterTuning
 from core.ship import spawn
@@ -34,9 +36,10 @@ from core.waves import Wave
 from settings import Config, load_config
 from tracks import build_tracks
 
-PART_TWO: str = (
-    "bot checks (zero-hit path, gap) are part 2: not run, so this is not the full pass"
+PART_ONE_ONLY: str = (
+    "bot check not run here: run it with --bot. The gap check is not built yet."
 )
+BOT_ONLY: str = "bot check only: run without --bot for the other checks"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(reports, indent=2))
     else:
-        _print(reports)
+        _print(reports, args.bot)
     return 1 if any(r["status"] == "FAIL" for r in reports) else 0
 
 
@@ -98,6 +101,11 @@ def _parser() -> argparse.ArgumentParser:
         "--base",
         metavar="REF",
         help="with --changed: waves changed since REF (git diff REF...HEAD), not in the working tree",
+    )
+    parser.add_argument(
+        "--bot",
+        action="store_true",
+        help="run the bot check alone (zero-hit path), not the other checks",
     )
     parser.add_argument("--force", action="store_true", help="ignore remembered passes")
     parser.add_argument(
@@ -174,18 +182,19 @@ def _check_wave(
     except (ValueError, OSError) as err:
         return [_loader_failure(wave_id, err)]
     reports: list[dict[str, Any]] = []
+    suite: str = store.BOT_SUITE if args.bot else store.SUITE
     for level in levels:
-        print_: str = store.fingerprint(document, config)
+        print_: str = store.fingerprint(document, config, suite)
         if not (args.force or args.wave or args.changed) and store.is_fresh(
-            passes, wave_id, level, print_
+            passes, wave_id, level, print_, suite
         ):
             reports.append(
                 {"wave": wave_id, "level": level, "status": "PASS", "remembered": True}
             )
             continue
-        results: list[Result] = _run(wave, level, config, tuning)
+        results: list[Result] = _run(wave, level, config, tuning, args.bot)
         ok: bool = all(r.status != "FAIL" for r in results)
-        store.remember(passes, wave_id, level, print_, ok)
+        store.remember(passes, wave_id, level, print_, ok, suite)
         reports.append(
             {
                 "wave": wave_id,
@@ -198,14 +207,16 @@ def _check_wave(
     return reports
 
 
-def _run(wave: Wave, level: int, config: Config, tuning: DrifterTuning) -> list[Result]:
+def _run(
+    wave: Wave, level: int, config: Config, tuning: DrifterTuning, bot: bool
+) -> list[Result]:
     try:
         tracks = build_tracks(wave, level, tuning, spawn(), config.track_ticks_max)
     except ValueError as err:
         failed = Result("spawn", "every placement spawns", "FAIL", note=str(err))
         return [failed]
     ctx = Context(wave, level, tuning, config, tracks, ships_at_spots(config))
-    return run_checks(ctx)
+    return [check_bot(ctx)] if bot else run_checks(ctx)
 
 
 def _loader_failure(wave_id: str, err: Exception) -> dict[str, Any]:
@@ -244,7 +255,7 @@ def _result_dict(result: Result) -> dict[str, Any]:
     }
 
 
-def _print(reports: list[dict[str, Any]]) -> None:
+def _print(reports: list[dict[str, Any]], bot: bool) -> None:
     passed: int = sum(1 for r in reports if r["status"] == "PASS")
     failed: int = sum(1 for r in reports if r["status"] == "FAIL")
     for report in reports:
@@ -274,7 +285,7 @@ def _print(reports: list[dict[str, Any]]) -> None:
                 print(f"       - {finding['message']}  [{', '.join(where)}]")
     print(f"\n{passed} passed, {failed} failed")
     if passed and not failed:
-        print(PART_TWO)
+        print(BOT_ONLY if bot else PART_ONE_ONLY)
 
 
 if __name__ == "__main__":
