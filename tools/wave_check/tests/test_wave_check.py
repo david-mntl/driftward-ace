@@ -127,6 +127,30 @@ def test_an_island_counts_as_a_hazard_for_the_seam_and_coin_near() -> None:
     assert run(near)["coin_near"] == "PASS"
 
 
+def planet(at_px: float, x: float, y: float) -> dict[str, Any]:
+    return {"at_px": at_px, "type": "planet", "x": x, "y": y}
+
+
+def test_a_planet_is_a_hazard_for_the_seam_and_placement() -> None:
+    # It hits, so the game's own wave loader already refuses one in the seam.
+    with pytest.raises(ValueError, match="a hazard \\(planet\\) at 0 px"):
+        run(wave(1400, planet(0, 320, 150)))
+    status = run(wave(1400, planet(300, 320, 150)))
+    assert status["placement"] == status["seam"] == "PASS"
+
+
+def test_coin_near_a_planet_is_measured_from_its_body_not_its_field() -> None:
+    # drifters/08-planet.md, rule 11. Body radius 32, field 150. The coin's 12 px wide box,
+    # grown by 96, reaches the body from 100 px off the center but not from 140, though 140
+    # is still inside the field.
+    body_near = wave(1400, planet(300, 320, 150), coin(300, 420, 150))
+    field_only = wave(1400, planet(300, 320, 150), coin(300, 460, 150))
+    assert run(body_near)["coin_near"] == "PASS"
+    messages = findings(field_only, "coin_near")
+    assert len(messages) == 1
+    assert "planet" in messages[0]
+
+
 def test_a_hazard_that_never_enters_the_screen_fails() -> None:
     gone = wave(1400, {"at_px": 300, "type": "meteorite", "x": 2000})
     assert run(gone)["placement"] == "FAIL"

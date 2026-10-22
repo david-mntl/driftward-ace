@@ -26,6 +26,8 @@ Exit code: 0 all passed, 1 a check failed, 2 a usage, config or game file error.
 
 A floating island counts as a hazard here (09-waves.md, rule 7), though in play it never hurts: it counts for placement, coin near and the seam.
 
+A planet is a hazard like any other. Coin near and the bot use its body, never its field (drifters/08-planet.md, rule 11). The game's wave loader already refuses a planet inside the seam.
+
 Each drifter is played alone with the game's physics (ship held at the start spot, world scrolling at the level's speed). The tracks are lined up by trigger tick, so two drifters can be compared at the same moment.
 
 | Check | Fails when |
@@ -37,7 +39,7 @@ Each drifter is played alone with the game's physics (ship held at the start spo
 | seam | a hazard is on screen in the wave's first `seam_clear_px` (120). An entry warning counts as on screen. The end of a wave is not checked: `extra_rest_ticks` covers it. |
 | bot (`--bot`) | from a start spot, no path gets through the wave with zero hits (09-waves.md, rule 7.3). See [The bot](#the-bot). |
 | gap | not built yet |
-| lava, per-drifter notes | not in the game yet / no extra notes for the types in the game |
+| lava, per-drifter notes | lava is not in the game yet. Floating island: coin inside is its own check above. Planet: measured from its body, as above. Gaps and the bot's island and planet physics are not built. |
 
 Every finding names the tick (counted from the wave's start), the scroll distance in px, the position and the drifters involved. A coin that fails also names the nearest hazard.
 
@@ -74,7 +76,9 @@ The bot can wrongly fail a wave that a person could fly, since it doesn't try ev
 | `safe_px` | room to the nearest hazard, or to the floor, past which a ship counts as safe | 96 |
 | `margin_px` | grows every hazard hitbox for the bot only, so it keeps room to spare like a person would. 0 is the game's exact hitbox. | 6 |
 
-The tracks play each drifter with the ship held at the spawn. No drifter in the game moves or hits by where the ship is (the chain lightning only places its warning by it), so the bot sees exactly what the game does. A future drifter that chases the ship would need the bot to play the whole game instead.
+The tracks play each drifter with the ship held at the spawn. No drifter in the game moves or hits by where the ship is (the chain lightning only places its warning by it). A future drifter that chases the ship would need the bot to play the whole game instead.
+
+The bot does not fly two drifters' effects on the ship yet: islands don't carry or block it, and a planet's field doesn't pull it (09-waves.md, rule 7.7; drifters/08-planet.md, rule 11). A wave with planets can pass the bot while a pulled ship would not get through. Fly such a wave yourself.
 
 ## Remembered passes
 

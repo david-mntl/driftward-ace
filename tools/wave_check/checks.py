@@ -301,7 +301,8 @@ NOT_YET: tuple[Result, ...] = (
         "notes",
         "per-drifter notes",
         "SKIP",
-        note="floating island: coin inside is its own check; gaps and the bot are part 2",
+        note="floating island: coin inside is its own check; planet: measured from its body; "
+        "gaps and the bot's island and planet physics are not built",
     ),
 )
 
