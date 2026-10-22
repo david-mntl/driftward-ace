@@ -3,7 +3,7 @@ Created by: architect
 Assignee: gameplay-implementer
 Writes to: game/core/
 Contract: docs/contracts/systems/ship.md, docs/contracts/systems/drifters.md
-Status: open
+Status: done
 Linear: DRA-89
 
 ## Read in the contract

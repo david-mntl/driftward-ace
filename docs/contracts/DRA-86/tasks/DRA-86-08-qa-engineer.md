@@ -3,7 +3,7 @@ Created by: architect
 Assignee: qa-engineer
 Writes to: game/tests/
 Contract: docs/contracts/systems/ship.md, docs/contracts/systems/drifters.md
-Status: open
+Status: done
 Linear: DRA-94
 
 ## Read in the contract
