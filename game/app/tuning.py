@@ -13,12 +13,16 @@ The coin's file has one too: each variant gives its points and glint, the crysta
 shared, and its hitbox is worked out by core.drifters.coin.
 The floating island's file has one too: each variant gives its shape kind and size, the arm is
 shared, and its hitbox is worked out by core.drifters.floating_island.
+The planet's file has one too: each variant gives its size and its gravity field, the field rings'
+look is shared, its hitbox is worked out by core.drifters.planet, and every pull_max must pass
+core.ship.check_escapable_pull.
 Not a startup module: it imports core.drifters, so only app.frame imports it, inside the guard.
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Tuning loader;
 docs/contracts/schemas/drifter-tuning.schema.json, satellite-tuning.schema.json,
 chain-lightning-tuning.schema.json, fireball-tuning.schema.json, coin-tuning.schema.json,
-floating-island-tuning.schema.json, playtest-switches.schema.json and hazards.schema.json.
+floating-island-tuning.schema.json, planet-tuning.schema.json, playtest-switches.schema.json
+and hazards.schema.json.
 """
 
 import json
@@ -55,6 +59,7 @@ from core.drifters.floating_island import (
     IslandVariantExtra,
     island_hitbox,
 )
+from core.drifters.planet import PlanetTypeExtra, PlanetVariantExtra, planet_hitbox
 from core.drifters.satellite import SatelliteVariantExtra
 from core.drifters.tuning import (
     DrifterTuning,
@@ -63,6 +68,7 @@ from core.drifters.tuning import (
     PlaytestSwitches,
     VariantTuning,
 )
+from core.ship import check_escapable_pull
 
 log = logging.getLogger(__name__)
 
@@ -138,6 +144,21 @@ _ISLAND_ARM_SHAPES: frozenset[IslandShape] = frozenset({IslandShape.L_SHAPE, Isl
 
 Source: floating-island-tuning.schema.json.
 """
+_PLANET_FIELDS: frozenset[str] = frozenset(
+    {
+        "default_variant",
+        "variants",
+        "entry_warning_ticks",
+        "field_ring_trip",
+        "field_ring_gap",
+        "field_ring_fade",
+        "field_ring_count",
+    }
+)
+"""Every field of the planet's file, all required. Source: planet-tuning.schema.json."""
+_PLANET_VARIANT_FIELDS: frozenset[str] = frozenset({"size", "pull_radius", "pull_max"})
+_PLANET_FADE_MAX: float = 100.0
+"""field_ring_fade is a percent, 0 to 100. Source: planet-tuning.schema.json."""
 _VARIANT_FIELDS: frozenset[str] = frozenset({"width", "height", "hitbox"})
 _CIRCLE_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "r"})
 _BOX_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "w", "h"})
@@ -220,9 +241,9 @@ def _load_drifter(relative: Path, drifter_type: DrifterType) -> DrifterTypeTunin
     """Check one drifter tuning file and build its record.
 
     A drifter type with fields of its own (in _OWN_FIELDS) is checked against its own schema.
-    The chain lightning's, the fireball's, the coin's and the floating island's files have
-    schemas of their own throughout (_load_chain_lightning, _load_fireball, _load_coin,
-    _load_floating_island).
+    The chain lightning's, the fireball's, the coin's, the floating island's and the planet's files
+    have schemas of their own throughout (_load_chain_lightning, _load_fireball, _load_coin,
+    _load_floating_island, _load_planet).
     """
     name, data = _read_json(relative)
     if drifter_type is DrifterType.CHAIN_LIGHTNING:
@@ -233,6 +254,8 @@ def _load_drifter(relative: Path, drifter_type: DrifterType) -> DrifterTypeTunin
         return _load_coin(name, data)
     if drifter_type is DrifterType.FLOATING_ISLAND:
         return _load_floating_island(name, data)
+    if drifter_type is DrifterType.PLANET:
+        return _load_planet(name, data)
     fields: dict[str, object] = _fields(name, "", data, _DRIFTER_FIELDS)
     variants: dict[str, VariantTuning] = _variants(name, fields["variants"], drifter_type)
     default_variant: str = _variant_name(name, "default_variant", fields["default_variant"])
@@ -610,6 +633,75 @@ def _island_variants(name: str, data: object, arm: int) -> dict[str, VariantTuni
             height=float(height),
             hitbox=island_hitbox(shape, float(width), float(height), float(arm), False),
             extra=IslandVariantExtra(shape=shape),
+        )
+    return variants
+
+
+def _load_planet(name: str, data: object) -> DrifterTypeTuning:
+    """Check the planet's file and build its record.
+
+    Each variant's width and height are its size; its hitbox comes from
+    core.drifters.planet.planet_hitbox. The planet has no speed_ratio: the record gets 0.0, which
+    the spawner never reads for a parked drifter. The footprint check of the other files passes by
+    construction (a circle of radius size / 2 in a size x size box) and is not run again.
+    Source: docs/contracts/systems/app.md, Rules, Tuning loader (The planet's file, What the
+    loader builds for the planet); planet-tuning.schema.json.
+    """
+    fields: dict[str, object] = _fields(name, "", data, _PLANET_FIELDS)
+    warning_ticks: int = _warning_ticks(name, fields["entry_warning_ticks"])
+    ring_trip: int = _integer(name, "field_ring_trip", fields["field_ring_trip"], 1)
+    ring_gap: int = _integer(name, "field_ring_gap", fields["field_ring_gap"], 0)
+    ring_fade: object = fields["field_ring_fade"]
+    if not _is_number(ring_fade) or not 0 <= ring_fade <= _PLANET_FADE_MAX:
+        raise ValueError(f"{name}: field_ring_fade must be a number from 0 to 100")
+    ring_count: int = _integer(name, "field_ring_count", fields["field_ring_count"], 0)
+    variants: dict[str, VariantTuning] = _planet_variants(name, fields["variants"])
+    default_variant: str = _variant_name(name, "default_variant", fields["default_variant"])
+    if default_variant not in variants:
+        raise ValueError(f"{name}: default_variant must be one of the variant names")
+    return DrifterTypeTuning(
+        variants=variants,
+        default_variant=default_variant,
+        speed_ratio=0.0,
+        entry_warning_ticks=warning_ticks,
+        extra=PlanetTypeExtra(
+            field_ring_trip=ring_trip,
+            field_ring_gap=ring_gap,
+            field_ring_fade=float(ring_fade),
+            field_ring_count=ring_count,
+        ),
+    )
+
+
+def _planet_variants(name: str, data: object) -> dict[str, VariantTuning]:
+    """Check the planet's `variants` object and build each variant.
+
+    pull_radius must be more than size / 2, and every pull_max must pass
+    core.ship.check_escapable_pull; its message is kept as it is, after the variant's path.
+    """
+    if not isinstance(data, dict):
+        raise ValueError(f"{name}: variants must be an object")
+    if not data:
+        raise ValueError(f"{name}: variants must have at least one variant")
+    variants: dict[str, VariantTuning] = {}
+    for key, value in data.items():
+        variant: str = _variant_name(name, f"variants.{key}", key)
+        path: str = f"variants.{variant}"
+        fields: dict[str, object] = _fields(name, path, value, _PLANET_VARIANT_FIELDS)
+        size: int = _even_size(name, f"{path}.size", fields["size"])
+        pull_radius: int = _integer(name, f"{path}.pull_radius", fields["pull_radius"], 2)
+        pull_max: float = _positive(name, f"{path}.pull_max", fields["pull_max"])
+        if pull_radius <= size / 2:
+            raise ValueError(f"{name}: {path}.pull_radius must be more than size / 2")
+        try:
+            check_escapable_pull(pull_max)
+        except ValueError as err:
+            raise ValueError(f"{name}: {path}.{err}") from err
+        variants[variant] = VariantTuning(
+            width=float(size),
+            height=float(size),
+            hitbox=planet_hitbox(float(size)),
+            extra=PlanetVariantExtra(pull_radius=float(pull_radius), pull_max=float(pull_max)),
         )
     return variants
 

@@ -1,7 +1,7 @@
 {
   "play": "list",
-  "mode": "floating_island",
-  "loop_ticks": 180,
+  "mode": "planet",
+  "loop_ticks": 1200,
   "rows": [
     {
       "type": "meteorite",
@@ -171,6 +171,19 @@
       "x": 160,
       "variant": "triangle",
       "invert": true
+    },
+    {
+      "type": "planet",
+      "x": 320
+    },
+    {
+      "type": "planet",
+      "x": 200
+    },
+    {
+      "type": "planet",
+      "x": 440,
+      "y": 289
     }
   ]
 }

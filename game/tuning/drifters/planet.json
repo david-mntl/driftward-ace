@@ -1,0 +1,11 @@
+{
+  "default_variant": "standard",
+  "variants": {
+    "standard": { "size": 64, "pull_radius": 150, "pull_max": 0.2 }
+  },
+  "entry_warning_ticks": 60,
+  "field_ring_trip": 120,
+  "field_ring_gap": 60,
+  "field_ring_fade": 50,
+  "field_ring_count": 2
+}
