@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "driftward-ace/debug-spawn-list.schema.json",
   "title": "Debug test spawn list",
-  "description": "The file game/tuning/debug_spawns.json, edited by hand. Debug mode only: normal mode never reads it. Not a wave (15-tech-constraints.md, rule 7; 91-decision-log.md, row 38). play chooses whether debug mode plays these rows or the normal waves (DRA-76; 91-decision-log.md, row 73). Each row places one drifter. The rows in play (all of them, or only those of the drifter type named by mode) are spread evenly over one loop of loop_ticks, in file order, and the loop repeats. A row needs only its drifter type and the position its drifter needs; everything else is the drifter's default. Loaded and checked by game/app/debug_spawns.py at startup in debug mode (docs/contracts/systems/app.md, Rules, Debug test spawn list). Rules this schema can't express, also enforced by the loader: type and mode name a built drifter type (DrifterType values); the row has the coordinate its drifter needs (the meteorite, the chain lightning, the coin and the floating island need x, the satellite y; the fireball needs neither: no x and no y is its corner entry, DRA-56); variant names one of that drifter's variants; invert is allowed only for a drifter that has one (the satellite, the chain lightning, the fireball, and the floating island's l_shape, t_shape and triangle, DRA-86); speed is refused for a parked drifter (the coin, DRA-62; the floating island, DRA-86). The loader checks those by spawning every row once at load. Defaults: mode all, loop_ticks 180 (scope report DRA-39, Values needed: temporary stand-ins, not in the GDD). Owner of the schema: architect.",
+  "description": "The file game/tuning/debug_spawns.json, edited by hand. Debug mode only: normal mode never reads it. Not a wave (15-tech-constraints.md, rule 7; 91-decision-log.md, row 38). play chooses whether debug mode plays these rows or the normal waves (DRA-76; 91-decision-log.md, row 73). Each row places one drifter. The rows in play (all of them, or only those of the drifter type named by mode) are spread evenly over one loop of loop_ticks, in file order, and the loop repeats. A row needs only its drifter type and the position its drifter needs; everything else is the drifter's default. Loaded and checked by game/app/debug_spawns.py at startup in debug mode (docs/contracts/systems/app.md, Rules, Debug test spawn list). Rules this schema can't express, also enforced by the loader: type and mode name a built drifter type (DrifterType values); the row has the coordinate its drifter needs (the meteorite, the chain lightning, the coin, the floating island and the planet need x, the satellite y; the fireball needs neither: no x and no y is its corner entry, DRA-56); variant names one of that drifter's variants; invert is allowed only for a drifter that has one (the satellite, the chain lightning, the fireball, and the floating island's l_shape, t_shape and triangle, DRA-86); speed is refused for a parked drifter (the coin, DRA-62; the floating island, DRA-86; the planet, DRA-96). The loader checks those by spawning every row once at load. Defaults: mode all, loop_ticks 180 (scope report DRA-39, Values needed: temporary stand-ins, not in the GDD). Owner of the schema: architect.",
   "type": "object",
   "additionalProperties": false,
   "required": ["rows"],
@@ -12,7 +12,7 @@
       "enum": ["list", "waves"]
     },
     "mode": {
-      "description": "Which rows play: \"all\" (the default when left out), or one drifter type value such as \"satellite\", \"chain_lightning\", \"fireball\", \"coin\" or \"floating_island\" to play only that type's rows.",
+      "description": "Which rows play: \"all\" (the default when left out), or one drifter type value such as \"satellite\", \"chain_lightning\", \"fireball\", \"coin\", \"floating_island\" or \"planet\" to play only that type's rows.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*$"
     },
@@ -34,16 +34,16 @@
       "required": ["type"],
       "properties": {
         "type": {
-          "description": "The drifter type value, e.g. \"meteorite\", \"satellite\", \"chain_lightning\", \"fireball\", \"coin\" or \"floating_island\".",
+          "description": "The drifter type value, e.g. \"meteorite\", \"satellite\", \"chain_lightning\", \"fireball\", \"coin\", \"floating_island\" or \"planet\".",
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
         },
         "x": {
-          "description": "Center x, screen px. Required for the meteorite, the chain lightning (the center of the box around its nodes), the coin (the crystal's center) and the floating island (the center of the box around its shape). Left out for a satellite: just outside the wall it enters from. For a fireball (the head's center): x alone is an entry along the top; left out with y, a side entry; left out with no y either, the top-left corner (top-right with invert).",
+          "description": "Center x, screen px. Required for the meteorite, the chain lightning (the center of the box around its nodes), the coin (the crystal's center), the floating island (the center of the box around its shape) and the planet (its center). Left out for a satellite: just outside the wall it enters from. For a fireball (the head's center): x alone is an entry along the top; left out with y, a side entry; left out with no y either, the top-left corner (top-right with invert).",
           "type": "number"
         },
         "y": {
-          "description": "Center y, screen px, y down. Required for the satellite. Left out for a meteorite, a chain lightning, a fireball, a coin or a floating island: just above the top edge. For a fireball, y alone is a side entry: the left wall, or the right with invert. For a coin or a floating island, x and y place it at that spot, where it shows at once with no warning.",
+          "description": "Center y, screen px, y down. Required for the satellite. Left out for a meteorite, a chain lightning, a fireball, a coin, a floating island or a planet: just above the top edge (for a planet, its field ring touching the top edge, DRA-96). For a fireball, y alone is a side entry: the left wall, or the right with invert. For a coin or a floating island, x and y place it at that spot, where it shows at once with no warning. For a planet, x and y place it at that spot after its entry warning.",
           "type": "number"
         },
         "variant": {
@@ -56,7 +56,7 @@
           "type": "boolean"
         },
         "speed": {
-          "description": "Level 1 speed, px/tick, along the drifter's path. Replaces the drifter's default speed; the level's hazard speed x still applies on top (scope report DRA-39, Values needed: Director, temporary stand-in). Left out: the drifter's default. Refused for a coin and a floating island, which move only with the scroll (DRA-62, DRA-86).",
+          "description": "Level 1 speed, px/tick, along the drifter's path. Replaces the drifter's default speed; the level's hazard speed x still applies on top (scope report DRA-39, Values needed: Director, temporary stand-in). Left out: the drifter's default. Refused for a coin, a floating island and a planet, which move only with the scroll (DRA-62, DRA-86, DRA-96).",
           "type": "number",
           "exclusiveMinimum": 0
         }

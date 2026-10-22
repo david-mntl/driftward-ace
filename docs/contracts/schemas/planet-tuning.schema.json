@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/planet-tuning.schema.json",
+  "title": "Planet tuning file",
+  "description": "The file game/tuning/drifters/planet.json. Built on drifter-tuning.schema.json: the same default_variant, variant names and entry_warning_ticks, but no speed_ratio, because the planet is a parked drifter: it moves only with the scroll (drifters/08-planet.md, kind, locked). It is a hazard, so it keeps the shared entry warning. Each variant gives its size and its gravity field instead of width, height and hitbox: a new size or pull is a new variant (08-planet.md, How to extend). The loader works out width and height (both the size) and the hitbox (one circle of radius size / 2, centered) with core.drifters.planet.planet_hitbox, and passes each pull_max through core.ship.check_escapable_pull (docs/contracts/systems/drifters.md, Rules, Planet; docs/contracts/systems/ship.md, Rules, Escape). The four field_ring values are the inner field rings' look, the same for every variant. Values from drifters/08-planet.md (all guess) and scope report DRA-96: default_variant standard; variants standard (size 64, pull_radius 150, pull_max 0.2); entry_warning_ticks 60 (07-drifters.md, the shared value); field_ring_trip 120; field_ring_gap 60; field_ring_fade 50; field_ring_count 2. Key mapping to the GDD: size is the size row's diameter (the hitbox circle's radius is half of it, the surface the pull is measured to); pull_radius and pull_max are their own rows; the field_ring values are their own rows, field_ring_fade the opacity at pull_radius in %; field_ring_count is the placeholder_look's 'two faint 1 px rings'. size is an even whole number and pull_radius a whole number, so the body and the field ring sit on whole px when the view draws at the rounded center (docs/contracts/systems/drifters.md, Rationale). Colors and the 1 px ring width are not here: they stay in the view. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Rules this schema can't express, also enforced by the loader: default_variant is one of the variant names; pull_radius > size / 2 in every variant; every pull_max passes core.ship.check_escapable_pull (pull_max + gravity below thrust_up and pull_max below thrust_side, 04-ship.md, rule 5). Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, Planet.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_variant",
+    "variants",
+    "entry_warning_ticks",
+    "field_ring_trip",
+    "field_ring_gap",
+    "field_ring_fade",
+    "field_ring_count"
+  ],
+  "properties": {
+    "default_variant": {
+      "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants. standard.",
+      "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+    },
+    "variants": {
+      "description": "Named sizes and fields (08-planet.md, variants). A new size or pull is a new entry here and needs no code (08-planet.md, How to extend). Looks are not variants.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "drifter-tuning.schema.json#/$defs/variant_name" },
+      "additionalProperties": { "$ref": "#/$defs/variant" }
+    },
+    "entry_warning_ticks": { "$ref": "drifter-tuning.schema.json#/properties/entry_warning_ticks" },
+    "field_ring_trip": {
+      "description": "Ticks each inner field ring takes to slide at a steady speed from pull_radius to the planet's surface, then it starts again at pull_radius. A look only; never scaled by level. 120.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "field_ring_gap": {
+      "description": "Ticks each inner field ring runs behind the one before it. A look only. 60.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "field_ring_fade": {
+      "description": "An inner field ring's opacity at pull_radius, % (0 to 100). It falls in a straight line to 0 at the planet's surface. A look only. 50.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "field_ring_count": {
+      "description": "How many inner field rings slide inward. 0 draws none; the outer ring at pull_radius is always drawn. A look only. 2.",
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "pull_radius", "pull_max"],
+      "properties": {
+        "size": {
+          "description": "The planet's diameter, px: its width and height, its hitbox circle's diameter, and twice the surface radius the pull reaches pull_max at. Even. 64.",
+          "type": "integer",
+          "minimum": 2,
+          "multipleOf": 2
+        },
+        "pull_radius": {
+          "description": "The field's radius, px from the planet's center: the pull is 0 here and the outer field ring is drawn here. More than size / 2 (checked by the loader). 150.",
+          "type": "integer",
+          "minimum": 2
+        },
+        "pull_max": {
+          "description": "The pull at the planet's surface, px/tick², toward its center. Inside the surface it stays at this; it falls in a straight line to 0 at pull_radius. Must pass the escape rule (checked by the loader with core.ship.check_escapable_pull). 0.2.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}
