@@ -1,7 +1,7 @@
 {
   "play": "list",
-  "mode": "planet",
-  "loop_ticks": 1200,
+  "mode": "ufo",
+  "loop_ticks": 800,
   "rows": [
     {
       "type": "meteorite",
@@ -184,6 +184,25 @@
       "type": "planet",
       "x": 440,
       "y": 289
+    },
+    {
+      "type": "ufo",
+      "y": 300
+    },
+    {
+      "type": "ufo",
+      "y": 220,
+      "invert": true
+    },
+    {
+      "type": "ufo",
+      "y": 200,
+      "seed": 1
+    },
+    {
+      "type": "ufo",
+      "y": 400,
+      "seed": 2
     }
   ]
 }

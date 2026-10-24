@@ -7,6 +7,7 @@ Source: docs/contracts/systems/drifters.md, Rules, Spawner; 08-difficulty.md, ru
 """
 
 import logging
+import random
 from dataclasses import dataclass
 from typing import Final
 
@@ -53,6 +54,29 @@ class Placement:
     Hazard speed multiplier still applies. Debug test spawn list only (scope report DRA-39).
     """
 
+    seed: int | None = None
+    """0 to `MAX_SEED`. Picks a seeded drifter's path. Required for a seeded drifter (its `born`
+    raises without one), refused for any other. The loaders fill it with `placement_seed` when
+    the file leaves it out. Source: drifters/07-ufo.md, seed (locked)."""
+
+
+MAX_SEED: Final[int] = 4_294_967_295
+"""The largest seed a file may give, 2^32 - 1. Not a game value: the size `placement_seed`
+draws."""
+
+DEBUG_SPAWNS_SOURCE: Final[str] = "debug_spawns"
+"""The source name of the debug list's rows, for `placement_seed`."""
+
+
+def placement_seed(source: str, index: int) -> int:
+    """Return the default seed, 0 to `MAX_SEED`, of the placement at `index` (from 0) in `source`.
+
+    `source` is a wave id, or `DEBUG_SPAWNS_SOURCE`. Python seeds a generator from text with
+    SHA-512, so the result is the same on every platform and every run. Pure.
+    Source: drifters.md, Rules, Spawner, Placement seed.
+    """
+    return random.Random(f"{source}#{index}").getrandbits(MAX_SEED.bit_length())
+
 
 def _birth_speed(
     cls: type[Drifter], placement: Placement, type_tuning: DrifterTypeTuning, speed_mult: float
@@ -72,13 +96,19 @@ def _birth_speed(
     return base_speed * speed_mult
 
 
+def _check_seed(cls: type[Drifter], placement: Placement) -> None:
+    """Raise ValueError("<type> has no seed") when a seed is set for a drifter that isn't seeded."""
+    if placement.seed is not None and not cls.seeded:
+        raise ValueError(f"{placement.drifter_type.value} has no seed")
+
+
 def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Drifter:
     """Create one drifter from `placement`, at `level`: in WARNING, or ACTIVE for the coin.
 
     Raises ValueError for a drifter type with no class or no tuning, an unknown variant, a
-    level outside 1 to 8, a coordinate, specialty or invert the drifter refuses, or a speed for
-    a parked drifter. The playtest switches beat `as_level`. Entry warnings and the re-hit
-    cooldown never scale.
+    level outside 1 to 8, a coordinate, specialty or invert the drifter refuses, a speed for
+    a parked drifter, or a seed for a drifter that isn't seeded. The playtest switches beat
+    `as_level`. Entry warnings and the re-hit cooldown never scale.
     """
     cls: type[Drifter] = drifter_class(placement.drifter_type)
     type_name: str = placement.drifter_type.value
@@ -95,8 +125,11 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
     check_level(use_level)
     speed_level: int = use_level if tuning.switches.hazard_speed_scaling else BASE_LEVEL
     timer_level: int = use_level if tuning.switches.timer_scaling else BASE_LEVEL
+    speed_mult: float = hazard_speed_mult(speed_level)
+    speed: float = _birth_speed(cls, placement, type_tuning, speed_mult)
     start_width, start_height = cls.start_size(variant.width, variant.height, variant.extra)
     x, y = cls.start_position(placement.x, placement.y, start_width, start_height, placement.invert)
+    _check_seed(cls, placement)
     return cls.born(
         Birth(
             x=x,
@@ -105,7 +138,7 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
             width=variant.width,
             height=variant.height,
             hitbox=variant.hitbox,
-            speed=_birth_speed(cls, placement, type_tuning, hazard_speed_mult(speed_level)),
+            speed=speed,
             warning_ticks=type_tuning.entry_warning_ticks,
             timer_mult=timer_mult(timer_level),
             specialty_enabled=placement.specialty_enabled,
@@ -115,5 +148,7 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
             rehit_dim=tuning.hazards.rehit_dim,
             type_extra=type_tuning.extra,
             telegraph_min_ticks=tuning.hazards.telegraph_min_ticks,
+            hazard_speed_mult=speed_mult,
+            seed=placement.seed,
         )
     )

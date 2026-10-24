@@ -151,6 +151,54 @@ def test_coin_near_a_planet_is_measured_from_its_body_not_its_field() -> None:
     assert "planet" in messages[0]
 
 
+def ufo(at_px: float, y: float, **extra: Any) -> dict[str, Any]:
+    return {"at_px": at_px, "type": "ufo", "y": y, **extra}
+
+
+def test_a_ufo_is_a_hazard_for_the_seam_placement_and_coin_near() -> None:
+    with pytest.raises(ValueError, match="a hazard \\(ufo\\) at 0 px"):
+        run(wave(1400, ufo(0, 300)))
+    status = run(wave(1400, ufo(300, 300), coin(300, 100, 150)))
+    assert status["placement"] == status["seam"] == status["coin_near"] == "PASS"
+    assert run(wave(1400, coin(300, 100, 150)))["coin_near"] == "FAIL"
+
+
+def ufo_path(document: dict[str, Any]) -> list[tuple[float, float]]:
+    """The first track's positions, frame by frame."""
+    tuning = load_tuning()
+    built = _build_wave("t", document, tuning)
+    tracks = build_tracks(built, 8, tuning, ships_at_spots(Config())["center"], 2400)
+    return [(f.x, f.y) for f in tracks[0].frames]
+
+
+def test_a_ufo_flies_one_path_per_seed() -> None:
+    # drifters/07-ufo.md, seed and rule 12: one path per seed, so one track to check.
+    default = ufo_path(wave(1400, ufo(300, 300)))
+    assert ufo_path(wave(1400, ufo(300, 300))) == default
+    assert ufo_path(wave(1400, ufo(300, 300, seed=7))) != default
+    assert all(188 <= y <= 440 for _, y in default)
+
+
+@pytest.mark.parametrize(
+    ("placements", "message"),
+    [
+        ([ufo(300, 100)], "outside its band"),
+        ([ufo(300, 200, seed=3), ufo(600, 400, seed=3)], "seed"),
+    ],
+)
+def test_the_loader_refusing_a_ufo_fails_the_wave(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    placements: list[dict[str, Any]],
+    message: str,
+) -> None:
+    # drifters/07-ufo.md, rule 12 and seed: a y outside the band, or two UFOs on one path.
+    bad = tmp_path / "bad_ufo.json"
+    bad.write_text(json.dumps(wave(1400, *placements)))
+    assert wave_check.main(["--wave", str(bad), "--no-record"]) == 1
+    assert message in capsys.readouterr().out
+
+
 def test_a_hazard_that_never_enters_the_screen_fails() -> None:
     gone = wave(1400, {"at_px": 300, "type": "meteorite", "x": 2000})
     assert run(gone)["placement"] == "FAIL"

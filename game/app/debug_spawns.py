@@ -9,7 +9,8 @@ picker.
 Not a startup module: it imports core.drifters, so only app.frame imports it, inside the guard.
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Debug test spawn list;
-docs/contracts/schemas/debug-spawn-list.schema.json; scope report DRA-39, Limits and Values needed.
+docs/contracts/schemas/debug-spawn-list.schema.json; scope report DRA-39, Limits and Values needed;
+scope report DRA-104, Decision log (Q1: UFO rows and seed).
 """
 
 import logging
@@ -19,7 +20,14 @@ from pathlib import Path
 
 from app.tuning import _fields, _is_number, _read_json
 from core.drifters.base import DrifterType
-from core.drifters.spawner import Placement, spawn_drifter
+from core.drifters.registry import drifter_class
+from core.drifters.spawner import (
+    DEBUG_SPAWNS_SOURCE,
+    MAX_SEED,
+    Placement,
+    placement_seed,
+    spawn_drifter,
+)
 from core.drifters.tuning import DrifterTuning
 
 log = logging.getLogger(__name__)
@@ -51,8 +59,8 @@ _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
 _LIST_FIELDS: frozenset[str] = frozenset({"play", "mode", "loop_ticks", "rows"})
 _LIST_OPTIONAL: frozenset[str] = frozenset({"play", "mode", "loop_ticks"})
-_ROW_FIELDS: frozenset[str] = frozenset({"type", "x", "y", "variant", "invert", "speed"})
-_ROW_OPTIONAL: frozenset[str] = frozenset({"x", "y", "variant", "invert", "speed"})
+_ROW_FIELDS: frozenset[str] = frozenset({"type", "x", "y", "variant", "invert", "speed", "seed"})
+_ROW_OPTIONAL: frozenset[str] = frozenset({"x", "y", "variant", "invert", "speed", "seed"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,9 +98,7 @@ def load_debug_spawns(tuning: DrifterTuning) -> DebugSpawnList:
     rows: object = fields["rows"]
     if not isinstance(rows, list):
         raise ValueError(f"{name}: rows must be a list")
-    placements: list[Placement] = [
-        _row(name, f"rows[{index}]", row, tuning) for index, row in enumerate(rows)
-    ]
+    placements: list[Placement] = [_row(name, index, row, tuning) for index, row in enumerate(rows)]
     in_play: list[Placement] = [
         placement
         for placement in placements
@@ -154,16 +160,22 @@ def _loop_ticks(name: str, value: object) -> int:
     return value
 
 
-def _row(name: str, path: str, data: object, tuning: DrifterTuning) -> Placement:
+def _row(name: str, index: int, data: object, tuning: DrifterTuning) -> Placement:
     """Check one row against the schema, build its Placement and spawn it once to check it.
 
     x and y are both optional: the drifter's own start position refuses a missing coordinate it
     needs, through the load-time spawn. Source: app.md, Rules, Debug test spawn list (DRA-56).
+    A seeded drifter's row with no seed gets placement_seed(DEBUG_SPAWNS_SOURCE, its index in
+    rows), so it flies the same path on every loop and every page load (DRA-104).
     """
+    path: str = f"rows[{index}]"
     fields: dict[str, object] = _fields(name, path, data, _ROW_FIELDS, optional=_ROW_OPTIONAL)
     drifter_type: DrifterType | None = _drifter_type(fields["type"])
     if drifter_type is None:
         raise ValueError(f"{name}: {path}.type must be a drifter type ({_type_names()})")
+    seed: int | None = _seed(name, path, fields)
+    if seed is None and drifter_class(drifter_type).seeded:
+        seed = placement_seed(DEBUG_SPAWNS_SOURCE, index)
     placement = Placement(
         drifter_type,
         x=_coordinate(name, path, fields, "x"),
@@ -171,6 +183,7 @@ def _row(name: str, path: str, data: object, tuning: DrifterTuning) -> Placement
         variant=_variant(name, path, fields),
         invert=_invert(name, path, fields),
         speed=_speed(name, path, fields),
+        seed=seed,
     )
     try:
         spawn_drifter(placement, 1, tuning)
@@ -215,3 +228,16 @@ def _speed(name: str, path: str, fields: dict[str, object]) -> float | None:
     if not _is_number(value) or value <= 0:
         raise ValueError(f"{name}: {path}.speed must be a number > 0")
     return float(value)
+
+
+def _seed(name: str, path: str, fields: dict[str, object]) -> int | None:
+    """Return a row's seed, None when left out. Raise unless it is an int from 0 to MAX_SEED.
+
+    Never a bool. Source: debug-spawn-list.schema.json, row.seed (DRA-104).
+    """
+    if "seed" not in fields:
+        return None
+    value: object = fields["seed"]
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= MAX_SEED:
+        raise ValueError(f"{name}: {path}.seed must be an integer from 0 to {MAX_SEED}")
+    return value

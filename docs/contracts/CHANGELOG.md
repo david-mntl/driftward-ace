@@ -141,3 +141,10 @@
 - `systems/run.md`: 8 to 9, frozen.
 - `systems/ship.md`: 6 to 7, frozen.
 - Planet drifter: a gravity well that pulls the ship toward its center inside a drawn field; touching the body costs a life.
+
+## DRA-104, 2026-10-23
+- `systems/app.md`: 14 to 15, frozen.
+- `systems/drifters.md`: 8 to 9, frozen.
+- `systems/run.md`: 9 to 10, frozen.
+- `systems/waves.md`: 1 to 2, frozen.
+- The UFO drifter crosses the screen in a weave, with a warning before it enters, a seeded spawn row and its own tuning file, and wave_check counts it as a hazard.

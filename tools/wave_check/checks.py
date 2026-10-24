@@ -115,7 +115,7 @@ def check_placements(ctx: Context) -> Result:
         "placement",
         "placement: enters the screen, not on the ship",
         found,
-        "the UFO band is not in the game yet",
+        "a UFO outside its band is refused by the game's loader",
     )
 
 
@@ -302,6 +302,7 @@ NOT_YET: tuple[Result, ...] = (
         "per-drifter notes",
         "SKIP",
         note="floating island: coin inside is its own check; planet: measured from its body; "
+        "UFO: band checked by the game's loader; "
         "gaps and the bot's island and planet physics are not built",
     ),
 )

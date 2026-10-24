@@ -16,13 +16,16 @@ shared, and its hitbox is worked out by core.drifters.floating_island.
 The planet's file has one too: each variant gives its size and its gravity field, the field rings'
 look is shared, its hitbox is worked out by core.drifters.planet, and every pull_max must pass
 core.ship.check_escapable_pull.
+The UFO's file has one too: each variant gives its disc and dome sizes, the weave and its band are
+shared, its hitbox is worked out by core.drifters.ufo, and every variant and the weave must pass
+core.drifters.ufo.check_ufo_variant and check_ufo_weave.
 Not a startup module: it imports core.drifters, so only app.frame imports it, inside the guard.
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Tuning loader;
 docs/contracts/schemas/drifter-tuning.schema.json, satellite-tuning.schema.json,
 chain-lightning-tuning.schema.json, fireball-tuning.schema.json, coin-tuning.schema.json,
-floating-island-tuning.schema.json, planet-tuning.schema.json, playtest-switches.schema.json
-and hazards.schema.json.
+floating-island-tuning.schema.json, planet-tuning.schema.json, ufo-tuning.schema.json,
+playtest-switches.schema.json and hazards.schema.json.
 """
 
 import json
@@ -68,6 +71,7 @@ from core.drifters.tuning import (
     PlaytestSwitches,
     VariantTuning,
 )
+from core.drifters.ufo import UfoTypeExtra, check_ufo_variant, check_ufo_weave, ufo_hitbox
 from core.ship import check_escapable_pull
 
 log = logging.getLogger(__name__)
@@ -159,6 +163,20 @@ _PLANET_FIELDS: frozenset[str] = frozenset(
 _PLANET_VARIANT_FIELDS: frozenset[str] = frozenset({"size", "pull_radius", "pull_max"})
 _PLANET_FADE_MAX: float = 100.0
 """field_ring_fade is a percent, 0 to 100. Source: planet-tuning.schema.json."""
+_UFO_FIELDS: frozenset[str] = _DRIFTER_FIELDS | frozenset(
+    {
+        "weave_change_ticks_min",
+        "weave_change_ticks_max",
+        "weave_step_min",
+        "weave_step_max",
+        "weave_speed_max",
+        "weave_turn",
+        "band_top",
+        "band_bottom",
+    }
+)
+"""Every field of the UFO's file, all required. Source: ufo-tuning.schema.json."""
+_UFO_VARIANT_FIELDS: frozenset[str] = frozenset({"disc_width", "disc_height", "dome_radius"})
 _VARIANT_FIELDS: frozenset[str] = frozenset({"width", "height", "hitbox"})
 _CIRCLE_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "r"})
 _BOX_FIELDS: frozenset[str] = frozenset({"shape", "cx", "cy", "w", "h"})
@@ -241,9 +259,9 @@ def _load_drifter(relative: Path, drifter_type: DrifterType) -> DrifterTypeTunin
     """Check one drifter tuning file and build its record.
 
     A drifter type with fields of its own (in _OWN_FIELDS) is checked against its own schema.
-    The chain lightning's, the fireball's, the coin's, the floating island's and the planet's files
-    have schemas of their own throughout (_load_chain_lightning, _load_fireball, _load_coin,
-    _load_floating_island, _load_planet).
+    The chain lightning's, the fireball's, the coin's, the floating island's, the planet's and the
+    UFO's files have schemas of their own throughout (_load_chain_lightning, _load_fireball,
+    _load_coin, _load_floating_island, _load_planet, _load_ufo).
     """
     name, data = _read_json(relative)
     if drifter_type is DrifterType.CHAIN_LIGHTNING:
@@ -256,6 +274,8 @@ def _load_drifter(relative: Path, drifter_type: DrifterType) -> DrifterTypeTunin
         return _load_floating_island(name, data)
     if drifter_type is DrifterType.PLANET:
         return _load_planet(name, data)
+    if drifter_type is DrifterType.UFO:
+        return _load_ufo(name, data)
     fields: dict[str, object] = _fields(name, "", data, _DRIFTER_FIELDS)
     variants: dict[str, VariantTuning] = _variants(name, fields["variants"], drifter_type)
     default_variant: str = _variant_name(name, "default_variant", fields["default_variant"])
@@ -702,6 +722,82 @@ def _planet_variants(name: str, data: object) -> dict[str, VariantTuning]:
             height=float(size),
             hitbox=planet_hitbox(float(size)),
             extra=PlanetVariantExtra(pull_radius=float(pull_radius), pull_max=float(pull_max)),
+        )
+    return variants
+
+
+def _load_ufo(name: str, data: object) -> DrifterTypeTuning:
+    """Check the UFO's file and build its record.
+
+    Each variant's width and height are its disc's; its hitbox, disc then dome, comes from
+    core.drifters.ufo.ufo_hitbox. Every variant must pass check_ufo_variant and the weave
+    check_ufo_weave; a core message is kept as it is, after the variant's path for a variant. The
+    footprint check of the other files is not run: the dome lies above the disc by design.
+    Source: docs/contracts/systems/app.md, Rules, Tuning loader (The UFO's file, What the loader
+    builds for the UFO); ufo-tuning.schema.json.
+    """
+    fields: dict[str, object] = _fields(name, "", data, _UFO_FIELDS)
+    speed_ratio: float = _number(name, "speed_ratio", fields["speed_ratio"])
+    if speed_ratio < 0:
+        raise ValueError(f"{name}: speed_ratio must be a number >= 0")
+    warning_ticks: int = _warning_ticks(name, fields["entry_warning_ticks"])
+    band_top: float = _number(name, "band_top", fields["band_top"])
+    if band_top < 0:
+        raise ValueError(f"{name}: band_top must be a number >= 0")
+    extra = UfoTypeExtra(
+        weave_change_ticks_min=_integer(
+            name, "weave_change_ticks_min", fields["weave_change_ticks_min"], 1
+        ),
+        weave_change_ticks_max=_integer(
+            name, "weave_change_ticks_max", fields["weave_change_ticks_max"], 1
+        ),
+        weave_step_min=float(_positive(name, "weave_step_min", fields["weave_step_min"])),
+        weave_step_max=float(_positive(name, "weave_step_max", fields["weave_step_max"])),
+        weave_speed_max=float(_positive(name, "weave_speed_max", fields["weave_speed_max"])),
+        weave_turn=float(_positive(name, "weave_turn", fields["weave_turn"])),
+        band_top=float(band_top),
+        band_bottom=float(_positive(name, "band_bottom", fields["band_bottom"])),
+    )
+    variants: dict[str, VariantTuning] = _ufo_variants(name, fields["variants"])
+    default_variant: str = _variant_name(name, "default_variant", fields["default_variant"])
+    if default_variant not in variants:
+        raise ValueError(f"{name}: default_variant must be one of the variant names")
+    try:
+        check_ufo_weave(extra)
+    except ValueError as err:
+        raise ValueError(f"{name}: {err}") from err
+    return DrifterTypeTuning(
+        variants=variants,
+        default_variant=default_variant,
+        speed_ratio=speed_ratio,
+        entry_warning_ticks=warning_ticks,
+        extra=extra,
+    )
+
+
+def _ufo_variants(name: str, data: object) -> dict[str, VariantTuning]:
+    """Check the UFO's `variants` object and build each variant from its disc and dome, px."""
+    if not isinstance(data, dict):
+        raise ValueError(f"{name}: variants must be an object")
+    if not data:
+        raise ValueError(f"{name}: variants must have at least one variant")
+    variants: dict[str, VariantTuning] = {}
+    for key, value in data.items():
+        variant: str = _variant_name(name, f"variants.{key}", key)
+        path: str = f"variants.{variant}"
+        fields: dict[str, object] = _fields(name, path, value, _UFO_VARIANT_FIELDS)
+        disc_width: float = float(_integer(name, f"{path}.disc_width", fields["disc_width"], 1))
+        disc_height: float = float(_integer(name, f"{path}.disc_height", fields["disc_height"], 1))
+        dome_radius: float = float(_integer(name, f"{path}.dome_radius", fields["dome_radius"], 1))
+        try:
+            check_ufo_variant(disc_width, disc_height, dome_radius)
+        except ValueError as err:
+            raise ValueError(f"{name}: {path}: {err}") from err
+        variants[variant] = VariantTuning(
+            width=disc_width,
+            height=disc_height,
+            hitbox=ufo_hitbox(disc_width, disc_height, dome_radius),
+            extra=None,
         )
     return variants
 

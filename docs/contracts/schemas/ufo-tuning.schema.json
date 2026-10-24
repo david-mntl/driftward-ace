@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/ufo-tuning.schema.json",
+  "title": "UFO tuning file",
+  "description": "The file game/tuning/drifters/ufo.json. Built on drifter-tuning.schema.json: the same default_variant, speed_ratio and entry_warning_ticks, plus the UFO's own type values (its weave and its band), and variants that give the disc and dome sizes instead of width, height and hitbox. The loader works those three out: width and height are the disc's (the UFO's size is its disc; the dome joins through the hitbox and the drawn parts), and the hitbox is the disc box plus the dome circle, built by core.drifters.ufo.ufo_hitbox (docs/contracts/systems/drifters.md, Rules, UFO). Values from drifters/07-ufo.md (all guess): default_variant standard; variants standard (disc 40 x 10, dome radius 9); speed_ratio 0.3; entry_warning_ticks 60 (07-drifters.md, the shared value); weave_change_ticks_min 60 and weave_change_ticks_max 96; weave_step_min 40 and weave_step_max 120; weave_speed_max 1.6; weave_turn 0.1; band_top 188 and band_bottom 440. Key mapping to the GDD: disc_width and disc_height are the size and hitbox rows' disc (40 x 10); dome_radius is the hitbox row's dome circle radius (9); weave_change_ticks_min and _max are the weave_change_ticks row's 60 to 96; weave_step_min and _max are the weave_step row's 40 to 120, and weave_step_min is also rule 5's '40 px of room'; band_top and band_bottom are the band row's y 188 and y 440 (screen px, the UFO's center). Level scaling (07-ufo.md, rule 9) is applied at birth by core, never here: speed, weave_speed_max and weave_turn x the level's hazard speed; both weave_change_ticks ends x the level's Timer x, rounded up; weave_step and the band never scale. Colors are not here: they stay in the view. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader). Rules this schema can't express, also enforced by the loader through core.drifters.ufo.check_ufo_variant and check_ufo_weave: default_variant is one of the variant names; each variant's dome, drawn, fits inside its disc's width; weave_change_ticks_max >= weave_change_ticks_min; weave_step_max >= weave_step_min; band_top < band_bottom <= the screen height; the band is at least 2 x weave_step_min tall; weave_step_min is at least the UFO's stopping distance at the highest hazard speed x. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, UFO.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_variant",
+    "variants",
+    "speed_ratio",
+    "entry_warning_ticks",
+    "weave_change_ticks_min",
+    "weave_change_ticks_max",
+    "weave_step_min",
+    "weave_step_max",
+    "weave_speed_max",
+    "weave_turn",
+    "band_top",
+    "band_bottom"
+  ],
+  "properties": {
+    "default_variant": {
+      "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants. standard.",
+      "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+    },
+    "variants": {
+      "description": "Named sizes (07-ufo.md, variants). A new size is a new entry here and needs no code (07-ufo.md, How to extend).",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "drifter-tuning.schema.json#/$defs/variant_name" },
+      "additionalProperties": { "$ref": "#/$defs/variant" }
+    },
+    "speed_ratio": {
+      "description": "Level 1 speed across the screen as a multiple of the ship's top sideways speed (07-ufo.md, speed_ratio). 0.3.",
+      "$ref": "drifter-tuning.schema.json#/properties/speed_ratio"
+    },
+    "entry_warning_ticks": { "$ref": "drifter-tuning.schema.json#/properties/entry_warning_ticks" },
+    "weave_change_ticks_min": {
+      "description": "Fewest ticks between two picks of a new height, at Level 1. Scaled by the level's Timer x at birth, rounded up. 60.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "weave_change_ticks_max": {
+      "description": "Most ticks between two picks of a new height, at Level 1. At least weave_change_ticks_min (checked by the loader). Scaled like the minimum. 96.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "weave_step_min": {
+      "description": "Least distance from the current height to a new one, px. Also the least room a turn needs before it goes the other way (07-ufo.md, rule 5). Never scaled. 40.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "weave_step_max": {
+      "description": "Most distance from the current height to a new one, px. At least weave_step_min (checked by the loader). Never scaled. 120.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "weave_speed_max": {
+      "description": "Top up-or-down speed, px/tick at Level 1. Scaled by the level's hazard speed x at birth. 1.6.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "weave_turn": {
+      "description": "Most the up-or-down speed may change in one tick, px/tick per tick at Level 1. Scaled by the level's hazard speed x at birth. 0.1.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "band_top": {
+      "description": "Smallest y the UFO's center may have, screen px, y down. A placed y below it is refused. Never scaled. 188.",
+      "type": "number",
+      "minimum": 0
+    },
+    "band_bottom": {
+      "description": "Largest y the UFO's center may have, screen px, y down. More than band_top and at most the screen height (checked by the loader). Never scaled. 440.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disc_width", "disc_height", "dome_radius"],
+      "properties": {
+        "disc_width": {
+          "description": "The disc's width, px: the UFO's width and its disc box's width. A whole number, so the drawn disc sits on whole pixels. 40.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "disc_height": {
+          "description": "The disc's height, px: the UFO's height and its disc box's height. A whole number. 10.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "dome_radius": {
+          "description": "The dome circle's radius, px. Its center sits on the middle of the disc's top edge. A whole number. Drawn, it must fit inside the disc's width (checked by the loader). 9.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

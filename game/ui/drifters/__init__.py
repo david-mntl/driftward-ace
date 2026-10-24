@@ -11,3 +11,4 @@ from ui.drifters import floating_island_view as floating_island_view
 from ui.drifters import meteorite_view as meteorite_view
 from ui.drifters import planet_view as planet_view
 from ui.drifters import satellite_view as satellite_view
+from ui.drifters import ufo_view as ufo_view

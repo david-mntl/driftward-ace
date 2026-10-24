@@ -8,7 +8,8 @@ tables, the chain lightning ship cases) and docs/contracts/DRA-56/tasks/DRA-56-0
 (the fireball ship cases, the tail alone) and docs/contracts/DRA-62/tasks/DRA-62-05-qa-engineer.md
 (the coin ship cases) and docs/contracts/DRA-86/tasks/DRA-86-07-qa-engineer.md (the polygon
 tables, the push-out, the island ship cases) and
-docs/contracts/DRA-96/tasks/DRA-96-06-qa-engineer.md (the planet ship cases).
+docs/contracts/DRA-96/tasks/DRA-96-06-qa-engineer.md (the planet ship cases) and
+docs/contracts/DRA-104/tasks/DRA-104-04-qa-engineer.md (the UFO ship cases).
 
 Every expected number is exact in binary (whole numbers, halves, sixteenths, 3-4-5 triangles) or
 comes from the GDD values below or from `game/tuning/drifters/*.json`. The ship-against-every-
@@ -65,6 +66,7 @@ from core.drifters.planet import PlanetTypeExtra, PlanetVariantExtra, planet_hit
 from core.drifters.satellite import SatelliteVariantExtra
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning, DrifterTypeTuning, PlaytestSwitches, VariantTuning
+from core.drifters.ufo import UfoTypeExtra, ufo_hitbox
 from core.ship import TOP_SIDE_SPEED, Ship, ship_hitbox, spawn
 
 THRUST_SIDE: float = 0.42
@@ -1379,6 +1381,17 @@ class PlanetFacts:
 
 
 @dataclass(frozen=True, slots=True)
+class UfoFacts:
+    """One UFO variant as its tuning file states it, and the band, px."""
+
+    disc_width: float
+    disc_height: float
+    dome_radius: float
+    band_top: float
+    band_bottom: float
+
+
+@dataclass(frozen=True, slots=True)
 class VariantCase:
     """One variant of one drifter type, as its tuning file states it."""
 
@@ -1402,6 +1415,10 @@ class VariantCase:
 
     planet: PlanetFacts | None = None
     """Set for a planet variant: `shapes` is the circle the test writes from `size`."""
+
+    ufo: UfoFacts | None = None
+    """Set for a UFO variant: `shapes` is the disc box then the dome circle the test writes from
+    the file's sizes."""
 
 
 def chain_layout(raw: dict[str, object], spacing: float) -> ChainLayout:
@@ -1715,11 +1732,79 @@ def load_planet_cases(data: dict[str, object]) -> list[VariantCase]:
     ]
 
 
+def load_ufo_cases(data: dict[str, object]) -> list[VariantCase]:
+    """Return one case per variant of the UFO's tuning file.
+
+    The records are built the way `app.tuning` builds them (contract, Tuning files, the UFO's
+    file), here: per variant `VariantTuning(width=disc_width, height=disc_height,
+    hitbox=ufo_hitbox(...), extra=None)`, and for the type the file's `speed_ratio`,
+    `entry_warning_ticks` and a `UfoTypeExtra` (every number a float but the two tick counts).
+    The case's `shapes` are written here from the contract's Hitbox rule (the disc box, then the
+    dome circle on the middle of its top edge), never taken from `ufo_hitbox`, and the spawned
+    UFO's hitbox must equal them.
+    """
+    raw_variants: dict[str, dict[str, object]] = cast(
+        dict[str, dict[str, object]], data["variants"]
+    )
+    facts: dict[str, UfoFacts] = {
+        name: UfoFacts(
+            disc_width=float(cast(float, raw["disc_width"])),
+            disc_height=float(cast(float, raw["disc_height"])),
+            dome_radius=float(cast(float, raw["dome_radius"])),
+            band_top=float(cast(float, data["band_top"])),
+            band_bottom=float(cast(float, data["band_bottom"])),
+        )
+        for name, raw in raw_variants.items()
+    }
+    tuning: DrifterTuning = DrifterTuning(
+        drifters={
+            DrifterType.UFO: DrifterTypeTuning(
+                variants={
+                    name: VariantTuning(
+                        width=f.disc_width,
+                        height=f.disc_height,
+                        hitbox=ufo_hitbox(f.disc_width, f.disc_height, f.dome_radius),
+                        extra=None,
+                    )
+                    for name, f in facts.items()
+                },
+                default_variant=str(data["default_variant"]),
+                speed_ratio=float(cast(float, data["speed_ratio"])),
+                entry_warning_ticks=int(cast(int, data["entry_warning_ticks"])),
+                extra=UfoTypeExtra(
+                    weave_change_ticks_min=int(cast(int, data["weave_change_ticks_min"])),
+                    weave_change_ticks_max=int(cast(int, data["weave_change_ticks_max"])),
+                    weave_step_min=float(cast(float, data["weave_step_min"])),
+                    weave_step_max=float(cast(float, data["weave_step_max"])),
+                    weave_speed_max=float(cast(float, data["weave_speed_max"])),
+                    weave_turn=float(cast(float, data["weave_turn"])),
+                    band_top=float(cast(float, data["band_top"])),
+                    band_bottom=float(cast(float, data["band_bottom"])),
+                ),
+            )
+        },
+        switches=PlaytestSwitches(),
+    )
+    return [
+        VariantCase(
+            DrifterType.UFO,
+            name,
+            tuning,
+            (
+                Box(0.0, 0.0, f.disc_width, f.disc_height),
+                Circle(0.0, -f.disc_height / 2, f.dome_radius),
+            ),
+            ufo=f,
+        )
+        for name, f in facts.items()
+    ]
+
+
 def load_variant_cases() -> list[VariantCase]:
     """Return one case per variant of every drifter type, from `game/tuning/drifters/`.
 
     The chain lightning, the fireball and the floating island get one case per variant and
-    `invert` value. The coin and the planet get one case per variant.
+    `invert` value. The coin, the planet and the UFO get one case per variant.
     """
     cases: list[VariantCase] = []
     for drifter_type in DrifterType:
@@ -1742,6 +1827,9 @@ def load_variant_cases() -> list[VariantCase]:
             continue
         if drifter_type is DrifterType.PLANET:
             cases.extend(load_planet_cases(data))
+            continue
+        if drifter_type is DrifterType.UFO:
+            cases.extend(load_ufo_cases(data))
             continue
         raw_variants: dict[str, dict[str, object]] = cast(
             dict[str, dict[str, object]], data["variants"]
@@ -1807,6 +1895,16 @@ PLANET_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.planet is not N
 `SHAPE_CASES` too and goes through the touching-distance test; the field test is its own."""
 
 
+UFO_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.ufo is not None]
+"""The UFO, per variant. It is born in WARNING with a plain two-shape hitbox, so it stays in
+`SHAPE_CASES` too and goes through the touching-distance test; the disc and the dome alone, the
+hitbox and the graze zone are their own tests."""
+
+UFO_SEED: int = 7
+"""A seed for every UFO the cases spawn. The hitbox never depends on it. Source: drifters.md,
+Rules, UFO (Born): a UFO needs a seed, 0 to MAX_SEED."""
+
+
 def case_id(case: VariantCase) -> str:
     """Return the test id of a case: the type, the variant, and `-invert` when it is set."""
     return f"{case.drifter_type.value}-{case.variant}" + ("-invert" if case.invert else "")
@@ -1869,7 +1967,14 @@ def drifter_at(case: VariantCase, x: float, y: float) -> Drifter:
     """Spawn the case's drifter at level 1 with its center at (x, y), in WARNING."""
     assert case.tuning is not None
     return spawn_drifter(
-        Placement(case.drifter_type, x=x, y=y, variant=case.variant, invert=case.invert),
+        Placement(
+            case.drifter_type,
+            x=x,
+            y=y,
+            variant=case.variant,
+            invert=case.invert,
+            seed=UFO_SEED if case.ufo is not None else None,
+        ),
         1,
         case.tuning,
     )
@@ -2454,3 +2559,163 @@ def test_the_planet_field_never_counts_only_its_body_hits(case: VariantCase) -> 
         assert math.hypot(x - SPAWN_X, y - SPAWN_Y) < case.planet.pull_radius, name
         assert not overlap_both_ways(planet.current_hitbox(), ship), name
         assert planet.effect_on_touch() is TouchEffect.HIT, name
+
+
+@pytest.mark.parametrize("case", UFO_CASES, ids=[case_id(c) for c in UFO_CASES])
+def test_a_ufo_has_no_hitbox_while_warning_and_its_disc_and_dome_once_active(
+    case: VariantCase,
+) -> None:
+    facts: UfoFacts | None = case.ufo
+    assert facts is not None
+    # The two shapes, written from the file's sizes: the disc box, then the dome circle centered
+    # on the middle of the disc's top edge.
+    assert case.shapes == (
+        Box(0.0, 0.0, facts.disc_width, facts.disc_height),
+        Circle(0.0, -facts.disc_height / 2, facts.dome_radius),
+    )
+    middle: float = (facts.band_top + facts.band_bottom) / 2
+    for y in (facts.band_top, middle, facts.band_bottom):
+        where: str = f"y {y}"
+        ufo: Drifter = drifter_at(case, 100.0, y)
+        ctx: TickContext = TickContext(ship=spawn())
+        warning_ticks: int = ufo.warning_ticks
+        assert warning_ticks > 0, where
+        for tick in range(warning_ticks):
+            assert ufo.phase is Phase.WARNING, (where, tick)
+            assert ufo.current_hitbox() == (), (where, tick)
+            ufo = ufo.update(ctx)
+        assert ufo.phase is Phase.ACTIVE, where
+        assert (ufo.x, ufo.y) == (100.0, y), where
+        placed: Hitbox = place_hitbox(case.shapes, 100.0, y)
+        assert ufo.current_hitbox() == placed, where
+        disc, dome = ufo.current_hitbox()
+        assert isinstance(disc, Box), where
+        assert isinstance(dome, Circle), where
+        assert (dome.cx, dome.cy) == (disc.cx, disc.cy - disc.h / 2), where
+
+
+@dataclass(frozen=True, slots=True)
+class UfoPlace:
+    """Where a UFO's center sits, and which of its shapes overlaps the ship there."""
+
+    name: str
+    x: float
+    y: float
+    disc: bool
+    dome: bool
+
+
+def ufo_places(facts: UfoFacts) -> list[UfoPlace]:
+    """Return the places a UFO meets the ship: just clear, and 0.5 px into it, on each shape alone.
+
+    The edges come from the ship's own boxes (`ship_hitbox`) and the file's sizes. The disc alone:
+    from the left and the right on the foot's rows (the dome is narrower than the disc, so it is
+    clear), and from above on the bar (the dome is above the disc, so it is clear). The dome alone:
+    from below, above the disc and clear of it, on the foot's bottom edge, and on the foot's
+    bottom right and bottom left corners. The disc box meets whole-number edges, so a clear
+    placement is exactly touching. A corner is a circle met off its axis: its clear step is
+    `CLEAR_SLACK` past touching.
+    """
+    bar: Box
+    foot: Box
+    bar, foot = cast(tuple[Box, Box], ship_hitbox(spawn()))
+    half_w: float = facts.disc_width / 2
+    half_h: float = facts.disc_height / 2
+    r: float = facts.dome_radius
+    foot_left: float = foot.cx - foot.w / 2
+    foot_right: float = foot.cx + foot.w / 2
+    foot_bottom: float = foot.cy + foot.h / 2
+    bar_top: float = bar.cy - bar.h / 2
+    places: list[UfoPlace] = []
+    # Disc alone. `step` moves the UFO toward the ship by that many px.
+    for step, hit in ((0.0, False), (INSIDE, True)):
+        places += [
+            UfoPlace("disc left of the foot", foot_left - half_w + step, foot.cy, hit, False),
+            UfoPlace("disc right of the foot", foot_right + half_w - step, foot.cy, hit, False),
+            UfoPlace("disc above the bar", bar.cx, bar_top - half_h + step, hit, False),
+        ]
+    # Dome alone, from below: its top is the lowest-reaching point above the disc.
+    for step, hit in ((0.0, False), (INSIDE, True)):
+        places.append(
+            UfoPlace("dome below the foot", foot.cx, foot_bottom + r + half_h - step, False, hit)
+        )
+    # Dome alone at the foot's bottom corners, the circle's center out along the diagonal.
+    diagonal: float = math.sqrt(0.5)
+    for radial, hit in ((r + CLEAR_SLACK, False), (r - INSIDE, True)):
+        for side, corner_x in (("right", foot_right), ("left", foot_left)):
+            sign: float = 1.0 if side == "right" else -1.0
+            places.append(
+                UfoPlace(
+                    f"dome at the foot's bottom {side} corner",
+                    corner_x + sign * radial * diagonal,
+                    foot_bottom + radial * diagonal + half_h,
+                    False,
+                    hit,
+                )
+            )
+    return places
+
+
+@pytest.mark.parametrize("case", UFO_CASES, ids=[case_id(c) for c in UFO_CASES])
+def test_ship_meets_a_ufo_on_its_disc_and_on_its_dome_alone(case: VariantCase) -> None:
+    facts: UfoFacts | None = case.ufo
+    assert facts is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    disc_shape, dome_shape = case.shapes
+    for place in ufo_places(facts):
+        where: str = f"{place.name} at ({place.x}, {place.y})"
+        assert facts.band_top <= place.y <= facts.band_bottom, where
+        warning: Drifter = drifter_at(case, place.x, place.y)
+        assert not overlap_both_ways(warning.current_hitbox(), ship), where
+        active: Drifter = activate(warning)
+        assert (active.x, active.y) == (place.x, place.y), where
+        assert active.current_hitbox() == place_hitbox(case.shapes, place.x, place.y), where
+        disc_only: Hitbox = place_hitbox((disc_shape,), place.x, place.y)
+        dome_only: Hitbox = place_hitbox((dome_shape,), place.x, place.y)
+        assert overlap_both_ways(disc_only, ship) is place.disc, where
+        assert overlap_both_ways(dome_only, ship) is place.dome, where
+        assert overlap_both_ways(active.current_hitbox(), ship) is (place.disc or place.dome), where
+
+
+@pytest.mark.parametrize("case", UFO_CASES, ids=[case_id(c) for c in UFO_CASES])
+def test_a_ufo_graze_zone_is_its_disc_and_dome_each_grown_by_14(case: VariantCase) -> None:
+    facts: UfoFacts | None = case.ufo
+    assert facts is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    bar: Box
+    foot: Box
+    bar, foot = cast(tuple[Box, Box], ship)
+    half_w: float = facts.disc_width / 2
+    half_h: float = facts.disc_height / 2
+    r: float = facts.dome_radius
+    # Nothing to grow in WARNING.
+    waiting: Drifter = drifter_at(case, 270.0, 250.0)
+    assert waiting.graze_zone() == ()
+    ufo: Drifter = activate(waiting)
+    assert ufo.effect_on_touch() is TouchEffect.HIT
+    assert ufo.graze_zone() == (
+        Box(
+            270.0, 250.0, facts.disc_width + 2 * GRAZE_MARGIN, facts.disc_height + 2 * GRAZE_MARGIN
+        ),
+        Circle(270.0, 250.0 - half_h, r + GRAZE_MARGIN),
+    )
+    # The grown disc box meets the ship on the foot's left edge, strictly. The grown dome is
+    # narrower than the grown disc, so only the box can reach it from the side.
+    foot_left: float = foot.cx - foot.w / 2
+    foot_bottom: float = foot.cy + foot.h / 2
+    for gap, expect in ((0.0, False), (INSIDE, True)):
+        zone: Hitbox = drifter_zone(case, foot_left - GRAZE_MARGIN - half_w + gap, foot.cy)
+        assert overlap_both_ways(zone, ship) is expect, ("disc box", gap)
+    # The grown dome meets the foot's bottom edge from below, above the grown disc box.
+    for gap, expect in ((0.0, False), (INSIDE, True)):
+        y: float = foot_bottom + r + GRAZE_MARGIN + half_h - gap
+        zone = drifter_zone(case, foot.cx, y)
+        assert overlap_both_ways(zone, ship) is expect, ("dome", gap)
+        box_only: Hitbox = zone[:1]
+        assert not overlap_both_ways(box_only, ship), ("dome", gap)
+    assert bar.cx == foot.cx
+
+
+def drifter_zone(case: VariantCase, x: float, y: float) -> Hitbox:
+    """Return the graze zone of the case's UFO, ACTIVE with its center at (x, y)."""
+    return activate(drifter_at(case, x, y)).graze_zone()

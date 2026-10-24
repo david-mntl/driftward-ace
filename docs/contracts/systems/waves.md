@@ -1,7 +1,7 @@
 # Waves: wave files, the wave book, the wave clock, playlists and the random picker
-Version: 1
+Version: 2
 Status: frozen
-Features: DRA-76
+Features: DRA-76, DRA-104
 Created by: architect
 
 ## Purpose
@@ -13,12 +13,12 @@ The wave state lives inside the run (`docs/contracts/systems/run.md`, `Run.waves
 
 Who builds what:
 - `game/core/waves.py`: the Gameplay Implementer, task `DRA-76-03-gameplay-implementer`.
-- `game/core/wave_files.py`: the Gameplay Implementer, task `DRA-76-04-gameplay-implementer`.
+- `game/core/wave_files.py`: the Gameplay Implementer, task `DRA-76-04-gameplay-implementer`. The `seed` placement field, default seeds and one path per UFO: task `DRA-104-02-gameplay-implementer`.
 - The level table rows this contract reads (`scroll_mult`, `rest_gap_mult`, `FIRST_LEVEL`): `docs/contracts/systems/drifters.md`, `core/levels.py`, task `DRA-76-01-gameplay-implementer`.
 - The wave state inside the run (`Run.waves`, `Run.level`, `Run.wave_spawns_due`, step 9a, the retry): `docs/contracts/systems/run.md`, task `DRA-76-05-gameplay-implementer`.
 - The `wave` and `level` lines of the debug overlay: `docs/contracts/systems/debug-overlay.md`, task `DRA-76-06-ui-developer`.
 - Reading the files, picking the first seed, starting the waves, adding the due placements each tick, and the debug choice between the waves and the test spawn list: the Integration Engineer, in `game/app/waves.py`, `game/app/frame.py` and `game/app/debug_spawns.py`, from `docs/contracts/systems/app.md`. No task file.
-- Tests: the QA Engineer. The wave state and the picker: task `DRA-76-07-qa-engineer`. The wave files: task `DRA-76-08-qa-engineer`. Waves inside the run: task `DRA-76-09-qa-engineer`.
+- Tests: the QA Engineer. The wave state and the picker: task `DRA-76-07-qa-engineer`. The wave files: task `DRA-76-08-qa-engineer`; the seed in them: task `DRA-104-06-qa-engineer`. Waves inside the run: task `DRA-76-09-qa-engineer`.
 - The data files are content, no task file: one `game/waves/<wave id>.json` per wave, to `docs/contracts/schemas/wave.schema.json`, and `game/waves/playlist.json`, to `docs/contracts/schemas/playlist.schema.json`. For DRA-76 the placeholder files (`wave_0`, `l1_a`, `l1_b` and the playlist, scope report DRA-76, Values needed) are written by the main session acting as Wave Designer and Wave Critic, by Director decision, after this contract and before integration. Each placeholder wave gets a critic report `docs/reports/waves/<wave id>.md` with line 1 `Verdict: provisional` (09-waves.md, Edge cases). Later waves: the Wave Designer and the Wave Critic, per `docs/crew/roster.md`.
 
 ## Diagram
@@ -140,7 +140,8 @@ class WaveKind(Enum):
 class WavePlacement:
     """One drifter of a wave: when it comes and how it is placed."""
     at_px: float          # trigger: px of scroll from the wave's start, >= 0
-    placement: Placement  # where and how (core.drifters.spawner). speed is always None
+    placement: Placement  # where and how (core.drifters.spawner). speed is always None. seed is
+                          # set for a seeded drifter (the UFO, DRA-104), None for every other
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -215,7 +216,8 @@ def rest_gap_ticks(level: int, extra_rest_ticks: int) -> int: ...
 ```python
 # game/core/wave_files.py
 # Imports: stdlib (collections.abc, logging, re, typing), core.levels, core.waves,
-# core.drifters (base: DrifterType, TouchEffect; spawner: Placement, spawn_drifter; tuning: DrifterTuning).
+# core.drifters (base: DrifterType, TouchEffect; spawner: Placement, spawn_drifter, placement_seed,
+# MAX_SEED (DRA-104); registry: drifter_class (DRA-104); tuning: DrifterTuning).
 # Never pygame, ui or app. Never opens a file: the app reads and decodes them.
 
 SEAM_CLEAR_PX: Final[float] = 120.0          # 09-waves.md, seam_clear, px of scroll (locked)
@@ -295,9 +297,10 @@ The wave files (`build_wave_book`). Source: scope report DRA-76, Limits ("refusi
 - Order: every wave, by id; then the playlist; then the pool checks, Level 1 to 8. Inside a file, fields in the order below, placements by index.
 - **Wave id.** Each key of `wave_documents` matches `NAME_PATTERN`. Else `waves/<key>.json: the file name must match ^[a-z][a-z0-9_]*$`.
 - **Wave file** (`docs/contracts/schemas/wave.schema.json`), checked by hand like the tuning files (no schema library: pygbag has none). A JSON object. No unknown field. Required: `length_px`, a number > 0; `kind`, `"fixed"` or `"pool"`; `placements`, a list (may be empty). `min_level`: required for a pool wave, an integer from 1 to 8; refused for a fixed wave. `extra_rest_ticks`: optional, an integer >= 0, 0 when left out. A number is an `int` or a `float`, never a `bool`; an integer is an `int`, never a `bool`. Examples: `waves/l1_a.json: length_px must be a number > 0`, `waves/l1_b.json: min_level is required for a pool wave`, `waves/l1_a.json: min_level is only for a pool wave`, `waves/l1_a.json: unknown field 'speed'`.
-- **Placement**, each item of `placements`. A JSON object. No unknown field: so `speed` is refused, as it stays a debug-only field (scope report DRA-76, Limits). Required: `at_px`, a number >= 0; `type`, a string. Optional: `x`, `y`, numbers; `variant`, a string matching `NAME_PATTERN`; `invert`, `specialty`, booleans; `as_level`, an integer from 1 to 8. Examples: `waves/wave_0.json: placements[3].at_px must be a number >= 0`, `waves/l1_a.json: placements[0]: unknown field 'speed'`.
-- **Drifter type.** `type` is a `DrifterType` value. Else `waves/<id>.json: placements[<i>].type 'ufo' is not a drifter type (meteorite, satellite, chain_lightning, fireball, coin)`, the list in enum order.
-- **Built drifter.** Each placement becomes `Placement(drifter_type, x=x, y=y, variant=variant, as_level=as_level, specialty_enabled=specialty, invert=invert)`, every field left out at its `Placement` default (`invert` False), `speed` None. It is spawned once with `spawn_drifter(placement, FIRST_LEVEL, tuning)` and the drifter is kept only for the next check. Whatever that raises (an unknown variant, a coordinate the drifter needs, an `invert` or a specialty it refuses) is raised again as `ValueError` naming the placement, `from` the original: `waves/l1_a.json: placements[2]: unknown variant 'huge' for drifter type 'meteorite'`. Source: the same load-time spawn as the debug test spawn list (`systems/app.md`, Rules, Debug test spawn list).
+- **Placement**, each item of `placements`. A JSON object. No unknown field: so `speed` is refused, as it stays a debug-only field (scope report DRA-76, Limits). Required: `at_px`, a number >= 0; `type`, a string. Optional: `x`, `y`, numbers; `variant`, a string matching `NAME_PATTERN`; `invert`, `specialty`, booleans; `as_level`, an integer from 1 to 8; `seed` (DRA-104), an integer from 0 to `MAX_SEED` (4294967295). Examples: `waves/wave_0.json: placements[3].at_px must be a number >= 0`, `waves/l1_a.json: placements[0]: unknown field 'speed'`, `waves/l1_a.json: placements[0].seed must be an integer from 0 to 4294967295`.
+- **Drifter type.** `type` is a `DrifterType` value. Else `waves/<id>.json: placements[<i>].type 'comet' is not a drifter type (meteorite, satellite, chain_lightning, fireball, coin, floating_island, planet, ufo)`, the list in enum order.
+- **Built drifter.** Each placement becomes `Placement(drifter_type, x=x, y=y, variant=variant, as_level=as_level, specialty_enabled=specialty, invert=invert, seed=seed)`, every field left out at its `Placement` default (`invert` False), `speed` None. **Seed** (DRA-104): when the file leaves `seed` out and `drifter_class(drifter_type).seeded` is True (the UFO), `seed = placement_seed(<wave id>, i)`, with `i` the placement's index in the file's `placements` list (before the sort by `at_px`). For any other drifter a seed left out stays None, and a seed given is passed on, so its load-time spawn refuses it below. Source: drifters/07-ufo.md, seed (locked: fixed per placement) and rule 10; `systems/drifters.md`, Rules, Spawner (Placement seed). It is spawned once with `spawn_drifter(placement, FIRST_LEVEL, tuning)` and the drifter is kept only for the next check. Whatever that raises (an unknown variant, a coordinate the drifter needs, an `invert` or a specialty it refuses) is raised again as `ValueError` naming the placement, `from` the original: `waves/l1_a.json: placements[2]: unknown variant 'huge' for drifter type 'meteorite'`. From DRA-104 that includes a seed on a drifter that has none (`placements[2]: meteorite has no seed`) and a UFO placed outside its band (`placements[4]: ufo placement y 100 is outside its band 188 to 440`). Source: the same load-time spawn as the debug test spawn list (`systems/app.md`, Rules, Debug test spawn list).
+- **One path per UFO** (DRA-104). Within one wave, no two placements of a seeded drifter have the same seed, given or default. The later one, by index in the file, is refused: `waves/l1_a.json: placements[5]: seed 7 is already used by placements[2]`. Checked after every placement of the wave is built and spawned. Seeds are never compared across waves. Source: drifters/07-ufo.md, seed (locked: "Two UFOs in one wave never share a path").
 - **Seam start.** A placement whose drifter's `effect_on_touch()` is `HIT` (a hazard) with `at_px < SEAM_CLEAR_PX` is refused: `waves/l1_a.json: placements[0]: a hazard (meteorite) at 100 px is inside the first 120 px`, the two numbers in `g` format. A trigger of exactly 120 px is allowed: the hazard's warning shows from 120 px on. Pickups (the coin) may trigger anywhere. Source: 09-waves.md, rule 7.4 (an entry warning counts as on screen; it shows from the tick the drifter is due); scope report DRA-76, Limits.
 - **Playlist** (`docs/contracts/schemas/playlist.schema.json`). A JSON object. No unknown field. Required: `wave_zero`, a string; `levels`, a list of exactly `LEVEL_COUNT` (8) objects, Level 1 first. Each level: no unknown field; required `fixed`, a list of strings, and `random_count`, an integer >= 0. Example: `waves/playlist.json: levels must be a list of exactly 8 levels`, `waves/playlist.json: levels[2].random_count must be an integer >= 0`.
 - **Named waves exist.** `wave_zero` and every `fixed` entry name a wave in `wave_documents`. Else `waves/playlist.json: wave_zero names 'wave_00', which is not a wave`, `waves/playlist.json: levels[0].fixed[1] names 'l1_c', which is not a wave`.
@@ -315,12 +318,26 @@ Logging (logger `core.waves`, DEBUG, by event, never by tick). Source: game/CONT
 - Nothing else: no line when a placement is due (the run logs `drifter spawn` when it enters), no line per tick, no line for the rest's countdown. `core.wave_files` logs nothing; the app logs the one load line (`systems/app.md`).
 
 Other rules:
-- `step_waves`, `start_waves`, `next_run_waves`, `pick_pool_wave`, `rest_gap_ticks` and `build_wave_book` use no frame time. The only randomness is `random.Random` built from a seed in the state or handed in. Same input, same output. Source: 15-tech-constraints.md, rule 2.
+- `step_waves`, `start_waves`, `next_run_waves`, `pick_pool_wave`, `rest_gap_ticks` and `build_wave_book` use no frame time. The only randomness is `random.Random` built from a seed in the state or handed in, or, for a default placement seed, from the wave id and index (`placement_seed`, DRA-104). Same input, same output. Source: 15-tech-constraints.md, rule 2.
 - Core behaves the same in normal and debug mode and never reads the run mode. Whether a run has waves is the app's choice, made when it starts the run. Source: game/CONTEXT.md, Run modes; 15-tech-constraints.md, rule 7.
 - Drifter values stay per drifter type: a wave sets no speed, size or timer, only placement fields. Source: 09-waves.md, rule 12; 91-decision-log.md, row 71.
 - Core never imports pygame, `ui` or `app`, and never reads a file. Source: game/CONTEXT.md, Layout.
 
+## Impact
+DRA-104 changes this frozen contract (v1), in the wave files only: the optional `seed` placement field, default seeds for seeded drifters, the one-path-per-UFO check, and the unknown-type example (`ufo` is a type now). The wave state, the clock and the picker don't change. Grepping `game/` (tests included) and `tools/` for `build_wave_book`, `wave_files`, `_PLACEMENT_FIELDS`, `not a drifter type` and `WavePlacement`:
+
+| File | Change needed |
+|---|---|
+| `game/core/wave_files.py` | the `seed` field and its check, the default seed, the one-path check. Task `DRA-104-02-gameplay-implementer`, after `DRA-104-01` (`Placement.seed`, `placement_seed`, `seeded`). |
+| `game/core/waves.py`, `game/core/run.py`, `game/app/waves.py`, `game/app/frame.py` | none. They pass placements on as they are; the seed rides inside. |
+| `game/tests/core/test_wave_files.py` | breaks: the unknown-type refusal uses `ufo` and expects the list ending `planet)` (already from task DRA-104-01). Task `DRA-104-06-qa-engineer`, which also adds the seed cases. |
+| `game/tests/core/test_waves.py`, `test_run_waves.py` and every other test | none. |
+| `game/waves/*.json` | none: no committed wave has a UFO or a `seed`. A UFO wave is a later wave request (scope report DRA-104, Out). |
+| `tools/wave_check/`, `tools/wave_editor/` | none from this contract's tasks. Both build the book with `build_wave_book`, so a wave with a bad seed or a UFO outside its band fails to load in them as in the game. The editor's own placement list has no `seed` (`systems/drifters.md`, Impact). |
+
 ## Rationale
+- **The default seed is filled in here (DRA-104).** Only the loader knows the wave id and the placement's index, the two facts that stay fixed while the file does; the spawner and the UFO never see the wave. `systems/drifters.md`, Rationale, has the reasoning on the seed itself.
+- **Equal seeds are refused, not re-drawn (DRA-104).** "Two UFOs in one wave never share a path" is locked. Silently changing a seed the designer typed would break "a placement may set `seed` to pick another path"; refusing it names the placement, and a different seed fixes it. Default seeds collide only by a 1-in-4-billion chance, and the same message covers that.
 - **The wave state lives in the run.** Game over must freeze it and a retry must restart it, the same as the ship and the scroll. `step_run` already does both for everything it holds, so the waves get them for free. Core owns the rule; the app only chooses, once per page load, whether the run has waves.
 - **The run's level comes from the wave state.** The level is now a fact of the playlist (08-difficulty.md, rule 1), and only the wave clock knows when a playlist ends. A run with no waves (the test spawn list) stays at Level 1, as the scope report asks.
 - **The book travels inside the wave state.** A retry happens inside `step_run`, which has no other way to reach the waves to restart. The book never changes, so carrying a reference costs nothing.

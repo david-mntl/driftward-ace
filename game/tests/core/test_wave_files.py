@@ -2,9 +2,12 @@
 
 Contract: docs/contracts/systems/waves.md, Interface (`game/core/wave_files.py`, the shapes
 `game/core/waves.py` builds), Rules (The wave files, Logging); docs/contracts/schemas/
-wave.schema.json and playlist.schema.json. Task: docs/contracts/DRA-76/tasks/
-DRA-76-08-qa-engineer.md. One test per behavior it lists. The good set is the test-only JSON in
-`wave_files/`, read here with `json`; each refusal is that set with the edits of one row made.
+wave.schema.json and playlist.schema.json; systems/drifters.md, Interface (`placement_seed`,
+`MAX_SEED`) and Rules (Spawner, Placement seed; UFO, Born). Tasks: docs/contracts/DRA-76/tasks/
+DRA-76-08-qa-engineer.md and docs/contracts/DRA-104/tasks/DRA-104-06-qa-engineer.md (the seed, the
+UFO). One test per behavior they list. The good set is the test-only JSON in `wave_files/`, read
+here with `json`; each refusal is that set with the edits of one row made. A UFO goes in by an
+edit that sets a wave's whole `placements` list (`with_placements`), so the good set stays as it is.
 The tuning records are built here from the GDD values below, never read from game/tuning/ or
 game/waves/, and no expected number is imported from the code under test.
 """
@@ -23,13 +26,14 @@ from core.drifters.base import DrifterType
 from core.drifters.coin import Coin, CoinTypeExtra, CoinVariantExtra
 from core.drifters.meteorite import Meteorite
 from core.drifters.satellite import Satellite, SatelliteVariantExtra
-from core.drifters.spawner import Placement
+from core.drifters.spawner import Placement, placement_seed
 from core.drifters.tuning import (
     DrifterTuning,
     DrifterTypeTuning,
     PlaytestSwitches,
     VariantTuning,
 )
+from core.drifters.ufo import Ufo, UfoTypeExtra
 from core.wave_files import build_wave_book
 from core.waves import LevelPlaylist, WaveBook, WaveKind, WavePlacement
 
@@ -58,6 +62,17 @@ RING_W: Final[int] = 22
 RING_H: Final[int] = 8
 """px. Source: drifters/04-coin.md, Values (guess)."""
 
+DISC_W: Final[float] = 40.0
+DISC_H: Final[float] = 10.0
+DOME_R: Final[float] = 9.0
+UFO_SPEED_RATIO: Final[float] = 0.3
+BAND_TOP: Final[float] = 188.0
+BAND_BOTTOM: Final[float] = 440.0
+"""px. Source: drifters/07-ufo.md, size, hitbox, speed_ratio and band (guess)."""
+
+MAX_SEED_VALUE: Final[int] = 4_294_967_295
+"""A seed's largest value, 2^32 - 1. Source: waves.md, Rules, The wave files (Placement)."""
+
 POINTS: Final[dict[str, int]] = {"common": 50, "rare": 100}
 """Source: 06-scoring.md, coin_points (common 50 locked, rare 100 guess)."""
 
@@ -70,7 +85,7 @@ SIZES: Final[dict[str, tuple[float, float]]] = {
 
 
 def make_tuning() -> DrifterTuning:
-    """Build the meteorite, satellite and coin tuning from the GDD values above."""
+    """Build the meteorite, satellite, coin and UFO tuning from the GDD values above."""
     coin_extra: CoinTypeExtra = CoinTypeExtra(
         body_height=BODY_H,
         ring_width=RING_W,
@@ -81,7 +96,17 @@ def make_tuning() -> DrifterTuning:
         popup_ticks=60,
         popup_rise_per_tick=0.5,
     )
-    # Importing the three classes registers them with the spawner; their types key the tuning.
+    ufo_extra: UfoTypeExtra = UfoTypeExtra(
+        weave_change_ticks_min=60,
+        weave_change_ticks_max=96,
+        weave_step_min=40.0,
+        weave_step_max=120.0,
+        weave_speed_max=1.6,
+        weave_turn=0.1,
+        band_top=BAND_TOP,
+        band_bottom=BAND_BOTTOM,
+    )
+    # Importing the four classes registers them with the spawner; their types key the tuning.
     return DrifterTuning(
         drifters={
             Meteorite.drifter_type: DrifterTypeTuning(
@@ -120,6 +145,20 @@ def make_tuning() -> DrifterTuning:
                 speed_ratio=0.0,
                 entry_warning_ticks=0,
                 extra=coin_extra,
+            ),
+            Ufo.drifter_type: DrifterTypeTuning(
+                variants={
+                    "standard": VariantTuning(
+                        width=DISC_W,
+                        height=DISC_H,
+                        hitbox=(Box(0.0, 0.0, DISC_W, DISC_H), Circle(0.0, -DISC_H / 2, DOME_R)),
+                        extra=None,
+                    )
+                },
+                default_variant="standard",
+                speed_ratio=UFO_SPEED_RATIO,
+                entry_warning_ticks=WARNING_TICKS,
+                extra=ufo_extra,
             ),
         },
         switches=PlaytestSwitches(),
@@ -236,12 +275,51 @@ def level_field(index: int, field: str, values: tuple[object, ...]) -> list[Refu
     return field_rows("playlist", ("levels", index, field), prefix, values)
 
 
+def ufo_row(at_px: float = 200, y: float | None = 300, **fields: object) -> dict[str, Json]:
+    """One UFO placement of a wave file. `y` None leaves it out; `fields` adds `seed` and so on."""
+    row: dict[str, Json] = {"at_px": at_px, "type": "ufo"}
+    if y is not None:
+        row["y"] = y
+    row.update(fields)
+    return row
+
+
+def rock_row(at_px: float = 500) -> dict[str, Json]:
+    """One meteorite placement, a hazard that carries no seed."""
+    return {"at_px": at_px, "type": "meteorite", "x": 200}
+
+
+def with_placements(*rows: dict[str, Json], wave_id: str = "l1_a") -> Edit:
+    """The edit that sets a wave's whole placement list, in the order given (the file's order)."""
+    return Edit(wave_id, ("placements",), list(rows))
+
+
+def ufos_in(book: WaveBook, wave_id: str = "l1_a") -> list[WavePlacement]:
+    """The wave's UFO placements, in the book's order (sorted by trigger)."""
+    return [
+        p for p in book.waves[wave_id].placements if p.placement.drifter_type is DrifterType.UFO
+    ]
+
+
 NOT_A_NUMBER: Final[tuple[object, ...]] = ("10", True, False, None, [], {})
 NOT_AN_INTEGER: Final[tuple[object, ...]] = (1.5, "2", True, None, [])
 NOT_A_STRING: Final[tuple[object, ...]] = (5, None, True, [])
 NOT_A_BOOLEAN: Final[tuple[object, ...]] = ("yes", 1, 0, None)
 NOT_A_NAME: Final[tuple[object, ...]] = (5, "", "Big", "bad-name", "1x", True)
 NOT_AN_OBJECT: Final[tuple[object, ...]] = ([], "text", 5, None)
+BAD_SEEDS: Final[tuple[object, ...]] = (
+    -1,
+    MAX_SEED_VALUE + 1,
+    2**64,
+    1.5,
+    -0.5,
+    True,
+    False,
+    "5",
+    None,
+    [],
+    {},
+)
 NO_LEVELS: Final[tuple[object, ...]] = (
     REMOVE,
     {},
@@ -356,9 +434,9 @@ REFUSALS: Final[list[Refusal]] = [
             f"placement type {value!r}",
             (Edit("wave_0", ("placements", 2, "type"), value),),
             f"waves/wave_0.json: placements[2].type '{value}' is not a drifter type "
-            "(meteorite, satellite, chain_lightning, fireball, coin, floating_island, planet)",
+            "(meteorite, satellite, chain_lightning, fireball, coin, floating_island, planet, ufo)",
         )
-        for value in ("ufo", "Meteorite", "")
+        for value in ("comet", "Meteorite", "UFO", "")
     ],
     *placement_field("wave_0", 2, "x", ("5", True, False, None, [])),
     *placement_field("l1_a", 0, "y", ("5", True, False, None, [])),
@@ -420,6 +498,73 @@ REFUSALS: Final[list[Refusal]] = [
         (Edit("wave_0", ("placements", 1, "specialty"), True),),
         "waves/wave_0.json: placements[1]: coin has no specialty",
         spawn=True,
+    ),
+    # The seed field: an integer from 0 to MAX_SEED, on any placement (the range is checked first).
+    *[
+        Refusal(
+            f"placement seed={label(value)}",
+            (Edit("wave_0", ("placements", 2, "seed"), value),),
+            "waves/wave_0.json: placements[2].seed must be an integer from 0 to 4294967295",
+        )
+        for value in BAD_SEEDS
+    ],
+    # What the load-time spawn refuses about a seed or a UFO, named by the placement.
+    *[
+        Refusal(
+            f"seed on {name}",
+            (Edit(wave_id, ("placements", index, "seed"), 5),),
+            f"waves/{wave_id}.json: placements[{index}]: {name} has no seed",
+            spawn=True,
+        )
+        for name, wave_id, index in (("meteorite", "wave_0", 2), ("coin", "wave_0", 1))
+    ],
+    Refusal(
+        "seed on a satellite",
+        (Edit("l1_a", ("placements", 0, "seed"), 0),),
+        "waves/l1_a.json: placements[0]: satellite has no seed",
+        spawn=True,
+    ),
+    *[
+        Refusal(
+            f"ufo at y {y:g}",
+            (with_placements(rock_row(), ufo_row(y=y)),),
+            f"waves/l1_a.json: placements[1]: ufo placement y {y:g} is outside its band 188 to 440",
+            spawn=True,
+        )
+        for y in (0, 100, 187.5, 187.99, 440.01, 440.5, 480)
+    ],
+    # Two UFOs in one wave never share a seed, given or default. The later one, by the file's
+    # order and not the trigger's, is named with the earlier.
+    Refusal(
+        "two ufos with the same given seed",
+        (
+            with_placements(
+                ufo_row(at_px=500, seed=7), rock_row(), ufo_row(at_px=200, seed=8), ufo_row(seed=7)
+            ),
+        ),
+        "waves/l1_a.json: placements[3]: seed 7 is already used by placements[0]",
+    ),
+    Refusal(
+        "the later ufo is the one in the file after the first, whatever its trigger",
+        (with_placements(ufo_row(at_px=500, seed=7), ufo_row(at_px=130, seed=7)),),
+        "waves/l1_a.json: placements[1]: seed 7 is already used by placements[0]",
+    ),
+    Refusal(
+        "three ufos with one seed name the first",
+        (with_placements(ufo_row(seed=0), ufo_row(seed=1), ufo_row(seed=0), ufo_row(seed=0)),),
+        "waves/l1_a.json: placements[2]: seed 0 is already used by placements[0]",
+    ),
+    Refusal(
+        "a given seed equal to an earlier default seed",
+        (with_placements(ufo_row(), ufo_row(seed=placement_seed("l1_a", 0))),),
+        f"waves/l1_a.json: placements[1]: seed {placement_seed('l1_a', 0)} is already used by "
+        "placements[0]",
+    ),
+    Refusal(
+        "a default seed equal to an earlier given seed",
+        (with_placements(rock_row(), ufo_row(seed=placement_seed("l1_a", 2)), ufo_row()),),
+        f"waves/l1_a.json: placements[2]: seed {placement_seed('l1_a', 2)} is already used by "
+        "placements[1]",
     ),
     # The playlist: shape, and the number of levels.
     *[
@@ -656,6 +801,147 @@ def test_a_coin_triggers_anywhere_even_below_120_px(at_px: float) -> None:
             p for p in wave_placements if p.placement.drifter_type is DrifterType.COIN
         ]
         assert [p.at_px for p in coins] == [float(at_px)]
+
+
+def test_the_unknown_type_message_lists_every_type_in_enum_order_ending_planet_ufo() -> None:
+    with pytest.raises(ValueError, match=r"^waves") as raised:
+        build(Edit("wave_0", ("placements", 2, "type"), "comet"))
+    assert str(raised.value) == (
+        "waves/wave_0.json: placements[2].type 'comet' is not a drifter type "
+        "(meteorite, satellite, chain_lightning, fireball, coin, floating_island, planet, ufo)"
+    )
+    assert str(raised.value).endswith("planet, ufo)")
+    # `ufo` is a type now: it is no longer refused as one.
+    book: WaveBook = build(with_placements(ufo_row()))
+    assert [p.placement.drifter_type for p in ufos_in(book)] == [DrifterType.UFO]
+
+
+@pytest.mark.parametrize("seed", [0, 1, 7, 2**31, MAX_SEED_VALUE - 1, MAX_SEED_VALUE], ids=repr)
+def test_a_seed_from_0_to_max_seed_is_accepted_and_kept(seed: int) -> None:
+    book: WaveBook = build(with_placements(ufo_row(seed=seed)))
+    assert [p.placement.seed for p in ufos_in(book)] == [seed]
+    assert type(ufos_in(book)[0].placement.seed) is int
+
+
+def test_a_seed_below_0_above_max_seed_or_not_an_integer_is_refused_with_its_message() -> None:
+    message: str = "waves/l1_a.json: placements[0].seed must be an integer from 0 to 4294967295"
+    for seed in (-1, MAX_SEED_VALUE + 1, 1.5, True, False):
+        with pytest.raises(ValueError, match=r"^waves") as raised:
+            build(with_placements(ufo_row(seed=seed)))
+        assert str(raised.value) == message, seed
+
+
+def test_a_ufo_with_no_seed_gets_the_placement_seed_of_its_wave_and_file_index() -> None:
+    # File order: a meteorite (0), a UFO at 400 (1), a UFO at 150 (2), a UFO at 300 with a seed (3),
+    # a meteorite (4). Sorted by trigger the UFOs come as 2, 3, 1: the index is the file's.
+    rows: tuple[dict[str, Json], ...] = (
+        rock_row(500),
+        ufo_row(at_px=400),
+        ufo_row(at_px=150),
+        ufo_row(at_px=300, seed=99),
+        rock_row(250),
+    )
+    book: WaveBook = build(with_placements(*rows))
+    found: list[WavePlacement] = ufos_in(book)
+    assert [p.at_px for p in found] == [150.0, 300.0, 400.0]
+    assert [p.placement.seed for p in found] == [
+        placement_seed("l1_a", 2),
+        99,
+        placement_seed("l1_a", 1),
+    ]
+    # Every drifter that has no seed keeps None.
+    others: list[WavePlacement] = [
+        p for p in book.waves["l1_a"].placements if p.placement.drifter_type is not DrifterType.UFO
+    ]
+    assert len(others) == 2
+    assert [p.placement.seed for p in others] == [None, None]
+    # The wave id is part of the default: the same index in another wave is another seed.
+    other: WaveBook = build(with_placements(*rows, wave_id="l1_b"))
+    assert ufos_in(other, "l1_b")[0].placement.seed == placement_seed("l1_b", 2)
+    assert placement_seed("l1_b", 2) != placement_seed("l1_a", 2)
+    for found_seed in (p.placement.seed for p in found):
+        assert found_seed is not None
+        assert 0 <= found_seed <= MAX_SEED_VALUE
+
+
+def test_the_good_set_keeps_every_seed_at_none() -> None:
+    book: WaveBook = build()
+    for wave in book.waves.values():
+        for wave_placement in wave.placements:
+            assert wave_placement.placement.seed is None
+
+
+def test_a_seed_on_a_drifter_that_has_none_and_a_ufo_outside_its_band_are_refused() -> None:
+    cases: tuple[tuple[Edit, str], ...] = (
+        (
+            Edit("wave_0", ("placements", 2, "seed"), 5),
+            "waves/wave_0.json: placements[2]: meteorite has no seed",
+        ),
+        (
+            Edit("l1_a", ("placements", 0, "seed"), 5),
+            "waves/l1_a.json: placements[0]: satellite has no seed",
+        ),
+        (
+            Edit("wave_0", ("placements", 1, "seed"), 5),
+            "waves/wave_0.json: placements[1]: coin has no seed",
+        ),
+        (
+            with_placements(rock_row(), rock_row(), ufo_row(y=100)),
+            "waves/l1_a.json: placements[2]: ufo placement y 100 is outside its band 188 to 440",
+        ),
+    )
+    for edit, message in cases:
+        with pytest.raises(ValueError, match=r"^waves") as raised:
+            build(edit)
+        assert str(raised.value) == message
+        assert isinstance(raised.value.__cause__, ValueError)
+    # The band's two ends are inside it.
+    for y in (BAND_TOP, BAND_BOTTOM, 300):
+        book: WaveBook = build(with_placements(ufo_row(y=y)))
+        assert len(ufos_in(book)) == 1
+
+
+def test_one_seed_twice_in_a_wave_is_refused_and_in_two_waves_it_loads() -> None:
+    # Given seeds: the later one in the file is named, with the earlier.
+    with pytest.raises(ValueError, match=r"^waves") as raised:
+        build(with_placements(ufo_row(at_px=500, seed=7), rock_row(), ufo_row(at_px=200, seed=7)))
+    assert str(raised.value) == (
+        "waves/l1_a.json: placements[2]: seed 7 is already used by placements[0]"
+    )
+    # A given seed that is another UFO's default seed.
+    default: int = placement_seed("l1_a", 0)
+    with pytest.raises(ValueError, match=r"^waves") as raised:
+        build(with_placements(ufo_row(), ufo_row(seed=default)))
+    assert str(raised.value) == (
+        f"waves/l1_a.json: placements[1]: seed {default} is already used by placements[0]"
+    )
+    # Different seeds in one wave load, including a default next to a given one.
+    book: WaveBook = build(with_placements(ufo_row(seed=7), ufo_row(), ufo_row(seed=8)))
+    assert len({p.placement.seed for p in ufos_in(book)}) == 3
+    # The same seed in two different waves loads, and each wave keeps it.
+    both: WaveBook = build(
+        with_placements(ufo_row(seed=7), wave_id="l1_a"),
+        with_placements(ufo_row(seed=7), wave_id="l1_b"),
+    )
+    assert [p.placement.seed for p in ufos_in(both, "l1_a")] == [7]
+    assert [p.placement.seed for p in ufos_in(both, "l1_b")] == [7]
+    # A meteorite never counts: no placement but a UFO has a seed to share.
+    mixed: WaveBook = build(with_placements(rock_row(), ufo_row(seed=7), rock_row(300)))
+    assert [p.placement.seed for p in ufos_in(mixed)] == [7]
+
+
+def test_a_ufo_below_120_px_is_refused_and_one_at_120_px_is_accepted() -> None:
+    for at_px in (0, 0.0, 50, 100, 119.5, 119.99):
+        with pytest.raises(ValueError, match=r"^waves") as raised:
+            build(with_placements(rock_row(), ufo_row(at_px=at_px)))
+        assert str(raised.value) == (
+            f"waves/l1_a.json: placements[1]: a hazard (ufo) at {at_px:g} px is inside the first "
+            f"120 px"
+        )
+    for at_px in (120, 120.0, 120.5, 600):
+        book: WaveBook = build(with_placements(rock_row(), ufo_row(at_px=at_px)))
+        assert [p.at_px for p in ufos_in(book)] == [float(at_px)]
+    assert SEAM_CLEAR == 120.0
 
 
 def test_what_is_not_checked_at_load_is_accepted() -> None:
