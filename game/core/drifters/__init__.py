@@ -9,4 +9,5 @@ from core.drifters import coin as coin
 from core.drifters import fireball as fireball
 from core.drifters import floating_island as floating_island
 from core.drifters import meteorite as meteorite
+from core.drifters import planet as planet
 from core.drifters import satellite as satellite

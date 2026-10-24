@@ -134,3 +134,10 @@
 - `systems/run.md`: 7 to 8, frozen.
 - `systems/ship.md`: 5 to 6, frozen.
 - Floating islands: solid drifters the ship can stand on and ride, in five shapes, with their own tuning file and debug-spawn rows.
+
+## DRA-96, 2026-10-22
+- `systems/app.md`: 13 to 14, frozen.
+- `systems/drifters.md`: 7 to 8, frozen.
+- `systems/run.md`: 8 to 9, frozen.
+- `systems/ship.md`: 6 to 7, frozen.
+- Planet drifter: a gravity well that pulls the ship toward its center inside a drawn field; touching the body costs a life.

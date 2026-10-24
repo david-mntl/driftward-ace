@@ -23,6 +23,7 @@ from core.popup import PointsPopup, step_popups
 from core.scroll import Scroll, scroll_step_px, start_scroll, step_scroll
 from core.ship import (
     NO_GROUND,
+    GravityWell,
     Ground,
     Ship,
     Thrust,
@@ -207,6 +208,15 @@ def island_ground(drifters: Sequence[Drifter], scroll_step_px: float) -> Ground:
     return Ground(hitbox=shapes, velocity_x=0.0, velocity_y=scroll_step_px)
 
 
+def gravity_wells(drifters: Sequence[Drifter]) -> tuple[GravityWell, ...]:
+    """Return the gravity field of every drifter that has one now, in drifter order.
+
+    A field comes from `Drifter.gravity_well()`, which is None in WARNING and for every drifter
+    without one. () when there is none. Pure, no logging. Source: systems/run.md, Interface.
+    """
+    return tuple(well for drifter in drifters if (well := drifter.gravity_well()) is not None)
+
+
 def step_run(run: Run, thrust: Thrust) -> Run:
     """Advance the run one fixed 60 Hz tick and return the new run. Never mutates the input.
 
@@ -238,8 +248,8 @@ def _is_press(thrust: Thrust, held: Thrust) -> bool:
 
 
 def _step_playing(run: Run, thrust: Thrust) -> Run:
-    """A playing tick: press, timer, drifters, popups, ground and ship, scroll, collect, fall or
-    hit, cooldowns, drops, waves.
+    """A playing tick: press, timer, drifters, popups, ground and wells, ship, scroll, collect,
+    fall or hit, cooldowns, drops, waves.
 
     A hit is tested only when the ship did not fall. The level is read once, going into the tick.
     Source: systems/run.md, Rules, a playing tick, steps 1 to 10 with 3a, 5a and 9a.
@@ -254,7 +264,8 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
         log.debug("respawn wait end")
     stands: bool = run.waiting and not press
     ground: Ground = island_ground(drifters, scroll_px)
-    ship: Ship = block_ship(run.ship, ground) if stands else step(run.ship, thrust, ground)
+    wells: tuple[GravityWell, ...] = gravity_wells(drifters)
+    ship: Ship = block_ship(run.ship, ground) if stands else step(run.ship, thrust, ground, wells)
     scroll: Scroll = step_scroll(run.scroll, run.level)
     if run.invuln_ticks_left == 1:
         log.debug("invulnerable end")

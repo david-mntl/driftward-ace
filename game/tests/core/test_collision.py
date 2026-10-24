@@ -7,7 +7,8 @@ engineer.md (the two ship tests at the end), docs/contracts/DRA-39/tasks/DRA-39-
 tables, the chain lightning ship cases) and docs/contracts/DRA-56/tasks/DRA-56-03-qa-engineer.md
 (the fireball ship cases, the tail alone) and docs/contracts/DRA-62/tasks/DRA-62-05-qa-engineer.md
 (the coin ship cases) and docs/contracts/DRA-86/tasks/DRA-86-07-qa-engineer.md (the polygon
-tables, the push-out, the island ship cases).
+tables, the push-out, the island ship cases) and
+docs/contracts/DRA-96/tasks/DRA-96-06-qa-engineer.md (the planet ship cases).
 
 Every expected number is exact in binary (whole numbers, halves, sixteenths, 3-4-5 triangles) or
 comes from the GDD values below or from `game/tuning/drifters/*.json`. The ship-against-every-
@@ -60,6 +61,7 @@ from core.drifters.floating_island import (
     IslandVariantExtra,
     island_hitbox,
 )
+from core.drifters.planet import PlanetTypeExtra, PlanetVariantExtra, planet_hitbox
 from core.drifters.satellite import SatelliteVariantExtra
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning, DrifterTypeTuning, PlaytestSwitches, VariantTuning
@@ -1366,6 +1368,17 @@ class IslandFacts:
 
 
 @dataclass(frozen=True, slots=True)
+class PlanetFacts:
+    """One planet variant as its tuning file states it, px."""
+
+    size: float
+    """The body's diameter. The hitbox is a circle of radius `size` / 2."""
+
+    pull_radius: float
+    """The field's radius."""
+
+
+@dataclass(frozen=True, slots=True)
 class VariantCase:
     """One variant of one drifter type, as its tuning file states it."""
 
@@ -1386,6 +1399,9 @@ class VariantCase:
 
     island: IslandFacts | None = None
     """Set for a floating island variant: its hitbox is built from its shape, size and `arm`."""
+
+    planet: PlanetFacts | None = None
+    """Set for a planet variant: `shapes` is the circle the test writes from `size`."""
 
 
 def chain_layout(raw: dict[str, object], spacing: float) -> ChainLayout:
@@ -1641,11 +1657,69 @@ def load_island_cases(data: dict[str, object]) -> list[VariantCase]:
     ]
 
 
+def load_planet_cases(data: dict[str, object]) -> list[VariantCase]:
+    """Return one case per variant of the planet's tuning file.
+
+    The records are built the way `app.tuning` builds them (contract, Tuning files, the planet's
+    file), here: per variant `VariantTuning(width=size, height=size, hitbox=planet_hitbox(size),
+    extra=PlanetVariantExtra(pull_radius, pull_max))`, and for the type `speed_ratio` 0.0,
+    `entry_warning_ticks` from the file and a `PlanetTypeExtra`. The case's `shapes` are written
+    here from the contract's Hitbox rule (one circle of radius `size` / 2 on the center), never
+    taken from `planet_hitbox`, and the spawned planet's hitbox must equal them.
+    """
+    raw_variants: dict[str, dict[str, object]] = cast(
+        dict[str, dict[str, object]], data["variants"]
+    )
+    sizes: dict[str, float] = {
+        name: float(cast(float, raw["size"])) for name, raw in raw_variants.items()
+    }
+    tuning: DrifterTuning = DrifterTuning(
+        drifters={
+            DrifterType.PLANET: DrifterTypeTuning(
+                variants={
+                    name: VariantTuning(
+                        width=sizes[name],
+                        height=sizes[name],
+                        hitbox=planet_hitbox(sizes[name]),
+                        extra=PlanetVariantExtra(
+                            pull_radius=float(cast(float, raw["pull_radius"])),
+                            pull_max=float(cast(float, raw["pull_max"])),
+                        ),
+                    )
+                    for name, raw in raw_variants.items()
+                },
+                default_variant=str(data["default_variant"]),
+                speed_ratio=0.0,
+                entry_warning_ticks=int(cast(int, data["entry_warning_ticks"])),
+                extra=PlanetTypeExtra(
+                    field_ring_trip=int(cast(int, data["field_ring_trip"])),
+                    field_ring_gap=int(cast(int, data["field_ring_gap"])),
+                    field_ring_fade=float(cast(float, data["field_ring_fade"])),
+                    field_ring_count=int(cast(int, data["field_ring_count"])),
+                ),
+            )
+        },
+        switches=PlaytestSwitches(),
+    )
+    return [
+        VariantCase(
+            DrifterType.PLANET,
+            name,
+            tuning,
+            (Circle(0.0, 0.0, sizes[name] / 2),),
+            planet=PlanetFacts(
+                size=sizes[name], pull_radius=float(cast(float, raw["pull_radius"]))
+            ),
+        )
+        for name, raw in raw_variants.items()
+    ]
+
+
 def load_variant_cases() -> list[VariantCase]:
     """Return one case per variant of every drifter type, from `game/tuning/drifters/`.
 
     The chain lightning, the fireball and the floating island get one case per variant and
-    `invert` value. The coin gets one case per variant.
+    `invert` value. The coin and the planet get one case per variant.
     """
     cases: list[VariantCase] = []
     for drifter_type in DrifterType:
@@ -1665,6 +1739,9 @@ def load_variant_cases() -> list[VariantCase]:
             continue
         if drifter_type is DrifterType.FLOATING_ISLAND:
             cases.extend(load_island_cases(data))
+            continue
+        if drifter_type is DrifterType.PLANET:
+            cases.extend(load_planet_cases(data))
             continue
         raw_variants: dict[str, dict[str, object]] = cast(
             dict[str, dict[str, object]], data["variants"]
@@ -1724,6 +1801,10 @@ COIN_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.coin is not None]
 
 ISLAND_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.island is not None]
 """The floating island, per variant and `invert` value. Born ACTIVE, so it has its own tests."""
+
+PLANET_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.planet is not None]
+"""The planet, per variant. It is born in WARNING with a plain hitbox, so it stays in
+`SHAPE_CASES` too and goes through the touching-distance test; the field test is its own."""
 
 
 def case_id(case: VariantCase) -> str:
@@ -2357,3 +2438,19 @@ def test_ship_top_sideways_speed_is_the_drag_limit() -> None:
     top: float = TOP_SIDE_SPEED
     assert top == pytest.approx(expected)
     assert top == pytest.approx(6.58, abs=0.005)
+
+
+@pytest.mark.parametrize("case", PLANET_CASES, ids=[case_id(c) for c in PLANET_CASES])
+def test_the_planet_field_never_counts_only_its_body_hits(case: VariantCase) -> None:
+    assert case.planet is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    for name, toward in DIRECTIONS.items():
+        distance, exact = touching_distance(case.shapes, toward)
+        gap: float = distance + (0.0 if exact else 1e-9)
+        x: float = SPAWN_X - toward[0] * gap
+        y: float = SPAWN_Y - toward[1] * gap
+        planet: Drifter = activate(drifter_at(case, x, y))
+        # The ship is inside the field, just clear of the body.
+        assert math.hypot(x - SPAWN_X, y - SPAWN_Y) < case.planet.pull_radius, name
+        assert not overlap_both_ways(planet.current_hitbox(), ship), name
+        assert planet.effect_on_touch() is TouchEffect.HIT, name
