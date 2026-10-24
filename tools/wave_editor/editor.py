@@ -30,9 +30,13 @@ CLICK_FIELDS: dict[str, tuple[str, ...]] = {
     "chain_lightning": ("x",),
     "fireball": ("x",),
     "coin": ("x", "y"),
+    "floating_island": ("x",),
+    "planet": ("x",),
+    "ufo": ("y",),
 }
 """Which coordinates of a mouse click a drifter takes. A meteorite falls from its x, a satellite
-crosses at its y, a coin sits at both. A fireball enters along the top, at its x."""
+crosses at its y, a coin sits at both. A fireball enters along the top, at its x. An island and a
+planet scroll in from the top at their x. A UFO crosses from a side at its y."""
 NEW_WAVE_LENGTH: int = 1320
 """Length of a new wave, px. The same as the game's first waves (20 s at Level 1)."""
 """Rows the palette lists show at once."""

@@ -59,7 +59,7 @@ Ctrl+N asks for a name (lower case letters, digits, `_`) and starts an empty fix
 
 **Invert switch:** the pill at the top right of the DRIFTERS panel (or the I key). When it is on, every drifter you place from the palette gets `invert: true`, so you pick the mirrored version from the start. The status line says `INVERTED` while placing. It can be flipped while a drifter is armed, and applies to the next one placed. A drifter with no mirror (the meteorite and the coin) is placed as it is, and the message says so. Inverted: a satellite and a fireball come from the right and fly left; a chain lightning is mirrored.
 
-A click gives a drifter the coordinates it uses: a meteorite, a chain lightning and a fireball take the click's `x` (they come in from the top), a satellite takes `y` (it crosses at that height), a coin takes both. A satellite enters from the left unless the invert switch is on.
+A click gives a drifter the coordinates it uses: a meteorite, a chain lightning, a fireball, a floating island and a planet take the click's `x` (they come in from the top), a satellite and a UFO take `y` (they cross at that height), a coin takes both. A satellite or a UFO enters from the left unless the invert switch is on.
 
 **With the keyboard:**
 
