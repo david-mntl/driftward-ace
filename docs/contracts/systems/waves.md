@@ -1,6 +1,6 @@
 # Waves: wave files, the wave book, the wave clock, playlists and the random picker
-Version: 1
-Status: draft
+Version: 2
+Status: frozen
 Features: DRA-76, DRA-104
 Created by: architect
 
