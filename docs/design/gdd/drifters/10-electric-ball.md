@@ -26,14 +26,15 @@ A single glowing ball falls from the top. It charges, and a faint ring shows how
 | telegraph | the charge: blue rays grow around the ball, more and faster as the charge fills, and a faint outline of the pulse circle brightens with them. It shows when and exactly where the strike lands | — | — | locked | Director |
 | specialty | none | — | — | locked | Director |
 | graze | yes, only while it fires, and once per electric ball | — | — | locked | Director |
+| fill_opacity | 0.35, the firing circle's fill (the rim is opaque) | 0–1 | — | guess | Director (away decision, DRA-111) |
 | look_reference | Purple spiky glowing orb | — | — | guess | Director |
-| placeholder_look | ball: filled purple circle (170, 80, 255), 16 px. Charge: short 1 px rays (200, 150, 255) around the ball, more as the charge fills, and a 1 px outline of the pulse circle in the same color, brighter as it fills. Fire: the pulse circle filled translucent (200, 160, 255) with a 2 px bright rim (240, 220, 255) | RGB | — | guess | Director |
+| placeholder_look | ball: filled purple circle (170, 80, 255), 16 px. Charge: short 1 px rays (200, 150, 255) around the ball, more as the charge fills, and a 1 px outline of the pulse circle in the same color, brighter as it fills. Fire: the pulse circle filled translucent (200, 160, 255) at `fill_opacity` with a 2 px bright rim (240, 220, 255) | RGB | — | guess | Director |
 
 ## Rules
 1. **Appears:** at its placed x, just above the top edge ([../07-drifters.md](../07-drifters.md) rule 14), then falls into view. Its entry warning shows first, at its x against the top edge.
 2. **Telegraph:** the charge starts the moment it appears and lasts `charge_ticks`.
 3. **Moves:** straight down at `speed` on screen, every tick. No targeting. The scroll doesn't add to it ([../03-world-and-camera.md](../03-world-and-camera.md) rule 9).
-4. **Fires:** after the charge, the pulse circle fires for `fire_ticks`, then the next charge starts. It fires only while the ball is on screen (any part visible).
+4. **Fires:** after the charge, the pulse circle fires for `fire_ticks`, then the next charge starts. It fires only while the ball is on screen (any part visible). The charge look (rays and outline) also shows only while the ball is on screen. Off screen the cycle keeps counting, but nothing shows.
 5. **Hits:** touching the firing circle is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)). The ball and the charge outline never hit.
 6. **Leaves:** once the ball is fully below the floor ([../07-drifters.md](../07-drifters.md) rule 12).
 7. **Scales:** `speed` × the level's hazard speed; `charge_ticks` × the level's Timer ×, never below `telegraph_min` ([../08-difficulty.md](../08-difficulty.md)). `fire_ticks` and `pulse_radius` never scale.
