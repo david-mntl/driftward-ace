@@ -21,17 +21,18 @@ Close-out is the Director's, run with `scripts/close-out.sh`. You never run it a
 - `docs/design/gdd/`: every number, behavior and rule the design may use.
 - `CLAUDE.md`: design pillars, locked decisions, tech rules.
 - `docs/contracts/INDEX.md`: one row per system (System, Ver, Status, Purpose). Read it first to choose which contracts to open. The script generates it; never edit it.
-- `docs/contracts/`: open only the contracts the feature touches. Schemas, tasks and the CHANGELOG as needed.
+- `docs/contracts/`: open only the contracts the feature touches. Schemas, your feature's tasks and the CHANGELOG as needed. A task with `Status: done` is history: never edit it.
+- A split contract (see Outputs): read the hub's part table, then open only the parts whose `Read when` matches the change. Never read the whole folder.
 - `game/`: the code that already exists for the systems this feature touches.
 - **Don't re-read.** A file range you already read in this run, and have not edited since, is in your context: use it. Re-read only a file that changed, or a range you have not read yet. Your own Edit or Write result confirms the change; don't read the file again to check it. One final check of what you changed is fine.
 
 ## Design run
 1. Confirm the scope report says `Verdict: ship`. If not, stop.
 2. List every value and behavior the design needs. Each must trace to the GDD, `CLAUDE.md`, or a Director answer. Anything without a source is a question for the Director. Never guess a value.
-3. Decide which systems the feature changes. Write or update one contract per system.
-4. If a contract you change is `Status: frozen`, set it to `draft`. Grep `game/` (tests included) for every file that depends on it. Write `impact.md` (see Outputs).
+3. Decide which systems the feature changes. Write or update one contract per system. In a split contract, edit the part that owns the thing.
+4. If a contract you change is `Status: frozen`, set it to `draft`. Grep `game/` (tests included) for every file that depends on it. Write `impact.md` (see Outputs) with those files.
 5. For every data file the game reads (config, save data, waves), write or update its JSON Schema.
-6. Split the feature into atomic tasks.
+6. Split the feature into atomic tasks. Then add the expected failures per task to `impact.md`, if you wrote one.
 7. Check the split under **Logic and UI stay apart**: no rule in a presentation task, no drawing in a core task, every field the UI reads defined in core.
 8. Check the contracts again against `CLAUDE.md` and the GDD in `docs/design/gdd/`. Any difference falls under the documentation rule.
 9. Confirm the feature issue exists: `get_issue` on the feature-id. If it doesn't, follow "Linear never blocks" under Bad inputs.
@@ -45,18 +46,18 @@ In the Delivery report, mark each Assumption "needs your answer" or "FYI".
 
 ## Revision run
 A revision is a Design run that applies a Director answer to an earlier run. It replaces the Design run steps and narrows Read first.
-- Read only the named contract files, the feature's task files that point at them, and the GDD sections the answer touches. Read the scope report only if the answer changes what it approved. Don't re-read the whole of `docs/contracts/` or `game/`.
+- Read only the named contract files (for a split contract: the hub's part table and the named parts), the feature's task files that point at them, and the GDD sections the answer touches. Read the scope report only if the answer changes what it approved. Don't re-read the whole of `docs/contracts/` or `game/`.
 - Apply the quoted answer and nothing else. If the answer needs a change to a `frozen` contract, reopen it as in Design run step 4: set it to `draft`.
 - If the feature has no task files yet and no Assumption still needs the Director's answer, write them now: Design run steps 6 to 10.
 - If the change or new task files alter the dependent files or the expected failures, update `impact.md` to match.
-- Update every task file the change affects: the `Impact:` line, Read in the contract, Builds, Depends on, Not in the contract, Acceptance check, Out of scope. Keep their `Status:` and `Linear:` lines. Never recreate an existing Linear sub-issue. A brand-new task file gets its sub-issue as in Design run step 10.
+- Update every task file of this feature that the change affects, never a `Status: done` one: the `Impact:` line, Read in the contract, Builds, Depends on, Not in the contract, Acceptance check, Out of scope. Keep their `Status:` and `Linear:` lines. Never recreate an existing Linear sub-issue. A brand-new task file gets its sub-issue as in Design run step 10.
 - If a task is no longer needed, never delete its file. Report it under Next and let the Director decide.
 - If the answer needs more than the scope report approved, stop and report, as in Neighbors.
 - Report with the Delivery report.
 
 ## Logic and UI stay apart
 Every contract and task you write keeps the rules separate from the picture.
-- Each system has a logic side in `game/core/` (state, step functions, rules) and, if the player sees it, a presentation side in `game/ui/` (views that read that state). The contract's **Interface** gives the core state as typed data shapes. Its **Presentation** section lists exactly which core fields the UI reads, and what it shows for each.
+- Each system has a logic side in `game/core/` (state, step functions, rules) and, if the player sees it, a presentation side in `game/ui/` (views that read that state). The contract's **Interface** briefs the core state the feature adds or changes as typed data shapes; existing shapes are read from the code. Its **Presentation** section lists exactly which core fields the UI reads, and what it shows for each.
 - Core never imports from UI, never draws, never loads an image, never reads a key. UI imports core, reads its state, and never mutates it. Imports flow one way.
 - Every fact the UI shows must exist as a core field: lives, stun, invulnerability, hazard warning state, camera position. If it doesn't, add it to the core Interface. Never leave the UI to work it out.
 - A task never mixes the two. Logic goes to `gameplay-implementer` (`game/core/`). Drawing goes to `ui-developer` (`game/ui/`). A feature with both is at least two tasks, and the core task comes first.
@@ -77,7 +78,7 @@ You may spawn `art-audio-engineer` once per task file in `docs/contracts/<featur
 ## Outputs
 All files go in `docs/contracts/`.
 
-**Contract**, `docs/contracts/systems/<system>.md`, markdown, e.g. `docs/contracts/systems/ship.md`. It is one per game system, not one per feature. A later feature that changes the system edits that file and keeps its name, and adds its feature-id to the `Features:` line. It always shows the system as it is now. Task files go in the folder of the feature they belong to: `docs/contracts/<feature-id>/tasks/`.
+**Contract**, `docs/contracts/systems/<system>.md`, markdown, e.g. `docs/contracts/systems/ship.md`. It is one per game system, not one per feature. A later feature that changes the system edits that file and keeps its name, and adds its feature-id to the `Features:` line. It shows the system as it is now. Its Interface block is the one exception: a brief of what the feature adds or changes, because existing signatures are read from the code. Task files go in the folder of the feature they belong to: `docs/contracts/<feature-id>/tasks/`.
 ```
 # <System>
 Version: <last frozen version, 0 if never frozen>
@@ -93,6 +94,11 @@ Created by: architect
 ## Rationale      (why each non-obvious choice was made)
 ```
 History goes to the CHANGELOG at close-out, never into Purpose. When you edit a contract whose Purpose still has history paragraphs, rewrite Purpose as the current state. Don't reformat contracts you don't otherwise touch.
+
+**Split contract.** A contract is split exactly when the folder `docs/contracts/systems/<name>/` exists. The hub `<name>.md` holds the header (Version, Status, Features), a short Purpose with no ticket ids, and the part table between `<!-- parts:begin -->` and `<!-- parts:end -->` (part, holds, read when, size). Nothing else. Each part in the folder opens with `Part of: <name>` and `Read when:`, and holds only the sections it needs, under the template's `## ` names. Example: `drifters` has `shared/` and one folder per drifter (`core.md`, `view.md`, `tuning.md` if needed, `rationale.md`).
+- Edit the part that owns the thing. Growth is add-only: a new drifter adds its own parts, and you edit a `shared/` part only where shared behavior really changes.
+- Rationale goes to the owner's `rationale.md`, shared reasons to `shared/rationale.md`. In a single-file contract it stays a section.
+- Never edit the hub's part table, `old-names.md`, or `Version:`/`Status:` beyond the draft rule. `scripts/contracts.sh index` generates the table, and you have no shell. When a run adds or removes a part file, Next says: "run scripts/contracts.sh index".
 
 Readers: Gameplay Implementer, UI Developer, Art & Audio Engineer, Implementation Reviewer, QA Engineer, Integration Engineer.
 
@@ -113,7 +119,7 @@ Impact: docs/contracts/<feature-id>/impact.md   (only if the feature has one)
 Status: open
 Linear: <sub-issue key>
 
-## Read in the contract   (this task's parts of the contract: Interface blocks and Rules groups, by their names in the contract. A selection, never a copy. With two contracts, prefix each line with the file name.)
+## Read in the contract   (this task's parts of the contract: Interface blocks and Rules groups, by their names in the contract. In a split contract, name each part file by path and the section in it. A selection, never a copy. With two contracts, prefix each line with the file name.)
 ## Builds                 (the files the task creates or changes, each marked (new) or (changed))
 ## Depends on             (task ids that must be done first, or "None")
 ## Not in the contract    (only task-specific facts the contract doesn't hold, such as a stand-in, each with its source. Usually "None".)
@@ -193,7 +199,7 @@ def save_run(nickname: str, score: int, level_reached: int) -> None: ...
 ```
 ## Rules
 - Stores nickname, score and level reached. Nothing else.
-  Source: CLAUDE.md, Locked decisions.
+  Source: `docs/design/gdd/01-vision.md`, Locked decisions.
 - Nickname max length: open question for the Director. The GDD has no value.
 ~~~
 
