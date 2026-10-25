@@ -367,11 +367,11 @@ def rel(p: Paths, path: Path) -> str:
 
 
 def _fmt_args(a: ast.arguments) -> str:
-    """The parameter list with types, defaults shown as `...` (a default is a value)."""
+    """The parameter list as written: names, types and defaults."""
     def one(arg: ast.arg, default) -> str:
         text = arg.arg + (f": {ast.unparse(arg.annotation)}" if arg.annotation else "")
         if default is not None:
-            text += " = ..." if arg.annotation else "=..."
+            text += f" = {ast.unparse(default)}" if arg.annotation else f"={ast.unparse(default)}"
         return text
 
     positional = [*a.posonlyargs, *a.args]
@@ -421,7 +421,8 @@ def _class_lines(cls: ast.ClassDef) -> list[str]:
     out += _doc_lines(ast.get_docstring(cls), "    ")
     for i, stmt in enumerate(body):
         if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and not stmt.target.id.startswith("_"):
-            out += ["", f"    {stmt.target.id}: {ast.unparse(stmt.annotation)}"]
+            default = f" = {ast.unparse(stmt.value)}" if stmt.value is not None else ""
+            out += ["", f"    {stmt.target.id}: {ast.unparse(stmt.annotation)}{default}"]
             if i + 1 < len(body) and _is_doc(body[i + 1]):
                 out += _doc_lines(body[i + 1].value.value.strip(), "    ")
         elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) and not stmt.name.startswith("_"):
@@ -441,8 +442,9 @@ def _constant_line(stmt) -> str | None:
 
 def module_interface(root: Path, rel_path: str) -> str:
     """The Interface block of one module, generated with `ast`: a pointer, the Source: line from the
-    module docstring, class and function signatures with their docstrings, field types, and the
-    constants by name and type (never value)."""
+    module docstring, class and function signatures with their docstrings, fields with their types
+    and defaults, and the module constants by name and type only (their values stay in the code and
+    the GDD)."""
     tree = ast.parse((root / rel_path).read_text(encoding="utf-8"))
     doc = ast.get_docstring(tree) or ""
     summary = doc.split("\n", 1)[0].strip()
@@ -524,7 +526,7 @@ def cmd_interface(p: Paths, module: str) -> int:
         print(f"=== Comments and prose in the contract block that the generated block does not repeat word for word: {len(lost)} of {len(notes)}")
         for n in lost[:40]:
             print("  " + n[:160])
-        print("(Also not carried over by design: field defaults and ClassVar values, shown as types only.)")
+        print("(Module constants are listed by name and type only. Field and parameter defaults are kept.)")
     print("\nNothing written.")
     return 0
 
