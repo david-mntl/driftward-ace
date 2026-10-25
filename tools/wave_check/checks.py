@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from core.collision import Hitbox, grow_hitbox, hitboxes_overlap
-from core.drifters.base import DrifterType, Phase, scale_timer
+from core.drifters.base import DrifterType, Phase, TouchEffect, scale_timer
+from core.drifters.registry import drifter_class
 from core.drifters.tuning import DrifterTuning
 from core.levels import FIRST_LEVEL, timer_mult
 from core.scroll import scroll_speed
@@ -63,12 +64,14 @@ class Context:
 
 
 def _is_hazard(track: Track) -> bool:
-    # A floating island counts as a hazard here, though it never hurts (09-waves.md, rule 7).
-    return track.kind != DrifterType.COIN.value
+    # Anything that is not a pickup. A blocker (the floating island) counts as a hazard here,
+    # though it never hurts (09-waves.md, rule 7).
+    return track.effect is not TouchEffect.COLLECT
 
 
 def _is_island(track: Track) -> bool:
-    return track.kind == DrifterType.FLOATING_ISLAND.value
+    # The drifter the ship stands on: the one whose touch blocks.
+    return track.effect is TouchEffect.BLOCK
 
 
 def _result(name: str, title: str, findings: list[Finding], note: str = "") -> Result:
@@ -122,18 +125,22 @@ def check_placements(ctx: Context) -> Result:
 # ---- telegraph --------------------------------------------------------------------------
 
 
-def _chain_charge(tuning: DrifterTuning, level: int) -> tuple[int, str]:
-    """The chain lightning's charge at `level` before the game's floor, ticks, with its sum."""
-    extra = tuning.drifters[DrifterType.CHAIN_LIGHTNING].extra
-    base: int = extra.charge_ticks  # type: ignore[union-attr]
+def _telegraph(
+    tuning: DrifterTuning, level: int, drifter_type: DrifterType
+) -> tuple[int, str] | None:
+    """The drifter's telegraph at `level` before the game's floor, ticks, with its sum.
+
+    None when the drifter says it has no telegraph. An entry warning is not a telegraph
+    (07-drifters.md rule 9).
+    """
+    base: int | None = drifter_class(drifter_type).telegraph_ticks(
+        tuning.drifters[drifter_type].extra
+    )
+    if base is None:
+        return None
     use: int = level if tuning.switches.timer_scaling else FIRST_LEVEL
     mult: float = timer_mult(use)
     return scale_timer(base, mult), f"{base} x {mult:g}"
-
-
-TELEGRAPHS = {DrifterType.CHAIN_LIGHTNING: _chain_charge}
-"""Drifter types that have a telegraph, with how to work out its length at a level. An entry
-warning is not a telegraph (07-drifters.md rule 9)."""
 
 
 def check_telegraph(ctx: Context) -> Result:
@@ -141,12 +148,17 @@ def check_telegraph(ctx: Context) -> Result:
     minimum: int = ctx.tuning.hazards.telegraph_min_ticks
     found: list[Finding] = []
     seen: set[str] = set()
+    plain: set[DrifterType] = set()
     for track in ctx.tracks:
         drifter_type: DrifterType = track.item.placement.drifter_type
-        if drifter_type not in TELEGRAPHS or drifter_type in seen:
+        if drifter_type in seen or drifter_type in plain:
+            continue
+        telegraph: tuple[int, str] | None = _telegraph(ctx.tuning, ctx.level, drifter_type)
+        if telegraph is None:
+            plain.add(drifter_type)
             continue
         seen.add(drifter_type)
-        ticks, how = TELEGRAPHS[drifter_type](ctx.tuning, ctx.level)
+        ticks, how = telegraph
         if ticks < minimum:
             found.append(
                 Finding(
