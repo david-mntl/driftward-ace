@@ -154,3 +154,6 @@
 
 ## Drifter registration refactor, 2026-10-25
 - `systems/app.md`, `systems/drifters.md`: no version change. The tuning loader registers by drifter type in `app/drifters/`, `wave_check` asks the drifter instead of its type, a test guards both, and the base gains the `telegraph_ticks` hook.
+
+## Contract split: app, 2026-10-25
+- `systems/app.md`: restructured into a hub and parts, no content change. The Impact section and the Purpose task list are removed (history is in git).

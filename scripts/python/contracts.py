@@ -54,7 +54,7 @@ PART_MAX_BYTES = 25 * 1024
 TICKET_ID = re.compile(r"\b[A-Z]{2,}-\d+\b")
 # Contracts whose Impact section the one-time split has not removed yet. Each leaves this
 # set when it is cleaned. The set goes when it is empty.
-IMPACT_PENDING = {"app", "debug-overlay", "hud", "run", "scroll", "ship", "waves", "world"}
+IMPACT_PENDING = {"debug-overlay", "hud", "run", "scroll", "ship", "waves", "world"}
 
 
 @dataclass
