@@ -1,7 +1,8 @@
 """Promote: turn the sandbox into game files, showing first what would change. No pygame.
 
 `plan(doc)` lists what promote would write: the wave file and one production tuning file per
-changed type, each with its value diffs and, for a type, the other waves that use it. Nothing is
+changed type and the shared hazards file when the graze margin changed, each with its value diffs
+and, for a type, the other waves that use it. Nothing is
 written until `write(items)`, and only ticked items are. It never commits.
 Production tuning files are patched in place (only the changed numbers), so a diff stays small.
 """
@@ -29,6 +30,8 @@ class Item:
     checked: bool = False
     drifter: str | None = None
     """For a tuning file, the type it holds; its sandbox layers are dropped once it is written."""
+    hazards: bool = False
+    """True for hazards.json; the document's hazard changes are dropped once it is written."""
 
 
 def spans(text: str) -> dict[Leaf, tuple[int, int]]:
@@ -200,7 +203,34 @@ def plan(doc: Doc) -> list[Item]:
         items.append(
             Item(f"values tuning/drifters/{drifter}.json", target, patched, lines)
         )
+    items += _hazards_item(doc)
     return items
+
+
+def _hazards_item(doc: Doc) -> list[Item]:
+    """The hazards.json item, if the document changed a shared hazard value."""
+    production: dict[str, Any] = doc.production_hazards()
+    effective: dict[str, Any] = doc.effective_hazards()
+    if effective == production:
+        return []
+    target: Path = doc_module.production_dir() / "hazards.json"
+    changes: dict[Leaf, Any] = {
+        path: value
+        for path, value in leaves(effective)
+        if value != get_leaf(production, path)
+    }
+    patched: str | None = patch_text(target.read_text(encoding="utf-8"), changes)
+    if patched is None or read_json_text(patched) != effective:
+        patched = json.dumps(effective, indent=2) + "\n"
+        lines: list[str] = ["the whole file is rewritten (format changes)"]
+    else:
+        lines = []
+    lines += [
+        f"{'.'.join(path)}: {get_leaf(production, path)} -> {value}"
+        for path, value in changes.items()
+    ]
+    lines.append("every drifter's graze zone uses it")
+    return [Item("values tuning/hazards.json", target, patched, lines, hazards=True)]
 
 
 def read_json_text(text: str) -> Any:

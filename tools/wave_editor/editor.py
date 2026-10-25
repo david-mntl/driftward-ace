@@ -60,6 +60,10 @@ NUDGE_START: dict[str, float] = {"x": 320.0, "y": 240.0}
 PICK_RADIUS: float = 40.0
 """A click selects the nearest drifter within this many px."""
 FLOAT_STEP: float = 0.01
+HAZARD_FIELDS: tuple[str, ...] = ("graze_margin",)
+"""The shared hazard values the panel edits, from game/tuning/hazards.json."""
+HAZARD_STEP: float = 1.0
+"""px per nudge of the graze margin (Shift: x10)."""
 REMOVE: object = object()
 
 
@@ -133,8 +137,8 @@ class Editor:
         return items[self.selected]
 
     def rows(self) -> list[Row]:
-        """The wave's settings, the selected placement's fields, then the values of its drifter
-        type with W/F/P tags. Headings have no key."""
+        """The wave's settings, the shared graze values, the selected placement's fields, then
+        the values of its drifter type with W/F/P tags. Headings have no key."""
         rows: list[Row] = []
         wave: dict[str, Any] | None = self.doc.wave
         if wave is not None:
@@ -146,6 +150,7 @@ class Editor:
                 Row(name, _wave_show(wave, name), key=("wave", name))
                 for name in WAVE_FIELDS
             ]
+        rows += self._hazard_rows()
         placement: dict[str, Any] | None = self.current()
         if placement is None:
             return rows
@@ -180,6 +185,26 @@ class Editor:
                     ("value", drifter, path),
                 )
             )
+        return rows
+
+    def _hazard_rows(self) -> list[Row]:
+        """The graze margin, the same for every hazard, with its W or P tag."""
+        try:
+            effective: dict[str, Any] = self.doc.effective_hazards()
+        except (OSError, ValueError):
+            return []
+        rows: list[Row] = [
+            Row("graze (all hazards)", "production" if not self.doc.hazards else "")
+        ]
+        rows += [
+            Row(
+                name,
+                _show(effective.get(name)),
+                self.doc.hazard_layer(name),
+                ("hazard", name),
+            )
+            for name in HAZARD_FIELDS
+        ]
         return rows
 
     def seconds_at(self, px: float) -> float:
@@ -557,6 +582,11 @@ class Editor:
             self.cursor = self._home()
             self.message = "placement deleted (Ctrl+S saves the sandbox file)"
 
+    def _set_hazard(self, name: str, value: object) -> None:
+        """Change a shared hazard value. The game's loader checks it, and a refusal is undone."""
+        if self.bench.edit(lambda doc: doc.set_hazard(name, _tidy(value))):
+            self.message = ""
+
     def _set_value(self, drifter: str, path: Leaf, value: object) -> None:
         if self.bench.edit(lambda doc: doc.set_value(drifter, path, value)):
             self.message = ""
@@ -569,6 +599,8 @@ class Editor:
             return None
         if row.key[0] == "wave":
             return (self.doc.wave or {}).get(row.key[1], WAVE_DEFAULTS.get(row.key[1]))
+        if row.key[0] == "hazard":
+            return self.doc.effective_hazards().get(row.key[1])
         if row.key[0] == "field":
             name: str = row.key[1]
             return placement.get(
@@ -585,6 +617,11 @@ class Editor:
         value: Any = self._current_value(row)
         if row.key[0] == "wave":
             self._nudge_wave(row.key[1], value, direction, mult)
+            return
+        if row.key[0] == "hazard":
+            self._set_hazard(
+                row.key[1], max(float(value) + direction * HAZARD_STEP * mult, 1)
+            )
             return
         if row.key[0] == "field":
             name: str = row.key[1]
@@ -663,6 +700,8 @@ class Editor:
                 return
             if row.key[0] == "wave":
                 self._set_wave_field(row.key[1], parsed)
+            elif row.key[0] == "hazard":
+                self._set_hazard(row.key[1], parsed)
             elif row.key[0] == "field":
                 self._set_field(row.key[1], parsed)
             else:
@@ -686,13 +725,19 @@ class Editor:
             return
         if row.key[0] == "wave":
             self._default_wave(row.key[1])
+        elif row.key[0] == "hazard":
+            result: list[str] = []
+            if self.bench.edit(lambda doc: result.append(doc.drop_hazard(row.key[1]))):
+                self.message = result[0]
         elif row.key[0] == "field":
             self._default_field(row.key[1])
         else:
             _, drifter, path = row.key
-            result: list[str] = []
-            if self.bench.edit(lambda doc: result.append(doc.step_down(drifter, path))):
-                self.message = result[0]
+            dropped: list[str] = []
+            if self.bench.edit(
+                lambda doc: dropped.append(doc.step_down(drifter, path))
+            ):
+                self.message = dropped[0]
 
     def _default_wave(self, name: str) -> None:
         defaults: dict[str, object] = {
@@ -905,11 +950,14 @@ class Editor:
             self.message = "promote: nothing ticked, nothing written"
             return
         done: list[str] = [i.drifter for i in items if i.checked and i.drifter]
+        hazards_done: bool = any(i.checked and i.hazards for i in items)
 
         def fold(doc: Doc) -> None:
             for drifter in done:
                 doc.named.pop(drifter, None)
                 doc.inline.pop(drifter, None)
+            if hazards_done:
+                doc.hazards.clear()
 
         self.bench.edit(fold)
         names: str = ", ".join(_relative(path) for path in written)
@@ -932,7 +980,9 @@ def _parse(text: str, like: Any, field: str) -> Any:
         if text.lower() in ("false", "no", "0", "off"):
             return False
         raise ValueError("type yes or no")
-    if field in ("at_px", "x", "y", "length_px") or isinstance(like, float):
+    if field in ("at_px", "x", "y", "length_px", "graze_margin") or isinstance(
+        like, float
+    ):
         try:
             return float(text)
         except ValueError:

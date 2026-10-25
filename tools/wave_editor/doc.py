@@ -4,6 +4,8 @@ Each drifter value resolves top-down, the first layer that has it wins:
   W  inline changes in this document (`inline`, only the values touched)
   F  a named tuning file the document points to (`named`), a full copy in sandbox/tuning/
   P  production, game/tuning/drifters/<type>.json
+The shared hazard values (the graze margin) have the W and P layers only: `hazards` holds the
+touched ones over production, game/tuning/hazards.json.
 The game's own loaders check the merged result (see bench.load_merged). This module never writes
 under game/. Only promote.py does, and only what the Director ticks.
 """
@@ -111,6 +113,8 @@ class Doc:
     """The game wave id this was opened from. Promote writes there."""
     named: dict[str, str] = field(default_factory=dict)
     inline: dict[str, dict[str, Any]] = field(default_factory=dict)
+    hazards: dict[str, Any] = field(default_factory=dict)
+    """Shared hazard values touched in this document (layer W), over production's hazards.json."""
     dirty: bool = False
 
     # ---- files --------------------------------------------------------------------------
@@ -140,6 +144,7 @@ class Doc:
         self.origin = data.get("origin")
         self.named = dict(data.get("named", {}))
         self.inline = dict(data.get("inline", {}))
+        self.hazards = dict(data.get("hazards", {}))
 
     def reload_from_source(self) -> None:
         """Read the source file again. A plain wave file replaces only the wave."""
@@ -163,6 +168,8 @@ class Doc:
             data["wave"] = self.wave
         data["named"] = self.named
         data["inline"] = self.inline
+        if self.hazards:
+            data["hazards"] = self.hazards
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         self.path = self.source_file = target
@@ -178,6 +185,7 @@ class Doc:
                 self.origin,
                 self.named,
                 self.inline,
+                self.hazards,
                 self.dirty,
             )
         )
@@ -190,6 +198,7 @@ class Doc:
             self.origin,
             self.named,
             self.inline,
+            self.hazards,
             self.dirty,
         ) = saved
 
@@ -276,9 +285,39 @@ class Doc:
         stems: list[str] = sorted(p.stem for p in NAMED_DIR.glob("*.json"))
         return [s for s in stems if s == drifter or s.startswith(drifter + "_")]
 
+    # ---- shared hazard values -----------------------------------------------------------
+
+    def production_hazards(self) -> dict[str, Any]:
+        return read_json(production_dir() / "hazards.json")
+
+    def effective_hazards(self) -> dict[str, Any]:
+        """The hazard values with this document's changes laid over production."""
+        return deep_merge(self.production_hazards(), self.hazards)
+
+    def hazard_layer(self, name: str) -> str:
+        """ "W" if this document changed the hazard value, else "P"."""
+        return "W" if name in self.hazards else "P"
+
+    def set_hazard(self, name: str, value: Any) -> None:
+        self.hazards[name] = value
+        self.dirty = True
+
+    def drop_hazard(self, name: str) -> str:
+        """Back to production. Returns what happened."""
+        if name not in self.hazards:
+            return "already production"
+        del self.hazards[name]
+        self.dirty = True
+        return "back to production"
+
     def write_merged_dir(self, dest: Path) -> None:
-        """Copy the production tuning folder to `dest` with the layered type files laid over it."""
+        """Copy the production tuning folder to `dest` with the layered type files and hazard
+        values laid over it."""
         shutil.copytree(production_dir(), dest, dirs_exist_ok=True)
+        if self.hazards:
+            (dest / "hazards.json").write_text(
+                json.dumps(self.effective_hazards(), indent=2), encoding="utf-8"
+            )
         for drifter in sorted(self.named.keys() | self.inline.keys()):
             target: Path = dest / "drifters" / f"{drifter}.json"
             target.write_text(
