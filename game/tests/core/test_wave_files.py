@@ -4,8 +4,9 @@ Contract: docs/contracts/systems/waves.md, Interface (`game/core/wave_files.py`,
 `game/core/waves.py` builds), Rules (The wave files, Logging); docs/contracts/schemas/
 wave.schema.json and playlist.schema.json; systems/drifters.md, Interface (`placement_seed`,
 `MAX_SEED`) and Rules (Spawner, Placement seed; UFO, Born). Tasks: docs/contracts/DRA-76/tasks/
-DRA-76-08-qa-engineer.md and docs/contracts/DRA-104/tasks/DRA-104-06-qa-engineer.md (the seed, the
-UFO). One test per behavior they list. The good set is the test-only JSON in `wave_files/`, read
+DRA-76-08-qa-engineer.md, docs/contracts/DRA-104/tasks/DRA-104-06-qa-engineer.md (the seed, the
+UFO) and docs/contracts/DRA-111/tasks/DRA-111-05-qa-engineer.md (the electric ball). One test per
+behavior they list. The good set is the test-only JSON in `wave_files/`, read
 here with `json`; each refusal is that set with the edits of one row made. A UFO goes in by an
 edit that sets a wave's whole `placements` list (`with_placements`), so the good set stays as it is.
 The tuning records are built here from the GDD values below, never read from game/tuning/ or
@@ -24,6 +25,11 @@ import pytest
 from core.collision import Box, Circle
 from core.drifters.base import DrifterType
 from core.drifters.coin import Coin, CoinTypeExtra, CoinVariantExtra
+from core.drifters.electric_ball import (
+    ElectricBall,
+    ElectricBallTypeExtra,
+    ElectricBallVariantExtra,
+)
 from core.drifters.meteorite import Meteorite
 from core.drifters.satellite import Satellite, SatelliteVariantExtra
 from core.drifters.spawner import Placement, placement_seed
@@ -73,6 +79,12 @@ BAND_BOTTOM: Final[float] = 440.0
 MAX_SEED_VALUE: Final[int] = 4_294_967_295
 """A seed's largest value, 2^32 - 1. Source: waves.md, Rules, The wave files (Placement)."""
 
+BALL_SIZE: Final[float] = 16.0
+PULSE_RADIUS: Final[float] = 64.0
+BALL_SPEED_RATIO: Final[float] = 0.375
+"""px and ratio. Source: drifters/10-electric-ball.md, ball_size, pulse_radius and speed_ratio
+(guess)."""
+
 POINTS: Final[dict[str, int]] = {"common": 50, "rare": 100}
 """Source: 06-scoring.md, coin_points (common 50 locked, rare 100 guess)."""
 
@@ -85,7 +97,7 @@ SIZES: Final[dict[str, tuple[float, float]]] = {
 
 
 def make_tuning() -> DrifterTuning:
-    """Build the meteorite, satellite, coin and UFO tuning from the GDD values above."""
+    """Build the meteorite, satellite, coin, UFO and electric ball tuning from the values above."""
     coin_extra: CoinTypeExtra = CoinTypeExtra(
         body_height=BODY_H,
         ring_width=RING_W,
@@ -106,7 +118,17 @@ def make_tuning() -> DrifterTuning:
         band_top=BAND_TOP,
         band_bottom=BAND_BOTTOM,
     )
-    # Importing the four classes registers them with the spawner; their types key the tuning.
+    ball_extra: ElectricBallTypeExtra = ElectricBallTypeExtra(
+        charge_ticks=120,
+        fire_ticks=120,
+        charge_rays=4,
+        ray_length=6.0,
+        ray_width=1.0,
+        outline_width=1.0,
+        rim_width=2.0,
+        fill_opacity=0.35,
+    )
+    # Importing the five classes registers them with the spawner; their types key the tuning.
     return DrifterTuning(
         drifters={
             Meteorite.drifter_type: DrifterTypeTuning(
@@ -159,6 +181,20 @@ def make_tuning() -> DrifterTuning:
                 speed_ratio=UFO_SPEED_RATIO,
                 entry_warning_ticks=WARNING_TICKS,
                 extra=ufo_extra,
+            ),
+            ElectricBall.drifter_type: DrifterTypeTuning(
+                variants={
+                    "standard": VariantTuning(
+                        width=BALL_SIZE,
+                        height=BALL_SIZE,
+                        hitbox=(Circle(0.0, 0.0, PULSE_RADIUS),),
+                        extra=ElectricBallVariantExtra(pulse_radius=PULSE_RADIUS),
+                    )
+                },
+                default_variant="standard",
+                speed_ratio=BALL_SPEED_RATIO,
+                entry_warning_ticks=WARNING_TICKS,
+                extra=ball_extra,
             ),
         },
         switches=PlaytestSwitches(),
@@ -284,6 +320,15 @@ def ufo_row(at_px: float = 200, y: float | None = 300, **fields: object) -> dict
     return row
 
 
+def ball_row(at_px: float = 200, x: float | None = 300, **fields: object) -> dict[str, Json]:
+    """One electric ball placement of a wave file. `x` None leaves it out; `fields` adds more."""
+    row: dict[str, Json] = {"at_px": at_px, "type": "electric_ball"}
+    if x is not None:
+        row["x"] = x
+    row.update(fields)
+    return row
+
+
 def rock_row(at_px: float = 500) -> dict[str, Json]:
     """One meteorite placement, a hazard that carries no seed."""
     return {"at_px": at_px, "type": "meteorite", "x": 200}
@@ -298,6 +343,15 @@ def ufos_in(book: WaveBook, wave_id: str = "l1_a") -> list[WavePlacement]:
     """The wave's UFO placements, in the book's order (sorted by trigger)."""
     return [
         p for p in book.waves[wave_id].placements if p.placement.drifter_type is DrifterType.UFO
+    ]
+
+
+def balls_in(book: WaveBook, wave_id: str = "l1_a") -> list[WavePlacement]:
+    """The wave's electric ball placements, in the book's order (sorted by trigger)."""
+    return [
+        p
+        for p in book.waves[wave_id].placements
+        if p.placement.drifter_type is DrifterType.ELECTRIC_BALL
     ]
 
 
@@ -434,7 +488,8 @@ REFUSALS: Final[list[Refusal]] = [
             f"placement type {value!r}",
             (Edit("wave_0", ("placements", 2, "type"), value),),
             f"waves/wave_0.json: placements[2].type '{value}' is not a drifter type "
-            "(meteorite, satellite, chain_lightning, fireball, coin, floating_island, planet, ufo)",
+            "(meteorite, satellite, chain_lightning, fireball, coin, floating_island, planet, ufo, "
+            "electric_ball)",
         )
         for value in ("comet", "Meteorite", "UFO", "")
     ],
@@ -533,6 +588,19 @@ REFUSALS: Final[list[Refusal]] = [
         )
         for y in (0, 100, 187.5, 187.99, 440.01, 440.5, 480)
     ],
+    # What the load-time spawn refuses about an electric ball, named by the placement.
+    Refusal(
+        "electric ball without x",
+        (with_placements(rock_row(), ball_row(x=None)),),
+        "waves/l1_a.json: placements[1]: electric_ball placement needs x",
+        spawn=True,
+    ),
+    Refusal(
+        "electric ball with a seed",
+        (with_placements(rock_row(), ball_row(seed=5)),),
+        "waves/l1_a.json: placements[1]: electric_ball has no seed",
+        spawn=True,
+    ),
     # Two UFOs in one wave never share a seed, given or default. The later one, by the file's
     # order and not the trigger's, is named with the earlier.
     Refusal(
@@ -803,17 +871,20 @@ def test_a_coin_triggers_anywhere_even_below_120_px(at_px: float) -> None:
         assert [p.at_px for p in coins] == [float(at_px)]
 
 
-def test_the_unknown_type_message_lists_every_type_in_enum_order_ending_planet_ufo() -> None:
+def test_the_unknown_type_message_lists_every_type_in_enum_order_ending_ufo_electric_ball() -> None:
     with pytest.raises(ValueError, match=r"^waves") as raised:
         build(Edit("wave_0", ("placements", 2, "type"), "comet"))
     assert str(raised.value) == (
         "waves/wave_0.json: placements[2].type 'comet' is not a drifter type "
-        "(meteorite, satellite, chain_lightning, fireball, coin, floating_island, planet, ufo)"
+        "(meteorite, satellite, chain_lightning, fireball, coin, floating_island, planet, ufo, "
+        "electric_ball)"
     )
-    assert str(raised.value).endswith("planet, ufo)")
-    # `ufo` is a type now: it is no longer refused as one.
+    assert str(raised.value).endswith("ufo, electric_ball)")
+    # `ufo` and `electric_ball` are types now: neither is refused as one.
     book: WaveBook = build(with_placements(ufo_row()))
     assert [p.placement.drifter_type for p in ufos_in(book)] == [DrifterType.UFO]
+    balls: WaveBook = build(with_placements(ball_row()))
+    assert [p.placement.drifter_type for p in balls_in(balls)] == [DrifterType.ELECTRIC_BALL]
 
 
 @pytest.mark.parametrize("seed", [0, 1, 7, 2**31, MAX_SEED_VALUE - 1, MAX_SEED_VALUE], ids=repr)
@@ -941,6 +1012,47 @@ def test_a_ufo_below_120_px_is_refused_and_one_at_120_px_is_accepted() -> None:
     for at_px in (120, 120.0, 120.5, 600):
         book: WaveBook = build(with_placements(rock_row(), ufo_row(at_px=at_px)))
         assert [p.at_px for p in ufos_in(book)] == [float(at_px)]
+    assert SEAM_CLEAR == 120.0
+
+
+def test_an_electric_ball_needs_x_takes_no_seed_and_loads_with_invert() -> None:
+    # No x: refused, naming the placement and the drifter's own message, which is the cause.
+    with pytest.raises(ValueError, match=r"^waves") as raised:
+        build(with_placements(rock_row(), ball_row(x=None)))
+    assert str(raised.value) == "waves/l1_a.json: placements[1]: electric_ball placement needs x"
+    assert isinstance(raised.value.__cause__, ValueError)
+    assert str(raised.value.__cause__) == "electric_ball placement needs x"
+    # A seed, zero included: refused the same way, the ball has none.
+    for seed in (0, 5, MAX_SEED_VALUE):
+        with pytest.raises(ValueError, match=r"^waves") as raised:
+            build(with_placements(rock_row(), ball_row(seed=seed)))
+        assert str(raised.value) == "waves/l1_a.json: placements[1]: electric_ball has no seed"
+        assert isinstance(raised.value.__cause__, ValueError)
+        assert str(raised.value.__cause__) == "electric_ball has no seed"
+    # A ball with an x and no seed loads and keeps its seed at None, with or without y.
+    plain: WaveBook = build(with_placements(rock_row(), ball_row(), ball_row(at_px=300, y=100)))
+    assert [p.placement.seed for p in balls_in(plain)] == [None, None]
+    assert [p.placement.x for p in balls_in(plain)] == [300.0, 300.0]
+    # `invert` loads, true or false, and is kept on the placement.
+    for invert in (True, False):
+        book: WaveBook = build(with_placements(rock_row(), ball_row(invert=invert)))
+        found: list[WavePlacement] = balls_in(book)
+        assert len(found) == 1
+        assert found[0].placement.invert is invert
+        assert found[0].placement.drifter_type is DrifterType.ELECTRIC_BALL
+
+
+def test_an_electric_ball_below_120_px_is_refused_and_one_at_120_px_is_accepted() -> None:
+    for at_px in (0, 0.0, 50, 100, 119.5, 119.99):
+        with pytest.raises(ValueError, match=r"^waves") as raised:
+            build(with_placements(rock_row(), ball_row(at_px=at_px)))
+        assert str(raised.value) == (
+            f"waves/l1_a.json: placements[1]: a hazard (electric_ball) at {at_px:g} px is inside "
+            f"the first 120 px"
+        )
+    for at_px in (120, 120.0, 120.5, 600):
+        book: WaveBook = build(with_placements(rock_row(), ball_row(at_px=at_px)))
+        assert [p.at_px for p in balls_in(book)] == [float(at_px)]
     assert SEAM_CLEAR == 120.0
 
 

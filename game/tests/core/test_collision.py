@@ -9,7 +9,8 @@ tables, the chain lightning ship cases) and docs/contracts/DRA-56/tasks/DRA-56-0
 (the coin ship cases) and docs/contracts/DRA-86/tasks/DRA-86-07-qa-engineer.md (the polygon
 tables, the push-out, the island ship cases) and
 docs/contracts/DRA-96/tasks/DRA-96-06-qa-engineer.md (the planet ship cases) and
-docs/contracts/DRA-104/tasks/DRA-104-04-qa-engineer.md (the UFO ship cases).
+docs/contracts/DRA-104/tasks/DRA-104-04-qa-engineer.md (the UFO ship cases) and
+docs/contracts/DRA-111/tasks/DRA-111-04-qa-engineer.md (the electric ball ship cases).
 
 Every expected number is exact in binary (whole numbers, halves, sixteenths, 3-4-5 triangles) or
 comes from the GDD values below or from `game/tuning/drifters/*.json`. The ship-against-every-
@@ -55,6 +56,13 @@ from core.drifters.chain_lightning import (
     layout_size,
 )
 from core.drifters.coin import CoinTypeExtra, CoinVariantExtra, coin_hitbox
+from core.drifters.electric_ball import (
+    ElectricBall,
+    ElectricBallTypeExtra,
+    ElectricBallVariantExtra,
+    check_electric_ball_variant,
+    electric_ball_hitbox,
+)
 from core.drifters.fireball import FireballTypeExtra, fireball_hitbox
 from core.drifters.floating_island import (
     IslandShape,
@@ -1392,6 +1400,18 @@ class UfoFacts:
 
 
 @dataclass(frozen=True, slots=True)
+class ElectricBallFacts:
+    """One electric ball variant and its timings as the tuning file states them, px and ticks."""
+
+    ball_size: float
+    pulse_radius: float
+    charge_ticks: int
+    """Level 1 charge. The cases spawn at level 1 with the switches' defaults, so no scaling."""
+
+    fire_ticks: int
+
+
+@dataclass(frozen=True, slots=True)
 class VariantCase:
     """One variant of one drifter type, as its tuning file states it."""
 
@@ -1419,6 +1439,10 @@ class VariantCase:
     ufo: UfoFacts | None = None
     """Set for a UFO variant: `shapes` is the disc box then the dome circle the test writes from
     the file's sizes."""
+
+    electric_ball: ElectricBallFacts | None = None
+    """Set for an electric ball variant: `shapes` is the one pulse circle the test writes from
+    `pulse_radius`."""
 
 
 def chain_layout(raw: dict[str, object], spacing: float) -> ChainLayout:
@@ -1800,11 +1824,79 @@ def load_ufo_cases(data: dict[str, object]) -> list[VariantCase]:
     ]
 
 
+def load_electric_ball_cases(data: dict[str, object]) -> list[VariantCase]:
+    """Return one case per variant of the electric ball's tuning file.
+
+    The records are built the way `app.tuning` builds them (contract, Tuning, the electric ball's
+    file), here: per variant, after `check_electric_ball_variant` accepts it,
+    `VariantTuning(width=ball_size, height=ball_size, hitbox=electric_ball_hitbox(pulse_radius),
+    extra=ElectricBallVariantExtra(pulse_radius))`, and for the type the file's `speed_ratio`,
+    `entry_warning_ticks` and an `ElectricBallTypeExtra`. The case's `shapes` are written here
+    from the contract's Hitbox rule (one circle of radius `pulse_radius` on the ball's center),
+    never taken from `electric_ball_hitbox`, and the spawned ball's hitbox must equal them.
+    """
+    raw_variants: dict[str, dict[str, object]] = cast(
+        dict[str, dict[str, object]], data["variants"]
+    )
+    charge_ticks: int = int(cast(int, data["charge_ticks"]))
+    fire_ticks: int = int(cast(int, data["fire_ticks"]))
+    facts: dict[str, ElectricBallFacts] = {
+        name: ElectricBallFacts(
+            ball_size=float(cast(float, raw["ball_size"])),
+            pulse_radius=float(cast(float, raw["pulse_radius"])),
+            charge_ticks=charge_ticks,
+            fire_ticks=fire_ticks,
+        )
+        for name, raw in raw_variants.items()
+    }
+    for f in facts.values():
+        check_electric_ball_variant(f.ball_size, f.pulse_radius)
+    tuning: DrifterTuning = DrifterTuning(
+        drifters={
+            DrifterType.ELECTRIC_BALL: DrifterTypeTuning(
+                variants={
+                    name: VariantTuning(
+                        width=f.ball_size,
+                        height=f.ball_size,
+                        hitbox=electric_ball_hitbox(f.pulse_radius),
+                        extra=ElectricBallVariantExtra(pulse_radius=f.pulse_radius),
+                    )
+                    for name, f in facts.items()
+                },
+                default_variant=str(data["default_variant"]),
+                speed_ratio=float(cast(float, data["speed_ratio"])),
+                entry_warning_ticks=int(cast(int, data["entry_warning_ticks"])),
+                extra=ElectricBallTypeExtra(
+                    charge_ticks=charge_ticks,
+                    fire_ticks=fire_ticks,
+                    charge_rays=int(cast(int, data["charge_rays"])),
+                    ray_length=float(cast(float, data["ray_length"])),
+                    ray_width=float(cast(float, data["ray_width"])),
+                    outline_width=float(cast(float, data["outline_width"])),
+                    rim_width=float(cast(float, data["rim_width"])),
+                    fill_opacity=float(cast(float, data["fill_opacity"])),
+                ),
+            )
+        },
+        switches=PlaytestSwitches(),
+    )
+    return [
+        VariantCase(
+            DrifterType.ELECTRIC_BALL,
+            name,
+            tuning,
+            (Circle(0.0, 0.0, f.pulse_radius),),
+            electric_ball=f,
+        )
+        for name, f in facts.items()
+    ]
+
+
 def load_variant_cases() -> list[VariantCase]:
     """Return one case per variant of every drifter type, from `game/tuning/drifters/`.
 
     The chain lightning, the fireball and the floating island get one case per variant and
-    `invert` value. The coin, the planet and the UFO get one case per variant.
+    `invert` value. The coin, the planet, the UFO and the electric ball get one case per variant.
     """
     cases: list[VariantCase] = []
     for drifter_type in DrifterType:
@@ -1830,6 +1922,9 @@ def load_variant_cases() -> list[VariantCase]:
             continue
         if drifter_type is DrifterType.UFO:
             cases.extend(load_ufo_cases(data))
+            continue
+        if drifter_type is DrifterType.ELECTRIC_BALL:
+            cases.extend(load_electric_ball_cases(data))
             continue
         raw_variants: dict[str, dict[str, object]] = cast(
             dict[str, dict[str, object]], data["variants"]
@@ -1871,7 +1966,9 @@ def load_variant_cases() -> list[VariantCase]:
 VARIANT_CASES: list[VariantCase] = load_variant_cases()
 
 SHAPE_CASES: list[VariantCase] = [
-    c for c in VARIANT_CASES if c.chain is None and c.coin is None and c.island is None
+    c
+    for c in VARIANT_CASES
+    if c.chain is None and c.coin is None and c.island is None and c.electric_ball is None
 ]
 """Types whose tuning file lists a hitbox, and any type with no file (it fails by name)."""
 
@@ -1899,6 +1996,11 @@ UFO_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.ufo is not None]
 """The UFO, per variant. It is born in WARNING with a plain two-shape hitbox, so it stays in
 `SHAPE_CASES` too and goes through the touching-distance test; the disc and the dome alone, the
 hitbox and the graze zone are their own tests."""
+
+ELECTRIC_BALL_CASES: list[VariantCase] = [c for c in VARIANT_CASES if c.electric_ball is not None]
+"""The electric ball, per variant. It is born in WARNING, then charges with no hitbox, so the
+touching-distance test of `SHAPE_CASES` (overlap on the first ACTIVE state) doesn't apply: it has
+its own tests, and it fires only after its charge."""
 
 UFO_SEED: int = 7
 """A seed for every UFO the cases spawn. The hitbox never depends on it. Source: drifters.md,
@@ -2719,3 +2821,135 @@ def test_a_ufo_graze_zone_is_its_disc_and_dome_each_grown_by_14(case: VariantCas
 def drifter_zone(case: VariantCase, x: float, y: float) -> Hitbox:
     """Return the graze zone of the case's UFO, ACTIVE with its center at (x, y)."""
     return activate(drifter_at(case, x, y)).graze_zone()
+
+
+def electric_ball_at(case: VariantCase, x: float, y: float, *, active: bool = True) -> ElectricBall:
+    """Return the case's electric ball at (x, y): on its first ACTIVE state, held still
+    (`speed` 0.0), or still in WARNING with `active=False`."""
+    ball: Drifter = drifter_at(case, x, y)
+    assert isinstance(ball, ElectricBall)
+    if not active:
+        return ball
+    ball = activate(ball)
+    assert isinstance(ball, ElectricBall)
+    return replace(ball, speed=0.0)
+
+
+def firing_ball(case: VariantCase, x: float, y: float) -> ElectricBall:
+    """Return the case's electric ball with its center at (x, y), on its first firing state.
+
+    It is held still after its warning (`speed` 0.0), so the place is the same on every state.
+    The charge is stepped for the file's `charge_ticks` states.
+    """
+    facts: ElectricBallFacts | None = case.electric_ball
+    assert facts is not None
+    ball: ElectricBall = electric_ball_at(case, x, y)
+    ctx: TickContext = TickContext(ship=spawn())
+    for _ in range(facts.charge_ticks):
+        ball = ball.update(ctx)
+    assert ball.pulse_fires()
+    assert (ball.x, ball.y) == (x, y)
+    return ball
+
+
+@pytest.mark.parametrize("case", ELECTRIC_BALL_CASES, ids=[case_id(c) for c in ELECTRIC_BALL_CASES])
+def test_an_electric_ball_has_no_hitbox_while_warning_or_charging_and_its_circle_while_it_fires(
+    case: VariantCase,
+) -> None:
+    facts: ElectricBallFacts | None = case.electric_ball
+    assert facts is not None
+    # The one circle, written from the file's pulse radius, centered on the ball.
+    assert case.shapes == (Circle(0.0, 0.0, facts.pulse_radius),)
+    ball: ElectricBall = electric_ball_at(case, SPAWN_X, SPAWN_Y, active=False)
+    ctx: TickContext = TickContext(ship=spawn())
+    warning_ticks: int = ball.warning_ticks
+    assert warning_ticks > 0
+    for tick in range(warning_ticks):
+        assert ball.phase is Phase.WARNING, tick
+        assert ball.current_hitbox() == (), tick
+        ball = ball.update(ctx)
+    assert ball.phase is Phase.ACTIVE
+    ball = replace(ball, speed=0.0)
+    cycle: int = facts.charge_ticks + facts.fire_ticks
+    placed: Hitbox = place_hitbox(case.shapes, SPAWN_X, SPAWN_Y)
+    for n in range(2 * cycle):
+        where: str = f"state {n} of the ball's life"
+        assert ball.ticks_in_phase == n, where
+        assert (ball.x, ball.y) == (SPAWN_X, SPAWN_Y), where
+        if n % cycle < facts.charge_ticks:
+            assert ball.current_hitbox() == (), where
+        else:
+            assert ball.current_hitbox() == placed, where
+        ball = ball.update(ctx)
+
+
+@pytest.mark.parametrize("case", ELECTRIC_BALL_CASES, ids=[case_id(c) for c in ELECTRIC_BALL_CASES])
+def test_ship_meets_each_electric_ball_variant_firing_circle_at_its_own_touching_distance(
+    case: VariantCase,
+) -> None:
+    ship: Hitbox = ship_hitbox(spawn())
+    for name, toward in DIRECTIONS.items():
+        distance, exact = touching_distance(case.shapes, toward)
+        slack: float = 0.0 if exact else 1e-9
+        assert distance > 0, name
+        for gap, expect in ((distance + slack, False), (distance - 0.5, True)):
+            x: float = SPAWN_X - toward[0] * gap
+            y: float = SPAWN_Y - toward[1] * gap
+            ball: Drifter = firing_ball(case, x, y)
+            assert ball.current_hitbox() == place_hitbox(case.shapes, x, y), (name, gap)
+            assert overlap_both_ways(ball.current_hitbox(), ship) is expect, (name, gap)
+
+
+@pytest.mark.parametrize("case", ELECTRIC_BALL_CASES, ids=[case_id(c) for c in ELECTRIC_BALL_CASES])
+def test_the_ship_on_a_charging_electric_ball_overlaps_no_hitbox_until_it_fires(
+    case: VariantCase,
+) -> None:
+    facts: ElectricBallFacts | None = case.electric_ball
+    assert facts is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    ball: ElectricBall = electric_ball_at(case, SPAWN_X, SPAWN_Y)
+    ctx: TickContext = TickContext(ship=spawn())
+    for n in range(facts.charge_ticks):
+        where: str = f"charging state {n}"
+        assert ball.is_charging(), where
+        # The ship is on the ball itself, and still nothing of the ball hits.
+        assert overlap_both_ways(ball.drawn_parts()[:1], ship), where
+        assert ball.current_hitbox() == (), where
+        assert not overlap_both_ways(ball.current_hitbox(), ship), where
+        ball = ball.update(ctx)
+    # The first firing state: the ship is still inside the circle, so it overlaps.
+    assert ball.is_firing()
+    assert overlap_both_ways(ball.current_hitbox(), ship)
+
+
+@pytest.mark.parametrize("case", ELECTRIC_BALL_CASES, ids=[case_id(c) for c in ELECTRIC_BALL_CASES])
+def test_an_electric_ball_graze_zone_is_its_firing_circle_grown_by_14_and_nothing_while_it_charges(
+    case: VariantCase,
+) -> None:
+    facts: ElectricBallFacts | None = case.electric_ball
+    assert facts is not None
+    ship: Hitbox = ship_hitbox(spawn())
+    ctx: TickContext = TickContext(ship=spawn())
+    # Nothing in WARNING and on every charging state.
+    ball: ElectricBall = electric_ball_at(case, 270.0, 250.0, active=False)
+    assert ball.graze_zone() == ()
+    ball = electric_ball_at(case, 270.0, 250.0)
+    assert ball.effect_on_touch() is TouchEffect.HIT
+    for n in range(facts.charge_ticks):
+        assert ball.graze_zone() == (), n
+        ball = ball.update(ctx)
+    # Firing: the circle grown by the margin, on the same center.
+    grown: Hitbox = (Circle(270.0, 250.0, facts.pulse_radius + GRAZE_MARGIN),)
+    for n in range(facts.fire_ticks):
+        assert ball.graze_zone() == grown, n
+        ball = ball.update(ctx)
+    # The grown circle meets the ship strictly at its own touching distance.
+    grown_shapes: tuple[Circle | Box, ...] = (Circle(0.0, 0.0, facts.pulse_radius + GRAZE_MARGIN),)
+    for name, toward in DIRECTIONS.items():
+        distance, exact = touching_distance(grown_shapes, toward)
+        slack: float = 0.0 if exact else 1e-9
+        for gap, expect in ((distance + slack, False), (distance - 0.5, True)):
+            x: float = SPAWN_X - toward[0] * gap
+            y: float = SPAWN_Y - toward[1] * gap
+            zone: Hitbox = firing_ball(case, x, y).graze_zone()
+            assert overlap_both_ways(zone, ship) is expect, (name, gap)

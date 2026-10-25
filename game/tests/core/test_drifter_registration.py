@@ -10,6 +10,7 @@ Rules, Tuning loader.
 """
 
 import ast
+from dataclasses import replace
 from pathlib import Path
 
 from core.drifters.base import Drifter, DrifterType
@@ -19,6 +20,7 @@ from core.drifters.chain_lightning import (
     ChainLightningTypeExtra,
     InvertMirror,
 )
+from core.drifters.electric_ball import ElectricBall, ElectricBallTypeExtra
 from core.drifters.registry import drifter_class
 
 REPO = Path(__file__).resolve().parents[3]
@@ -84,11 +86,13 @@ def test_every_drifter_names_itself_in_its_own_core_module() -> None:
 
 
 def test_only_a_drifter_with_a_telegraph_says_so() -> None:
-    """wave_check asks the drifter: the base says none, the chain lightning says its charge."""
+    """wave_check asks the drifter: the base says none, the chain lightning and the electric ball
+    say their charge, and only with their own type values."""
     assert Drifter.telegraph_ticks(None) is None
     assert ChainLightning.telegraph_ticks(None) is None
+    assert ElectricBall.telegraph_ticks(None) is None
     for drifter_type in DrifterType:
-        if drifter_type is not DrifterType.CHAIN_LIGHTNING:
+        if drifter_type not in (DrifterType.CHAIN_LIGHTNING, DrifterType.ELECTRIC_BALL):
             assert drifter_class(drifter_type).telegraph_ticks(None) is None
     extra: ChainLightningTypeExtra = ChainLightningTypeExtra(
         node_size=12.0,
@@ -103,3 +107,18 @@ def test_only_a_drifter_with_a_telegraph_says_so() -> None:
         ),
     )
     assert ChainLightning.telegraph_ticks(extra) == 90
+    ball_extra: ElectricBallTypeExtra = ElectricBallTypeExtra(
+        charge_ticks=120,
+        fire_ticks=100,
+        charge_rays=4,
+        ray_length=6.0,
+        ray_width=1.0,
+        outline_width=1.0,
+        rim_width=2.0,
+        fill_opacity=0.35,
+    )
+    assert ElectricBall.telegraph_ticks(ball_extra) == 120
+    # The charge, not the fire: it is the telegraph before the circle fires.
+    assert ElectricBall.telegraph_ticks(replace(ball_extra, charge_ticks=77)) == 77
+    # Another type's values give no charge.
+    assert ElectricBall.telegraph_ticks(extra) is None
