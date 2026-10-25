@@ -19,7 +19,7 @@ Close-out is the Director's, run with `scripts/close-out.sh`. You never run it a
 ## Read first, every run
 - `docs/reports/scope/<feature-id>.md`: the approved feature and its limits. The feature-id is the file name. Not in Advice; Advice reads its candidates from the spawn prompt.
 - `docs/design/gdd/`: every number, behavior and rule the design may use.
-- `CLAUDE.md`: design pillars, locked decisions, tech rules.
+- `docs/design/gdd/00-index.md`, then the GDD files it names: design pillars and locked decisions in `01-vision.md`, tech rules in `15-tech-constraints.md`. `CLAUDE.md` holds the agent rules and points into the GDD.
 - `docs/contracts/INDEX.md`: one row per system (System, Ver, Status, Purpose). Read it first to choose which contracts to open. The script generates it; never edit it.
 - `docs/contracts/`: open only the contracts the feature touches. Schemas, your feature's tasks and the CHANGELOG as needed. A task with `Status: done` is history: never edit it.
 - A split contract (see Outputs): read the hub's part table, then open only the parts whose `Read when` matches the change. Never read the whole folder.
@@ -28,13 +28,13 @@ Close-out is the Director's, run with `scripts/close-out.sh`. You never run it a
 
 ## Design run
 1. Confirm the scope report says `Verdict: ship`. If not, stop.
-2. List every value and behavior the design needs. Each must trace to the GDD, `CLAUDE.md`, or a Director answer. Anything without a source is a question for the Director. Never guess a value.
+2. List every value and behavior the design needs. Each must trace to the GDD or a Director answer. Anything without a source is a question for the Director. Never guess a value.
 3. Decide which systems the feature changes. Write or update one contract per system. In a split contract, edit the part that owns the thing.
 4. If a contract you change is `Status: frozen`, set it to `draft`. Grep `game/` (tests included) for every file that depends on it. Write `impact.md` (see Outputs) with those files.
 5. For every data file the game reads (config, save data, waves), write or update its JSON Schema.
 6. Split the feature into atomic tasks. Then add the expected failures per task to `impact.md`, if you wrote one.
 7. Check the split under **Logic and UI stay apart**: no rule in a presentation task, no drawing in a core task, every field the UI reads defined in core.
-8. Check the contracts again against `CLAUDE.md` and the GDD in `docs/design/gdd/`. Any difference falls under the documentation rule.
+8. Check the contracts again against the GDD in `docs/design/gdd/`. Any difference falls under the documentation rule.
 9. Confirm the feature issue exists: `get_issue` on the feature-id. If it doesn't, follow "Linear never blocks" under Bad inputs.
 10. Create one Linear sub-issue per task file: team `Driftward-ace`, `parentId` = the feature-id (e.g. `DRA-5`), status Todo, title = the task's short name, description = the task file path plus its Acceptance check. Write the sub-issue key into the task file's `Linear:` line.
 
@@ -174,7 +174,7 @@ In this mode:
 In Linear: never create, edit or close the parent feature issue. Never touch issues of other features. Never delete anything. Make no mid-build status changes. In No Linear mode: no Linear call at all.
 
 ## Done
-- **Design:** contracts re-checked against `CLAUDE.md` and the GDD with no difference left unreported, the feature split into atomic tasks, every affected implementer has a task file, and every task file has a Linear sub-issue, or the gap is reported. Then report. If an Assumption needs the Director's answer: contracts only, no tasks, Status blocked.
+- **Design:** contracts re-checked against the GDD with no difference left unreported, the feature split into atomic tasks, every affected implementer has a task file, and every task file has a Linear sub-issue, or the gap is reported. Then report. If an Assumption needs the Director's answer: contracts only, no tasks, Status blocked.
 - **Advice:** answer returned to the Scope Guardian. Nothing written, no Linear call.
 - **No Linear mode:** the same, minus every Linear item. Report the skipped Linear work under Next. Then report.
 
