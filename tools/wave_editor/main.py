@@ -24,6 +24,7 @@ from doc import Doc
 from editor import PALETTE_ROWS, TYPES, Editor, Row, place_text
 from ui.debug_overlay import draw_debug_hitboxes
 from ui.drifters.registry import render_drifter
+from ui.graze_view import draw_graze_ring
 from ui.look import BACKGROUND
 from ui.popup_view import draw_points_popup
 from ui.ship_view import draw_ship
@@ -58,7 +59,7 @@ SPEEDS: tuple[float, ...] = (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5
 WAVE_PANEL: pygame.Rect = pygame.Rect(4, 4, LEFT_W, 206)
 PALETTE_PANEL: pygame.Rect = pygame.Rect(4, 214, LEFT_W, 140)
 VALUES_PANEL: pygame.Rect = pygame.Rect(
-    RIGHT_X - 6, 112, WINDOW[0] - RIGHT_X, WINDOW[1] - 116
+    RIGHT_X - 6, 126, WINDOW[0] - RIGHT_X, WINDOW[1] - 130
 )
 KEYS: tuple[tuple[str, str], ...] = (
     ("PLAY", ""),
@@ -239,8 +240,8 @@ def _held_thrust() -> Thrust:
 
 
 def _draw_game(surface: pygame.Surface, editor: Editor, hitboxes: bool) -> None:
-    """The draw order of app.frame._draw, without the HUD and the overlay text, then a ring
-    round the selected placement's drifter."""
+    """The draw order of app.frame._draw (graze rings after the ship), without the HUD and the
+    overlay text, then a ring round the selected placement's drifter."""
     bench: Bench = editor.bench
     run: Run = bench.run
     surface.fill(BACKGROUND)
@@ -251,6 +252,8 @@ def _draw_game(surface: pygame.Surface, editor: Editor, hitboxes: bool) -> None:
         draw_points_popup(surface, popup)
     if not bench.ghost and run.ship_visible:
         draw_ship(surface, run.ship)
+    for ring in run.graze_rings:
+        draw_graze_ring(surface, ring, run.ship)
     if hitboxes:
         draw_debug_hitboxes(surface, run)
     if editor.trail and editor.selected is not None and bench.spawn_list is None:
@@ -484,6 +487,11 @@ def _draw_config(
             TEXT,
         ),
         (f"Drifters {len(run.drifters)}   Lives {run.lives}   Score {run.score}", TEXT),
+        (
+            f"Grazes {run.grazes}   Margin {bench.tuning.hazards.graze_margin:g}px"
+            + ("   (ghost: no grazes)" if bench.ghost else ""),
+            TEXT,
+        ),
         ("END of wave" if bench.ended else "", ACCENT),
     ]
     _lines(screen, font, RIGHT_X, 10, rows)
