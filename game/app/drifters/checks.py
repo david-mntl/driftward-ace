@@ -13,6 +13,7 @@ from typing import TypeGuard
 
 from core.collision import Box, Circle, Hitbox
 from core.drifters.base import VariantExtra
+from core.drifters.tuning import DrifterTypeTuning, VariantTuning
 
 _VARIANT_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 """Variant names. Source: drifter-tuning.schema.json, $defs.variant_name."""
@@ -159,3 +160,66 @@ def check_variant_name(name: str, path: str, value: object) -> str:
     if not isinstance(value, str) or not _VARIANT_NAME.fullmatch(value):
         raise ValueError(f"{name}: {path} must be a string matching {_VARIANT_NAME.pattern}")
     return value
+
+
+type OwnFields = tuple[frozenset[str], ExtraBuilder]
+"""A drifter's own variant fields and the checker that builds its VariantExtra from them."""
+
+
+def _variants(name: str, data: object, own: OwnFields | None) -> dict[str, VariantTuning]:
+    """Check the `variants` object: at least one, each name valid, each variant valid."""
+    if not isinstance(data, dict):
+        raise ValueError(f"{name}: variants must be an object")
+    if not data:
+        raise ValueError(f"{name}: variants must have at least one variant")
+    variants: dict[str, VariantTuning] = {}
+    for key, value in data.items():
+        variant: str = check_variant_name(name, f"variants.{key}", key)
+        variants[variant] = _variant(name, f"variants.{variant}", value, own)
+    return variants
+
+
+def _variant(name: str, path: str, data: object, own: OwnFields | None) -> VariantTuning:
+    """Check one variant: width and height > 0, at least one shape, each inside the footprint.
+
+    A drifter with fields of its own (`own`) also gets those checked and its VariantExtra built.
+    """
+    allowed: frozenset[str] = VARIANT_FIELDS if own is None else VARIANT_FIELDS | own[0]
+    fields: dict[str, object] = check_fields(name, path, data, allowed)
+    width: float = check_positive(name, f"{path}.width", fields["width"])
+    height: float = check_positive(name, f"{path}.height", fields["height"])
+    shapes: object = fields["hitbox"]
+    if not isinstance(shapes, list):
+        raise ValueError(f"{name}: {path}.hitbox must be a list")
+    if not shapes:
+        raise ValueError(f"{name}: {path}.hitbox must have at least one shape")
+    hitbox: list[Circle | Box] = []
+    for index, item in enumerate(shapes):
+        shape_path: str = f"{path}.hitbox[{index}]"
+        shape: Circle | Box = check_shape(name, shape_path, item)
+        check_inside(name, shape_path, shape, width, height)
+        hitbox.append(shape)
+    extra: VariantExtra | None = None if own is None else own[1](name, path, fields, tuple(hitbox))
+    return VariantTuning(width=width, height=height, hitbox=tuple(hitbox), extra=extra)
+
+
+def load_generic(name: str, data: object, own: OwnFields | None = None) -> DrifterTypeTuning:
+    """Check a drifter's tuning file against drifter-tuning.schema.json and build its record.
+
+    `own` is the drifter's own variant fields, when its schema adds some (the satellite's angle).
+    A drifter with no module of its own registered in `app.drifters.registry` is checked here.
+    """
+    fields: dict[str, object] = check_fields(name, "", data, DRIFTER_FIELDS)
+    variants: dict[str, VariantTuning] = _variants(name, fields["variants"], own)
+    default_variant: str = check_variant_name(name, "default_variant", fields["default_variant"])
+    if default_variant not in variants:
+        raise ValueError(f"{name}: default_variant must be one of the variant names")
+    speed_ratio: float = check_number(name, "speed_ratio", fields["speed_ratio"])
+    if speed_ratio < 0:
+        raise ValueError(f"{name}: speed_ratio must be a number >= 0")
+    return DrifterTypeTuning(
+        variants=variants,
+        default_variant=default_variant,
+        speed_ratio=speed_ratio,
+        entry_warning_ticks=check_warning_ticks(name, fields["entry_warning_ticks"]),
+    )
