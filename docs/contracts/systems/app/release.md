@@ -156,6 +156,20 @@ if overlay_visible:
 ```
 A retry needs no app call: `step_run` restarts the waves itself (`systems/run.md`, a game-over tick).
 
+DRA-117 calls. They add one load before the first frame, one argument to `start_run` and one loop to the draw, right after the ship. Signatures are set in `systems/run.md` and `systems/app/tuning-loader.md`. Nothing else in the frame changes: graze popups are in `run.popups` and drawn by the DRA-62 loop, and the HUD reads `run.grazes` itself.
+```python
+# before the first frame:
+tuning = load_tuning()  # app.tuning: hazards.json now gives graze_margin too
+graze_rules = load_graze_rules()  # app.tuning, both modes: scoring.json. A bad file raises here
+run = start_run(waves=..., graze_rules=graze_rules)  # waves as in DRA-76
+# per frame, draw:
+if run.ship_visible:
+    draw_ship(surface, run.ship)
+for ring in run.graze_rings:
+    draw_graze_ring(surface, ring, run.ship)  # systems/run.md, Presentation: over the ship, every frame
+```
+A retry needs no app call: `step_run` keeps `graze_rules` itself.
+
 ### game/scripts/start-driftward-ace.sh (Integration Engineer)
 ```
 start-driftward-ace.sh            # serves the build, prints http://localhost:<PORT>

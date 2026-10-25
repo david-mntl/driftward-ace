@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "driftward-ace/hazards.schema.json",
   "title": "Shared hazard values",
-  "description": "The file game/tuning/hazards.json: values every hazard shares, read in both run modes. The file must exist; every field is optional, and a field left out keeps its default from core.drifters.base (DEFAULT_REHIT_COOLDOWN_TICKS 180, DEFAULT_REHIT_DIM 0.75, DEFAULT_TELEGRAPH_MIN_TICKS 45). {} is a valid file. Key names are the GDD's (05-lives-and-damage.md, Values; 07-drifters.md, Values). Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader) into core.drifters.tuning.HazardRules. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, The base (Re-hit cooldown, Timers).",
+  "description": "The file game/tuning/hazards.json: values every hazard shares, read in both run modes. The file must exist; every field is optional, and a field left out keeps its default from core.drifters.base (DEFAULT_REHIT_COOLDOWN_TICKS 180, DEFAULT_REHIT_DIM 0.75, DEFAULT_TELEGRAPH_MIN_TICKS 45, and from DRA-117 GRAZE_MARGIN). {} is a valid file. Key names are the GDD's (05-lives-and-damage.md, Values; 07-drifters.md, Values; 06-scoring.md, Values). Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app/tuning-loader.md) into core.drifters.tuning.HazardRules. Owner of the schema: architect. Contract: docs/contracts/systems/drifters/shared/base.md, Rules (Re-hit cooldown, Timers, Graze zone).",
   "type": "object",
   "additionalProperties": false,
   "required": [],
@@ -22,6 +22,11 @@
       "description": "Shortest a telegraph may get once Timer x has scaled it, ticks. A scaled telegraph below it is raised to it. Default 45 (07-drifters.md, telegraph_min, locked). DRA-47. Maps to HazardRules.telegraph_min_ticks.",
       "type": "integer",
       "minimum": 0
+    },
+    "graze_margin": {
+      "description": "Px every hazard's graze zone grows each of its hitbox shapes by, on every side. Never scales with level. Default: GRAZE_MARGIN, the GDD's 06-scoring.md, graze_margin (locked). DRA-117. An int or a float, never a bool. Maps to HazardRules.graze_margin.",
+      "type": "number",
+      "exclusiveMinimum": 0
     }
   }
 }

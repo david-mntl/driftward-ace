@@ -10,7 +10,8 @@ Import root is `game/`, as in the tests. Core modules import stdlib and `core` o
 ```python
 # Imports: stdlib, core.collision, core.ship (Ship; GravityWell from DRA-96), core.world,
 # core.popup (DRA-62, for PointsPopup).
-GRAZE_MARGIN: Final[int] = 14  # 06-scoring.md, graze_margin, px (locked)
+GRAZE_MARGIN: Final[int] = 14  # 06-scoring.md, graze_margin, px (locked). From DRA-117 the default of
+# HazardRules.graze_margin, Birth.graze_margin and Drifter.graze_margin; the name stays
 DEFAULT_REHIT_COOLDOWN_TICKS: Final[int] = (
     180  # 05-lives-and-damage.md, rehit_cooldown, ticks (guess). DRA-39
 )
@@ -48,6 +49,12 @@ class TouchEffect(Enum):
     BLOCK = "block"  # touching it neither hurts nor pays: it is ground the ship can't enter
     # (07-drifters.md, Summary, Blocker). The floating island. DRA-86
     NONE = "none"  # touching it does nothing
+
+
+class GrazeState(Enum):  # DRA-117. Set by the run's graze step (systems/run.md, step 5b)
+    OUTSIDE = "outside"  # the ship is not in the drifter's graze zone; it may still pay a graze
+    INSIDE = "inside"  # the ship was in its graze zone on the last check; it may still pay
+    SPENT = "spent"  # it touched the ship or already paid: it never pays a graze again
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +106,7 @@ class Birth:
     hazard_speed_mult: float = 1.0  # DRA-104. The hazard speed × the spawner applied to speed
     # (the level's, or Level 1's with the switch off), for a drifter's own speeds (the UFO's weave)
     seed: int | None = None  # DRA-104. The placement's seed, for a seeded drifter; None otherwise
+    graze_margin: float = GRAZE_MARGIN  # DRA-117. px the graze zone grows each hitbox shape by, > 0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -145,6 +153,8 @@ class Drifter(ABC):
         DEFAULT_REHIT_DIM  # DRA-39. Brightness while cooling, 0..1, from the spawner
     )
     rehit_ticks_left: int = 0  # DRA-39. Ticks of re-hit cooldown still to come. 0 = it may hit. Set by the run
+    graze_margin: float = GRAZE_MARGIN  # DRA-117. px the graze zone grows each hitbox shape by, from the spawner
+    graze_state: GrazeState = GrazeState.OUTSIDE  # DRA-117. Where the ship is against its graze zone. Set by the run
 
     def current_hitbox(self) -> Hitbox:
         ...
@@ -152,7 +162,8 @@ class Drifter(ABC):
 
     def graze_zone(self) -> Hitbox:
         ...
-        # grow_hitbox(current_hitbox(), GRAZE_MARGIN) when effect_on_touch() is HIT, else ().
+        # grow_hitbox(current_hitbox(), graze_margin) when effect_on_touch() is HIT, else ().
+        # From DRA-117 the drifter's own graze_margin, no longer the constant.
 
     def drawn_parts(self) -> tuple[Box, ...]:
         ...  # DRA-56
@@ -255,8 +266,8 @@ class Drifter(ABC):
 def born_drifter[T: Drifter](cls: type[T], birth: Birth) -> T:
     ...  # DRA-39. PEP 695, bound Drifter
     # cls built in WARNING from birth's shared fields: x, y, variant, width, height, speed, hitbox,
-    # warning_ticks, rehit_cooldown_ticks, rehit_dim. Every other field keeps its default, so a
-    # subclass's own fields need defaults. No checks.
+    # warning_ticks, rehit_cooldown_ticks, rehit_dim and, from DRA-117, graze_margin. Every other
+    # field keeps its default, so a subclass's own fields need defaults. No checks.
 
 
 def tick_warning[T: Drifter](obj: T) -> T:
@@ -269,4 +280,4 @@ def scale_timer(ticks: int, timer_mult: float) -> int: ...          # DRA-47
 def scale_telegraph(ticks: int, timer_mult: float, telegraph_min_ticks: int) -> int: ...   # DRA-47
     # A telegraph at its level: max(scale_timer(ticks, timer_mult), telegraph_min_ticks).
 ```
-The code documents each field with the comment above, as `core/ship.py` does for `Ship`. `Drifter` and `Specialty` refer to each other, so the module uses `from __future__ import annotations` or string annotations. With `slots=True` the methods never use the zero-argument `super()`. DRA-39 removes the field `hit_ship` and the abstract `default_y`; `may_hit_ship` is no longer abstract. DRA-47 adds `warning_copy` and `settle_warning`, both concrete with a do-nothing default, so the meteorite, the satellite and the registry test's stubs need no change. DRA-56 adds `drawn_parts`, concrete, whose default is the footprint the two screen tests used before, so no existing drifter, stub or test changes behavior; `base.py` imports `Box` from `core.collision` for it. DRA-62 adds the `COIN` member, `TickContext.scroll_step_px` with a default of 0.0 (every existing `TickContext(ship=...)` call still builds), the class attribute `parked` (False) and the concrete `collect_points` (0) and `collect_popup` (None), so no existing drifter, stub or test changes behavior. `PointsPopup` is in `game/core/popup.py` (`docs/contracts/systems/run.md`, Interface). DRA-96 adds the `PLANET` member and two concrete hooks with do-nothing defaults, `gravity_well` (None) and the classmethod `start_size` (the footprint), so no existing drifter, stub or test changes behavior. `telegraph_ticks` is another concrete classmethod hook, None by default, so none of them changes either; the chain lightning overrides it. `GravityWell` is in `game/core/ship.py` (`docs/contracts/systems/ship.md`, Interface). DRA-104 adds the `UFO` member, the class attribute `seeded` (False) and two `Birth` fields with defaults at the end, `hazard_speed_mult` (1.0) and `seed` (None), so every existing `Birth(...)` call still builds and no existing drifter, stub or test changes behavior. DRA-111 adds the `ELECTRIC_BALL` member, last, and nothing else here: the electric ball builds on the hooks that exist (`systems/drifters/electric-ball/core.md`).
+The code documents each field with the comment above, as `core/ship.py` does for `Ship`. `Drifter` and `Specialty` refer to each other, so the module uses `from __future__ import annotations` or string annotations. With `slots=True` the methods never use the zero-argument `super()`. DRA-39 removes the field `hit_ship` and the abstract `default_y`; `may_hit_ship` is no longer abstract. DRA-47 adds `warning_copy` and `settle_warning`, both concrete with a do-nothing default, so the meteorite, the satellite and the registry test's stubs need no change. DRA-56 adds `drawn_parts`, concrete, whose default is the footprint the two screen tests used before, so no existing drifter, stub or test changes behavior; `base.py` imports `Box` from `core.collision` for it. DRA-62 adds the `COIN` member, `TickContext.scroll_step_px` with a default of 0.0 (every existing `TickContext(ship=...)` call still builds), the class attribute `parked` (False) and the concrete `collect_points` (0) and `collect_popup` (None), so no existing drifter, stub or test changes behavior. `PointsPopup` is in `game/core/popup.py` (`docs/contracts/systems/run.md`, Interface). DRA-96 adds the `PLANET` member and two concrete hooks with do-nothing defaults, `gravity_well` (None) and the classmethod `start_size` (the footprint), so no existing drifter, stub or test changes behavior. `telegraph_ticks` is another concrete classmethod hook, None by default, so none of them changes either; the chain lightning overrides it. `GravityWell` is in `game/core/ship.py` (`docs/contracts/systems/ship.md`, Interface). DRA-104 adds the `UFO` member, the class attribute `seeded` (False) and two `Birth` fields with defaults at the end, `hazard_speed_mult` (1.0) and `seed` (None), so every existing `Birth(...)` call still builds and no existing drifter, stub or test changes behavior. DRA-111 adds the `ELECTRIC_BALL` member, last, and nothing else here: the electric ball builds on the hooks that exist (`systems/drifters/electric-ball/core.md`). DRA-117 adds the enum `GrazeState`, the `Drifter` fields `graze_margin` and `graze_state` and the `Birth` field `graze_margin`, all with defaults and the `Birth` one last, so every existing `Birth(...)` call, drifter, stub and test still builds; a drifter built with the default margin has exactly the zone it had before. No subclass overrides `graze_zone` or sets `graze_state`.
