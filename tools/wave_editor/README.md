@@ -19,7 +19,7 @@ Needs python3 and pygame-ce. Opening a game wave opens a **copy**. Nothing under
 - **Left bottom (KEYS):** the key table.
 - **Middle:** the game at 640x480, the timeline under it, then messages. A yellow ring marks the selected drifter.
 - **Right top (CONFIG):** level, speed, ghost or fly, start spot, live numbers.
-- **Right bottom (WAVE / SELECTED):** the wave's settings, then the selected placement's fields, then the values of its drifter type, each tagged W, F or P. Variant values sit under a small heading per variant.
+- **Right bottom (WAVE / SELECTED):** the wave's settings, then the graze margin, then the selected placement's fields, then the values of its drifter type, each tagged W, F or P. Variant values sit under a small heading per variant.
 
 ## Selecting and editing
 
@@ -37,6 +37,14 @@ In the SELECTED panel:
 | V | save the type's values as a named file |
 
 Every change goes through the game's own loaders. A bad value is refused, undone, and the error shows under the timeline in red. The run replays to the same tick, so you see the change at once.
+
+## Grazes
+
+The bench plays the game's graze rule with the game's own values (`game/tuning/scoring.json`, `hazards.json`). A paid graze adds its points to the score, shows the popup and the white ring, and the CONFIG panel counts `Grazes` and shows the `Margin` in px. F3 outlines every graze zone next to the hitboxes.
+
+- **Fly mode only.** The ghost is always invulnerable, and an invulnerable ship never grazes. The panel says `ghost: no grazes`. Use F3 in ghost mode to see the zones, and fly mode to see them pay.
+- **Graze margin.** The `graze_margin` row (under `graze (all hazards)` in the right panel) is the px every hazard's graze zone grows by. It is one number for all drifters, so it has no F layer: W is your change in this file, P is `hazards.json`. Left/Right nudge 1 px (Shift x10), Enter types a value (above 0), D goes back to production. The sandbox file saves it as `hazards`. Promote lists `tuning/hazards.json` when you changed it, and patches only that number.
+- The other graze values (points, popup, ring) are read from `scoring.json` and reload with the file, but are not editable here.
 
 ## Path trail
 
@@ -114,7 +122,7 @@ Nudge or type a value and it becomes **W**. D on a W value drops it back to F or
 | Ctrl+O | open a sandbox file or a game wave |
 | Ctrl+P | promote |
 
-**Promote** lists what it would write: the wave file in `game/waves/`, and one `game/tuning/drifters/<type>.json` per changed type, with the value diffs and which other waves use that type. Space ticks an item, Enter writes only the ticked ones. A tuning file is patched in place, so only the changed numbers differ. After writing a type, its W and F layers are dropped, because production now has them. `playlist.json` is never touched. Nothing is committed. `wave_check` is not built yet.
+**Promote** lists what it would write: the wave file in `game/waves/`, one `game/tuning/drifters/<type>.json` per changed type, with the value diffs and which other waves use that type, and `game/tuning/hazards.json` if the graze margin changed. Space ticks an item, Enter writes only the ticked ones. A tuning file is patched in place, so only the changed numbers differ. After writing a type, its W and F layers are dropped, because production now has them. The same goes for the graze margin after `hazards.json`. `playlist.json` is never touched. Nothing is committed. `wave_check` is not built yet.
 
 ## Play keys
 
