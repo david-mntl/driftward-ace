@@ -12,7 +12,7 @@ You can't shoot. You can only fly better. Driftward Ace is an endless arcade dod
 | players | Single-player | — | — | locked | Director |
 | platform | Desktop web browser, no install | — | — | locked | Director |
 | lose_condition | All lives lost | — | — | locked | Director |
-| win_condition | Beat your best score | — | — | locked | Director. Needs saves, see FL-03 |
+| win_condition | Beat your best score: the #1 score on this browser's top 10 ([11-save-data.md](11-save-data.md)) | — | — | locked | Director |
 
 ## Pillars
 Every decision gets checked against these three. A design that breaks one is wrong, however good it feels.
@@ -28,15 +28,15 @@ Every decision gets checked against these three. A design that breaks one is wro
 ## Locked decisions
 Do not reopen. Changing one needs the Director's explicit go-ahead and a row in [91-decision-log.md](91-decision-log.md). Details live in the linked file.
 
-1. Controls are arrow keys only. [02-game-flow.md](02-game-flow.md)
+1. Arrow keys fly the ship; nothing else does. Enter or Space confirms in menus, pauses and resumes, and starts a new run. No other keys. [02-game-flow.md](02-game-flow.md)
 2. The screen is fixed and never follows the ship. The world scrolls down past it at a steady speed set by the level, and distance counts that scroll. Falling off the floor (the bottom edge) costs a life. [03-world-and-camera.md](03-world-and-camera.md)
 3. Side walls are solid. They stop the ship with no bounce. [03-world-and-camera.md](03-world-and-camera.md)
 4. Every game rule runs on a fixed 60 Hz tick. Gravity is always on. Horizontal velocity has drag. Fall speed is capped. [04-ship.md](04-ship.md)
 5. The ship has 3 lives. A hit or a fall costs one, then brief invulnerability. No stun: losing a life never freezes the ship or takes control away. [05-lives-and-damage.md](05-lives-and-damage.md)
 6. Hazards are defined by behavior archetype, not by visual skin. [07-drifters.md](07-drifters.md)
 7. Waves are hand-authored JSON. Every run opens with the same fixed Wave 0. Its only hazard is the meteorite; it may also hold coins. [09-waves.md](09-waves.md)
-8. A control card shows after click-to-start. [02-game-flow.md](02-game-flow.md)
-9. If saves ship, they go to browser localStorage: nickname, score and level reached. Nothing else. [11-save-data.md](11-save-data.md)
+8. A main menu shows after click-to-start: Play, Instructions, Leaderboard. The instructions open only from the menu. [02-game-flow.md](02-game-flow.md)
+9. Saves go to browser localStorage: a top 10 of nickname, score and level reached, plus the last nickname entered. Nothing else. [11-save-data.md](11-save-data.md)
 
 ## Out of scope
 Combat, online leaderboard, mobile or touch controls, multiplayer, procedural levels, wave editor.
@@ -47,10 +47,10 @@ Combat, online leaderboard, mobile or touch controls, multiplayer, procedural le
 3. Feel words, for art, sound and tuning: drag, fight back, drift, chase, fall. The ship should feel heavy but controllable, never floaty and never stiff.
 
 ## Edge cases
-- A run with no BEST to beat (saves are a stretch goal): see FL-03.
+- No best to beat yet (empty top 10): the first score makes #1. Saves don't work: there is no best, and the run ends on GAME OVER ([11-save-data.md](11-save-data.md) rule 5).
 
 ## Open
-- FL-03: what "win" shows while saves are deferred.
+- None.
 
 ## How to extend
 A new pillar, locked decision or out-of-scope item goes here, only with the Director's go-ahead, with a row in [91-decision-log.md](91-decision-log.md). Put its details in the file it links to, not here.

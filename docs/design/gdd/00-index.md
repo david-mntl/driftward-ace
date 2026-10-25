@@ -27,7 +27,7 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 | Need to know | Read |
 |---|---|
 | What the game is, pillars, locked decisions, out of scope, win and lose | [01-vision.md](01-vision.md) |
-| Screens and states: start, control card, play, game over, retry | [02-game-flow.md](02-game-flow.md) |
+| Screens and states: start, menu, instructions, leaderboard, play, pause, last life, name entry, game over, retry; which key does what | [02-game-flow.md](02-game-flow.md) |
 | Screen size, coordinates, scroll, distance, top line, floor, walls | [03-world-and-camera.md](03-world-and-camera.md) |
 | Ship size, hitbox, gravity, thrust, drag, fall cap, tick order | [04-ship.md](04-ship.md) |
 | Lives, hits, falls, invulnerability, life-lost feedback, respawn | [05-lives-and-damage.md](05-lives-and-damage.md) |
@@ -36,8 +36,8 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 | How one drifter behaves | the file [07-drifters.md](07-drifters.md) routes to, in `drifters/` |
 | Levels, playlists, speed multipliers, rest gap, tier unlocks | [08-difficulty.md](08-difficulty.md) |
 | Waves, Wave 0, wave order, wave_check rules | [09-waves.md](09-waves.md) |
-| HUD, control card, game over screen | [10-ui.md](10-ui.md) |
-| Saves, nickname, top 10 (stretch) | [11-save-data.md](11-save-data.md) |
+| HUD, what each screen shows (menu, instructions, pause box, leaderboard, name entry, game over) | [10-ui.md](10-ui.md) |
+| Saves, nickname, letter picker, top 10, best score | [11-save-data.md](11-save-data.md) |
 | Art style, palette, sprite sizes, sound | [12-art-and-audio.md](12-art-and-audio.md) |
 | Schedule, priorities, cut order, stretch goals | [13-scope-and-schedule.md](13-scope-and-schedule.md) |
 | What a term means | [14-glossary.md](14-glossary.md) |
@@ -58,7 +58,7 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 | 08-difficulty.md | draft |
 | 09-waves.md | draft |
 | 10-ui.md | draft |
-| 11-save-data.md | stretch |
+| 11-save-data.md | draft |
 | 12-art-and-audio.md | draft |
 | 13-scope-and-schedule.md | draft |
 | 14-glossary.md | draft |

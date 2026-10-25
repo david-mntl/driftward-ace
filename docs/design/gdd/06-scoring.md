@@ -30,7 +30,7 @@ Depends on: [03-world-and-camera.md](03-world-and-camera.md), [05-lives-and-dama
 6. A hazard that hits the ship pays no graze.
 7. **No cap.** Grazes stack: each one adds the full `graze_points`, with no limit and no multiplier.
 8. **Feedback.** When a graze pays, `graze_popup` and `graze_ring` show, and the HUD's graze count goes up by one ([10-ui.md](10-ui.md) rule 2). Sound: none yet.
-9. **Best score** needs saves. Until saves ship there is no BEST. See [11-save-data.md](11-save-data.md), FL-03.
+9. **Best score** is the #1 score on the top 10 ([11-save-data.md](11-save-data.md) rule 3). The score freezes the tick the last life is lost ([02-game-flow.md](02-game-flow.md) rule 8).
 
 ## Edge cases
 - The ship enters and leaves the same hazard's zone several times: it pays once, on the first clean exit.
@@ -39,7 +39,7 @@ Depends on: [03-world-and-camera.md](03-world-and-camera.md), [05-lives-and-dama
 - The ship is in the respawn wait when it leaves a zone: no pay, even after invulnerability has run out (rule 5).
 
 ## Open
-- FL-03.
+- None.
 
 ## How to extend
 A new score source must say: how much, when it pays, whether it pays during invulnerability, and why it doesn't break Pillar 3 (no free safe points, no score for hiding). Add it to the formula in Summary.
