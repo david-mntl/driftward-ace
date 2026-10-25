@@ -71,6 +71,9 @@ class DrifterType(Enum):
     UFO = "ufo"
     """Source: drifters/07-ufo.md."""
 
+    ELECTRIC_BALL = "electric_ball"
+    """Source: drifters/10-electric-ball.md."""
+
 
 class Phase(Enum):
     """Where a drifter is in its life."""
