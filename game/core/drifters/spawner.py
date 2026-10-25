@@ -150,5 +150,6 @@ def spawn_drifter(placement: Placement, level: int, tuning: DrifterTuning) -> Dr
             telegraph_min_ticks=tuning.hazards.telegraph_min_ticks,
             hazard_speed_mult=speed_mult,
             seed=placement.seed,
+            graze_margin=tuning.hazards.graze_margin,
         )
     )

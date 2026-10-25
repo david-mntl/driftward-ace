@@ -18,6 +18,16 @@ from core.collision import Hitbox, hitboxes_overlap
 from core.drifters.base import Drifter, Phase, TickContext, TouchEffect
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning
+from core.graze import (
+    DEFAULT_GRAZE_RULES,
+    GrazeCheck,
+    GrazeRing,
+    GrazeRules,
+    check_grazes,
+    graze_popup,
+    graze_ring,
+    step_graze_rings,
+)
 from core.levels import FIRST_LEVEL
 from core.popup import PointsPopup, step_popups
 from core.scroll import Scroll, scroll_step_px, start_scroll, step_scroll
@@ -102,14 +112,27 @@ class Run:
     """The run's waves (core.waves). None: no waves play. Source: systems/run.md, Interface
     (DRA-76)."""
 
+    grazes: int = 0
+    """Grazes paid this run, at least 0. Only step 5b adds to it. Source: systems/run.md,
+    Interface (DRA-117)."""
+
+    graze_rings: tuple[GrazeRing, ...] = ()
+    """Graze rings on screen, oldest first. Source: systems/run.md, Interface (DRA-117)."""
+
+    graze_rules: GrazeRules = DEFAULT_GRAZE_RULES
+    """The graze values, from the app. A retry keeps them. Source: systems/run.md, Interface
+    (DRA-117)."""
+
     @property
     def score(self) -> int:
-        """The run's score in whole points: meters flown times POINTS_PER_METER plus coin points.
+        """The run's score in whole points: meters flown times POINTS_PER_METER, plus coin points,
+        plus the grazes times the graze points.
 
         Worked out on each read, never stored. Source: systems/run.md, Rules, Score;
-        06-scoring.md, rules 1 and 2.
+        06-scoring.md, Summary and rules 1 and 2.
         """
-        return self.scroll.meters * POINTS_PER_METER + self.coin_points
+        graze_points: int = self.grazes * self.graze_rules.points
+        return self.scroll.meters * POINTS_PER_METER + self.coin_points + graze_points
 
     @property
     def invulnerable(self) -> bool:
@@ -150,15 +173,16 @@ class Run:
         return self.waves.spawns_due
 
 
-def start_run(waves: WaveRun | None = None) -> Run:
+def start_run(waves: WaveRun | None = None, graze_rules: GrazeRules = DEFAULT_GRAZE_RULES) -> Run:
     """Return a new run: the ship at spawn, the scroll at tick 0, every other field default.
 
-    No drifters, next_uid 1, coin_points 0 (so the score is 0) and no popups. `waves` is the
-    run's wave state from `core.waves.start_waves`, or None for a run with no waves.
+    No drifters, next_uid 1, coin_points 0, grazes 0 (so the score is 0), no popups and no graze
+    rings. `waves` is the run's wave state from `core.waves.start_waves`, or None for a run with
+    no waves. `graze_rules` is kept in the run for its whole life and across a retry.
 
     Source: 02-game-flow.md, rule 3; systems/run.md, Interface.
     """
-    return Run(ship=spawn(), scroll=start_scroll(), waves=waves)
+    return Run(ship=spawn(), scroll=start_scroll(), waves=waves, graze_rules=graze_rules)
 
 
 def add_drifters(run: Run, placements: Sequence[Placement], tuning: DrifterTuning) -> Run:
@@ -248,11 +272,11 @@ def _is_press(thrust: Thrust, held: Thrust) -> bool:
 
 
 def _step_playing(run: Run, thrust: Thrust) -> Run:
-    """A playing tick: press, timer, drifters, popups, ground and wells, ship, scroll, collect,
-    fall or hit, cooldowns, drops, waves.
+    """A playing tick: press, timer, drifters, popups and rings, ground and wells, ship, scroll,
+    collect, graze, fall or hit, cooldowns, drops, waves.
 
     A hit is tested only when the ship did not fall. The level is read once, going into the tick.
-    Source: systems/run.md, Rules, a playing tick, steps 1 to 10 with 3a, 5a and 9a.
+    Source: systems/run.md, Rules, a playing tick, steps 1 to 10 with 3a, 5a, 5b and 9a.
     """
     press: bool = _is_press(thrust, run.held)
     protected: bool = run.invulnerable
@@ -275,16 +299,18 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
         scroll=scroll,
         drifters=drifters,
         popups=step_popups(run.popups),
+        graze_rings=step_graze_rings(run.graze_rings),
         invuln_ticks_left=left,
         waiting=stands,
         held=thrust,
     )
     collected: Run = stepped if stands else _apply_collect(stepped)
+    grazed: Run = _apply_graze(collected, may_pay=not protected and not stands)
     if is_below_floor(ship):
-        outcome: Run = _apply_fall(collected, protected, thrust, ground)
+        outcome: Run = _apply_fall(grazed, protected, thrust, ground)
     else:
-        outcome = _apply_hit(collected, protected, thrust)
-    return _step_run_waves(_drop_drifters(_cool_down(outcome, collected.drifters)))
+        outcome = _apply_hit(grazed, protected, thrust)
+    return _step_run_waves(_drop_drifters(_cool_down(outcome, grazed.drifters)))
 
 
 def _update_drifters(run: Run, scroll_px: float) -> tuple[Drifter, ...]:
@@ -354,6 +380,28 @@ def _apply_collect(stepped: Run) -> Run:
         drifters=tuple(drifters),
         coin_points=stepped.coin_points + points,
         popups=stepped.popups + tuple(popups),
+    )
+
+
+def _apply_graze(stepped: Run, *, may_pay: bool) -> Run:
+    """Follow the ship through every hazard's graze zone and pay the exits (step 5b).
+
+    `may_pay` is False when the ship was protected going into the tick or stands in the respawn
+    wait. Each paid graze adds one to `grazes`, a graze popup after the popups steps 3a and 5a
+    left, a graze ring after the rings step 3a kept, and one log line. Nothing else changes.
+    Source: systems/run.md, Rules, step 5b.
+    """
+    check: GrazeCheck = check_grazes(stepped.drifters, ship_hitbox(stepped.ship), may_pay)
+    for drifter in check.paid:
+        log.debug("drifter graze id=%d type=%s", drifter.uid, drifter.drifter_type.value)
+    paid: int = len(check.paid)
+    rules: GrazeRules = stepped.graze_rules
+    return replace(
+        stepped,
+        drifters=check.drifters,
+        grazes=stepped.grazes + paid,
+        popups=stepped.popups + (graze_popup(rules, stepped.ship),) * paid,
+        graze_rings=stepped.graze_rings + (graze_ring(rules),) * paid,
     )
 
 
@@ -518,7 +566,7 @@ def _step_game_over(run: Run, thrust: Thrust) -> Run:
         return replace(run, retry_armed=True, held=thrust)
     if run.retry_armed:
         log.info("new run")
-        return replace(start_run(_next_waves(run.waves)), held=thrust)
+        return replace(start_run(_next_waves(run.waves), run.graze_rules), held=thrust)
     return replace(run, held=thrust)
 
 

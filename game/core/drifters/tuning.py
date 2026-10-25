@@ -14,6 +14,7 @@ from core.drifters.base import (
     DEFAULT_REHIT_COOLDOWN_TICKS,
     DEFAULT_REHIT_DIM,
     DEFAULT_TELEGRAPH_MIN_TICKS,
+    GRAZE_MARGIN,
     DrifterType,
     DrifterTypeExtra,
     VariantExtra,
@@ -88,6 +89,9 @@ class HazardRules:
 
     telegraph_min_ticks: int = DEFAULT_TELEGRAPH_MIN_TICKS
     """The shortest a scaled telegraph may get, ticks, at least 0."""
+
+    graze_margin: float = GRAZE_MARGIN
+    """Px every hazard's graze zone grows each hitbox shape by, above 0."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
