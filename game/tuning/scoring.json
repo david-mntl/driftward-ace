@@ -1,0 +1,9 @@
+{
+  "graze_points": 25,
+  "graze_popup_ticks": 60,
+  "graze_popup_rise_per_tick": 0.5,
+  "graze_ring_ticks": 15,
+  "graze_ring_start_diameter": 16,
+  "graze_ring_end_diameter": 32,
+  "graze_ring_width": 1
+}
