@@ -29,7 +29,7 @@ Close-out is the Director's, run with `scripts/close-out.sh`. You never run it a
 1. Confirm the scope report says `Verdict: ship`. If not, stop.
 2. List every value and behavior the design needs. Each must trace to the GDD, `CLAUDE.md`, or a Director answer. Anything without a source is a question for the Director. Never guess a value.
 3. Decide which systems the feature changes. Write or update one contract per system.
-4. If a contract you change is `Status: frozen`, set it to `draft`. Grep `game/` (tests included) for every file that depends on it. List them under **Impact**.
+4. If a contract you change is `Status: frozen`, set it to `draft`. Grep `game/` (tests included) for every file that depends on it. Write `impact.md` (see Outputs).
 5. For every data file the game reads (config, save data, waves), write or update its JSON Schema.
 6. Split the feature into atomic tasks.
 7. Check the split under **Logic and UI stay apart**: no rule in a presentation task, no drawing in a core task, every field the UI reads defined in core.
@@ -46,9 +46,10 @@ In the Delivery report, mark each Assumption "needs your answer" or "FYI".
 ## Revision run
 A revision is a Design run that applies a Director answer to an earlier run. It replaces the Design run steps and narrows Read first.
 - Read only the named contract files, the feature's task files that point at them, and the GDD sections the answer touches. Read the scope report only if the answer changes what it approved. Don't re-read the whole of `docs/contracts/` or `game/`.
-- Apply the quoted answer and nothing else. If the answer needs a change to a `frozen` contract, reopen it as in Design run step 4: set it to `draft` and list the dependent files under **Impact**.
+- Apply the quoted answer and nothing else. If the answer needs a change to a `frozen` contract, reopen it as in Design run step 4: set it to `draft`.
 - If the feature has no task files yet and no Assumption still needs the Director's answer, write them now: Design run steps 6 to 10.
-- Update every task file the change affects: Read in the contract, Builds, Depends on, Not in the contract, Acceptance check, Out of scope. Keep their `Status:` and `Linear:` lines. Never recreate an existing Linear sub-issue. A brand-new task file gets its sub-issue as in Design run step 10.
+- If the change or new task files alter the dependent files or the expected failures, update `impact.md` to match.
+- Update every task file the change affects: the `Impact:` line, Read in the contract, Builds, Depends on, Not in the contract, Acceptance check, Out of scope. Keep their `Status:` and `Linear:` lines. Never recreate an existing Linear sub-issue. A brand-new task file gets its sub-issue as in Design run step 10.
 - If a task is no longer needed, never delete its file. Report it under Next and let the Director decide.
 - If the answer needs more than the scope report approved, stop and report, as in Neighbors.
 - Report with the Delivery report.
@@ -86,15 +87,18 @@ Created by: architect
 
 ## Purpose        (the system as it is now. No "From DRA-x, ..." history.)
 ## Diagram        (mermaid)
-## Interface      (concept snippets: signatures, data shapes. No logic.)
+## Interface      (a brief of new or changed signatures and data shapes only. Never restate existing code: read it from the code. No logic.)
 ## Presentation   (core fields the UI reads and what it shows for each. Omit if the player never sees the system.)
-## Rules          (each rule names its source)
-## Impact         (only when changing a frozen contract: dependent files)
+## Rules          (each rule names its source; never states a value)
 ## Rationale      (why each non-obvious choice was made)
 ```
 History goes to the CHANGELOG at close-out, never into Purpose. When you edit a contract whose Purpose still has history paragraphs, rewrite Purpose as the current state. Don't reformat contracts you don't otherwise touch.
 
 Readers: Gameplay Implementer, UI Developer, Art & Audio Engineer, Implementation Reviewer, QA Engineer, Integration Engineer.
+
+**A contract never states a value.** It cites the GDD file and field instead, e.g. `docs/design/gdd/<file>.md`, field name. This covers guess and locked flags too: the GDD is their only home.
+
+**Impact**, `docs/contracts/<feature-id>/impact.md`, markdown. Only when you change a frozen contract. It holds two things: the files that depend on the contract, and the failures expected until each task lands, so an implementer or QA knows which red results are not a bug yet. Readers: implementers, QA Engineer.
 
 **Schema**, `docs/contracts/schemas/<name>.schema.json`, JSON Schema. Data files are JSON, never YAML. Readers: whoever fills the data file, and QA.
 
@@ -105,6 +109,7 @@ Created by: architect
 Assignee: gameplay-implementer | ui-developer | art-audio-engineer | qa-engineer
 Writes to: <the assignee's owned path>
 Contract: docs/contracts/systems/<system>.md   (one or more paths, comma-separated)
+Impact: docs/contracts/<feature-id>/impact.md   (only if the feature has one)
 Status: open
 Linear: <sub-issue key>
 
@@ -115,7 +120,7 @@ Linear: <sub-issue key>
 ## Acceptance check       (one thing the Director can run or see)
 ## Out of scope
 ```
-Tasks point to the contract; they never copy it. Never restate contract text, values or identifiers in a task. Anything an implementer needs that is in neither the contract nor `Not in the contract` belongs in the contract.
+Tasks point to the contract and to `impact.md`; they never copy either. Never restate contract text, values or identifiers in a task. Anything an implementer needs that is in neither the contract nor `Not in the contract` belongs in the contract.
 
 A task is atomic when it has one assignee, one owned path, and one acceptance check. No big feature goes to one agent. A menu with three screens is three tasks. Example acceptance check: "ship falls when no key is pressed."
 
