@@ -696,6 +696,22 @@ def check_split(p: Paths, c: Contract, problems: list[str]) -> None:
                     problems.append(f"{rel(p, holder)}: old name {name!r} does not resolve: no line of its {sec} opens with {key!r} in {target}")
 
 
+CONTRACT_PATH = re.compile(r"(?:docs/contracts/)?systems/[A-Za-z0-9_\-/]+\.md")
+
+
+def task_path_problems(p: Paths, task: Task) -> list[str]:
+    """The paths an open task points at must exist: its `Impact:` file and every contract file or
+    part its `Read in the contract` names. A wrong path would only show when an implementer stops on it."""
+    problems = []
+    impact = (header(task.text, "Impact") or "").split()[:1]
+    if impact and not (p.root / impact[0]).exists():
+        problems.append(f"{rel(p, task.path)}: Impact {impact[0]} does not exist")
+    for match in sorted(set(CONTRACT_PATH.findall(section(task.text, "Read in the contract")))):
+        if not (p.root / "docs" / "contracts" / match.removeprefix("docs/contracts/")).exists():
+            problems.append(f"{rel(p, task.path)}: Read in the contract names {match}, which does not exist")
+    return problems
+
+
 def cmd_verify(p: Paths) -> int:
     problems: list[str] = []
     contracts = load_contracts(p)
@@ -718,6 +734,7 @@ def cmd_verify(p: Paths) -> int:
                 continue  # done tasks are history; their pointers are left as they were
             if t.assignee not in ASSIGNEES:
                 problems.append(f"{rel(p, t.path)}: Assignee {t.assignee!r} is not a task assignee")
+            problems += task_path_problems(p, t)
             texts = []
             for c in t.contracts:
                 target = p.root / c
