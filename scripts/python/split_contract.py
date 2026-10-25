@@ -95,6 +95,19 @@ SHARED_WHEN = {
 }
 
 
+def drifter_info(key: str) -> tuple[str, str]:
+    if key in SHARED_LABEL:
+        return SHARED_LABEL[key], SHARED_WHEN[key]
+    d, kind = key.split("/")
+    name, module, _rx = DRIFTERS[d]
+    return f"the {name}, {kind}", {
+        "core": f"you change how the {name} behaves (`{module}.py`).",
+        "view": f"you change how the {name} looks.",
+        "tuning": f"you change the {name}'s tuning file or its checks.",
+        "rationale": f"you ask why the {name} is built the way it is.",
+    }[kind]
+
+
 MANIFEST = "docs/contracts/splits.json"
 
 
@@ -110,16 +123,18 @@ def blob_sha(root: Path, text: str) -> str:
     return (git_text(root, "hash-object", "--stdin", stdin=text) or "").strip()
 
 
-def dropped_for(kind: str, old_text: str) -> list[str]:
-    """The only blocks a split may drop, found again in the old text: Impact sections, and for a full split the Purpose task list."""
+def dropped_for(drops: list[str], old_text: str) -> list[str]:
+    """The only blocks a split may drop, found again in the old text: Impact sections, and the Purpose task list."""
     doc = parse_doc(old_text)
-    lines = [ln for title, body in doc.sections.items() if title.startswith("Impact") for ln in ["## " + title] + body]
-    if kind == "split":
+    lines: list[str] = []
+    if "impact" in drops:
+        lines += [ln for title, body in doc.sections.items() if title.startswith("Impact") for ln in ["## " + title] + body]
+    if "who-builds" in drops:
         lines += cut_who_builds(doc.sections.get("Purpose", []))[1]
     return lines
 
 
-def record_split(root: Path, name: str, kind: str, old_text: str, new_files: dict[str, Path]) -> None:
+def record_split(root: Path, name: str, kind: str, old_text: str, new_files: dict[str, Path], drops: list[str]) -> None:
     """Append one record to the manifest. new_files: path in the repo -> file on disk, as written."""
     p = ct.Paths(root)
     path = root / MANIFEST
@@ -127,6 +142,7 @@ def record_split(root: Path, name: str, kind: str, old_text: str, new_files: dic
     records.append({
         "contract": name,
         "kind": kind,
+        "drops": drops,
         "date": datetime.date.today().isoformat(),
         "old": blob_sha(root, old_text),
         "new": {str(f.relative_to(root)): blob_sha(root, f.read_text(encoding="utf-8")) for f in new_files.values()},
@@ -160,7 +176,8 @@ def check_manifest(root: Path) -> tuple[list[str], list[str]]:
         if missing:
             continue
         want = collections.Counter(content_lines(lines_of(old)))
-        want.subtract(collections.Counter(content_lines(dropped_for(rec["kind"], old))))
+        drops = rec.get("drops") or (["impact", "who-builds"] if rec["kind"] == "split" else ["impact"])
+        want.subtract(collections.Counter(content_lines(dropped_for(drops, old))))
         lost = (+want) - new
         for ln, n in lost.items():
             problems.append(f"{name}: a line of the old file was lost in the {rec['kind']} of {rec['date']}: {ln[:90]!r} x{n}")
@@ -274,8 +291,9 @@ class PartBuf:
 
 
 class Plan:
-    def __init__(self, name: str, title: str):
-        self.name, self.title = name, title
+    def __init__(self, name: str, title: str, info, example: str):
+        """info(key) -> (label, when) for a part's title and its `Read when:` line."""
+        self.name, self.title, self.info, self.example = name, title, info, example
         self.parts: dict[str, PartBuf] = {}
         self.extra_scaffold: list[str] = []  # lines added while planning (repeated headings and fences)
         self.scaffold: list[str] = []  # every line the script adds, for the proof
@@ -284,6 +302,9 @@ class Plan:
         self.placements: list[str] = []  # for --detail
         self.hub_purpose = ""
         self.rationale: list[tuple[str, str, str]] = []  # (part, rule, first line) per Rationale entry
+        self.rationale_listed: set[str] = set()  # parts whose Rationale entries the report lists one by one
+        self.notes: list[str] = []  # things the Director decides, shown in the report
+        self.drops = ["impact"]  # the history blocks this split removes
 
     def put(self, key: str, section: str, lines: list[str], name: str | list[str] | None = None, why: str = "") -> None:
         lines = trim(lines)
@@ -301,23 +322,10 @@ class Plan:
         self.dropped.append((label, trim(lines)))
 
     def part_label(self, key: str) -> str:
-        if key in SHARED_LABEL:
-            return SHARED_LABEL[key]
-        d, kind = key.split("/")
-        name = DRIFTERS[d][0]
-        return f"the {name}, {kind}"
+        return self.info(key)[0]
 
     def part_when(self, key: str) -> str:
-        if key in SHARED_WHEN:
-            return SHARED_WHEN[key]
-        d, kind = key.split("/")
-        name, module, _rx = DRIFTERS[d]
-        return {
-            "core": f"you change how the {name} behaves (`{module}.py`).",
-            "view": f"you change how the {name} looks.",
-            "tuning": f"you change the {name}'s tuning file or its checks.",
-            "rationale": f"you ask why the {name} is built the way it is.",
-        }[kind]
+        return self.info(key)[1]
 
     def render_part(self, key: str) -> str:
         buf = self.parts[key]
@@ -343,7 +351,7 @@ class Plan:
         names_part = [
             f"# {self.title}, old names",
             f"Part of: {self.name}",
-            'Read when: a citation names a section of the old single file, such as "Rules, Satellite".',
+            f'Read when: a citation names a section of the old single file, such as "{self.example}".',
             "",
             "## Old names",
             "Code and docs cite sections of the old single file. This table says where each one lives now.",
@@ -517,22 +525,24 @@ def iface_part(path: str) -> str | None:
     return None
 
 
-def plan_interface(plan: Plan, body: list[str]) -> None:
+def plan_interface(plan: Plan, body: list[str], mapper, lead_key: str, special: dict | None = None) -> None:
+    """One Interface block per `### <path>` heading. mapper(path) gives the part key, None when it has no place.
+    special: path -> handler for a block that needs cutting inside its code fence."""
     mask = ct.fenced_mask(body)
     cuts = [i for i, (ln, f) in enumerate(zip(body, mask)) if not f and ln.startswith("### ")]
     if not cuts or cuts[0] > 0:
-        plan.put(BASE_IFACE, "Interface", body[: cuts[0] if cuts else len(body)], "Interface (opening paragraph)")
+        plan.put(lead_key, "Interface", body[: cuts[0] if cuts else len(body)], "Interface (opening paragraph)")
     for n, i in enumerate(cuts):
         block = body[i : cuts[n + 1] if n + 1 < len(cuts) else len(body)]
         path = re.match(r"### (\S+)", block[0]).group(1)
         name = f"Interface, `{path}`"
-        if path == "game/ui/drifters/":
-            iface_chunks(plan, block, name)
+        if special and path in special:
+            special[path](plan, block, name)
             continue
-        key = iface_part(path)
+        key = mapper(path)
         if key is None:
-            plan.unplaced.append(f"Interface block {path}: stays in {BASE_IFACE}")
-            key = BASE_IFACE
+            plan.unplaced.append(f"Interface block {path}: stays in {lead_key}")
+            key = lead_key
         plan.put(key, "Interface", block, name)
 
 
@@ -638,20 +648,161 @@ def plan_rationale(plan: Plan, body: list[str]) -> None:
         plan.put(u.key, "Rationale", u.lines, "Rationale")
 
 
-def plan_drifters(old_text: str) -> tuple[Doc, Plan]:
+def plan_drifters(old_text: str, drop_who: bool = True) -> tuple[Doc, Plan]:
     doc = parse_doc(old_text)
-    plan = Plan("drifters", "Drifters")
+    plan = Plan("drifters", "Drifters", drifter_info, "Rules, Satellite")
+    plan.rationale_listed = {RATIONALE}
+    plan.drops = ["impact", "who-builds"]
     keep, who = cut_who_builds(doc.sections["Purpose"])
     plan.drop('Purpose, "Who builds what" list', who)
     plan.put(BASE, "Purpose", keep, "Purpose (all but its first sentence)")
     plan.hub_purpose = f"{first_sentence(keep)} The contract is split into parts: open only the one you need."
     for u in split_units(doc.sections["Diagram"], diagram_classify):
         plan.put(u.key or BASE, "Diagram", u.lines, f"Diagram, {u.name}" if u.name else "Diagram (opening lines)")
-    plan_interface(plan, doc.sections["Interface"])
+    plan_interface(plan, doc.sections["Interface"], iface_part, BASE_IFACE, {"game/ui/drifters/": iface_chunks})
     plan_presentation(plan, doc.sections["Presentation"])
     plan_rules(plan, doc.sections["Rules"])
     plan.drop("Impact section", ["## Impact"] + doc.sections["Impact"])
     plan_rationale(plan, doc.sections["Rationale"])
+    extra = set(doc.sections) - set(SECTION_ORDER) - {"Impact"}
+    if extra:
+        raise SystemExit(f"sections the plan does not place: {sorted(extra)}")
+    return doc, plan
+
+
+# App: by area. Rules has 12 named blocks and one cumulative "Integration checks" block per feature.
+
+APP_AREAS = {  # part key -> (label, read when)
+    "general": ("overview", "you want the overview of the app, or a rule that fits no area."),
+    "startup": ("startup", "you change startup, the run mode switch, logging or the import boundary."),
+    "error-handling": ("error handling", "you change the error guard or the error screen."),
+    "release": ("release", "you change the launch script, the release package or `pygbag.ini`."),
+    "frame-loop": ("frame loop", "you change the frame loop: ticks, keys, draw order, the catch-up cap."),
+    "tuning-loader": ("tuning loader", "you change how the tuning files are loaded and checked."),
+    "debug-spawns": ("debug spawns", "you change the debug spawn list: its file, checks, rows or timing."),
+    "wave-loading": ("wave loading", "you change how wave files are read and loaded."),
+    "integration-checks/method": ("integration checks, method", "you run any browser check: how the checks are done."),
+}
+APP_FEATURES = {  # what each feature's integration checks cover
+    "DRA-5": "the app base", "DRA-6": "the ship, its view and the debug overlay",
+    "DRA-13": "the scroll, the starfield and the HUD", "DRA-19": "the review follow-ups (no new gameplay)",
+    "DRA-23": "the run: lives, hits and game over", "DRA-29": "the drifter base, the meteorite and the debug spawn list",
+    "DRA-39": "the satellite, the re-hit cooldown and the editable spawn list", "DRA-47": "the chain lightning",
+    "DRA-56": "the fireball", "DRA-61": "the score and the game-over score", "DRA-62": "the coin and its popup",
+    "DRA-76": "waves and the playlist", "DRA-86": "the floating island", "DRA-96": "the planet", "DRA-104": "the UFO",
+}
+APP_RULE_OPENERS = [  # (opener regex, part key; None = integration checks of the feature in the match)
+    (r"Startup\b", "startup"), (r"Import boundary", "startup"), (r"Run mode", "startup"), (r"Logging\b", "startup"),
+    (r"Frame loop", "frame-loop"), (r"Tuning loader", "tuning-loader"), (r"Debug test spawn list", "debug-spawns"),
+    (r"Wave files", "wave-loading"), (r"Error guard", "error-handling"), (r"Launch script", "release"),
+    (r"Release package", "release"), (r"How the browser checks", "integration-checks/method"),
+    (r"Integration checks for (DRA-\d+)", None),
+]
+APP_IFACE = {
+    "game/main.py": "startup", "game/app/mode.py": "startup", "game/app/log.py": "startup", "game/app/settings.py": "startup",
+    "game/app/guard.py": "error-handling", "game/ui/look.py": "error-handling", "game/ui/error_screen.py": "error-handling",
+    "game/app/loop.py": "frame-loop", "game/app/frame.py": "frame-loop", "game/app/tuning.py": "tuning-loader",
+    "game/app/debug_spawns.py": "debug-spawns", "game/app/waves.py": "wave-loading",
+    "pygbag.ini": "release", "game/scripts/start-driftward-ace.sh": "release",
+}
+# Rationale entries by the start of their bold title. Each area's why is its own part.
+APP_RATIONALE = {
+    "integration-checks": (
+        "The UFO checks compare two page loads", "The planet checks use", "The first planet row", "The island checks run",
+        "The first island row", "The DRA-6 and DRA-13 checks are reworded", "The earlier debug checks are reworded",
+        "One example row per variant", "Fireball rows: one meets the ship"),
+    "tuning-loader": (
+        "The UFO's weave checks run in the tuning loader", "The escape check runs in the tuning loader",
+        "The tuning is loaded in the app", "The tuning is loaded in both modes", "`TUNING_DIR` from", "`hazards.json` must exist",
+        "The defaults live in core", "The loader builds the chain's hitbox", "The loader builds the fireball's hitbox"),
+    "debug-spawns": (
+        "The debug list fills the default seed", "`play` lives in the spawn list file", "The debug list counts",
+        "The first test meteorite", "The spawn list is a file", "Rows carry no time", "Every row is spawned once",
+        "Rows out of play", "Normal mode never reads the list", "A spawn row may have no position"),
+    "wave-loading": (
+        "Wave files are read in the app", "The wave folder is listed", "Waves load in both modes", "One seed per page load",
+        "Both sources go through one"),
+    "startup": (
+        "`choose_mode` is pure", "`read_switch` runs before logging", "Heavy imports inside the guard", "`app/settings.py` holds",
+        "The screen size moved to", "`TICK_RATE` stays in", "Browser logs go to", "The PEP 723 block", "Run-mode parsing has no permanent test"),
+    "release": ("The release package is set in", "`?debug=1` and pygbag"),
+    "error-handling": (
+        "The guard imports its error screen late", "The error screen takes", "`ui/look.py` holds", "The guard removes null characters",
+        "Idle after the error", "The error screen is tested headless"),
+    "frame-loop": (
+        "The mode reaches `frame_loop`", "Held keys come from", "Key lines log the ship", "Ship events are logged in core",
+        "F3 lives in the app", "The catch-up cap drops time", "The cap is in `app/settings.py`", "The scroll starts right after the spawn",
+        "Dropped catch-up time", "The HUD is drawn last", "The cap logs only when it starts", "The app holds one `Run`",
+        "The app skips `draw_ship`", "The app passes `run.score`", "The Game Over box is drawn before the HUD"),
+}
+
+
+def bullet_names(lines: list[str]) -> list[str]:
+    """Bold names that open a bullet inside a Rules block ("Tick", "Draw"): other files cite them."""
+    out = []
+    for ln in lines[1:]:
+        m = re.match(r"- \*\*(.+?)\*\*", ln)
+        if m:
+            name = re.split(r"[,(.]", m.group(1))[0].strip(" `")
+            if name and f"Rules, {name}" not in out:
+                out.append(f"Rules, {name}")
+    return out
+
+
+def app_info(key: str) -> tuple[str, str]:
+    if key in APP_AREAS:
+        return APP_AREAS[key]
+    kind, _, name = key.partition("/")
+    if kind == "integration-checks":
+        return f"integration checks, {name}", f"you run or extend the browser checks for {APP_FEATURES[name]} ({name})."
+    label = "integration checks" if name == "integration-checks" else APP_AREAS[name][0]
+    return f"{label}, rationale", f"you ask why the app's {label} works as it does."
+
+
+def app_rules_classify(line: str):
+    for rx, key in APP_RULE_OPENERS:
+        m = re.match(rx, line)
+        if m:
+            return (key or f"integration-checks/{m.group(1)}"), m.group(0)
+    return None
+
+
+def plan_app(old_text: str, drop_who: bool = False) -> tuple[Doc, Plan]:
+    doc = parse_doc(old_text)
+    plan = Plan("app", "App", app_info, "Rules, Frame loop")
+    purpose = doc.sections["Purpose"]
+    keep, who = cut_who_builds(purpose)
+    if drop_who:
+        plan.drop('Purpose, "Who builds what" list', who)
+        plan.drops = ["impact", "who-builds"]
+    else:
+        keep = purpose
+        size = len("\n".join(who).encode())
+        plan.notes.append(f'The Purpose "Who builds what" list ({len(who)} lines, {kb(size)}) is kept in general.md: dropping it was approved only for drifters. Add --drop-who-builds to drop it.')
+    plan.put("general", "Purpose", keep, "Purpose (all but its first sentence)")
+    plan.hub_purpose = f"{first_sentence(purpose)} The contract is split into parts: open only the one you need."
+    plan.put("startup", "Diagram", doc.sections["Diagram"], "Diagram (all of it)")
+    plan_interface(plan, doc.sections["Interface"], lambda path: APP_IFACE.get(path), "general")
+    plan.put("error-handling", "Presentation", doc.sections["Presentation"], "Presentation (all of it)")
+    for u in split_units(doc.sections["Rules"], app_rules_classify):
+        if u.key is None:
+            plan.put("general", "Rules", u.lines, "Rules (opening lines)")
+        else:
+            plan.put(u.key, "Rules", u.lines, [f"Rules, {u.name}"] + ([] if u.key.startswith("integration-checks") else bullet_names(u.lines)))
+    plan.drop("Impact section", ["## Impact"] + doc.sections["Impact"])
+    plan.rationale_listed = {"general"}
+    marked = []
+    for u in split_units(doc.sections["Rationale"], lambda _line: ("", "")):
+        m = re.match(r"- \*\*(.+?)\*\*", u.lines[0])
+        title = m.group(1) if m else u.lines[0]
+        areas = [a for a, prefixes in APP_RATIONALE.items() if title.startswith(prefixes)]
+        key = f"rationale/{areas[0]}" if len(areas) == 1 else "general"
+        rule = "its area" if len(areas) == 1 else ("fits no area" if not areas else "fits several areas")
+        marked.append(Unit(key, "Rationale", u.lines))
+        plan.rationale.append((key, rule, u.lines[0]))
+        plan.placements.append(f"{'Rationale':<12} {title[:50]:<50} -> {key}  [{rule}]")
+    for u in merge_adjacent(marked):
+        plan.put(u.key, "Rationale", u.lines, "Rationale")
     extra = set(doc.sections) - set(SECTION_ORDER) - {"Impact"}
     if extra:
         raise SystemExit(f"sections the plan does not place: {sorted(extra)}")
@@ -734,7 +885,10 @@ def report_split(root: Path, old_text: str, doc: Doc, plan: Plan, files: dict[st
     out += ["", f"Unplaced ({len(plan.unplaced)}):"] + ([f"  {u}" for u in plan.unplaced] or ["  none"])
     by_owner = collections.Counter(k for k, _r, _l in plan.rationale)
     out += ["", f"Rationale: {len(plan.rationale)} entries. Per part: " + ", ".join(f"{k.replace('/rationale', '')} {n}" for k, n in sorted(by_owner.items()))]
-    out += [f"  shared ({by_owner[RATIONALE]}):"] + [f"    {line[:100]}" for k, _r, line in plan.rationale if k == RATIONALE]
+    for listed in sorted(plan.rationale_listed):
+        out += [f"  in {listed} ({by_owner[listed]}):"] + [f"    {line[:100]}" for k, _r, line in plan.rationale if k == listed]
+    for note in plan.notes:
+        out += ["", "For the Director: " + note]
     out += ["", "Lines the script adds (not in the old file):"]
     for ln, n in collections.Counter(plan.scaffold).most_common(14):
         out.append(f"  x{n:<3} {ln[:110]}")
@@ -771,7 +925,7 @@ def write_split(root: Path, name: str, files: dict[str, str], summary: str, old_
     ct.safe_write(p, changelog, changelog.read_text(encoding="utf-8").rstrip("\n") + "\n" + entry + "\n")
     ct.refresh_hubs(p)
     ct.safe_write(p, p.contracts / "INDEX.md", ct.render_index(ct.load_contracts(p)))
-    record_split(root, name, "split", old_text, {rel_path: p.systems / rel_path for rel_path in files})
+    record_split(root, name, "split", old_text, {rel_path: p.systems / rel_path for rel_path in files}, plan.drops)
     disk = {rel_path: (p.systems / rel_path).read_text(encoding="utf-8") for rel_path in files}
     return prove(old_text, plan.dropped, plan.scaffold, {k: v for k, v in disk.items()})
 
@@ -779,7 +933,7 @@ def write_split(root: Path, name: str, files: dict[str, str], summary: str, old_
 # Impact only
 
 
-def plan_drop_impact(text: str) -> tuple[str, list[tuple[str, list[str]]], int]:
+def plan_drop_impact(text: str, drop_who: bool = False) -> tuple[str, list[tuple[str, list[str]]], int]:
     doc = parse_doc(text)
     lines = lines_of(text)
     mask = ct.fenced_mask(lines)
@@ -790,11 +944,17 @@ def plan_drop_impact(text: str) -> tuple[str, list[tuple[str, list[str]]], int]:
             end = marks[n + 1] if n + 1 < len(marks) else len(lines)
             dropped = [("Impact section", lines[i:end])]
             kept = lines[:i] + lines[end:]
-    who = len(cut_who_builds(doc.sections.get("Purpose", []))[1])
-    return "\n".join(kept), dropped, who
+    who_lines = cut_who_builds(doc.sections.get("Purpose", []))[1]
+    if drop_who and who_lines:
+        for i in range(len(kept) - len(who_lines) + 1):
+            if kept[i : i + len(who_lines)] == who_lines:
+                kept = kept[:i] + kept[i + len(who_lines) :]
+                dropped.append(('Purpose, "Who builds what" list', who_lines))
+                break
+    return "\n".join(kept), dropped, len(who_lines)
 
 
-def cmd_drop_impact(root: Path, names: list[str], write: bool) -> int:
+def cmd_drop_impact(root: Path, names: list[str], write: bool, drop_who: bool = False) -> int:
     p = ct.Paths(root)
     status = 0
     for name in names:
@@ -804,11 +964,13 @@ def cmd_drop_impact(root: Path, names: list[str], write: bool) -> int:
             status = 1
             continue
         old = path.read_text(encoding="utf-8")
-        new, dropped, who = plan_drop_impact(old)
+        new, dropped, who = plan_drop_impact(old, drop_who)
         problems = prove(old, dropped, [], {name: new})
         size = sum(len("\n".join(ls).encode()) for _l, ls in dropped)
-        print(f"{name}: Impact {kb(size)} ({sum(len(ls) for _l, ls in dropped)} lines) dropped. {kb(len(old.encode()))} -> {kb(len(new.encode()))}. "
-              f"Proof {'OK' if not problems else 'FAILED'}. Purpose 'Who builds what' list ({who} lines) is not touched.")
+        what = " and ".join(label for label, _l in dropped)
+        print(f"{name}: dropped {what}: {kb(size)} ({sum(len(ls) for _l, ls in dropped)} lines). {kb(len(old.encode()))} -> {kb(len(new.encode()))}. "
+              f"Proof {'OK' if not problems else 'FAILED'}. "
+              + ("" if drop_who else f"The Purpose 'Who builds what' list ({who} lines) is kept."))
         for pr in problems[:10]:
             print(f"  {pr}")
         if problems:
@@ -821,9 +983,10 @@ def cmd_drop_impact(root: Path, names: list[str], write: bool) -> int:
             after = prove(old, dropped, [], {name: path.read_text(encoding="utf-8")})
             print(f"  written. Read back: proof {'OK' if not after else 'FAILED ' + str(after[:3])}")
             changelog = p.contracts / "CHANGELOG.md"
-            entry = f"\n## Contract split: {name} Impact, {datetime.date.today().isoformat()}\n- `systems/{name}.md`: Impact section removed (history is in git), no other change."
+            gone = "Impact section and the Purpose task list" if drop_who else "Impact section"
+            entry = f"\n## Contract split: {name} Impact, {datetime.date.today().isoformat()}\n- `systems/{name}.md`: {gone} removed (history is in git), no other change."
             ct.safe_write(p, changelog, changelog.read_text(encoding="utf-8").rstrip("\n") + "\n" + entry + "\n")
-            record_split(root, name, "impact", old, {name: path})
+            record_split(root, name, "impact", old, {name: path}, ["impact"] + (["who-builds"] if drop_who else []))
     if write and status == 0:
         ct.safe_write(p, p.contracts / "INDEX.md", ct.render_index(ct.load_contracts(p)))
     elif not write:
@@ -834,19 +997,22 @@ def cmd_drop_impact(root: Path, names: list[str], write: bool) -> int:
 # Command line
 
 
-PLANNERS = {"drifters": plan_drifters}
-SUMMARY = {
-    "drifters": "restructured into a hub and parts, no content change. The Impact section and the Purpose task list are removed (history is in git).",
-}
+PLANNERS = {"drifters": plan_drifters, "app": plan_app}
 
 
-def cmd_split(root: Path, target: str, write: bool, detail: bool) -> int:
+def summary_for(plan: Plan) -> str:
+    gone = "The Impact section and the Purpose task list are" if "who-builds" in plan.drops else "The Impact section is"
+    return f"restructured into a hub and parts, no content change. {gone} removed (history is in git)."
+
+
+def cmd_split(root: Path, target: str, write: bool, detail: bool, drop_who: bool) -> int:
     p = ct.Paths(root)
     source = p.systems / f"{target}.md"
     old_text = source.read_text(encoding="utf-8")
-    if (p.systems / target).exists() and not write:
-        print(f"note: systems/{target}/ already exists; the split was done before")
-    doc, plan = PLANNERS[target](old_text)
+    if (p.systems / target).is_dir() or ct.PARTS_BEGIN in old_text:
+        print(f"{target} is already split: systems/{target}/ exists. Nothing to do.")
+        return 0
+    doc, plan = PLANNERS[target](old_text, drop_who)
     files = plan.build(doc)
     problems = prove(old_text, plan.dropped, plan.scaffold, files)
     print(report_split(root, old_text, doc, plan, files, problems, detail))
@@ -855,7 +1021,7 @@ def cmd_split(root: Path, target: str, write: bool, detail: bool) -> int:
     if not write:
         print("\nNothing written. Add --write after the Director approves.")
         return 0
-    after = write_split(root, target, files, SUMMARY[target], old_text, plan)
+    after = write_split(root, target, files, summary_for(plan), old_text, plan)
     print("\nWritten. Read back from disk: proof " + ("OK" if not after else f"FAILED, {len(after)} problem(s): {after[:5]}"))
     return 1 if after else 0
 
@@ -868,14 +1034,16 @@ def main() -> int:
     sp.add_argument("target", choices=sorted(PLANNERS))
     sp.add_argument("--write", action="store_true", help="apply the split. Without it nothing is written")
     sp.add_argument("--detail", action="store_true", help="list every placement")
+    sp.add_argument("--drop-who-builds", action="store_true", help="also drop the Purpose task list (app; drifters always does)")
     di = sub.add_parser("drop-impact", help="remove only the Impact section from contracts that are not split")
     di.add_argument("names", nargs="+", help="contract names, such as run ship scroll")
     di.add_argument("--write", action="store_true", help="apply. Without it nothing is written")
+    di.add_argument("--drop-who-builds", action="store_true", help="also drop the Purpose task list")
     args = ap.parse_args()
     root = args.root.resolve()
     if args.command == "split":
-        return cmd_split(root, args.target, args.write, args.detail)
-    return cmd_drop_impact(root, args.names, args.write)
+        return cmd_split(root, args.target, args.write, args.detail, args.drop_who_builds)
+    return cmd_drop_impact(root, args.names, args.write, args.drop_who_builds)
 
 
 if __name__ == "__main__":
