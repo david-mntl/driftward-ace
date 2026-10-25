@@ -11,13 +11,13 @@ Every drifter in the game, hazards, pickups and blockers, is built on one shared
 <!-- parts:begin -->
 | Part | Holds | Read when | Size |
 |---|---|---|---|
-| [shared/base-interface](drifters/shared/base-interface.md) | Interface | you write or review code in `game/core/drifters/base.py`. | 13.6 KB |
+| [shared/base-interface](drifters/shared/base-interface.md) | Interface | you write or review code in `game/core/drifters/base.py`. | 14.0 KB |
 | [shared/base](drifters/shared/base.md) | Purpose, Diagram, Rules | you change what every drifter shares: phases, warning, hitbox, start, re-hit. | 23.9 KB |
 | [shared/collision](drifters/shared/collision.md) | Interface, Rules | you change hitbox shapes, the overlap test or the push-out. | 12.0 KB |
 | [shared/rationale](drifters/shared/rationale.md) | Rationale | you ask why a shared rule is the way it is. A drifter's own why is in its `rationale` part. | 13.1 KB |
-| [shared/spawner-registry-tuning](drifters/shared/spawner-registry-tuning.md) | Diagram, Interface, Rules | you change levels, the registry, the spawner or the shared tuning, or add a drifter. | 17.8 KB |
+| [shared/spawner-registry-tuning](drifters/shared/spawner-registry-tuning.md) | Diagram, Interface, Rules | you change levels, the registry, the spawner or the shared tuning, or add a drifter. | 18.5 KB |
 | [shared/views](drifters/shared/views.md) | Diagram, Interface, Presentation | you change how drifters are drawn: view registry, brightness, entry warning, shapes. | 16.9 KB |
-| [chain-lightning/core](drifters/chain-lightning/core.md) | Diagram, Interface, Rules | you change how the chain lightning behaves (`chain_lightning.py`). | 17.5 KB |
+| [chain-lightning/core](drifters/chain-lightning/core.md) | Diagram, Interface, Rules | you change how the chain lightning behaves (`chain_lightning.py`). | 17.7 KB |
 | [chain-lightning/rationale](drifters/chain-lightning/rationale.md) | Rationale | you ask why the chain lightning is built the way it is. | 4.1 KB |
 | [chain-lightning/tuning](drifters/chain-lightning/tuning.md) | Rules | you change the chain lightning's tuning file or its checks. | 1.0 KB |
 | [chain-lightning/view](drifters/chain-lightning/view.md) | Interface, Presentation | you change how the chain lightning looks. | 3.5 KB |

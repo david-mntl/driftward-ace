@@ -102,6 +102,9 @@ class ChainLightning(Drifter):
                        invert: bool) -> tuple[float, float]: ...
         # x is required: None raises ValueError("chain_lightning placement needs x"). y None: -height / 2.
     def update(self, ctx: TickContext) -> Self: ...
+    @classmethod
+    def telegraph_ticks(cls, type_extra: DrifterTypeExtra | None) -> int | None: ...
+        # The charge, ticks, from ChainLightningTypeExtra: the telegraph before an arc fires.
     def effect_on_touch(self) -> TouchEffect: ...     # TouchEffect.HIT
     def is_charging(self) -> bool: ...                # ACTIVE and cycle tick < charge_ticks
     def is_firing(self) -> bool: ...                  # ACTIVE and cycle tick >= charge_ticks
