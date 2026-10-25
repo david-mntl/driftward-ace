@@ -8,7 +8,9 @@ only on `close-out --write` and `index`, and only inside docs/contracts/:
 - contract `Status:` and `Version:` lines,
 - task `Status:` lines,
 - an entry appended to docs/contracts/CHANGELOG.md,
-- docs/contracts/INDEX.md (generated, one row per system).
+- docs/contracts/INDEX.md (generated, one row per system),
+- the part table of every split contract's hub, between the `parts:begin` and
+  `parts:end` markers (generated from the parts' `Read when:` lines).
 
 Everything else it prints and never stores.
 
@@ -18,8 +20,8 @@ Usage (the wrappers in scripts/ call this):
   contracts.py close-out              list features ready to close out
   contracts.py close-out DRA-29       show what close-out would do. Writes nothing.
   contracts.py close-out DRA-29 --write --summary "One line." [--accept-open]
-  contracts.py verify                 check headers and task pointers; exit 1 on problems
-  contracts.py index                  rebuild docs/contracts/INDEX.md
+  contracts.py verify                 check headers, task pointers, hubs, parts and that no split lost a line; exit 1 on problems
+  contracts.py index                  rebuild docs/contracts/INDEX.md and the hubs' part tables
 
 Standard library only.
 """
@@ -40,6 +42,14 @@ ASSIGNEES = {"gameplay-implementer", "ui-developer", "art-audio-engineer", "qa-e
 FINDING_ROW = re.compile(r"^\|\s*([A-Z]+-\d+-\d+-F\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*([^|]+?)\s*\|\s*$")
 ID_LIST = re.compile(r"[A-Z]+-\d+-\d+-F\d+")
 DONE_STATUSES = {"fixed", "no action"}
+PARTS_BEGIN = "<!-- parts:begin -->"
+PARTS_END = "<!-- parts:end -->"
+HUB_MAX_BYTES = 6 * 1024
+PART_MAX_BYTES = 25 * 1024
+TICKET_ID = re.compile(r"\b[A-Z]{2,}-\d+\b")
+# Contracts whose Impact section the one-time split has not removed yet. Each leaves this
+# set when it is cleaned. The set goes when it is empty.
+IMPACT_PENDING = {"app", "debug-overlay", "drifters", "hud", "run", "scroll", "ship", "waves", "world"}
 
 
 @dataclass
@@ -252,6 +262,86 @@ def safe_write(p: Paths, path: Path, text: str) -> None:
     resolved.write_text(text, encoding="utf-8")
 
 
+def fenced_mask(lines: list[str]) -> list[bool]:
+    """True for every line inside a code fence, fence lines included."""
+    mask, inside = [], False
+    for line in lines:
+        if line.startswith("```"):
+            mask.append(True)
+            inside = not inside
+        else:
+            mask.append(inside)
+    return mask
+
+
+def top_headings(text: str, level: str = "## ") -> list[str]:
+    """Titles of the headings of one level that are outside code fences."""
+    lines = text.split("\n")
+    return [ln[len(level):].strip() for ln, f in zip(lines, fenced_mask(lines)) if not f and ln.startswith(level)]
+
+
+def part_files(p: Paths, hub_name: str) -> list[Path]:
+    """Every part file of a split contract: systems/<name>/**/*.md, shared first."""
+    folder = p.systems / hub_name
+    if not folder.is_dir():
+        return []
+    return sorted(folder.rglob("*.md"), key=lambda f: (f.relative_to(folder).parts[0] != "shared", str(f)))
+
+
+def read_when(text: str) -> str:
+    for line in text.splitlines()[:6]:
+        if line.startswith("Read when:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def render_parts_table(hub_name: str, items: list[tuple[str, str]]) -> str:
+    """The hub's part table. items: (path under systems/<hub>/, the part's text)."""
+    rows = ["| Part | Holds | Read when | Size |", "|---|---|---|---|"]
+    for rel_path, text in items:
+        holds = ", ".join(top_headings(text))
+        size = f"{len(text.encode('utf-8')) / 1024:.1f} KB"
+        label = rel_path[:-3] if rel_path.endswith(".md") else rel_path
+        when = read_when(text).replace("|", "\\|")
+        rows.append(f"| [{label}]({hub_name}/{rel_path}) | {holds} | {when} | {size} |")
+    return "\n".join(rows)
+
+
+def with_parts_table(hub_text: str, table: str) -> str:
+    start, end = hub_text.find(PARTS_BEGIN), hub_text.find(PARTS_END)
+    if start < 0 or end < start:
+        return hub_text
+    return hub_text[: start + len(PARTS_BEGIN)] + "\n" + table + "\n" + hub_text[end:]
+
+
+def refreshed_hub(p: Paths, hub: Path) -> str:
+    text = hub.read_text(encoding="utf-8")
+    items = [(str(f.relative_to(p.systems / hub.stem)), f.read_text(encoding="utf-8")) for f in part_files(p, hub.stem)]
+    return with_parts_table(text, render_parts_table(hub.stem, items)) if items else text
+
+
+def refresh_hubs(p: Paths) -> list[Path]:
+    """Rewrite each split contract's part table. Returns the hubs that changed."""
+    changed = []
+    for hub in sorted(p.systems.glob("*.md")):
+        text = refreshed_hub(p, hub)
+        if text != hub.read_text(encoding="utf-8"):
+            safe_write(p, hub, text)
+            changed.append(hub)
+    return changed
+
+
+def old_name_rows(text: str) -> list[tuple[list[str], str]]:
+    """Rows of a hub's `## Old names` table: (old names, link target)."""
+    body = section(text, "Old names")
+    rows = []
+    for line in body.splitlines():
+        m = re.match(r"^\|\s*(.+?)\s*\|\s*\[[^\]]*\]\(([^)]+)\)\s*\|\s*$", line)
+        if m and not m[1].startswith(("Old name", "---")):
+            rows.append(([n.strip() for n in m[1].split(";") if n.strip()], m[2]))
+    return rows
+
+
 def set_header(text: str, key: str, value: str) -> str:
     lines = text.split("\n")
     for i, line in enumerate(lines[:HEADER_LINES]):
@@ -364,12 +454,61 @@ def cmd_close_out(p: Paths, feature_id: str | None, write: bool, summary: str | 
         entry.append(f"- Accepted open findings: {', '.join(f.id for f in still_open)}.")
     changelog = p.contracts / "CHANGELOG.md"
     safe_write(p, changelog, changelog.read_text(encoding="utf-8").rstrip("\n") + "\n" + "\n".join(entry) + "\n")
+    refresh_hubs(p)
     safe_write(p, p.contracts / "INDEX.md", render_index(load_contracts(p)))
 
     print(f"\nWritten: {len(drafts)} contracts frozen, {len(open_tasks)} tasks done, CHANGELOG entry, INDEX.md.")
     if keys:
         print(f"Next: set these Linear sub-issues to Done (main session, Linear tools): {', '.join(keys)}")
     return 0
+
+
+def table_without_sizes(text: str) -> str:
+    start, end = text.find(PARTS_BEGIN), text.find(PARTS_END)
+    region = text[start:end] if 0 <= start < end else ""
+    return re.sub(r"\| [\d.]+ KB \|[ \t]*$", "|", region, flags=re.M)
+
+
+def check_split(p: Paths, c: Contract, problems: list[str]) -> None:
+    """A split contract: a hub that links every part, parts in budget, old names that resolve."""
+    parts = part_files(p, c.name)
+    if not parts:
+        return
+    hub_bytes = len(c.text.encode("utf-8"))
+    if hub_bytes > HUB_MAX_BYTES:
+        problems.append(f"{rel(p, c.path)}: the hub is {hub_bytes} bytes, over its {HUB_MAX_BYTES} budget")
+    ids = sorted(set(TICKET_ID.findall(section(c.text, "Purpose"))))
+    if ids:
+        problems.append(f"{rel(p, c.path)}: Purpose names ticket ids ({', '.join(ids)}). A hub's Purpose is the system as it is now")
+    folder = p.systems / c.name
+    texts: dict[str, str] = {}
+    for f in parts:
+        text = f.read_text(encoding="utf-8")
+        name = f.relative_to(folder).as_posix()
+        texts[name] = text
+        if f"({c.name}/{name})" not in c.text:
+            problems.append(f"{rel(p, f)}: not linked from its hub")
+        if len(text.encode("utf-8")) > PART_MAX_BYTES:
+            problems.append(f"{rel(p, f)}: {len(text.encode('utf-8'))} bytes, over the {PART_MAX_BYTES} part budget")
+        if f"Part of: {c.name}" not in text.splitlines()[:4] or not read_when(text):
+            problems.append(f"{rel(p, f)}: must open with a `Part of: {c.name}` line and a `Read when:` line")
+    if table_without_sizes(c.text) != table_without_sizes(refreshed_hub(p, c.path)):
+        problems.append(f"{rel(p, c.path)}: the part table is out of date: run scripts/contracts.sh index")
+    for holder, text in [(c.path, c.text)] + [(f, t) for f, t in ((f, f.read_text(encoding="utf-8")) for f in parts) if "Old names" in top_headings(t)]:
+        for names, target in old_name_rows(text):
+            target_path = (holder.parent / target).resolve()
+            if not target_path.is_file():
+                problems.append(f"{rel(p, holder)}: old-name map points at {target}, which does not exist")
+                continue
+            text = target_path.read_text(encoding="utf-8")
+            for name in names:
+                if ", " not in name:
+                    continue
+                sec, key = name.split(", ", 1)[0], name.rsplit(", ", 1)[-1].strip("` ")
+                body = section(text, sec) or text
+                # a section name opens a line of that section (after a heading, bullet, bold or comment mark)
+                if not re.search(rf"^[#>*\-\s`]*{re.escape(key)}", body, re.M | re.I):
+                    problems.append(f"{rel(p, holder)}: old name {name!r} does not resolve: no line of its {sec} opens with {key!r} in {target}")
 
 
 def cmd_verify(p: Paths) -> int:
@@ -382,6 +521,11 @@ def cmd_verify(p: Paths) -> int:
             problems.append(f"{rel(p, c.path)}: Status is {c.status!r}, not draft or frozen")
         if not c.features:
             problems.append(f"{rel(p, c.path)}: no Features: line")
+        check_split(p, c, problems)
+        if c.name not in IMPACT_PENDING:
+            for f in [c.path, *part_files(p, c.name)]:
+                if any(h.startswith("Impact") for h in top_headings(f.read_text(encoding="utf-8"))):
+                    problems.append(f"{rel(p, f)}: has an Impact section. Impact lives in docs/contracts/<feature-id>/impact.md")
     for feature in load_features(p).values():
         for t in feature.tasks:
             if t.status not in {"open", "done"}:
@@ -397,6 +541,7 @@ def cmd_verify(p: Paths) -> int:
                     problems.append(f"{rel(p, t.path)}: Contract {c} does not exist")
                 else:
                     texts.append(target.read_text(encoding="utf-8").lower())
+                    texts += [f.read_text(encoding="utf-8").lower() for f in part_files(p, target.stem)]
             for line in section(t.text, "Read in the contract").splitlines():
                 names = line.lstrip("- ").split(":", 1)[-1]
                 for name in (n.strip(" `.") for n in names.split(",")):
@@ -405,13 +550,19 @@ def cmd_verify(p: Paths) -> int:
     index = p.contracts / "INDEX.md"
     if not index.exists() or index.read_text(encoding="utf-8") != render_index(contracts):
         problems.append("docs/contracts/INDEX.md is missing or out of date: run scripts/contracts.sh index")
-    for line in problems:
+    from split_contract import check_manifest  # the proof that a split lost no line, read from git
+
+    proof_problems, proof_info = check_manifest(p.root)
+    problems += proof_problems
+    for line in proof_info + problems:
         print(line)
     print("verify: ok" if not problems else f"verify: {len(problems)} problem(s)")
     return 1 if problems else 0
 
 
 def cmd_index(p: Paths) -> int:
+    for hub in refresh_hubs(p):
+        print(f"Written: {rel(p, hub)} (part table)")
     safe_write(p, p.contracts / "INDEX.md", render_index(load_contracts(p)))
     print("Written: docs/contracts/INDEX.md")
     return 0
@@ -427,8 +578,8 @@ def main() -> int:
     co.add_argument("--write", action="store_true", help="write the close-out. Without it, nothing is written")
     co.add_argument("--summary", help="one line on what changed, for the CHANGELOG")
     co.add_argument("--accept-open", action="store_true", help="the Director accepted the open findings and observations")
-    sub.add_parser("verify", help="check headers, task pointers and INDEX.md")
-    sub.add_parser("index", help="rebuild docs/contracts/INDEX.md")
+    sub.add_parser("verify", help="check headers, task pointers, INDEX.md, hubs and parts")
+    sub.add_parser("index", help="rebuild docs/contracts/INDEX.md and the hubs' part tables")
     args = ap.parse_args()
 
     p = Paths(args.root.resolve())
