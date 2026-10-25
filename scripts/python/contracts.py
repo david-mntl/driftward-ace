@@ -10,7 +10,9 @@ only on `close-out --write` and `index`, and only inside docs/contracts/:
 - an entry appended to docs/contracts/CHANGELOG.md,
 - docs/contracts/INDEX.md (generated, one row per system),
 - the part table of every split contract's hub, between the `parts:begin` and
-  `parts:end` markers (generated from the parts' `Read when:` lines).
+  `parts:end` markers (generated from the parts' `Read when:` lines),
+- on `close-out --interfaces --write` only: the Interface blocks (`### game/...py`) of the
+  contracts it freezes, replaced by an outline generated from the module with `ast`.
 
 Everything else it prints and never stores.
 
@@ -20,6 +22,8 @@ Usage (the wrappers in scripts/ call this):
   contracts.py close-out              list features ready to close out
   contracts.py close-out DRA-29       show what close-out would do. Writes nothing.
   contracts.py close-out DRA-29 --write --summary "One line." [--accept-open]
+  contracts.py close-out DRA-29 --interfaces    also list the Interface blocks it would regenerate (off by default)
+  contracts.py interface game/core/drifters/satellite.py   sample: the current block next to the generated one. Writes nothing.
   contracts.py verify                 check headers, task pointers, hubs, parts and that no split lost a line; exit 1 on problems
   contracts.py index                  rebuild docs/contracts/INDEX.md and the hubs' part tables
 
@@ -29,6 +33,7 @@ Standard library only.
 from __future__ import annotations
 
 import argparse
+import ast
 import datetime
 import re
 import sys
@@ -358,6 +363,172 @@ def rel(p: Paths, path: Path) -> str:
 # Commands
 
 
+# Interface blocks generated from the code (optional, off by default)
+
+
+def _fmt_args(a: ast.arguments) -> str:
+    """The parameter list with types, defaults shown as `...` (a default is a value)."""
+    def one(arg: ast.arg, default) -> str:
+        text = arg.arg + (f": {ast.unparse(arg.annotation)}" if arg.annotation else "")
+        if default is not None:
+            text += " = ..." if arg.annotation else "=..."
+        return text
+
+    positional = [*a.posonlyargs, *a.args]
+    defaults = [None] * (len(positional) - len(a.defaults)) + list(a.defaults)
+    parts = []
+    for i, (arg, default) in enumerate(zip(positional, defaults)):
+        parts.append(one(arg, default))
+        if a.posonlyargs and i == len(a.posonlyargs) - 1:
+            parts.append("/")
+    if a.vararg:
+        parts.append("*" + one(a.vararg, None))
+    elif a.kwonlyargs:
+        parts.append("*")
+    parts += [one(arg, default) for arg, default in zip(a.kwonlyargs, a.kw_defaults)]
+    if a.kwarg:
+        parts.append("**" + one(a.kwarg, None))
+    return ", ".join(parts)
+
+
+def _doc_lines(text: str | None, indent: str) -> list[str]:
+    if not text:
+        return []
+    lines = text.split("\n")
+    if len(lines) == 1:
+        return [f'{indent}"""{lines[0]}"""']
+    return [f'{indent}"""{lines[0]}', *[f"{indent}{ln}" if ln else "" for ln in lines[1:]], f'{indent}"""']
+
+
+def _func_lines(node, indent: str) -> list[str]:
+    ret = f" -> {ast.unparse(node.returns)}" if node.returns else ""
+    kind = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
+    out = [f"{indent}@{ast.unparse(d)}" for d in node.decorator_list]
+    doc = _doc_lines(ast.get_docstring(node), indent + "    ")
+    out.append(f"{indent}{kind} {node.name}({_fmt_args(node.args)}){ret}:" + ("" if doc else " ..."))
+    return out + doc
+
+
+def _is_doc(stmt) -> bool:
+    return isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str)
+
+
+def _class_lines(cls: ast.ClassDef) -> list[str]:
+    out = [f"@{ast.unparse(d)}" for d in cls.decorator_list]
+    bases = ", ".join(ast.unparse(b) for b in [*cls.bases, *cls.keywords])
+    out.append(f"class {cls.name}{f'({bases})' if bases else ''}:")
+    body = cls.body[1:] if cls.body and _is_doc(cls.body[0]) else cls.body
+    out += _doc_lines(ast.get_docstring(cls), "    ")
+    for i, stmt in enumerate(body):
+        if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and not stmt.target.id.startswith("_"):
+            out += ["", f"    {stmt.target.id}: {ast.unparse(stmt.annotation)}"]
+            if i + 1 < len(body) and _is_doc(body[i + 1]):
+                out += _doc_lines(body[i + 1].value.value.strip(), "    ")
+        elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) and not stmt.name.startswith("_"):
+            out += [""] + _func_lines(stmt, "    ")
+    return out
+
+
+def _constant_line(stmt) -> str | None:
+    """`NAME: type` for a module constant. The value is never shown."""
+    if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and stmt.target.id.isupper():
+        return f"{stmt.target.id}: {ast.unparse(stmt.annotation)}"
+    if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name) and stmt.targets[0].id.isupper():
+        kind = type(stmt.value.value).__name__ if isinstance(stmt.value, ast.Constant) else type(stmt.value).__name__.lower()
+        return f"{stmt.targets[0].id}: {kind}"
+    return None
+
+
+def module_interface(root: Path, rel_path: str) -> str:
+    """The Interface block of one module, generated with `ast`: a pointer, the Source: line from the
+    module docstring, class and function signatures with their docstrings, field types, and the
+    constants by name and type (never value)."""
+    tree = ast.parse((root / rel_path).read_text(encoding="utf-8"))
+    doc = ast.get_docstring(tree) or ""
+    summary = doc.split("\n", 1)[0].strip()
+    source = next((ln.strip() for ln in doc.split("\n") if ln.startswith("Source:")), "")
+    stdlib, project = set(), set()
+    for stmt in tree.body:
+        names = [a.name for a in stmt.names] if isinstance(stmt, ast.Import) else ([stmt.module or ""] if isinstance(stmt, ast.ImportFrom) and not stmt.level else [])
+        for name in names:
+            if name and name != "__future__":
+                (stdlib if name.split(".")[0] in sys.stdlib_module_names else project).add(name)
+    imports = ", ".join([f"stdlib ({', '.join(sorted(stdlib))})"] * bool(stdlib) + sorted(project))
+    code = [f"# Imports: {imports}."] if imports else []
+    for stmt in tree.body:
+        if (const := _constant_line(stmt)):
+            code.append(const)
+        elif isinstance(stmt, ast.ClassDef) and not stmt.name.startswith("_"):
+            code += ["", *_class_lines(stmt)]
+        elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) and not stmt.name.startswith("_"):
+            code += ["", *_func_lines(stmt, "")]
+    head = [f"### {rel_path}", "Generated from the module at close-out. The code is the source of truth."]
+    head += [summary] if summary else []
+    head += [source] if source else []
+    return "\n".join([*head, "```python", *code, "```"]).replace("\n\n\n", "\n\n")
+
+
+def interface_blocks(text: str) -> dict[str, tuple[int, int]]:
+    """`### <path>` blocks of a contract text: path -> (first line, line after the last). Fence-aware."""
+    lines = text.split("\n")
+    mask = fenced_mask(lines)
+    heads = [i for i, (ln, f) in enumerate(zip(lines, mask)) if not f and (ln.startswith("### ") or ln.startswith("## "))]
+    out = {}
+    for n, i in enumerate(heads):
+        m = re.match(r"### (\S+)", lines[i])
+        if m:
+            end = heads[n + 1] if n + 1 < len(heads) else len(lines)
+            while end > i and not lines[end - 1].strip():
+                end -= 1
+            out[m.group(1)] = (i, end)
+    return out
+
+
+def regenerate_interfaces(root: Path, text: str) -> tuple[str, list[tuple[str, int, int]]]:
+    """Replace every `### game/...py` block whose module exists. Returns the new text and (path, old lines, new lines)."""
+    lines = text.split("\n")
+    changes = []
+    for path, (start, end) in sorted(interface_blocks(text).items(), key=lambda kv: -kv[1][0]):
+        if path.endswith(".py") and (root / path).is_file():
+            new = module_interface(root, path).split("\n")
+            changes.append((path, end - start, len(new)))
+            lines[start:end] = new
+    return "\n".join(lines), list(reversed(changes))
+
+
+def contract_files(p: Paths, contract: Contract) -> list[Path]:
+    return [contract.path, *part_files(p, contract.name)]
+
+
+def cmd_interface(p: Paths, module: str) -> int:
+    """A sample, writes nothing: the block now in the contracts next to the one that would replace it."""
+    found = []
+    for path in sorted(p.systems.rglob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        block = interface_blocks(text).get(module)
+        if block:
+            found.append((path, "\n".join(text.split("\n")[block[0] : block[1]])))
+    if not (p.root / module).is_file():
+        print(f"{module}: no such module")
+        return 1
+    new = module_interface(p.root, module)
+    for path, current in found:
+        print(f"=== CURRENT: {rel(p, path)}: {len(current.splitlines())} lines, {len(current.encode()) / 1024:.1f} KB\n{current}\n")
+    print(f"=== GENERATED: {len(new.splitlines())} lines, {len(new.encode()) / 1024:.1f} KB\n{new}\n")
+    if found:
+        cur = found[0][1].split("\n")
+        mask = fenced_mask(cur)
+        notes = [ln.strip() for ln, f in zip(cur, mask) if (ln.strip().startswith("#") and f and not ln.startswith("###")) or (not f and ln.strip())]
+        notes = [n for n in notes if not n.startswith("### ")]
+        lost = [n for n in notes if n.lstrip("# ").strip() not in new]
+        print(f"=== Comments and prose in the contract block that the generated block does not repeat word for word: {len(lost)} of {len(notes)}")
+        for n in lost[:40]:
+            print("  " + n[:160])
+        print("(Also not carried over by design: field defaults and ClassVar values, shown as types only.)")
+    print("\nNothing written.")
+    return 0
+
+
 def cmd_overview(p: Paths, brief: bool) -> int:
     contracts = load_contracts(p)
     features = load_features(p)
@@ -384,7 +555,7 @@ def cmd_overview(p: Paths, brief: bool) -> int:
     return 0
 
 
-def cmd_close_out(p: Paths, feature_id: str | None, write: bool, summary: str | None, accept_open: bool) -> int:
+def cmd_close_out(p: Paths, feature_id: str | None, write: bool, summary: str | None, accept_open: bool, interfaces: bool = False) -> int:
     contracts = load_contracts(p)
     features = load_features(p)
     if not feature_id:
@@ -410,9 +581,20 @@ def cmd_close_out(p: Paths, feature_id: str | None, write: bool, summary: str | 
     notes = observations(feature)
     keys = [t.linear for t in feature.tasks if t.linear]
 
+    iface_plan: list[tuple[Path, str, list[tuple[str, int, int]]]] = []
+    if interfaces:  # off by default: only when the Director asks for it
+        for c in drafts:
+            for f in contract_files(p, c):
+                new_text, changes = regenerate_interfaces(p.root, f.read_text(encoding="utf-8"))
+                if changes:
+                    iface_plan.append((f, new_text, changes))
+
     print(f"Close-out {feature_id}")
     for c in drafts:
         print(f"  Freeze:   systems/{c.path.name} {c.version} -> {(c.version or 0) + 1}")
+    for f, _text, changes in iface_plan:
+        for path, old_n, new_n in changes:
+            print(f"  Interface: {rel(p, f)}: {path} regenerated from the code, {old_n} -> {new_n} lines")
     for name in sorted(pointed - {c.path.name for c in drafts}):
         print(f"  Note:     a task points at {name}, which is not a draft contract of {feature_id}")
     print(f"  Tasks to done: {len(open_tasks)}")
@@ -440,8 +622,12 @@ def cmd_close_out(p: Paths, feature_id: str | None, write: bool, summary: str | 
         print("refused: open findings or observations are listed above. Decide them, then add --accept-open.")
         return 1
 
+    for f, new_text, _changes in iface_plan:
+        if f not in {c.path for c in drafts}:
+            safe_write(p, f, new_text)
     for c in drafts:
-        text = set_header(c.text, "Status", "frozen")
+        base = next((new_text for f, new_text, _c in iface_plan if f == c.path), c.text)
+        text = set_header(base, "Status", "frozen")
         text = set_header(text, "Version", str((c.version or 0) + 1))
         safe_write(p, c.path, text)
     for t in open_tasks:
@@ -578,13 +764,18 @@ def main() -> int:
     co.add_argument("--write", action="store_true", help="write the close-out. Without it, nothing is written")
     co.add_argument("--summary", help="one line on what changed, for the CHANGELOG")
     co.add_argument("--accept-open", action="store_true", help="the Director accepted the open findings and observations")
+    co.add_argument("--interfaces", action="store_true", help="also regenerate the Interface blocks of the frozen contracts from the code (off by default)")
+    ifc = sub.add_parser("interface", help="sample: a module's current Interface block next to the generated one. Writes nothing")
+    ifc.add_argument("module", help="e.g. game/core/drifters/satellite.py")
     sub.add_parser("verify", help="check headers, task pointers, INDEX.md, hubs and parts")
     sub.add_parser("index", help="rebuild docs/contracts/INDEX.md and the hubs' part tables")
     args = ap.parse_args()
 
     p = Paths(args.root.resolve())
     if args.command == "close-out":
-        return cmd_close_out(p, args.feature_id, args.write, args.summary, args.accept_open)
+        return cmd_close_out(p, args.feature_id, args.write, args.summary, args.accept_open, args.interfaces)
+    if args.command == "interface":
+        return cmd_interface(p, args.module)
     if args.command == "verify":
         return cmd_verify(p)
     if args.command == "index":
