@@ -1,0 +1,7 @@
+# Drifters, the coin, tuning
+Part of: drifters
+Read when: you change the coin's tuning file or its checks.
+
+## Rules
+
+- **The coin's file** (DRA-62). Its own type values (`crystal_width`, `crystal_height`, `body_height`, `ring_width`, `ring_height`, `glint_size`, `glint_left`, `glint_top`, `popup_ticks`, `popup_rise_per_tick`) sit next to `default_variant` and `variants`, and each variant gives `points` and `glint` only. It has no `speed_ratio` and no `entry_warning_ticks`: a parked pickup has neither. `app.tuning` builds from it: per variant, `VariantTuning(width=crystal_width, height=crystal_height, hitbox=coin_hitbox(crystal_width, body_height), extra=CoinVariantExtra(points=..., glint=...))`; for the type, `DrifterTypeTuning(..., speed_ratio=0.0, entry_warning_ticks=0, extra=CoinTypeExtra(...))`, the two zeros never read as tuning (Spawner, step 4; Coin, Born). The file's values: `default_variant` common; `common` 50 and no glint, `rare` 100 with the glint; `crystal_width` 12; `crystal_height` 20; `body_height` 10; `ring_width` 22; `ring_height` 8; `glint_size` 2; `glint_left` 3; `glint_top` 3; `popup_ticks` 60; `popup_rise_per_tick` 0.5. Every size, point value and timing the coin uses is in this file; none is in code. Only the look's colors, the 1 px line width of the rim and the ring, and the popup's font stay in the views (Rationale). Source: drifters/04-coin.md, Values; scope report DRA-62, Limits ("Every value in the tuning file, never hard-coded").
