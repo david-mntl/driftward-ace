@@ -55,7 +55,7 @@ None open.
 | UI-01 | HUD font, size, colors, margins and max score digits. | 10-ui.md | HUD | open |
 | UI-02 | Lives as icons or a number? | 10-ui.md | HUD | open |
 | UI-03 | Instructions page: exact text, the icon for each section, font and layout. Content is set in 10-ui.md. | 10-ui.md | Instructions | open |
-| UI-04 | Look of the menu, leaderboard, pause box, name entry and game-over screen: font, layout, colors. Content is set in 10-ui.md. | 10-ui.md | Screens look | open |
+| UI-04 | Look of the menu, leaderboard, pause box and game-over screen, letter picker included: font, layout, colors. Content is set in 10-ui.md. | 10-ui.md | Screens look | open |
 
 ## Save data
 None open.
