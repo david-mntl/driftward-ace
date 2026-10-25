@@ -247,6 +247,32 @@ def load_tuning() -> DrifterTuning:
 ```
 Not a startup module: it imports `core.drifters`, so only `app.frame` imports it, inside the guard.
 
+### game/app/drifters/registry.py (Integration Engineer)
+```python
+type TuningLoader = Callable[[str, object], DrifterTypeTuning]  # (file name, parsed JSON)
+def register_tuning(drifter_type: DrifterType) -> Callable[[TuningLoader], TuningLoader]: ...
+    # Function decorator. ValueError when the type already has a loader.
+def tuning_loader(drifter_type: DrifterType) -> TuningLoader | None: ...
+    # None: the drifter's file follows drifter-tuning.schema.json.
+```
+
+### game/app/drifters/checks.py (Integration Engineer)
+```python
+type OwnFields = tuple[frozenset[str], ExtraBuilder]  # a drifter's own variant fields and their checker
+def load_generic(name: str, data: object, own: OwnFields | None = None) -> DrifterTypeTuning: ...
+    # The shared schema. `own`: the drifter's own variant fields, when its schema adds some.
+# Also the shared field checks every drifter module builds on (check_fields, check_number,
+# check_positive, check_integer, check_boolean, check_variant_name, check_warning_ticks,
+# check_shape, check_inside, check_even_size, is_number), each raising ValueError that names
+# the file and the field.
+```
+
+### game/app/drifters/<drifter>_tuning.py (Integration Engineer)
+A drifter whose file has a schema of its own has one module here that registers its loader with
+`@register_tuning(DrifterType.<MEMBER>)` and holds that drifter's field sets and checks. It is
+imported once in `game/app/drifters/__init__.py`. Today: `satellite`, `chain_lightning`,
+`fireball`, `coin`, `floating_island`, `planet`, `ufo`. The meteorite has none.
+
 ### game/app/debug_spawns.py (Integration Engineer, DRA-29; editable list DRA-39)
 The debug test spawn list, a file the Director edits by hand: `game/tuning/debug_spawns.json`, to `docs/contracts/schemas/debug-spawn-list.schema.json`. A temporary stand-in kept in the scope reports, not in the GDD. Debug mode only.
 ```python
@@ -566,6 +592,7 @@ Tuning loader (`app/tuning.py`, DRA-29). Source: scope report DRA-29, Limits; ga
 - **The UFO's file** (DRA-104), `drifters/ufo.json`, checked against `ufo-tuning.schema.json` instead of `drifter-tuning.schema.json`. Every field is required: the shared `default_variant`, `variants`, `speed_ratio` and `entry_warning_ticks`, checked as for every drifter file, plus `weave_change_ticks_min` and `weave_change_ticks_max`, each an `int` ≥ 1; `weave_step_min`, `weave_step_max`, `weave_speed_max` and `weave_turn`, each a number > 0; `band_top`, a number ≥ 0; `band_bottom`, a number > 0; every `int` never a `bool`. Each variant has exactly `disc_width`, `disc_height` and `dome_radius`, each an `int` ≥ 1 (no `width`, `height` or `hitbox`). Then the rules the schema can't express: `default_variant` is a variant name; every variant passes `core.drifters.ufo.check_ufo_variant`, and the type values pass `check_ufo_weave` (`systems/drifters.md`, Rules, UFO, Tuning checks); when either raises, the loader raises `ValueError` with the file, the place and the core message, `from` the core error: `<file>: variants.<variant name>: <core message>` for a variant, `<file>: <core message>` for the type. Errors name the field the same way, e.g. `tuning/drifters/ufo.json: weave_turn must be a number > 0`, `tuning/drifters/ufo.json: variants.standard.dome_radius must be an integer >= 1`, `tuning/drifters/ufo.json: the band must be at least 2 × weave_step_min tall (30 < 80)`. Source: `docs/contracts/systems/drifters.md`, Rules, UFO and Tuning files; scope report DRA-104, Limits ("Every value in a tuning file").
 - **What the loader builds for the UFO** (DRA-104): for each variant, `VariantTuning(width=float(disc_width), height=float(disc_height), hitbox=ufo_hitbox(float(disc_width), float(disc_height), float(dome_radius)), extra=None)`; for the type, `DrifterTypeTuning(variants=..., default_variant=..., speed_ratio=..., entry_warning_ticks=..., extra=UfoTypeExtra(weave_change_ticks_min=..., weave_change_ticks_max=..., weave_step_min=float(...), weave_step_max=float(...), weave_speed_max=float(...), weave_turn=float(...), band_top=float(...), band_bottom=float(...)))`. All from `core.drifters.ufo`, so the hitbox and the checks have one home. The footprint check of the plain files is not run on these shapes: the dome lies above the disc's footprint by design (drifters/07-ufo.md, size and hitbox), and rule 8 is kept because the UFO's look is exactly those two shapes. Source: `docs/contracts/systems/drifters.md`, Rules, Tuning files.
 - **A drifter's own fields** (DRA-39). A drifter type with its own schema is checked against it instead of `drifter-tuning.schema.json`. The satellite: every variant also requires `angle_degrees`, a number ≥ 0 and < 90, and its `hitbox` is exactly two boxes. The loader builds `SatelliteVariantExtra(angle_degrees=...)` (`core.drifters.satellite`) into each `VariantTuning.extra`. The meteorite's variants have no `extra` (None). Error messages name the field the same way, e.g. `tuning/drifters/satellite.json: variants.angled.angle_degrees must be a number >= 0 and < 90`.
+- **Loaders are registered by type.** `load_tuning` reads one file per `DrifterType` and asks `app.drifters.registry.tuning_loader` for that type's loader. A drifter whose file has a schema of its own registers its loader in its own module, `game/app/drifters/<drifter>_tuning.py`, imported once in `game/app/drifters/__init__.py`. Any other drifter's file is checked by `load_generic` against `drifter-tuning.schema.json`. A drifter's own variant fields (the satellite's angle) go to `load_generic` as `own`. `app.tuning` names no `DrifterType` member. Source: `game/CONTEXT.md`, Error handling; the code, `app/drifters/`. The guard is `game/tests/core/test_drifter_registration.py`: it fails when a file outside a drifter's own modules names its member.
 - Two rules the schema can't express, also checked: `default_variant` is one of the variant names; and every hitbox shape lies inside its variant's `width × height` footprint, centered on the drifter (circle: `|cx| + r <= width / 2` and `|cy| + r <= height / 2`; box: `|cx| + w / 2 <= width / 2` and `|cy| + h / 2 <= height / 2`). Source: 07-drifters.md, rule 8 (a hitbox is never bigger than what the player sees).
 - On any problem: raise `ValueError` with the file and the field, the file named from the tuning folder down, e.g. `tuning/drifters/meteorite.json: variants.small.hitbox[0].r must be a number > 0`. Invalid JSON: `ValueError("tuning/playtest.json: not valid JSON: <decoder message>")`, raised `from` the decode error. A missing file: the `FileNotFoundError` rises as it is (it names the path). Never fall back to a default for a missing file. The guard shows the error screen.
 - Builds `DrifterTuning(drifters={...}, switches=PlaytestSwitches(...), hazards=HazardRules(...))` with plain dicts, `Circle` and `Box` from `core.collision`. Core trusts these values.
