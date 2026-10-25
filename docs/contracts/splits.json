@@ -90,5 +90,18 @@
       "docs/contracts/systems/app/old-names.md": "340a606e795055710543c31b9c90756cac31f415",
       "docs/contracts/systems/app.md": "8b0b9c0481bbee416aa71bf7849598ea150e9f90"
     }
+  },
+  {
+    "contract": "run",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "46f99856e863022c6e01cd42c084b9631df4afb7",
+    "new": {
+      "docs/contracts/systems/run.md": "76a0407c8c7e6d7e1c353cd4cd7549967ea831c6"
+    }
   }
 ]

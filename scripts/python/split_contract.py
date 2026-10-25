@@ -957,6 +957,8 @@ def plan_drop_impact(text: str, drop_who: bool = False) -> tuple[str, list[tuple
 def cmd_drop_impact(root: Path, names: list[str], write: bool, drop_who: bool = False) -> int:
     p = ct.Paths(root)
     status = 0
+    if write and (dirty := is_dirty(root, ["docs/contracts"])):  # once: each write dirties the shared files
+        raise SystemExit("refused: docs/contracts has uncommitted changes, so git would not hold the old files:\n  " + "\n  ".join(dirty[:8]))
     for name in names:
         path = p.systems / f"{name}.md"
         if not path.is_file():
@@ -977,8 +979,6 @@ def cmd_drop_impact(root: Path, names: list[str], write: bool, drop_who: bool = 
             status = 1
             continue
         if write:
-            if is_dirty(root, [f"docs/contracts/systems/{name}.md", "docs/contracts/CHANGELOG.md", "docs/contracts/INDEX.md", MANIFEST]):
-                raise SystemExit(f"refused: {name}.md or the changelog has uncommitted changes")
             ct.safe_write(p, path, new)
             after = prove(old, dropped, [], {name: path.read_text(encoding="utf-8")})
             print(f"  written. Read back: proof {'OK' if not after else 'FAILED ' + str(after[:3])}")

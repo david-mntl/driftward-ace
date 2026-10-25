@@ -157,3 +157,6 @@
 
 ## Contract split: app, 2026-10-25
 - `systems/app.md`: restructured into a hub and parts, no content change. The Impact section and the Purpose task list are removed (history is in git).
+
+## Contract split: run Impact, 2026-10-25
+- `systems/run.md`: Impact section and the Purpose task list removed (history is in git), no other change.
