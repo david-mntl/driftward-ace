@@ -1,7 +1,7 @@
 {
   "play": "list",
-  "mode": "ufo",
-  "loop_ticks": 800,
+  "mode": "electric_ball",
+  "loop_ticks": 200,
   "rows": [
     {
       "type": "meteorite",
@@ -203,6 +203,27 @@
       "type": "ufo",
       "y": 400,
       "seed": 2
+    },
+    {
+      "type": "electric_ball",
+      "x": 320,
+      "speed": 1
+    },
+    {
+      "type": "electric_ball",
+      "x": 60
+    },
+    {
+      "type": "electric_ball",
+      "x": 580
+    },
+    {
+      "type": "electric_ball",
+      "x": 140
+    },
+    {
+      "type": "electric_ball",
+      "x": 180
     }
   ]
 }
