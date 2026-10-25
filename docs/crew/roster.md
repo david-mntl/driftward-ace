@@ -89,4 +89,5 @@ Diamonds block work until they pass. Pink nodes are critics.
 - No two agents write the same path. Any agent may read anything.
 - Only the Director edits `docs/design/` and `docs/crew/`.
 - The Architect writes contract content. The close-out script (`scripts/close-out.sh`, which runs `scripts/python/contracts.py`) may change only contract `Status:` and `Version:` lines and task `Status:` lines, and append to `docs/contracts/CHANGELOG.md`.
+- The one-time split script (`scripts/split-contract.sh`) may also cut a contract into part files and remove its history blocks (Impact tables, the Purpose task list), changing no other word. The Director and the main session run it. No agent runs it. `scripts/contracts.sh verify` proves no line was lost.
 - `scripts/` belongs to the Director and the main session. No agent writes there.
