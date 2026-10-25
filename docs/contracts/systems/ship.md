@@ -15,15 +15,6 @@ Floating islands are ground. The run hands the step every island as one `Ground`
 
 Planets pull. The run hands the step every planet's field as a `GravityWell`. Right after gravity the step adds each field's pull to the ship's speed: toward the planet's center, 0 at the field's edge, rising in a straight line to `pull_max` at the planet's surface, never more. Fields add up. The pull is an acceleration like thrust and gravity, so it bends the drift and never sets a speed. `check_escapable_pull` refuses a pull the ship's thrust can't beat; the app calls it when it loads a planet's tuning.
 
-Who builds what:
-- `game/core/ship.py`: the Gameplay Implementer, task `DRA-6-01-gameplay-implementer`. Field docs, `Final` and `slots` in DRA-19: task `DRA-19-01-gameplay-implementer`. The step without the respawn, and `is_below_floor`, in DRA-23: task `DRA-23-01-gameplay-implementer`. The hitbox and `TOP_SIDE_SPEED` in DRA-29: task `DRA-29-01-gameplay-implementer`.
-- `game/ui/ship_view.py`: the UI Developer, task `DRA-6-02-ui-developer`. The inverted T in DRA-29: task `DRA-29-04-ui-developer`, with the shared shape helper `game/ui/shapes.py`.
-- `game/tests/core/test_ship.py`: the QA Engineer, task `DRA-6-03-qa-engineer`. Updated for DRA-23: task `DRA-23-04-qa-engineer`. The hitbox in DRA-29: task `DRA-29-07-qa-engineer`. The inverted T drawn: `game/tests/ui/test_ship_view.py`, task `DRA-29-09-qa-engineer`.
-- `Ground`, `NO_GROUND`, `Ship.against_island`, the islands in `step`, `block_ship`, `spawn_clear` and the `island contact` log line, in DRA-86: task `DRA-86-03-gameplay-implementer`. They measure with `core.collision`'s push-out (`docs/contracts/systems/drifters.md`, task `DRA-86-01-gameplay-implementer`). Tests: `game/tests/core/test_ship_islands.py`, task `DRA-86-08-qa-engineer`.
-- `GravityWell`, `NO_WELLS`, `well_pull`, the pull in `step` and `check_escapable_pull`: task `DRA-96-01-gameplay-implementer`. Tests: `game/tests/core/test_ship_pull.py`, task `DRA-96-05-qa-engineer`.
-- Calling `check_escapable_pull` for every planet variant's `pull_max` when the planet's tuning file loads: the Integration Engineer, in `game/app/tuning.py`, from `docs/contracts/systems/app.md`.
-- Calling `spawn`, `spawn_clear`, `step`, `block_ship`, `is_below_floor` and `ship_hitbox`, building the ground from the islands and the wells from the planets: `core.run`, from `docs/contracts/systems/run.md`. Building `Thrust` from the keys, and calling `draw_ship` only while `run.ship_visible`: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
-
 ## Diagram
 ```mermaid
 flowchart TD
@@ -348,50 +339,6 @@ Logging (logger `core.ship`, DEBUG, by event, never by tick). Source: game/CONTE
 - `island contact x=%.2f y=%.2f` (DRA-86): logged by `block_ship` when the ship it returns has `against_island` True and the ship it got had it False. Standing, riding or being carried logs once, when the contact starts; a ship that lifts off and lands again logs again. In `step` it comes between `wall hit` and `top line stop`. A ship in the respawn wait logs it through the run's call too.
 - Values are the new position after the clamp or the push. Nothing else is logged. `ship_hitbox` and `spawn_clear` log nothing. Hits are logged by `core.run`.
 - The planet pull logs nothing (DRA-96): entering or leaving a field is not logged, and neither `well_pull` nor `check_escapable_pull` logs. A refused pull is reported by the error it raises.
-
-## Impact
-DRA-96 changes this frozen contract (v6). New: `GravityWell`, `NO_WELLS`, `well_pull`, `check_escapable_pull`, the optional `wells` argument of `step` (default `NO_WELLS`) and the pull right after gravity in step 2. Every existing constant, field, signature, step and log line stays as it is, and `step(ship, thrust)` and `step(ship, thrust, ground)` give the same ship as before. Every file that depends on it, found by grepping `game/` (tests included) and `tools/` for `core.ship`, `step(`, `GRAVITY`, `THRUST_UP`, `THRUST_SIDE` and `Ship(`:
-
-| File | Change needed |
-|---|---|
-| `game/core/ship.py` | the new names and the pull in step 2. Task `DRA-96-01-gameplay-implementer`. |
-| `game/core/drifters/base.py`, `game/core/drifters/planet.py` (new) | the `gravity_well` hook returns a `GravityWell` (`systems/drifters.md`). Task `DRA-96-02-gameplay-implementer`. |
-| `game/core/run.py` | gathers the wells and passes them to `step` (`systems/run.md`). Task `DRA-96-03-gameplay-implementer`. |
-| `game/app/tuning.py` | calls `check_escapable_pull` for each planet variant (`systems/app.md`). Integration Engineer. |
-| `game/core/drifters/spawner.py` | none from this contract: it reads `TOP_SIDE_SPEED`, which doesn't change. |
-| `game/ui/ship_view.py`, `game/ui/debug_overlay.py`, `game/ui/hud.py`, `game/app/frame.py` | none. They read `x`, `y`, `vx`, `vy` and `ship_hitbox`, and build `Thrust`. |
-| `game/tests/core/test_ship.py`, `test_ship_islands.py`, `test_run.py` and every test that builds a `Ship` or calls `step` | none. Their calls leave `wells` out, so no pull acts. Must pass unchanged. |
-| `game/tests/core/test_ship_pull.py` (new) | the pull, the escape check. Task `DRA-96-05-qa-engineer`. |
-| `tools/wave_check/bot.py` | none now: it calls `step(ship, action)` with no wells, so its bot feels no pull. The bot's pull physics is part 2 of wave_check, out of DRA-96's scope (scope report DRA-96, Out); when built it steps the ship with `step(ship, thrust, ground, gravity_wells(drifters))`. |
-| `tools/wave_check/checks.py`, `tracks.py`, `wave_check.py`, `tools/wave_editor/` | none from this contract. The planet in wave_check is the main session's part of DRA-96 (`systems/drifters.md`, Rules, Planet, For wave_check). |
-
-DRA-86 changes this frozen contract (v5). New: `Ground`, `NO_GROUND`, `Ship.against_island` (default False), `spawn_clear`, `block_ship`, the optional `ground` argument of `step` (default `NO_GROUND`), the islands after the side walls, the `island contact` log line; `core.ship` imports more of `core.collision`. Every existing constant, field, signature, step and log line stays as it is, and `step(ship, thrust)` gives the same ship as before. Every file that depends on it, found by grepping `game/` (tests included) and `tools/` for `core.ship`, `step(`, `spawn(`, `Ship(` and `draw_ship`:
-
-| File | Change needed |
-|---|---|
-| `game/core/ship.py` | the new names and rules above. Task `DRA-86-03-gameplay-implementer`. |
-| `game/core/collision.py` | the push-out functions (`systems/drifters.md`). Task `DRA-86-01-gameplay-implementer`, before this one. |
-| `game/core/run.py` | builds the ground, passes it to `step`, blocks the waiting ship, respawns with `spawn_clear` (`systems/run.md`). Task `DRA-86-04-gameplay-implementer`. |
-| `game/core/drifters/base.py` | none: it reads `Ship` in `TickContext`, and the new field has a default. |
-| `game/ui/ship_view.py`, `game/ui/debug_overlay.py`, `game/ui/hud.py` | none. They read `x`, `y`, `vx`, `vy` and `ship_hitbox`. |
-| `game/app/frame.py` | none. It builds `Thrust` and reads `run.ship`. |
-| `game/tests/core/test_ship.py`, `test_run.py`, every test that builds a `Ship` or calls `step(ship, thrust)` | none. They build `Ship` by keyword or with the first four fields, and compare ships that now all have `against_island` False. Must pass unchanged. |
-| `game/tests/core/test_ship_islands.py` (new) | the block, the speed rule, the respawn spot, the log line. Task `DRA-86-08-qa-engineer`. |
-| `tools/wave_check/` | none now: it calls `spawn()` and `ship_hitbox`. Its later bot steps the ship with `step(ship, thrust, ground)` (`systems/drifters.md`, Rules, Floating island, For wave_check). |
-
-DRA-29 changes this frozen contract (v4). `core/ship.py` gains `TOP_SIDE_SPEED`, `HITBOX_BAR_W`, `HITBOX_FOOT_H`, `SHIP_HITBOX` and `ship_hitbox`, and imports `core.collision`. Every existing constant, field, signature, step and log line stays as it is. The ship view draws the inverted T instead of the 32 × 32 square; its signature doesn't change. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.ship`, `draw_ship`, `ship_view`, `SHIP_W`, `SHIP_H` and `Ship`:
-
-| File | Change needed |
-|---|---|
-| `game/core/ship.py` | the new constants and `ship_hitbox`, the `core.collision` import, and the module docstring names the hitbox. Task `DRA-29-01-gameplay-implementer`. |
-| `game/core/collision.py` (new) | `Box`, `Hitbox`, `place_hitbox`. Task `DRA-29-01-gameplay-implementer`. |
-| `game/ui/ship_view.py` | draws `ship_hitbox(ship)` filled with `ui.shapes.draw_hitbox`; the docstrings stop naming a rectangle. Task `DRA-29-04-ui-developer`. |
-| `game/ui/shapes.py` (new) | `draw_shape`, `draw_hitbox`. Task `DRA-29-04-ui-developer`. |
-| `game/core/run.py` | calls `ship_hitbox`. See `systems/run.md`, Impact. Task `DRA-29-03-gameplay-implementer`. |
-| `game/ui/debug_overlay.py` | outlines `ship_hitbox(run.ship)`. See `systems/debug-overlay.md`, Impact. Task `DRA-29-06-ui-developer`. |
-| `game/app/frame.py` | none from this contract. `draw_ship(surface, run.ship)` is unchanged. |
-| `game/tests/core/test_ship.py` | none breaks: no test reads a removed name. Task `DRA-29-07-qa-engineer` adds the hitbox test in its own file. |
-| `game/tests/core/test_run.py`, `game/tests/ui/test_hud.py` | none. They use `spawn()`, `step`, `Ship` and `Thrust`, which don't change. `test_hud.py` never draws the ship. |
 
 ## Rationale
 - **The pull lives in the ship step (DRA-96).** 04-ship.md, rule 2 puts it in step 2, right after gravity, before drag and the fall cap. The step already owns every acceleration; the run only hands it the fields. So the ship never knows what a planet is, and the later wave_check bot gets the same physics from the same call, as with the islands.

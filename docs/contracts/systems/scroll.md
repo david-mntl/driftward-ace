@@ -9,15 +9,6 @@ The screen stays fixed. The world scrolls down past it at a speed set by the lev
 
 The scroll and the ship never touch each other. The ship's step doesn't read the scroll, and the scroll's step doesn't read the ship.
 
-Who builds what:
-- `game/core/scroll.py`: the Gameplay Implementer, task `DRA-13-01-gameplay-implementer`. `Final` and `slots` in DRA-19: task `DRA-19-01-gameplay-implementer`.
-- `game/ui/starfield.py`: the UI Developer, task `DRA-13-02-ui-developer`.
-- `game/tests/core/test_scroll.py`: the QA Engineer, task `DRA-13-04-qa-engineer`.
-- Creating the scroll at play start and stepping it once per playing tick: `core.run`, from `docs/contracts/systems/run.md` (DRA-23). Drawing the starfield from `run.scroll`: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
-- The score, which counts `meters` at 1 point a meter: `docs/contracts/systems/run.md`. The SCORE line that shows it: `docs/contracts/systems/hud.md`. `meters` has no readout of its own.
-- `scroll_step_px` in `game/core/scroll.py`: the Gameplay Implementer, task `DRA-62-02-gameplay-implementer`. `core.run` reads it each tick and hands it to the drifters (`docs/contracts/systems/run.md`, step 3; `docs/contracts/systems/drifters.md`, `TickContext`). Its test: task `DRA-62-06-qa-engineer`, in `game/tests/core/test_scroll.py`.
-- The speed per level (`scroll_speed`, `raised_level_ticks`, the `level` argument, `DISTANCE_DECIMALS`, the meters' rounding): the Gameplay Implementer, task `DRA-76-01-gameplay-implementer`. The scroll speed × row is in `core/levels.py` (`docs/contracts/systems/drifters.md`). Its tests: task `DRA-76-02-qa-engineer`, in `game/tests/core/test_scroll.py`. `core.run` passing the run's level: task `DRA-76-05-gameplay-implementer`.
-
 ## Diagram
 ```mermaid
 flowchart TD
@@ -178,48 +169,6 @@ Other rules:
 Logging (logger `core.scroll`, DEBUG, by event, never by tick). Source: game/CONTEXT.md, Logging; 15-tech-constraints.md, rule 9:
 - `scroll start tick=%d`: once per scroll, on the tick the world first moves (the returned scroll has `scrolled_ticks == 1`), with that tick's `ticks` (31). From DRA-23 each run has its own scroll, so a retry logs it again for the new run.
 - Nothing else. No line per tick, no line per meter.
-
-## Impact
-DRA-23 changes this frozen contract (v2). No code, signature, value or log line changes. Only who creates and steps the scroll changes (`core.run` instead of the app), and the scroll now freezes at game over and restarts on retry. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.scroll`, `Scroll`, `start_scroll` and `step_scroll`:
-
-| File | Change needed |
-|---|---|
-| `game/core/scroll.py` | none. |
-| `game/core/run.py` (new) | calls `start_scroll` and `step_scroll`. Task `DRA-23-01-gameplay-implementer`. |
-| `game/ui/starfield.py` | none. The app passes `run.scroll`. |
-| `game/ui/hud.py` | reads `run.scroll.meters` instead of `scroll.meters`. See `systems/hud.md`, Impact. Task `DRA-23-02-ui-developer`. |
-| `game/app/frame.py` | stops calling `start_scroll` and `step_scroll`; `core.run` does. Integration Engineer, from `systems/app.md`. |
-| `game/tests/core/test_scroll.py` | none. It calls the scroll directly. |
-| `game/tests/ui/test_hud.py` | see `systems/hud.md`, Impact. |
-
-DRA-61 changes this frozen contract (v3). No code, signature, value or log line changes. Only who reads `meters` for the screen changes: `core.run`'s `score` reads it, and the HUD shows the score instead of a meters readout. Grepping `game/` (tests included) for `core.scroll`, `Scroll`, `.meters`:
-
-| File | Change needed |
-|---|---|
-| `game/core/scroll.py`, `game/ui/starfield.py`, `game/tests/core/test_scroll.py` | none. |
-| `game/core/run.py` | `score` reads `scroll.meters`. See `systems/run.md`, Impact. Task `DRA-61-01-gameplay-implementer`. |
-| `game/ui/hud.py`, `game/tests/ui/test_hud.py` | see `systems/hud.md`, Impact. |
-
-DRA-62 changes this frozen contract (v4). One new pure function, `scroll_step_px`. `Scroll`, `start_scroll`, `step_scroll`, every constant and the log line don't change. Grepping `game/` (tests included) for `core.scroll`, `Scroll`, `step_scroll` and `SCROLL_`:
-
-| File | Change needed |
-|---|---|
-| `game/core/scroll.py` | `scroll_step_px`. Task `DRA-62-02-gameplay-implementer`. |
-| `game/core/run.py` | step 3 passes `scroll_step_px(run.scroll)` to the drifters. See `systems/run.md`, Impact. Task `DRA-62-02-gameplay-implementer`. |
-| `game/ui/starfield.py`, `game/ui/hud.py`, `game/app/frame.py`, `game/app/debug_spawns.py` | none. |
-| `game/tests/core/test_scroll.py` | none needed; must pass unchanged. Task `DRA-62-06-qa-engineer` adds one test for `scroll_step_px`. |
-| `game/tests/core/test_run.py`, `test_run_score.py`, `test_run_drifters.py`, `test_chain_lightning.py`, `test_fireball.py`, `game/tests/ui/test_hud.py` | none. They read `run.scroll` and its properties, which don't change. |
-
-DRA-76 changes this frozen contract (v5). `Scroll` gains `raised_level_ticks` (default: all 0, so Level 1 only); `step_scroll` and `scroll_step_px` gain a `level` argument defaulting to Level 1; `scroll_speed` and `DISTANCE_DECIMALS` are new; `LEVEL_1_SCROLL_MULT` and `SCROLL_PER_TICK` are gone; `meters` rounds before flooring. At Level 1 every value, the step and the log line are what they were. Grepping `game/` (tests included) for `core.scroll`, `Scroll(`, `step_scroll`, `scroll_step_px`, `SCROLL_PER_TICK`, `LEVEL_1_SCROLL_MULT`, `.meters` and `distance_px`:
-
-| File | Change needed |
-|---|---|
-| `game/core/scroll.py` | everything above. Task `DRA-76-01-gameplay-implementer`. |
-| `game/core/run.py` | steps 3 and 5 pass `run.level` (`systems/run.md`). Task `DRA-76-05-gameplay-implementer`. Until then it calls both with no level: Level 1, as today. |
-| `game/core/waves.py` (new) | imports `DISTANCE_DECIMALS` (`systems/waves.md`). Task `DRA-76-03-gameplay-implementer`. |
-| `game/ui/starfield.py`, `game/ui/hud.py`, `game/app/` | none. The stars read `distance_px`, so they speed up with the level by themselves. |
-| `game/tests/core/test_scroll.py` | none needed; must pass unchanged. Task `DRA-76-02-qa-engineer` adds the speed per level. |
-| `game/tests/core/test_run.py`, `test_run_score.py`, `test_run_drifters.py`, `test_chain_lightning.py`, `test_fireball.py`, `test_coin.py`, `game/tests/ui/test_hud.py` | none. They build `Scroll(ticks=..., scrolled_ticks=...)` by keyword, which is still Level 1 only, and import neither removed constant. |
 
 ## Rationale
 - **The level is an argument, not part of the scroll (DRA-76).** The level belongs to the run's waves (`systems/waves.md`); a copy in the scroll could disagree with it. Passing it in keeps one home for the level and leaves the scroll a plain step. The default keeps every existing call and test at Level 1.

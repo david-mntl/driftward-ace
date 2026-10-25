@@ -160,3 +160,21 @@
 
 ## Contract split: run Impact, 2026-10-25
 - `systems/run.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: ship Impact, 2026-10-25
+- `systems/ship.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: scroll Impact, 2026-10-25
+- `systems/scroll.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: hud Impact, 2026-10-25
+- `systems/hud.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: debug-overlay Impact, 2026-10-25
+- `systems/debug-overlay.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: world Impact, 2026-10-25
+- `systems/world.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: waves Impact, 2026-10-25
+- `systems/waves.md`: Impact section and the Purpose task list removed (history is in git), no other change.

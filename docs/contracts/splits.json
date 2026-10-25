@@ -103,5 +103,83 @@
     "new": {
       "docs/contracts/systems/run.md": "76a0407c8c7e6d7e1c353cd4cd7549967ea831c6"
     }
+  },
+  {
+    "contract": "ship",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "e3c2d5b86c26ce86a56fa7699fcc99933b77c509",
+    "new": {
+      "docs/contracts/systems/ship.md": "f845cb94e430111c4b4a48340a490e901fc43176"
+    }
+  },
+  {
+    "contract": "scroll",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "4b82f7758ee6cda85bacd6062a82da6b0830e955",
+    "new": {
+      "docs/contracts/systems/scroll.md": "2040c1a675eaeb49f0677d6263da5aa143150017"
+    }
+  },
+  {
+    "contract": "hud",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "83e92203df171adbeea4649d8b8ca6b27992a174",
+    "new": {
+      "docs/contracts/systems/hud.md": "1ebf71f80f9258085e1731df7b6aa9cf5780b109"
+    }
+  },
+  {
+    "contract": "debug-overlay",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "206b897301b1b1940d04b8e3b1d91d015bf7a081",
+    "new": {
+      "docs/contracts/systems/debug-overlay.md": "978fa1f32e643084aa9ca1d2176b95ff8cf7962e"
+    }
+  },
+  {
+    "contract": "world",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "fa24a8fe57a1e5be5b36234737bb2a4c93176a70",
+    "new": {
+      "docs/contracts/systems/world.md": "37c4b6d8c680e1365b7802ad600487386cf9eeae"
+    }
+  },
+  {
+    "contract": "waves",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "5ae8fc6d50a5d43152e7957ca989c395a8bfc30e",
+    "new": {
+      "docs/contracts/systems/waves.md": "7150272168e71000bd8a5e95067aebe18015a526"
+    }
   }
 ]

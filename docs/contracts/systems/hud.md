@@ -11,12 +11,6 @@ In debug mode the HUD's lines sit below the debug overlay's text, so the two nev
 
 This contract also sets the score's text, `score_text`, which the Game Over box uses too (`docs/contracts/systems/run.md`, Presentation).
 
-Who builds what:
-- `game/ui/hud.py`, and the helper `overlay_text_bottom()` in `game/ui/debug_overlay.py`: the UI Developer, task `DRA-13-03-ui-developer`. The hearts and the `run` argument: task `DRA-23-02-ui-developer`. `game/ui/score_text.py`: task `DRA-61-02-ui-developer`. The SCORE line in place of the meters readout: task `DRA-61-06-ui-developer`.
-- `game/tests/ui/test_hud.py`: the QA Engineer, tasks `DRA-13-05-qa-engineer` and `DRA-23-05-qa-engineer`. `game/tests/ui/test_score_text.py`, and the two line-1 tests reworded to hold with or without SCORE: task `DRA-61-05-qa-engineer`. The SCORE line tests: task `DRA-61-07-qa-engineer`.
-- Calling `draw_hud` every frame and deciding `below_overlay`: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
-- The `score` and `lives` fields: `docs/contracts/systems/run.md`. The meters inside the score: `docs/contracts/systems/scroll.md`.
-
 ## Diagram
 Normal mode:
 ```
@@ -141,37 +135,6 @@ Both:
 - **Corner warnings, by Director override.** SCORE at the top left and the hearts at the top right are drawn over any entry warning in those corners, such as the default fireball's at the top-left corner. 10-ui.md, rule 1 says the HUD never hides a warning. The Director chose not to fix it in DRA-61; rule 1 stays the target and docs/TODO.md tracks it. Source: scope report DRA-61, Objection 2 and Decision log.
 - The HUD only reads game state. It never changes it. Source: 10-ui.md, rule 5.
 - The HUD never covers the top line. Its lowest line ends far above row 168 in both modes. Source: 10-ui.md, rule 1.
-
-## Impact
-DRA-23 changes this frozen contract (v1). `draw_hud` takes the run instead of the scroll, and draws the hearts. The readout's text, place and look don't change. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `draw_hud`, `ui.hud`, `HUD_` and `Scroll`:
-
-| File | Change needed |
-|---|---|
-| `game/ui/hud.py` | `draw_hud(surface, run, below_overlay)`; the readout reads `run.scroll.meters`; the four heart constants and the hearts. Task `DRA-23-02-ui-developer`. |
-| `game/ui/debug_overlay.py` | none. |
-| `game/app/frame.py` | passes `run` instead of `scroll`. Integration Engineer, from `systems/app.md`. |
-| `game/tests/ui/test_hud.py` | every test calls `draw_hud(surface, SCROLL, below_overlay)` and fails after task DRA-23-02 on the new argument. The readout tests also count every white pixel as the readout, and the white hearts would break them. Task `DRA-23-05-qa-engineer` updates them and adds the heart tests. |
-
-DRA-61 changes this frozen contract (v2). The SCORE line takes HUD line 1 and the meters readout on line 2 goes. `draw_hud` keeps its signature and its constants. `score_text` is new. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `draw_hud`, `ui.hud`, `HUD_`, `score_text` and `" m"`:
-
-| File | Change needed |
-|---|---|
-| `game/ui/hud.py` | the SCORE line from `run.score` and `score_text` on line 1; the readout goes; the text is rendered again only when the score changes; the module and `draw_hud` docstrings name SCORE. Task `DRA-61-06-ui-developer`. |
-| `game/ui/score_text.py` (new) | `SCORE_LABEL`, `DIGIT_GROUP`, `GROUP_SEPARATOR`, `score_text`. Task `DRA-61-02-ui-developer`. |
-| `game/ui/game_over.py` | uses `score_text`; see `systems/run.md`, Impact. Task `DRA-61-03-ui-developer`. |
-| `game/ui/debug_overlay.py` | none. |
-| `game/app/frame.py` | none from this contract: the `draw_hud` call doesn't change. |
-| `game/tests/ui/test_hud.py` | would break once SCORE is on line 1: `test_hud_normal_layout_leaves_line_one_empty` (ink on line 1) and `test_hud_keeps_the_gap_below_the_overlay` (expects the HUD's first ink one line spacing lower). The other tests read the white HUD text wherever it is and should still pass. So the change comes in two steps. First, before the SCORE line lands, task `DRA-61-05-qa-engineer` rewords those two tests to hold with the meters readout on line 2 and with SCORE on line 1. In normal mode, the HUD's ink starts at or right of `HUD_MARGIN` and at or below `HUD_TOP`. In debug mode, its first ink is at or below `overlay_text_bottom() + HUD_OVERLAY_GAP`. Then task `DRA-61-06-ui-developer` moves the HUD to SCORE, and task `DRA-61-07-qa-engineer` adds the exact SCORE line tests. |
-| `game/tests/ui/test_score_text.py` (new) | the format. Task `DRA-61-05-qa-engineer`. |
-
-DRA-76 changes this frozen contract (v3) in its text only: the overlay has six text lines, so `overlay_text_bottom()` is two line-heights lower and the HUD follows it in debug mode. No code, constant, signature or rule of the HUD changes. Grepping `game/` (tests included) for `overlay_text_bottom`, `HUD_OVERLAY_GAP` and `draw_hud`:
-
-| File | Change needed |
-|---|---|
-| `game/ui/hud.py` | none: it already reads `overlay_text_bottom()`. |
-| `game/ui/debug_overlay.py` | the six-line bottom (`systems/debug-overlay.md`). Task `DRA-76-06-ui-developer`. |
-| `game/tests/ui/test_hud.py` | none: every debug-mode place it checks is worked out from `overlay_text_bottom()`. Must pass unchanged. |
-| `game/app/frame.py` | none from this contract. |
 
 ## Rationale
 - **The HUD contract no longer restates the overlay's formula (DRA-76).** One fact, one home: the overlay owns its lines and their bottom. The HUD only reads the bottom, so a new overlay line moves the HUD with no HUD change.
