@@ -4,7 +4,7 @@ Assignee: gameplay-implementer
 Writes to: game/core/
 Contract: docs/contracts/systems/run.md, docs/contracts/systems/drifters.md
 Impact: docs/contracts/DRA-117/impact.md
-Status: open
+Status: done
 Linear: DRA-119
 
 ## Read in the contract

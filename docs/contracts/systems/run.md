@@ -1,6 +1,6 @@
 # Run: lives, score, coins, grazes, falls, hits, drifters, respawn wait, game over and retry
-Version: 10
-Status: draft
+Version: 11
+Status: frozen
 Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-117
 Created by: architect
 

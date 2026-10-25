@@ -1,6 +1,6 @@
 # Drifters: base, hitboxes, levels, spawner, every drifter and their views
-Version: 9
-Status: draft
+Version: 10
+Status: frozen
 Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111, DRA-117
 Created by: architect
 
