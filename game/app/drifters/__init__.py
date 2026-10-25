@@ -6,6 +6,7 @@ registers. A new drifter adds one import line here.
 
 from app.drifters import chain_lightning_tuning as chain_lightning_tuning
 from app.drifters import coin_tuning as coin_tuning
+from app.drifters import electric_ball_tuning as electric_ball_tuning
 from app.drifters import fireball_tuning as fireball_tuning
 from app.drifters import floating_island_tuning as floating_island_tuning
 from app.drifters import planet_tuning as planet_tuning
