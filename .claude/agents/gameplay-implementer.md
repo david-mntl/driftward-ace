@@ -33,6 +33,7 @@ The player sees: the ship thrusts, drifts, falls, and dies on contact.
 - `CLAUDE.md`: pillars, locked decisions, tech rules.
 - `game/core/`: the code that exists, so you extend it instead of duplicating it.
 - `game/tuning/`: read only. How tuning values are exposed and which ones exist.
+- **Don't re-read.** A file range you already read in this run, and have not edited since, is in your context: use it. Re-read only a file that changed, or a range you have not read yet. Your own Edit or Write result confirms the change; don't read the file again to check it. One final check of what you changed is fine.
 
 ## Outputs
 **Python modules** in `game/core/`, at the file and function names the contract's Interface gives. Readers: Implementation Reviewer, then QA Engineer, then Integration Engineer.

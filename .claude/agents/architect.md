@@ -23,6 +23,7 @@ Close-out is the Director's, run with `scripts/close-out.sh`. You never run it a
 - `docs/contracts/INDEX.md`: one row per system (System, Ver, Status, Purpose). Read it first to choose which contracts to open. The script generates it; never edit it.
 - `docs/contracts/`: open only the contracts the feature touches. Schemas, tasks and the CHANGELOG as needed.
 - `game/`: the code that already exists for the systems this feature touches.
+- **Don't re-read.** A file range you already read in this run, and have not edited since, is in your context: use it. Re-read only a file that changed, or a range you have not read yet. Your own Edit or Write result confirms the change; don't read the file again to check it. One final check of what you changed is fine.
 
 ## Design run
 1. Confirm the scope report says `Verdict: ship`. If not, stop.

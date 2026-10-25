@@ -26,6 +26,7 @@ Your verdict blocks close-out. On `Verdict: pass`, Next tells the Director to ru
 - `game/core/`, `game/ui/`: read only. The step functions, state and views you call.
 - `game/assets/`, `game/tuning/`, `game/waves/`: read only. What `main.py` loads.
 - `game/main.py` and `game/app/`: what already exists, so you extend it.
+- **Don't re-read.** A file range you already read in this run, and have not edited since, is in your context: use it. Re-read only a file that changed, or a range you have not read yet. Your own Edit or Write result confirms the change; don't read the file again to check it. One final check of what you changed is fine.
 
 If an input is missing or two documents contradict each other, write the report with `Verdict: blocked` and stop. Say which input and what you need.
 

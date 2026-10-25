@@ -27,6 +27,7 @@ Your findings advise. They do not block: `changes-requested` sends the task back
 - `CLAUDE.md`: pillars, locked decisions, tech rules.
 - The files listed under **Delivered**, and `game/ruff.toml` for the style the code is held to.
 - **Re-check only:** your review's **Findings**, and the implementation report's `## Review fix` section: each answer and the `file:line` it names. Beyond those, read only the code the fix changed and the rule each finding cites.
+- **Don't re-read.** A file range you already read in this run, and have not edited since, is in your context: use it. Re-read only a file that changed, or a range you have not read yet. Your own Edit or Write result confirms the change; don't read the file again to check it. One final check of what you changed is fine.
 
 ## Outputs
 **Review report**, `docs/reports/review/<feature-id>-<nn>-<assignee>.md`. Markdown. The same base name as the task file and the implementation report. The Scope Guardian moves the task's Linear sub-issue to In QA when line 1 reads `Status: reviewed`, so the name must match exactly. Readers: the implementer (Review fix mode), QA Engineer, the Scope Guardian, the close-out script and the Director.

@@ -16,6 +16,7 @@ Your verdicts block. A task with any open bug does not reach the Integration Eng
 - `CLAUDE.md`: pillars, locked decisions, tech rules.
 - `docs/design/gdd/`: every number and behavior. The source of every expected value.
 - The contract the task links in `docs/contracts/`: Interface, Rules, Rationale.
+- **Don't re-read.** A file range you already read in this run, and have not edited since, is in your context: use it. Re-read only a file that changed, or a range you have not read yet. Your own Edit or Write result confirms the change; don't read the file again to check it. One final check of what you changed is fine.
 
 ## Four modes
 1. **Verify.** A `gameplay-implementer` or `ui-developer` task has no QA report with its base name, and either its review report `docs/reports/review/<feature-id>-<nn>-<assignee>.md` has line 1 `Status: reviewed`, or its implementation report has its second `## Review fix` section (round 2). In the round 2 case the review still says `changes-requested`; that's expected. Never start on `changes-requested` before round 2: write nothing and say so in chat. Also read the implementation report with every `## Review fix` section, the task file, and the review report (**Findings**, **For QA**, and any `## Re-check` section).
