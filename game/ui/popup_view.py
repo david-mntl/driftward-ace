@@ -11,15 +11,25 @@ from typing import Final
 
 import pygame
 
-from core.popup import PointsPopup
+from core.popup import PointsPopup, PopupKind
 
 log = logging.getLogger(__name__)
 
 POPUP_COLOR: Final[tuple[int, int, int]] = (255, 80, 150)
 """Popup text color, RGB. drifters/04-coin.md, popup_color (guess)."""
 
+GRAZE_POPUP_COLOR: Final[tuple[int, int, int]] = (255, 255, 255)
+"""Graze popup text color, RGB. 06-scoring.md, graze_popup_color (guess)."""
+
 POPUP_FONT_SIZE: Final[int] = 16
 """Popup text size, default font, px. Scope report DRA-62, Limits: the HUD's font size."""
+
+
+_KIND_COLORS: Final[dict[PopupKind, tuple[int, int, int]]] = {
+    PopupKind.COIN: POPUP_COLOR,
+    PopupKind.GRAZE: GRAZE_POPUP_COLOR,
+}
+"""The text color of each popup kind. Source: run.md, Presentation, `popup.kind`."""
 
 
 def popup_text(points: int) -> str:
@@ -30,20 +40,22 @@ def popup_text(points: int) -> str:
 def draw_points_popup(surface: pygame.Surface, popup: PointsPopup) -> None:
     """Blit the popup's text centered on ``(round(popup.x), round(popup.y))``. Units: pixels.
 
+    The color follows ``popup.kind``; the font and size are the same for every kind.
     Needs ``pygame.font`` initialized. The place comes from core; nothing is moved here.
     """
-    text: pygame.Surface = _popup_surface(popup.points)
+    text: pygame.Surface = _popup_surface(popup.points, popup.kind)
     center: tuple[int, int] = (round(popup.x), round(popup.y))
     surface.blit(text, text.get_rect(center=center))
 
 
 @cache
-def _popup_surface(points: int) -> pygame.Surface:
-    """Return the text for ``points``, rendered once per value and kept.
+def _popup_surface(points: int, kind: PopupKind) -> pygame.Surface:
+    """Return the text for ``points`` in the color of ``kind``, rendered once per pair and kept.
 
-    Source: run.md, Presentation, Points popup, Cache; 15-tech-constraints.md, rule 5.
+    Source: run.md, Presentation, Points popup and Graze popup, Cache; 15-tech-constraints.md,
+    rule 5.
     """
-    return _popup_font().render(popup_text(points), True, POPUP_COLOR)
+    return _popup_font().render(popup_text(points), True, _KIND_COLORS[kind])
 
 
 @cache
