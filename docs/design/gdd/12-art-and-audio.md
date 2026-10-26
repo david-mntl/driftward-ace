@@ -43,7 +43,7 @@ The player never reads this. It gives the art a feeling to aim at.
 |---|---|---|
 | Navy to near-black | empty space | the deepest background |
 | Fuchsia and purple | magnetism, the anomaly | coins at full brightness, dim auroras, the rim light on touched objects |
-| Orange and yellow | heat, danger | meteorite tails, lava, fireball, entry warnings |
+| Orange and yellow | heat, danger | lava, fireball, entry warnings |
 | Pale white-cyan | electricity | chain lightning, electric ball: a pale white-cyan core with thin purple and fuchsia arcs. Kept away from the ship's blue |
 | Deep cobalt blue with pale plating | you, untouched | the ship and its cockpit: cobalt neon lines, a blue flame, silver-grey and pale plating |
 
@@ -67,6 +67,7 @@ The player never reads this. It gives the art a feeling to aim at.
 10. **A fixed pool of looks.** A drifter with several looks picks one from a fixed pool each time it appears. Art is never made new per run. Source: Director.
 11. **Painted once.** Background layers are images made ahead of time and loaded by the game, never drawn shape by shape each frame. Source: Director.
 12. **Words, not pictures.** The style is defined in words in this file. Images from other works are never part of this design and never ship. Only art made for the game, or converted from a source that is free to use and credited, ships. Source: Director.
+13. **Motion must show at game size.** A turn smaller than about 20° does not read on a sprite this small. A turning object uses a full turn in steps of 45° or less, so the loop has no back-and-forth. The light and the rim stay fixed while the shape turns. Frames sit in one strip, all the same size. Source: Director.
 
 ## Edge cases
 - Art for a drifter whose spec is still draft: wait, or use a placeholder shape the Director approves.

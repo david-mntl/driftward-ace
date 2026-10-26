@@ -23,7 +23,9 @@ A rock that falls straight down from the top. It has no logic: it just falls. It
 | graze | yes | — | — | locked | 06-scoring.md |
 | looks | a list of named skins, filled when the art is drawn. Every skin keeps the variant's size and hitbox. Until then: one placeholder look | — | — | guess | Director |
 | look_pick | random, each time a meteorite appears. Looks only; the game plays the same | — | — | guess | Director |
-| look_reference | A rock like a shooting star, with a small glowing tail. May be animated | — | — | guess | Director |
+| look_reference | A plain rock, floating and falling. No tail and no glow: the fireball is the comet. Tumbles slowly as it falls: one full turn, always the same way | — | — | guess | Director |
+| look_frames | 8 drawn frames, the same rock turned 45° each, so the 8 frames make one full turn. Played in order 1 to 8, then again from 1. Frame size = the variant width, square. All looks use the same count | frames | — | guess | Director |
+| look_ticks_per_frame | 5 (one full turn = 40 ticks, about 1.5 turns a second). Each rock starts at a random frame | ticks | — | guess | Director |
 | placeholder_look | a filled circle as wide as the variant, grey (140, 140, 140) | RGB | — | guess | Director |
 | start_y | just above the top edge: its bottom edge on the top edge, so center y = −width ÷ 2. A placement may set another y | px | — | guess | Director |
 
@@ -34,7 +36,7 @@ A rock that falls straight down from the top. It has no logic: it just falls. It
 4. **Hits:** touching it is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)).
 5. **Leaves:** once fully below the floor ([../07-drifters.md](../07-drifters.md) rule 12).
 6. **Scales:** `speed` × the level's hazard speed, set when it appears ([../08-difficulty.md](../08-difficulty.md)).
-7. **Looks and sounds:** placeholder grey circle until the look is drawn. Each meteorite takes a random look from `looks`. A look may turn as the rock falls (frames drawn ahead of time); the rock's path and hitbox never turn, so rule 3 still holds. Sound: none yet.
+7. **Looks and sounds:** placeholder grey circle until the look is drawn. Each meteorite takes a random look from `looks`. The look turns as the rock falls (`look_frames`, drawn ahead of time, one shared frame counter); the rock's path and hitbox never turn, so rule 3 still holds. Sound: none yet.
 8. **wave_check notes:** none beyond the shared rules.
 
 ## Edge cases
