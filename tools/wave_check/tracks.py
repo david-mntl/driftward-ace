@@ -44,6 +44,8 @@ class Track:
     frames: tuple[Frame, ...]
     entered: bool
     """The drifter was ACTIVE and partly on screen at some tick."""
+    effect: TouchEffect
+    """What touching the drifter does, as the drifter says: a hit, a collect or a block."""
 
     @property
     def kind(self) -> str:
@@ -68,6 +70,7 @@ def build_tracks(
     tracks: list[Track] = []
     for index, item in enumerate(wave.placements):
         drifter = spawn_drifter(item.placement, level, tuning).settle_warning(context)
+        effect: TouchEffect = drifter.effect_on_touch()
         frames: list[Frame] = []
         entered: bool = False
         for age in range(max_ticks + 1):
@@ -92,6 +95,6 @@ def build_tracks(
             ):
                 break
         tracks.append(
-            Track(index, item, start_tick(item.at_px, level), tuple(frames), entered)
+            Track(index, item, start_tick(item.at_px, level), tuple(frames), entered, effect)
         )
     return tracks

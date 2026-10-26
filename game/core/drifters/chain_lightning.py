@@ -237,6 +237,11 @@ class ChainLightning(Drifter):
             return replace(self, y=self.y + self.speed, ticks_in_phase=self.ticks_in_phase + 1)
         return self
 
+    @classmethod
+    def telegraph_ticks(cls, type_extra: DrifterTypeExtra | None) -> int | None:
+        """Return the charge, ticks, from the type's file: the telegraph before an arc fires."""
+        return type_extra.charge_ticks if isinstance(type_extra, ChainLightningTypeExtra) else None
+
     def effect_on_touch(self) -> TouchEffect:
         """Touching a firing arc, or a node while one of its arcs fires, is a hit."""
         return TouchEffect.HIT

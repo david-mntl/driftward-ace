@@ -43,6 +43,7 @@ This is the rule that matters most in your lane.
 - `game/core/`: read only. The state classes and fields your views show. Extend what exists in `game/ui/` instead of duplicating it.
 - `game/assets/`: read only. Which images exist and their names. You never load them.
 - `game/tuning/`: read only, for any presentation value tuning exposes.
+- **Don't re-read.** A file range you already read in this run, and have not edited since, is in your context: use it. Re-read only a file that changed, or a range you have not read yet. Your own Edit or Write result confirms the change; don't read the file again to check it. One final check of what you changed is fine.
 
 ## Outputs
 **Python modules** in `game/ui/`, at the file and class names the contract's Interface gives. Readers: Implementation Reviewer, then QA Engineer, then Integration Engineer.

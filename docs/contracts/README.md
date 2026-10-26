@@ -8,6 +8,7 @@ contracts/
   CHANGELOG.md                 every version change, by feature
   systems/                     one spec per part of the code, always current
   schemas/                     JSON schemas for data files
+  <feature-id>/impact.md       the files that depend on the specs it changes, and the failures expected until each task lands
   <feature-id>/tasks/          the tickets for that feature
     <feature-id>-<nn>-<assignee>.md
 ```
@@ -17,7 +18,7 @@ contracts/
 A spec describes one part of the code as it is now: its interface, rules, what the player sees, and why. There is one file per system, never one per feature.
 
 When a later feature changes a system, it edits that system's spec:
-1. The Architect sets the spec back to `Status: draft` and lists the files that depend on it under **Impact**.
+1. The Architect sets the spec back to `Status: draft` and lists the files that depend on it, and the failures expected until each task lands, in the feature's `impact.md`. The spec itself carries no Impact section.
 2. The change goes through build, review, QA and integration like any other.
 3. At close-out the Director runs `scripts/close-out.sh <feature-id>`. It shows the open review findings and the integration Observations first. Once the Director decides, it sets the spec back to `Status: frozen`, with `Version` one higher.
 

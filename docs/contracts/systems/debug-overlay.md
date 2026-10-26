@@ -9,10 +9,6 @@ In debug mode, show the ship's numbers, the current wave and the level, and the 
 
 The overlay also tells the HUD where its text ends, so the HUD can sit below it with no overlap (`docs/contracts/systems/hud.md`).
 
-Who builds what:
-- `game/ui/debug_overlay.py`: the UI Developer, task `DRA-6-04-ui-developer`. `overlay_text_bottom()`: task `DRA-13-03-ui-developer`. No `-0.00` in DRA-19: task `DRA-19-02-ui-developer`. `draw_debug_hitboxes()` in DRA-29: task `DRA-29-06-ui-developer`. `draw_debug_wave_lines()` and the six-line `overlay_text_bottom()`: task `DRA-76-06-ui-developer`.
-- `overlay_visible` and the F3 toggle, and calling both draw functions: the Integration Engineer, in `game/app/frame.py`, from `docs/contracts/systems/app.md`.
-
 ## Diagram
 ```mermaid
 flowchart LR
@@ -125,25 +121,6 @@ def draw_debug_hitboxes(surface: pygame.Surface, run: Run) -> None: ...   # DRA-
 - Text layout as in Presentation. Source: 10-ui.md, debug_overlay_layout (guess); 91-decision-log.md, row 20.
 - The overlay shows the hitbox and graze outlines, the drifter labels, and from DRA-76 the wave and level lines, as the GDD lists. Nothing else: no graze count, no hit marker, no seed, no wave distance. Source: 10-ui.md, debug_overlay; scope report DRA-29, Limits; scope report DRA-76, Limits.
 - The six text lines sit above the HUD and never overlap it (`systems/hud.md`). Labels follow their drifter and may cross the HUD or the text for a moment; the HUD is drawn last and stays on top, and the text lines are drawn after the labels. Source: 10-ui.md, rule 1; scope report DRA-13, Decision log.
-
-## Impact
-DRA-29 changes this frozen contract (v3). `draw_debug_hitboxes` is new. `draw_debug_overlay` and `overlay_text_bottom` don't change: no signature, text, line, color or layout changes. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `debug_overlay`, `draw_debug_overlay`, `overlay_text_bottom` and `OVERLAY_`:
-
-| File | Change needed |
-|---|---|
-| `game/ui/debug_overlay.py` | `draw_debug_hitboxes`, its imports, and the module docstring names it. Task `DRA-29-06-ui-developer`. |
-| `game/ui/hud.py` | none. `overlay_text_bottom()` doesn't change. |
-| `game/app/frame.py` | calls `draw_debug_hitboxes(surface, run)` right before `draw_debug_overlay` when `overlay_visible`. Integration Engineer, from `systems/app.md`. |
-| `game/tests/ui/test_hud.py` | none. It calls only `draw_debug_overlay` and `overlay_text_bottom`, which draw exactly what they drew before. |
-
-DRA-76 changes this frozen contract (v4). `draw_debug_wave_lines` and `OVERLAY_TEXT_LINES` are new; `overlay_text_bottom()` grows by two line-heights; `draw_debug_overlay` and `draw_debug_hitboxes` don't change. In debug mode the HUD moves down by the two lines, through `overlay_text_bottom()`. Grepping `game/` (tests included) for `debug_overlay`, `draw_debug_overlay`, `overlay_text_bottom` and `OVERLAY_`:
-
-| File | Change needed |
-|---|---|
-| `game/ui/debug_overlay.py` | `OVERLAY_TEXT_LINES`, `draw_debug_wave_lines`, the six-line `overlay_text_bottom`, the module docstring. Task `DRA-76-06-ui-developer`. |
-| `game/ui/hud.py` | none in code: it reads `overlay_text_bottom()`. Its contract restates the formula, updated in `systems/hud.md`. |
-| `game/app/frame.py` | calls `draw_debug_wave_lines(surface, run)` right after `draw_debug_overlay` when `overlay_visible` (`systems/app.md`). Integration Engineer. Until then lines 5 and 6 are not drawn and the HUD sits two empty line-heights lower in debug mode. |
-| `game/tests/ui/test_hud.py` | none. Every place it checks comes from `overlay_text_bottom()` and the drawn pixels of `draw_debug_overlay`, which still draws lines 1 to 4 only. The HUD stays above the top line: six 16 px lines end far above row 168. Must pass unchanged. |
 
 ## Rationale
 - **A third function for lines 5 and 6 (DRA-76).** `draw_debug_overlay(surface, ship)` and its pixels stay as they were, so the HUD's tests, which measure them, keep working, and the app's call doesn't change. The new lines need the run, as `draw_debug_hitboxes` does. `overlay_text_bottom()` covers all six, so the HUD sits below them whichever functions draw.

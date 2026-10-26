@@ -1,0 +1,7 @@
+# Drifters, the planet, tuning
+Part of: drifters
+Read when: you change the planet's tuning file or its checks.
+
+## Rules
+
+- **The planet's file** (DRA-96). `default_variant`, `variants`, `entry_warning_ticks` and its own type values `field_ring_trip`, `field_ring_gap`, `field_ring_fade` and `field_ring_count`. Each variant gives `size`, `pull_radius` and `pull_max`, and no `width`, `height` or `hitbox`. It has no `speed_ratio`: a parked drifter has none. `app.tuning` builds from it: per variant, `VariantTuning(width=float(size), height=float(size), hitbox=planet_hitbox(float(size)), extra=PlanetVariantExtra(pull_radius=float(pull_radius), pull_max=float(pull_max)))`, after `core.ship.check_escapable_pull(pull_max)` accepts the pull; for the type, `DrifterTypeTuning(..., speed_ratio=0.0, entry_warning_ticks=..., extra=PlanetTypeExtra(field_ring_trip=..., field_ring_gap=..., field_ring_fade=float(...), field_ring_count=...))`, the zero never read as tuning (Spawner, step 4). The file's values: `default_variant` standard; `standard` size 64, `pull_radius` 150, `pull_max` 0.2; `entry_warning_ticks` 60; `field_ring_trip` 120; `field_ring_gap` 60; `field_ring_fade` 50; `field_ring_count` 2. Every size, pull and timing the planet uses is in this file; none is in code. Only the look's two colors and the 1 px ring width stay in the view (Rationale). Source: drifters/08-planet.md, Values; 07-drifters.md, entry_warning_ticks; scope report DRA-96, Limits ("Every value in the tuning file, never hard-coded").

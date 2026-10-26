@@ -18,7 +18,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.tuning import _fields, _is_number, _read_json
+from app.drifters.checks import check_fields, is_number
+from app.tuning import _read_json
 from core.drifters.base import DrifterType
 from core.drifters.registry import drifter_class
 from core.drifters.spawner import (
@@ -91,7 +92,7 @@ def load_debug_spawns(tuning: DrifterTuning) -> DebugSpawnList:
     missing file raises FileNotFoundError as it is.
     """
     name, data = _read_json(Path(SPAWN_LIST_FILE))
-    fields: dict[str, object] = _fields(name, "", data, _LIST_FIELDS, optional=_LIST_OPTIONAL)
+    fields: dict[str, object] = check_fields(name, "", data, _LIST_FIELDS, optional=_LIST_OPTIONAL)
     play: str = _play(name, fields.get("play", DEFAULT_PLAY))
     mode: str = _mode(name, fields.get("mode", DEFAULT_MODE))
     loop_ticks: int = _loop_ticks(name, fields.get("loop_ticks", DEFAULT_LOOP_TICKS))
@@ -169,7 +170,7 @@ def _row(name: str, index: int, data: object, tuning: DrifterTuning) -> Placemen
     rows), so it flies the same path on every loop and every page load (DRA-104).
     """
     path: str = f"rows[{index}]"
-    fields: dict[str, object] = _fields(name, path, data, _ROW_FIELDS, optional=_ROW_OPTIONAL)
+    fields: dict[str, object] = check_fields(name, path, data, _ROW_FIELDS, optional=_ROW_OPTIONAL)
     drifter_type: DrifterType | None = _drifter_type(fields["type"])
     if drifter_type is None:
         raise ValueError(f"{name}: {path}.type must be a drifter type ({_type_names()})")
@@ -197,7 +198,7 @@ def _coordinate(name: str, path: str, fields: dict[str, object], key: str) -> fl
     if key not in fields:
         return None
     value: object = fields[key]
-    if not _is_number(value):
+    if not is_number(value):
         raise ValueError(f"{name}: {path}.{key} must be a number")
     return float(value)
 
@@ -225,7 +226,7 @@ def _speed(name: str, path: str, fields: dict[str, object]) -> float | None:
     if "speed" not in fields:
         return None
     value: object = fields["speed"]
-    if not _is_number(value) or value <= 0:
+    if not is_number(value) or value <= 0:
         raise ValueError(f"{name}: {path}.speed must be a number > 0")
     return float(value)
 

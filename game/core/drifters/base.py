@@ -404,6 +404,16 @@ class Drifter(ABC):
         return width, height
 
     @classmethod
+    def telegraph_ticks(cls, type_extra: DrifterTypeExtra | None) -> int | None:
+        """Return the length, ticks, of the telegraph the drifter's file gives it, or None.
+
+        Before the level's scale and floor. None: the drifter has no telegraph. Read by wave_check,
+        which checks it against `telegraph_min`. An entry warning is not a telegraph.
+        Source: 07-drifters.md, rule 9.
+        """
+        return None
+
+    @classmethod
     def born(cls, birth: Birth) -> Self:
         """Build the drifter in WARNING from `birth`.
 

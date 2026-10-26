@@ -9,10 +9,6 @@ Give every system one home for the screen's size and the lines the rules use: th
 
 All rules use screen px. World coordinates with y up (03-world-and-camera.md, rule 1) are for wave files, which don't exist yet. The feature that adds wave loading defines the conversion.
 
-Who builds what:
-- `game/core/world.py`: the Gameplay Implementer, task `DRA-6-01-gameplay-implementer`. Docstring update in DRA-13: task `DRA-13-01-gameplay-implementer`. `Final` in DRA-19: task `DRA-19-01-gameplay-implementer`.
-- Read by `core/ship.py`, `ui/debug_overlay.py`, `ui/starfield.py`, `app/frame.py` and the error step in `app/guard.py`.
-
 ## Diagram
 ```
  x=0                              x=640  (SCREEN_W)
@@ -53,16 +49,6 @@ Screen coordinates, pygame style: x to the right, y down, in pixels. The left wa
 - The whole window is the play area. Source: 03-world-and-camera.md, Edge cases (WC-07 still open).
 - Constants only: one stdlib import, `typing.Final`, and no logger, no code. Source: game/CONTEXT.md, Logging (a constants-only module has no logger); scope report DRA-19, item 5 (core constants are `Final`).
 - Every constant is `Final`. Source: scope report DRA-19, item 5.
-
-## Impact
-DRA-19 changes this frozen contract (v2). No constant name, type or value changes. The constants gain `Final`, so the module gains its one import, `from typing import Final`. Every file in `game/` that depends on it, found by grepping `game/` (tests included) for `core.world`, `SCREEN_W`, `SCREEN_H`, `TOP_LINE_RATIO` and `TOP_LINE_Y`:
-
-| File | Change needed |
-|---|---|
-| `game/core/world.py` | `Final[...]` on the four constants, the import, and the module docstring's "Constants only, no imports." reworded to match. Task `DRA-19-01-gameplay-implementer`. |
-| `game/core/ship.py`, `game/ui/debug_overlay.py`, `game/ui/starfield.py`, `game/app/frame.py` | none. They import the constants by name; names and values don't change. |
-| `game/app/guard.py` | none. Its error step imports `core.world`. A stdlib `typing` import can't realistically fail, so the guard's reasoning in `systems/app.md`, Rationale still holds. |
-| `game/tests/` | none. The tests copy the screen values from the GDD and never import or patch them. |
 
 ## Rationale
 - **`TOP_LINE_Y` uses `round(...)`.** `480 * 0.35` in floating point is not exactly 168. Rounding gives the int 168 that the GDD names, and keeps the ratio as the source.

@@ -11,16 +11,6 @@ Every run opens with Wave 0 at Level 1. Then each level plays its playlist: its 
 
 The wave state lives inside the run (`docs/contracts/systems/run.md`, `Run.waves`): it freezes at game over, and a retry starts it again from Wave 0 with new picks. Its level is the run's level: the scroll speed (`docs/contracts/systems/scroll.md`) and the spawner read it. A run with no wave state plays no waves and stays at Level 1: that is the debug test spawn list.
 
-Who builds what:
-- `game/core/waves.py`: the Gameplay Implementer, task `DRA-76-03-gameplay-implementer`.
-- `game/core/wave_files.py`: the Gameplay Implementer, task `DRA-76-04-gameplay-implementer`. The `seed` placement field, default seeds and one path per UFO: task `DRA-104-02-gameplay-implementer`.
-- The level table rows this contract reads (`scroll_mult`, `rest_gap_mult`, `FIRST_LEVEL`): `docs/contracts/systems/drifters.md`, `core/levels.py`, task `DRA-76-01-gameplay-implementer`.
-- The wave state inside the run (`Run.waves`, `Run.level`, `Run.wave_spawns_due`, step 9a, the retry): `docs/contracts/systems/run.md`, task `DRA-76-05-gameplay-implementer`.
-- The `wave` and `level` lines of the debug overlay: `docs/contracts/systems/debug-overlay.md`, task `DRA-76-06-ui-developer`.
-- Reading the files, picking the first seed, starting the waves, adding the due placements each tick, and the debug choice between the waves and the test spawn list: the Integration Engineer, in `game/app/waves.py`, `game/app/frame.py` and `game/app/debug_spawns.py`, from `docs/contracts/systems/app.md`. No task file.
-- Tests: the QA Engineer. The wave state and the picker: task `DRA-76-07-qa-engineer`. The wave files: task `DRA-76-08-qa-engineer`; the seed in them: task `DRA-104-06-qa-engineer`. Waves inside the run: task `DRA-76-09-qa-engineer`.
-- The data files are content, no task file: one `game/waves/<wave id>.json` per wave, to `docs/contracts/schemas/wave.schema.json`, and `game/waves/playlist.json`, to `docs/contracts/schemas/playlist.schema.json`. For DRA-76 the placeholder files (`wave_0`, `l1_a`, `l1_b` and the playlist, scope report DRA-76, Values needed) are written by the main session acting as Wave Designer and Wave Critic, by Director decision, after this contract and before integration. Each placeholder wave gets a critic report `docs/reports/waves/<wave id>.md` with line 1 `Verdict: provisional` (09-waves.md, Edge cases). Later waves: the Wave Designer and the Wave Critic, per `docs/crew/roster.md`.
-
 ## Diagram
 The order of one run:
 ```mermaid
@@ -322,18 +312,6 @@ Other rules:
 - Core behaves the same in normal and debug mode and never reads the run mode. Whether a run has waves is the app's choice, made when it starts the run. Source: game/CONTEXT.md, Run modes; 15-tech-constraints.md, rule 7.
 - Drifter values stay per drifter type: a wave sets no speed, size or timer, only placement fields. Source: 09-waves.md, rule 12; 91-decision-log.md, row 71.
 - Core never imports pygame, `ui` or `app`, and never reads a file. Source: game/CONTEXT.md, Layout.
-
-## Impact
-DRA-104 changes this frozen contract (v1), in the wave files only: the optional `seed` placement field, default seeds for seeded drifters, the one-path-per-UFO check, and the unknown-type example (`ufo` is a type now). The wave state, the clock and the picker don't change. Grepping `game/` (tests included) and `tools/` for `build_wave_book`, `wave_files`, `_PLACEMENT_FIELDS`, `not a drifter type` and `WavePlacement`:
-
-| File | Change needed |
-|---|---|
-| `game/core/wave_files.py` | the `seed` field and its check, the default seed, the one-path check. Task `DRA-104-02-gameplay-implementer`, after `DRA-104-01` (`Placement.seed`, `placement_seed`, `seeded`). |
-| `game/core/waves.py`, `game/core/run.py`, `game/app/waves.py`, `game/app/frame.py` | none. They pass placements on as they are; the seed rides inside. |
-| `game/tests/core/test_wave_files.py` | breaks: the unknown-type refusal uses `ufo` and expects the list ending `planet)` (already from task DRA-104-01). Task `DRA-104-06-qa-engineer`, which also adds the seed cases. |
-| `game/tests/core/test_waves.py`, `test_run_waves.py` and every other test | none. |
-| `game/waves/*.json` | none: no committed wave has a UFO or a `seed`. A UFO wave is a later wave request (scope report DRA-104, Out). |
-| `tools/wave_check/`, `tools/wave_editor/` | none from this contract's tasks. Both build the book with `build_wave_book`, so a wave with a bad seed or a UFO outside its band fails to load in them as in the game. The editor's own placement list has no `seed` (`systems/drifters.md`, Impact). |
 
 ## Rationale
 - **The default seed is filled in here (DRA-104).** Only the loader knows the wave id and the placement's index, the two facts that stay fixed while the file does; the spawner and the UFO never see the wave. `systems/drifters.md`, Rationale, has the reasoning on the seed itself.

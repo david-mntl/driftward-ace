@@ -9,8 +9,9 @@ Project tools that run outside the game. Nothing here ships, and the pygbag buil
 - A script is read-only unless its docstring names what it writes.
 
 ## Commands
-- `scripts/contracts.sh`: what's in progress and ready to close out. `verify` checks headers, task pointers and INDEX.md. `index` rebuilds INDEX.md.
-- `scripts/close-out.sh [FEATURE-ID]`: without an id, lists features ready to close out. With one, shows what close-out would do and writes nothing. With `--write --summary "..."`, it freezes the feature's contracts, sets its tasks done, appends the CHANGELOG entry and rebuilds INDEX.md. When open findings or Observations are listed, it also needs `--accept-open`, given only after the Director decides them.
+- `scripts/contracts.sh`: what's in progress and ready to close out. `verify` checks headers, task pointers, INDEX.md, and every split contract's hub and parts. `index` rebuilds INDEX.md and the hubs' part tables.
+- `scripts/split-contract.sh`: the one-time contract splitter. `split <name>` and `drop-impact <names>` print a dry-run report and write nothing. With `--write` it cuts the contract into a hub and parts, removes its history blocks and proves that no line was lost. Run it only after the Director has approved the dry-run report.
+- `scripts/close-out.sh [FEATURE-ID]`: without an id, lists features ready to close out. With one, shows what close-out would do and writes nothing. With `--write --summary "..."`, it freezes the feature's contracts, sets its tasks done, appends the CHANGELOG entry and rebuilds INDEX.md. When open findings or Observations are listed, it also needs `--accept-open`, given only after the Director decides them. `--interfaces` (off by default, only when the Director asks) also replaces the Interface blocks of the contracts it freezes with an outline generated from the code. `scripts/contracts.sh interface <module>` prints a sample of that outline next to the current block and writes nothing.
 - `scripts/tokens.sh`: token use and cost per ticket and agent. Read-only.
 
 ## After a close-out

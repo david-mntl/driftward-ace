@@ -148,3 +148,33 @@
 - `systems/run.md`: 9 to 10, frozen.
 - `systems/waves.md`: 1 to 2, frozen.
 - The UFO drifter crosses the screen in a weave, with a warning before it enters, a seeded spawn row and its own tuning file, and wave_check counts it as a hazard.
+
+## Contract split: drifters, 2026-10-25
+- `systems/drifters.md`: restructured into a hub and parts, no content change. The Impact section and the Purpose task list are removed (history is in git).
+
+## Drifter registration refactor, 2026-10-25
+- `systems/app.md`, `systems/drifters.md`: no version change. The tuning loader registers by drifter type in `app/drifters/`, `wave_check` asks the drifter instead of its type, a test guards both, and the base gains the `telegraph_ticks` hook.
+
+## Contract split: app, 2026-10-25
+- `systems/app.md`: restructured into a hub and parts, no content change. The Impact section and the Purpose task list are removed (history is in git).
+
+## Contract split: run Impact, 2026-10-25
+- `systems/run.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: ship Impact, 2026-10-25
+- `systems/ship.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: scroll Impact, 2026-10-25
+- `systems/scroll.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: hud Impact, 2026-10-25
+- `systems/hud.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: debug-overlay Impact, 2026-10-25
+- `systems/debug-overlay.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: world Impact, 2026-10-25
+- `systems/world.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## Contract split: waves Impact, 2026-10-25
+- `systems/waves.md`: Impact section and the Purpose task list removed (history is in git), no other change.

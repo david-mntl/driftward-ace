@@ -1,0 +1,185 @@
+[
+  {
+    "contract": "drifters",
+    "kind": "split",
+    "date": "2026-10-25",
+    "old": "272d3323c68b2038095dfb3b9e9105c1e5846f57",
+    "new": {
+      "docs/contracts/systems/drifters/shared/base.md": "ae8930f65fad2f32ddb566fecce500069f7a7944",
+      "docs/contracts/systems/drifters/shared/base-interface.md": "9c9f35e8943ba87044a52e29a05183c983368431",
+      "docs/contracts/systems/drifters/shared/collision.md": "380506815ef51a536e63a240e7eef0373313206e",
+      "docs/contracts/systems/drifters/shared/rationale.md": "522eae4adcec9cffd09c1c8529e0427c9209b1f2",
+      "docs/contracts/systems/drifters/shared/spawner-registry-tuning.md": "e725a507dfff18a3b42b10e4db232796b172dddc",
+      "docs/contracts/systems/drifters/shared/views.md": "202a3d170f8f8e179a0e8a2cd0da0e6a959a4a78",
+      "docs/contracts/systems/drifters/chain-lightning/core.md": "dee461fbabf44ba84fd8163a2b17d8c3d8273482",
+      "docs/contracts/systems/drifters/chain-lightning/rationale.md": "207dd192978635394bdca322f03b384b519017c8",
+      "docs/contracts/systems/drifters/chain-lightning/tuning.md": "cca70b7255ffe8bd26bff7ee5b8b482cb778be9b",
+      "docs/contracts/systems/drifters/chain-lightning/view.md": "2813a2c22986e656d746d531e076fea4b1f288df",
+      "docs/contracts/systems/drifters/coin/core.md": "3f78f7acecd0d88ac38adc889980db9ad3fbe4b6",
+      "docs/contracts/systems/drifters/coin/rationale.md": "5def18813da8a2d6923988f58656efd5c541b2fd",
+      "docs/contracts/systems/drifters/coin/tuning.md": "e9d83542963502059f548f4b7939b421dc50f455",
+      "docs/contracts/systems/drifters/coin/view.md": "87a38b456a01712c203bb50520fa82bda03b5529",
+      "docs/contracts/systems/drifters/fireball/core.md": "f07385241d9e57db62d2e67a6e7c52184c4d5813",
+      "docs/contracts/systems/drifters/fireball/rationale.md": "a82169d5f89890ece679e124e67ee84650409a04",
+      "docs/contracts/systems/drifters/fireball/tuning.md": "bf6a064083123062375149e64a92974a9f6c8e60",
+      "docs/contracts/systems/drifters/fireball/view.md": "7b65d7f350e2077497edb9f25c91783380b49303",
+      "docs/contracts/systems/drifters/floating-island/core.md": "3014a21150393093f69e6fb33136dcc3796050f2",
+      "docs/contracts/systems/drifters/floating-island/rationale.md": "56a8b0751ba7182248a4d7ad053218c3e6e250a1",
+      "docs/contracts/systems/drifters/floating-island/tuning.md": "3c31924ea1db3f0ea14171bb6a33e7481ef02e97",
+      "docs/contracts/systems/drifters/floating-island/view.md": "00ff887442a3d790f00d50088a6918d8646a61cd",
+      "docs/contracts/systems/drifters/meteorite/core.md": "f2da39931dfcc77630c511e23db7b7a7a6b3a9b3",
+      "docs/contracts/systems/drifters/meteorite/rationale.md": "403fa7d7e1864c87b5cd20e86f1172702f860530",
+      "docs/contracts/systems/drifters/meteorite/view.md": "5d948109cd1cf4ee6af591d4ab37d675d92834aa",
+      "docs/contracts/systems/drifters/planet/core.md": "5d4012ec22898bc3285561f2ea602b52ea5b5767",
+      "docs/contracts/systems/drifters/planet/rationale.md": "8d3cc97221939e7cda3c8eb5db90d2da637b5a21",
+      "docs/contracts/systems/drifters/planet/tuning.md": "16259fb1beecaeb3b43793c5e1e04f9b9cc5ccf0",
+      "docs/contracts/systems/drifters/planet/view.md": "726c60f957c8a29735efc9a8af8e6111a816dfe8",
+      "docs/contracts/systems/drifters/satellite/core.md": "0abbf582f58d02a44559f3aab646309811bf3a89",
+      "docs/contracts/systems/drifters/satellite/rationale.md": "278b822c3d92af7e7b27fc22d358ffc77df6f94a",
+      "docs/contracts/systems/drifters/satellite/view.md": "5fcd6a598b57901d227e2e195b71b49ff8155d80",
+      "docs/contracts/systems/drifters/ufo/core.md": "0a420c596e78f2da27ba4d8774455ca97b2578b7",
+      "docs/contracts/systems/drifters/ufo/rationale.md": "000faba67e10912e56d818598e33712b747b7ee7",
+      "docs/contracts/systems/drifters/ufo/tuning.md": "c99b33cb0d5ed1d6921ac4a4bf3387e536cf7983",
+      "docs/contracts/systems/drifters/ufo/view.md": "67eb89f413427509f737de0452af4c43a7a6c0b3",
+      "docs/contracts/systems/drifters/old-names.md": "6bd7feae89c61db1afe349049ee60a1ac5c4cc62",
+      "docs/contracts/systems/drifters.md": "733f84931e1f74f8317ffabf461daf304f9ad04b"
+    }
+  },
+  {
+    "contract": "app",
+    "kind": "split",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "b99195497c507275c72eb635aa3a8c011e93625e",
+    "new": {
+      "docs/contracts/systems/app/debug-spawns.md": "22b648f394df660f4889536e79bb1710d49936d7",
+      "docs/contracts/systems/app/error-handling.md": "7dbcb5d494ec1d6eece05e8d84b6989f65f80977",
+      "docs/contracts/systems/app/frame-loop.md": "f5b412720f6248b287a80f5f0cc7f90a90806380",
+      "docs/contracts/systems/app/general.md": "3667b166f9437f7059659243055484fbe2ea63f2",
+      "docs/contracts/systems/app/integration-checks/DRA-104.md": "0e5822f8537adc7654f28224b506cd745aa1c369",
+      "docs/contracts/systems/app/integration-checks/DRA-13.md": "c0af7111f88de45928eae32c2a0f81391b44bab8",
+      "docs/contracts/systems/app/integration-checks/DRA-19.md": "6915743684781c8f17b04cfd7e4418715ef61802",
+      "docs/contracts/systems/app/integration-checks/DRA-23.md": "2cb8b28caae7fdd2753f0eb16b7785e0805c321f",
+      "docs/contracts/systems/app/integration-checks/DRA-29.md": "21b2c5cdf1ede790d7b695407042dbcf72736da6",
+      "docs/contracts/systems/app/integration-checks/DRA-39.md": "7f53f94f809a1224979c20c08f5df067aaa79d33",
+      "docs/contracts/systems/app/integration-checks/DRA-47.md": "a1528559dfe186481cf046abe69f3f87a8105d12",
+      "docs/contracts/systems/app/integration-checks/DRA-5.md": "960ebcf6d9df6bf8b789c4e718c53c027cb4616a",
+      "docs/contracts/systems/app/integration-checks/DRA-56.md": "d8404436fda4bf35ba51042bc580f13f6e26b029",
+      "docs/contracts/systems/app/integration-checks/DRA-6.md": "03c1932e6732f5e285826e0986c1f8da5f6f1cd9",
+      "docs/contracts/systems/app/integration-checks/DRA-61.md": "096016884b75d1907816cb302a2a05409db40227",
+      "docs/contracts/systems/app/integration-checks/DRA-62.md": "ecb9bf3f4cf0958549d3b0d2cdf50bae8e8b9291",
+      "docs/contracts/systems/app/integration-checks/DRA-76.md": "534e4e7f46088b9fd199f08907dac5c1fc9947d0",
+      "docs/contracts/systems/app/integration-checks/DRA-86.md": "bf52c6ebb669e8909a5d0743bf4d8dc45b4d0c8f",
+      "docs/contracts/systems/app/integration-checks/DRA-96.md": "779e80b1c110695be2db28492f31a803488878fd",
+      "docs/contracts/systems/app/integration-checks/method.md": "a780d9cc4378f13a1ac42359665bb7f985f90212",
+      "docs/contracts/systems/app/rationale/debug-spawns.md": "57564b530538016d7233119806a3c511312ad1cd",
+      "docs/contracts/systems/app/rationale/error-handling.md": "e6bff7cebebbdbb12da976be781878643e24e9a0",
+      "docs/contracts/systems/app/rationale/frame-loop.md": "1e281aee822131a6e8e91877cc1d08c01ae0e7fb",
+      "docs/contracts/systems/app/rationale/integration-checks.md": "c3b16bbb5890cb6e65bf2a7a1a91e6105fdbc89f",
+      "docs/contracts/systems/app/rationale/release.md": "808e51c8ca3e2ffd8844b92f6f3fd6e52a0fba86",
+      "docs/contracts/systems/app/rationale/startup.md": "d9efb80447d4f112ee78f720003898d76518ce81",
+      "docs/contracts/systems/app/rationale/tuning-loader.md": "abe8d24ea165e0e73904e82d3800899e0f06e8e1",
+      "docs/contracts/systems/app/rationale/wave-loading.md": "a08ddcd351623daae73834ca8f5f4ea7228f3158",
+      "docs/contracts/systems/app/release.md": "740be73fcf1fa8573fa84442e3b52ede47806b6a",
+      "docs/contracts/systems/app/startup.md": "bfee6cb387e9dfe309bf786f3e5440e444217d9a",
+      "docs/contracts/systems/app/tuning-loader.md": "43c9f96598a25aeaded5056f2db3fa27d85bcbfb",
+      "docs/contracts/systems/app/wave-loading.md": "0ba7d143e44a5798b2eeea79338c9ecdd9ac01b6",
+      "docs/contracts/systems/app/old-names.md": "340a606e795055710543c31b9c90756cac31f415",
+      "docs/contracts/systems/app.md": "8b0b9c0481bbee416aa71bf7849598ea150e9f90"
+    }
+  },
+  {
+    "contract": "run",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "46f99856e863022c6e01cd42c084b9631df4afb7",
+    "new": {
+      "docs/contracts/systems/run.md": "76a0407c8c7e6d7e1c353cd4cd7549967ea831c6"
+    }
+  },
+  {
+    "contract": "ship",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "e3c2d5b86c26ce86a56fa7699fcc99933b77c509",
+    "new": {
+      "docs/contracts/systems/ship.md": "f845cb94e430111c4b4a48340a490e901fc43176"
+    }
+  },
+  {
+    "contract": "scroll",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "4b82f7758ee6cda85bacd6062a82da6b0830e955",
+    "new": {
+      "docs/contracts/systems/scroll.md": "2040c1a675eaeb49f0677d6263da5aa143150017"
+    }
+  },
+  {
+    "contract": "hud",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "83e92203df171adbeea4649d8b8ca6b27992a174",
+    "new": {
+      "docs/contracts/systems/hud.md": "1ebf71f80f9258085e1731df7b6aa9cf5780b109"
+    }
+  },
+  {
+    "contract": "debug-overlay",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "206b897301b1b1940d04b8e3b1d91d015bf7a081",
+    "new": {
+      "docs/contracts/systems/debug-overlay.md": "978fa1f32e643084aa9ca1d2176b95ff8cf7962e"
+    }
+  },
+  {
+    "contract": "world",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "fa24a8fe57a1e5be5b36234737bb2a4c93176a70",
+    "new": {
+      "docs/contracts/systems/world.md": "37c4b6d8c680e1365b7802ad600487386cf9eeae"
+    }
+  },
+  {
+    "contract": "waves",
+    "kind": "impact",
+    "drops": [
+      "impact",
+      "who-builds"
+    ],
+    "date": "2026-10-25",
+    "old": "5ae8fc6d50a5d43152e7957ca989c395a8bfc30e",
+    "new": {
+      "docs/contracts/systems/waves.md": "7150272168e71000bd8a5e95067aebe18015a526"
+    }
+  }
+]

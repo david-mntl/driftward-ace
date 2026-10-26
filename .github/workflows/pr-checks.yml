@@ -1,6 +1,7 @@
 # Runs the QA gate and the browser build on every pull request to main and every push to main.
 # Lint and tests run through game/tests/check.sh, the same command used locally.
 # The wave check and the bot check run only the waves the change touched. Run `wave_check.py --all` (and `--all --bot`) locally for all.
+# The contracts job runs scripts/contracts.sh verify on the whole history: it checks every contract hub and part, and proves again that no contract split lost a line.
 # Actions are pinned to a commit SHA. The comment names the release.
 name: PR checks
 
@@ -98,3 +99,20 @@ jobs:
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
         run: python tools/wave_check/wave_check.py --changed --base "$BASE" --bot --force --no-record
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # The whole history: verify reads the old files of the contract splits from git.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Verify the contracts
+        run: scripts/contracts.sh verify
