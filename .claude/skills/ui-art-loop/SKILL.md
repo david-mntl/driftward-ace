@@ -28,7 +28,7 @@ List `docs/reports/ui-art/<asset>-r*.md`.
 Start `art-audio-engineer` with:
 "Loop round 1. Asset: `<asset>`. Kind: `<kind>`. Brief: `<brief>`. Write the image `<image path>` and the board `<board path>`."
 
-The agent picks Request or Convert mode from the brief. Read its delivery report. Status blocked, or the image or the board is missing: stop.
+The agent picks Request or Convert mode from the brief. Read its delivery report. Status `staged` means the files wait in staging for the Director; that is a success, go on. Status blocked, or the image or the board is missing: stop.
 
 ## 3. Measure
 Run, for the round's image:
@@ -55,11 +55,11 @@ Also stop after round 3, whatever the score. Otherwise go on.
 Start `art-audio-engineer` with:
 "Refine mode. Report: `docs/reports/ui-art/<asset>-r<n>.md`. Write the image `<round n+1 image path>` and the board `<round n+1 board path>`."
 
-Status blocked, or a file missing: stop. Otherwise go to step 3 with round `<n+1>`.
+Status `staged` is a success, as in step 2. Status blocked, or a file missing: stop. Otherwise go to step 3 with round `<n+1>`.
 
 ## When to stop early
 Stop and tell the Director when:
-- an agent reports `blocked`, or a pending documentation difference
+- an agent reports `blocked` (not `staged`), or a pending documentation difference
 - a round's image, board or report is missing
 - the measure step fails
 

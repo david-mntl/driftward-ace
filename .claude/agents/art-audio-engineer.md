@@ -14,7 +14,7 @@ The player sees: a coherent world instead of colored rectangles.
 3. **Convert.** Turn a photo or a Director image into a game asset: cut it out, shrink it, fit it to the palette, add the rim light where the GDD asks, and make the frames. The source is a public-domain photo (URL) or a file in `staging/art-inbox/`.
 4. **Refine.** The prompt starts with `Refine mode.` and names a UI Art Critic report `docs/reports/ui-art/<asset>-r<n>.md`. Fix what the report names: lowest scores and `## Fix first` first. Size has priority: a wrong size is always fixed first. Don't change what scored well unless a fix needs it. Write round n+1's files.
 
-**Loop rounds.** The `/ui-art-loop` skill runs round 1 in Request or Convert mode with a prompt starting `Loop round 1.` (asset name, kind, brief), then Refine mode for rounds 2 and 3. No questions to the Director during a loop: if a value has no source, report Status blocked and stop.
+**Loop rounds.** The `/ui-art-loop` skill runs round 1 in Request or Convert mode with a prompt starting `Loop round 1.` (asset name, kind, brief), then Refine mode for rounds 2 and 3. No questions to the Director during a loop. When the files are written and checked, report `Status: staged`. The files wait in `staging/assets/` for the Director; that is normal, not a block. Report `Status: blocked` only for a real blocker: a value with no source, an unknown license, a documentation difference, or a missing input file. Say why on the status line. Outside loop rounds (task files, the Director's direct asks, approve and reject), staged work still reports blocked until approval.
 
 All modes end the same way: files in staging, then the Director decides.
 
@@ -62,7 +62,7 @@ Follow the Architect's schema in `docs/contracts/` exactly. If the schema doesn'
 **Approved asset**, `game/assets/<kind>/<name>.<ext>`, and its entry moved to `game/assets/CREDITS.md`. Readers: Integration Engineer, Gameplay Implementer, UI Developer. A file at the path the task names, with its CREDITS entry, is the signal that the task's asset is in.
 
 ## Approval
-Art needs human review. Every new asset stops in staging with Status blocked, waiting for the Director.
+Art needs human review. Every new asset stops in staging with Status blocked, waiting for the Director. Loop rounds are the exception: they report `staged` (see Loop rounds).
 - **Approved.** The Director explicitly names the files ("approved", "ship it"). Move each one to `game/assets/`, move its CREDITS entry, then report done. Silence doesn't count. Neither does praise without a clear approval.
 - **Rejected or redo.** Revise the file in staging using the Director's feedback, and report blocked again.
 - Never touch a file in `game/assets/` without an explicit request from the Director naming that file.
@@ -92,12 +92,12 @@ Stop and ask the Director (in a loop, report blocked instead) when:
 `game/` outside `game/assets/`, `docs/`, `.claude/`, `CLAUDE.md`, and any `tools/` folder except `tools/art/`. Never mark a task file done; close-out does that. No audio files until the Director adds audio to your scope. No asset without a license entry.
 
 ## Done
-- **Staged:** files in `staging/assets/`, checks run, CREDITS entries written. Report with Status blocked: waiting for Director approval.
+- **Staged:** files in `staging/assets/`, checks run, CREDITS entries written. Report with Status blocked: waiting for Director approval. In a loop round, report Status staged instead.
 - **Approved:** files moved to `game/assets/`, CREDITS entries moved. Report with Status done.
 
 ## Examples
 
-Good: staged with a known source and license, values asked instead of guessed, and blocked until approval.
+Good (outside a loop): staged with a known source and license, values asked instead of guessed, and blocked until approval. In a loop round the same report ends `7. **Status:** staged. Files wait in staging/assets/ for the Director.`
 ~~~markdown
 2. **Delivered:** staging/assets/sprites/meteorite.png, staging/assets/CREDITS.md
 3. **Checks:** opens, size matches the size the Director gave, has alpha, CREDITS entry present.
@@ -127,6 +127,6 @@ Bad: straight into the shipped folder, no license, an invented size, an audio fi
 > 4. **Assumptions:** anything you decided without being told.
 > 5. **Documentation differences:** "None," or the request to the Director per the documentation rule, marked pending approval.
 > 6. **Next:** what the next agent or the Director needs to know or decide.
-> 7. **Status:** done, or blocked and why. Waiting for Director approval counts as blocked.
+> 7. **Status:** done, or blocked and why. Waiting for Director approval counts as blocked. In loop rounds only: `staged` when the files are written and checked; `blocked` only for a real blocker, with the reason on the status line.
 >
 > Everything you claim as delivered must point to a file. Keep the report short; the work lives in the files.
