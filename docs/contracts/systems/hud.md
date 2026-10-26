@@ -1,15 +1,15 @@
 # HUD
 Version: 5
-Status: frozen
-Features: DRA-13, DRA-23, DRA-61, DRA-76, DRA-117
+Status: draft
+Features: DRA-13, DRA-23, DRA-61, DRA-76, DRA-117, DRA-125
 Created by: architect
 
 ## Purpose
-Keep the run's numbers in view during play. The HUD shows the score at the top left, on HUD line 1, as `SCORE 1 234`, the graze count below it, on HUD line 2 at the left margin, as `GRAZE 5`, and the lives left as white hearts at the top right. LV comes in a later feature, on line 2 too, and pushes GRAZE to the right then. BEST comes only once saves ship. The HUD only reads core state.
+Keep the run's numbers in view while the run is on screen: playing, the last life, paused and game over. The HUD shows the score at the top left, on HUD line 1, as `SCORE 1 234`, the graze count below it, on HUD line 2 at the left margin, as `GRAZE 5`, and the lives left as white hearts at the top right. LV comes in a later feature, on line 2 too, and pushes GRAZE to the right then. BEST comes only once saves ship. The HUD only reads core state. It doesn't show on the menu, the instructions page or the leaderboard page.
 
 In debug mode the HUD's lines sit below the debug overlay's text, so the two never overlap. The hearts are at the top right, away from the overlay, and don't move.
 
-This contract also sets the score's text, `score_text`, which the Game Over box uses too (`docs/contracts/systems/run.md`, Presentation).
+This contract also sets the score's text, `score_text`, which the game-over screen uses too (`docs/contracts/systems/game-flow.md`, Presentation).
 
 ## Diagram
 Normal mode:
@@ -139,7 +139,7 @@ Hearts:
 - The heart is drawn once onto a 24 × 24 `pygame.SRCALPHA` surface, on the first draw, and kept. Each frame blits it once per life. Never redrawn per frame. Source: 15-tech-constraints.md, rule 5.
 - A lost life empties the leftmost filled slot. The other hearts don't move, and the visible hearts always end 8 px from the right edge. Source: scope report DRA-23 ("A lost life makes one heart disappear"; 8 px from the right edge).
 - The hearts are in the same place in both modes and whatever `below_overlay` is. They never touch the overlay's text, which stays at the left, or the SCORE line. Their lowest row is 31, far above the top line on row 168. Source: 10-ui.md, rule 1; scope report DRA-13, Decision log (no overlap).
-- `lives` 0 draws no heart. That only happens at game over.
+- `lives` 0 draws no heart. That only happens from the last life on (DRA-125), through game over.
 
 Both:
 - Fonts and the heart surface are created once, on the first draw, and kept. Never per frame. Source: 15-tech-constraints.md, rule 5.
@@ -155,7 +155,7 @@ Both:
 - SCORE replaces the meters readout. The meters are still counted in core and are part of the score; only their own readout goes. Source: scope report DRA-61, Decision log (Director: "SCORE replaces it").
 - The SCORE format, label and look are the Director's, not in the GDD (UI-01 is TBD). The look is the DRA-13 stand-in, kept. Source: scope report DRA-61, Values needed.
 - The hearts are a temporary stand-in. 10-ui.md, lives_display is TBD (UI-02). Source: scope report DRA-23, Values needed.
-- The HUD shows in both modes, from the first frame, and while the Game Over box shows. SCORE reads `SCORE 0` until the world has scrolled 10 px, and `SCORE 0` again after a retry. Three hearts show from the first frame of every run. Source: scope report DRA-61, Player sees; scope report DRA-23, Player sees.
+- The HUD shows in both modes, from the first frame of every run, through the last life, while paused and while the game-over screen shows. It never shows on the menu, the instructions page or the leaderboard page: the app doesn't call `draw_hud` there (`docs/contracts/systems/app/frame-loop.md`, Draw). SCORE reads `SCORE 0` until the world has scrolled 10 px, and `SCORE 0` again in a new run. From the last life on it shows the frozen final score (`docs/contracts/systems/run.md`, Score). Three hearts show from the first frame of every run. Source: scope report DRA-61, Player sees; scope report DRA-23, Player sees; scope report DRA-125, Values needed (the pages are text on the background; "The HUD stays visible" on pause).
 - In debug mode the HUD sits below the overlay's text and never overlaps it. Source: scope report DRA-13, Decision log (Director: "Overlap is not acceptable").
 - In debug mode the HUD stays below the overlay's place even while F3 hides the overlay, so it never jumps. The app passes `below_overlay` from the run mode, never from `overlay_visible`. Source: scope report DRA-13, HUD layout.
 - The HUD draws on top of everything. Source: 10-ui.md, rule 1.
@@ -182,4 +182,4 @@ Both:
 - **The HUD is drawn last.** 10-ui.md, rule 1 puts the HUD on top of everything.
 - **GRAZE fills line 2's slot (DRA-117).** DRA-61 kept the slot free for it, so SCORE and the hearts don't move. GRAZE takes the left margin now; LV moves it right when LV ships (scope report DRA-117, Decision log, Q5).
 - **One grouping for SCORE and GRAZE (DRA-117).** Both numbers read the same way, so one private helper in `ui/score_text.py` groups the digits and each function adds its own label. A change to the grouping changes both, which is what the Director asked for ("digits grouped like SCORE").
-- **HUD values live in `ui/hud.py`, not `ui/look.py`.** Only the HUD uses them, and they are temporary stand-ins waiting for UI-01 and UI-02. The Game Over box has its own font size constant for its score line, so the box can be redesigned (UI-04) without touching the HUD.
+- **HUD values live in `ui/hud.py`, not `ui/look.py`.** Only the HUD uses them, and they are temporary stand-ins waiting for UI-01 and UI-02. The game-over screen takes its score line's size from `ui/screen_look.py` (DRA-125), not from the HUD, so the screens can be redesigned (UI-04) without touching the HUD.
