@@ -1,0 +1,4 @@
+# Art scripts only (desktop dev env). Never shipped: the pygbag build packs
+# game/ alone, and the game itself never imports these.
+pillow==13.0.0
+numpy==2.5.4

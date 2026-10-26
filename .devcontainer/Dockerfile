@@ -41,6 +41,11 @@ RUN cp -r /root/.oh-my-zsh /home/$USERNAME/.oh-my-zsh \
 COPY game/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
+# Art script libraries (Pillow, numpy). Dev container only: the pygbag build
+# packs game/ alone, so these never ship with the game.
+COPY tools/art/requirements.txt /tmp/art-requirements.txt
+RUN pip install --no-cache-dir -r /tmp/art-requirements.txt
+
 # Browser testing for the Integration Engineer agent. CLAUDE.md requires every
 # build to be tested in a real browser, so the agent drives headless Chromium
 # through the Playwright MCP server (Node-based). Browsers go in a shared path
