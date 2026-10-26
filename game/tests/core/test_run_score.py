@@ -1,19 +1,19 @@
-"""Run score tests: meters plus coin points, never down, frozen at game over, 0 after a retry.
+"""Run score tests: meters plus coin points, never down, frozen from the last life, 0 when new.
 
-Contract: docs/contracts/systems/run.md, Rules (Score, a game-over tick, Logging) and
+Contract: docs/contracts/systems/run.md, Rules (Score, The last life, a last-life tick, a
+game-over tick, `next_run`, Logging) and
 docs/contracts/systems/scroll.md, Rules (Distance).
 Task: docs/contracts/DRA-61/tasks/DRA-61-04-qa-engineer.md. One test per behavior it lists.
 Every expected number comes from the GDD values below, never from the code under test.
 """
 
 import logging
-import re
 from dataclasses import replace
 from itertools import pairwise
 
 import pytest
 
-from core.run import Run, start_run, step_run
+from core.run import Run, next_run, start_run, step_run
 from core.scroll import Scroll
 from core.ship import Ship, Thrust
 
@@ -48,6 +48,10 @@ NO_KEY = Thrust()
 UP = Thrust(up=True)
 RUN_LOGGERS = ("core.run", "core.scroll", "core.ship")
 """Every logger a run step writes to. Source: systems/run.md, Logging; scroll.md; ship.md."""
+
+LAST_LIFE_DELAY: int = 120
+"""Ticks from the death tick to game over. Source: 02-game-flow.md, Values, last_life_delay
+(guess)."""
 
 HOLD_UP_TICKS: int = 150
 """Ticks the scripted pilot holds up after each respawn before it lets the ship fall."""
@@ -101,6 +105,11 @@ def _scripted_run(coin_points: int = 0) -> list[Run]:
         if run.game_over:
             return states
     raise AssertionError("the scripted run never reached game over")
+
+
+def _death(states: list[Run]) -> int:
+    """The index of the state after the tick the last life was lost."""
+    return next(i for i, s in enumerate(states) if s.burst is not None)
 
 
 def _lines(caplog: pytest.LogCaptureFixture) -> list[str]:
@@ -163,16 +172,17 @@ def test_no_playing_tick_changes_the_coin_points() -> None:
         assert any(s.waiting for s in states), "the run has a respawn wait"
         assert states[-1].lives == 0
         assert states[-1].game_over
-        assert min(s.lives for s in states[:-1]) == 1, "the run has falls"
+        playing = [s for s in states if s.burst is None]
+        assert min(s.lives for s in playing) == 1, "the run has falls"
         assert all(s.coin_points == coin_points for s in states)
 
         # A fall tick on its own.
         assert step_run(_falling_run(coin_points=coin_points), NO_KEY).coin_points == coin_points
-        # A last-life fall (the game-over tick) and the frozen ticks after it.
-        over = step_run(_falling_run(lives=1, coin_points=coin_points), NO_KEY)
-        assert over.game_over
-        assert over.coin_points == coin_points
-        assert step_run(over, NO_KEY).coin_points == coin_points
+        # A last-life fall (the tick the last life starts) and the ticks after it.
+        last = step_run(_falling_run(lives=1, coin_points=coin_points), NO_KEY)
+        assert last.last_life
+        assert last.coin_points == coin_points
+        assert step_run(last, NO_KEY).coin_points == coin_points
 
 
 @pytest.mark.smoke
@@ -181,10 +191,15 @@ def test_score_never_goes_down_and_keeps_counting_through_falls_and_waits() -> N
     scores = [s.score for s in states]
 
     assert all(a <= b for a, b in pairwise(scores))
-    # The meters keep counting through every fall, respawn and wait, tick for tick.
+    # The meters keep counting through every fall, respawn and wait, tick for tick, up to the
+    # tick the last life is lost. From then on the score is the frozen final score.
+    death = _death(states)
     for ticks, run in enumerate(states):
         assert run.scroll.ticks == ticks
-        assert run.score == _meters_after(ticks) * POINTS_PER_METER, f"tick {ticks}"
+        if ticks <= death:
+            assert run.score == _meters_after(ticks) * POINTS_PER_METER, f"tick {ticks}"
+        else:
+            assert run.score == states[death].score, f"tick {ticks}"
 
     # A fall happened, and the score still counted up across the wait that followed it.
     fall_ticks = [i for i in range(1, len(states)) if states[i].lives < states[i - 1].lives]
@@ -198,15 +213,22 @@ def test_score_never_goes_down_and_keeps_counting_through_falls_and_waits() -> N
 
 
 @pytest.mark.smoke
-def test_score_stops_at_game_over_until_the_retry() -> None:
+def test_score_stops_on_the_death_tick_and_stays_through_game_over() -> None:
     states = _scripted_run()
+    death = _death(states)
+    last = states[death]
     over = states[-1]
     assert over.game_over
-    # The game-over tick runs in full: the score on it is the meters of that tick.
-    assert over.score == _meters_after(over.scroll.ticks) * POINTS_PER_METER
-    assert over.score > 0
+    # The death tick runs in full: the score on it is the meters of that tick.
+    assert last.score == _meters_after(last.scroll.ticks) * POINTS_PER_METER
+    assert last.score > 0
+    assert last.final_score == last.score
+    # The scroll runs on through the last life, but the score never moves.
+    assert over.scroll.ticks == last.scroll.ticks + LAST_LIFE_DELAY
+    assert over.scroll.meters > last.scroll.meters
+    assert all(s.score == last.score for s in states[death:])
 
-    # Every arrow released: the box waits for a press, the score never moves.
+    # Every arrow released: the score never moves.
     run = over
     for _ in range(400):
         run = step_run(run, NO_KEY)
@@ -215,24 +237,25 @@ def test_score_stops_at_game_over_until_the_retry() -> None:
         assert run.scroll == over.scroll
         assert run.coin_points == over.coin_points
 
-    # An arrow held since game over: no retry, and the score never moves.
+    # An arrow held since game over: no new run, and the score never moves.
     left = Thrust(left=True)
-    run = replace(over, retry_armed=False, held=left)
+    run = replace(over, held=left)
     for _ in range(400):
         run = step_run(run, left)
         assert run.game_over
         assert run.score == over.score
         assert run.scroll == over.scroll
 
-    # With coin points set, the final score is meters + coin points and stays too.
-    paid = replace(over, coin_points=40)
+    # With coin points, the final score is meters + coin points and stays too.
+    paid = _scripted_run(coin_points=40)[-1]
+    assert paid.score == over.score + 40
     run = paid
     for _ in range(50):
         run = step_run(run, NO_KEY)
-        assert run.score == paid.score == over.score + 40
+        assert run.score == paid.score
 
 
-def test_a_retry_gives_score_0_again() -> None:
+def test_a_new_run_gives_score_0_again() -> None:
     over = _scripted_run()[-1]
     assert over.score > 0
 
@@ -240,39 +263,40 @@ def test_a_retry_gives_score_0_again() -> None:
     assert released.game_over
     assert released.score == over.score
 
-    run = step_run(released, UP)
+    run = next_run(released)
     assert not run.game_over
     assert run.score == 0
     assert run.coin_points == 0
+    assert run.final_score is None
 
     # The new run counts from 0 like the first one.
     for ticks in range(1, 200):
         run = step_run(run, UP)
         assert run.score == _meters_after(ticks) * POINTS_PER_METER
 
-    # Coin points do not carry over a retry.
-    paid_over = replace(over, coin_points=33)
+    # Coin points do not carry over into a new run.
+    paid_over = _scripted_run(coin_points=33)[-1]
     assert paid_over.score == over.score + 33
-    retried = step_run(step_run(paid_over, NO_KEY), UP)
-    assert not retried.game_over
-    assert retried.coin_points == 0
-    assert retried.score == 0
+    fresh = next_run(step_run(paid_over, NO_KEY))
+    assert not fresh.game_over
+    assert fresh.coin_points == 0
+    assert fresh.score == 0
 
 
-def test_no_log_line_names_the_score(caplog: pytest.LogCaptureFixture) -> None:
+def test_only_the_last_life_and_game_over_lines_name_the_score(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     for name in RUN_LOGGERS:
         caplog.set_level(logging.DEBUG, logger=name)
 
     states = _scripted_run(coin_points=5)
     over = states[-1]
-    step_run(step_run(over, NO_KEY), UP)  # the retry
+    next_run(step_run(over, NO_KEY))  # the new run
     lines = _lines(caplog)
 
     assert lines
-    assert not [line for line in lines if "score" in line.lower()]
+    named = [line for line in lines if "score" in line.lower()]
+    assert named == [f"last life score={over.score}", f"game over score={over.score}"]
     assert not [line for line in lines if "coin" in line.lower()]
-
-    over_lines = [line for line in lines if line.startswith("game over")]
-    assert len(over_lines) == 1
-    assert re.fullmatch(r"game over meters=\d+", over_lines[0])
-    assert over_lines[0] == f"game over meters={over.scroll.meters}"
+    assert not [line for line in lines if line.startswith("game over meters")]
+    assert lines.index(named[0]) < lines.index(named[1])

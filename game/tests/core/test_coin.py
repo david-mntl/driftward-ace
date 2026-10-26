@@ -29,7 +29,7 @@ from core.drifters.tuning import (
     VariantTuning,
 )
 from core.popup import PointsPopup
-from core.run import Run, add_drifters, start_run, step_run
+from core.run import Run, add_drifters, next_run, start_run, step_run
 from core.scroll import Scroll
 from core.ship import Ship, Thrust, ship_hitbox, spawn
 
@@ -75,6 +75,10 @@ INVULN_TICKS: int = 30
 GRAVITY: float = 0.16
 FALL_CAP: float = 5.5
 """px/tick². px/tick. Source: 04-ship.md, Values, gravity, fall_cap (guess)."""
+
+LAST_LIFE_DELAY: int = 120
+"""Ticks from the death tick to game over. Source: 02-game-flow.md, Values, last_life_delay
+(guess)."""
 
 RUN_LOGGER = "core.run"
 """Logger name. Source: systems/run.md, Logging."""
@@ -618,7 +622,7 @@ def test_a_coin_touched_on_a_fall_tick_pays_the_fall_costs_its_life_and_no_hit_i
         assert lines[-1].startswith("drifter gone id=1 type=coin")
 
 
-def test_a_coin_paid_on_the_last_lifes_tick_is_in_the_frozen_final_score_and_a_retry_clears_it(
+def test_a_coin_paid_on_the_last_lifes_tick_is_in_the_frozen_final_score_and_a_new_run_clears_it(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.DEBUG, logger=RUN_LOGGER)
@@ -630,33 +634,46 @@ def test_a_coin_paid_on_the_last_lifes_tick_is_in_the_frozen_final_score_and_a_r
     }
     for name, run in scenarios.items():
         meters = meters_after_step(run.scroll)
-        over = step_run(run, NO_KEY)
-        assert over.game_over, name
-        assert over.lives == 0
-        assert over.coin_points == 50 + POINTS["rare"], name
-        assert over.score == meters + 50 + POINTS["rare"], name
-        assert len(over.popups) == 1
-        # The box shows: the score, the coin points and the popup stay as they were.
-        frozen = over
-        for _ in range(5):
+        last = step_run(run, NO_KEY)
+        assert last.last_life, name
+        assert not last.game_over
+        assert last.lives == 0
+        assert last.coin_points == 50 + POINTS["rare"], name
+        assert last.score == meters + 50 + POINTS["rare"], name
+        assert last.final_score == last.score
+        assert len(last.popups) == 1
+        # The last life: the score and the coin points stay, the popup ages with the world.
+        frozen = last
+        for k in range(1, 6):
             frozen = step_run(frozen, NO_KEY)
-            assert frozen.game_over
-            assert frozen.score == over.score
-            assert frozen.coin_points == over.coin_points
-            assert frozen.popups == over.popups
-        # With an arrow held at game over (not armed), holding it changes nothing either.
-        held_over = step_run(run, UP)
-        assert held_over.game_over
-        assert not held_over.retry_armed
-        assert step_run(held_over, UP).score == held_over.score
-        assert step_run(held_over, UP).popups == held_over.popups
-        # A retry (arrows released, then a press) is a new run: no coin points, no popups.
-        fresh = step_run(frozen, UP)
+            assert frozen.last_life
+            assert frozen.score == last.score
+            assert frozen.coin_points == last.coin_points
+            assert [p.age_ticks for p in frozen.popups] == [k]
+        # An arrow held on the death tick or after it changes nothing either.
+        held_last = step_run(run, UP)
+        assert held_last.last_life
+        assert step_run(held_last, UP).score == held_last.score
+        assert step_run(held_last, UP).popups == step_run(held_last, NO_KEY).popups
+        # Game over: the score is still the final score, and everything freezes.
+        over = last
+        for _ in range(LAST_LIFE_DELAY):
+            over = step_run(over, NO_KEY)
+        assert over.game_over, name
+        assert over.score == last.score
+        assert over.coin_points == last.coin_points
+        assert over.scroll.meters > last.scroll.meters
+        again = step_run(over, NO_KEY)
+        assert again.score == over.score
+        assert again.popups == over.popups
+        # A new run: no coin points, no popups.
+        fresh = next_run(over)
         assert not fresh.game_over, name
         assert fresh.coin_points == 0, name
         assert fresh.score == 0
         assert fresh.popups == ()
         assert fresh.drifters == ()
+    assert lines_starting(caplog, "last life") != []
     assert lines_starting(caplog, "game over") != []
 
 
@@ -698,7 +715,9 @@ def test_two_coins_touched_on_one_tick_both_pay_with_their_popups_in_drifter_ord
     assert [c.variant for c in coins_of(apart)] == ["rare"]
 
 
-def test_a_popup_rises_for_its_lifetime_is_frozen_at_game_over_and_gone_after_a_retry() -> None:
+def test_a_popup_rises_for_its_lifetime_ages_through_the_last_life_and_is_gone_in_a_new_run() -> (
+    None
+):
     run = run_of(resting(HOME_X, HOME_Y), coin("rare", HOME_X, HOME_Y))
     away = resting(100.0, 400.0)
     run = step_run(run, NO_KEY)
@@ -726,17 +745,30 @@ def test_a_popup_rises_for_its_lifetime_is_frozen_at_game_over_and_gone_after_a_
         waiting = step_run(waiting, NO_KEY)
         assert waiting.popups[0].age_ticks == age
     assert step_run(waiting, NO_KEY).popups == ()
-    # Game over: frozen like everything else. The tick it happens still ages it once.
+    # The last life: the world runs on, so a popup keeps aging and goes when it ends. The tick
+    # the last life starts ages it once.
     last_life = run_of(fall_ship(), lives=1, popups=(old,))
-    over = step_run(last_life, NO_KEY)
+    last = step_run(last_life, NO_KEY)
+    assert last.last_life
+    assert [p.age_ticks for p in last.popups] == [1]
+    last = step_run(last, NO_KEY)
+    assert [p.age_ticks for p in last.popups] == [2]
+    assert step_run(last, NO_KEY).popups == ()
+    # A long popup is still on screen at game over, and frozen there like everything else.
+    long_popup = PointsPopup(
+        x=10.0, start_y=100.0, points=50, lifetime_ticks=500, rise_per_tick=POPUP_RISE
+    )
+    over = step_run(run_of(fall_ship(), lives=1, popups=(long_popup,)), NO_KEY)
+    for _ in range(LAST_LIFE_DELAY):
+        over = step_run(over, NO_KEY)
     assert over.game_over
-    assert [p.age_ticks for p in over.popups] == [1]
+    assert [p.age_ticks for p in over.popups] == [LAST_LIFE_DELAY + 1]
     for held in (NO_KEY, NO_KEY, NO_KEY):
         over = step_run(over, held)
         assert over.game_over
-        assert over.popups == (replace(old, age_ticks=1),)
-    # A retry starts with none.
-    fresh = step_run(over, UP)
+        assert over.popups == (replace(long_popup, age_ticks=LAST_LIFE_DELAY + 1),)
+    # A new run starts with none.
+    fresh = next_run(over)
     assert not fresh.game_over
     assert fresh.popups == ()
     assert fresh.drifters == ()

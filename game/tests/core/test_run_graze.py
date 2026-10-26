@@ -1,8 +1,9 @@
-"""The graze rule inside the run: step 5b, the score, the game-over tick and the retry, the log.
+"""The graze rule inside the run: step 5b, the score, the last life, game over, a new run, the log.
 
 Contract: docs/contracts/systems/run.md, Diagram (the two graze state tables), Interface
 (DRA-117: `core/graze.py` `check_grazes`, `GrazeCheck`, `GrazeRules`; `core/run.py`), Rules (step
-5b, a game-over tick, Score, Other rules, Logging); docs/design/gdd/06-scoring.md, Rules 3 to 8.
+5b, a last-life tick, a game-over tick, Score, Other rules, Logging);
+docs/design/gdd/06-scoring.md, Rules 3 to 8.
 Task: docs/contracts/DRA-117/tasks/DRA-117-05-qa-engineer.md. One test per behavior it lists.
 The graze margin from tuning and the popup's and the ring's own state over time are DRA-117-06.
 
@@ -58,7 +59,7 @@ from core.graze import (
     check_grazes,
 )
 from core.popup import PointsPopup, PopupKind
-from core.run import Run, start_run, step_run
+from core.run import Run, next_run, start_run, step_run
 from core.scroll import Scroll
 from core.ship import Ship, Thrust, ship_hitbox
 from core.waves import LevelPlaylist, Wave, WaveBook, WaveKind, start_waves
@@ -165,6 +166,10 @@ PAIR_NODES: tuple[tuple[float, float], ...] = (
 PAIR_LAYOUT: ChainLayout = ChainLayout(
     nodes=PAIR_NODES, arcs=((0, 1),), invert_mirror=InvertMirror.LEFT_RIGHT
 )
+
+LAST_LIFE_DELAY: int = 120
+"""Ticks from the death tick to game over. Source: 02-game-flow.md, Values, last_life_delay
+(guess)."""
 
 CUSTOM_RULES: GrazeRules = GrazeRules(
     points=40,
@@ -848,16 +853,19 @@ def test_a_graze_and_a_hit_by_another_hazard_on_one_tick_the_graze_pays_then_the
     touch_at = messages.index("drifter touch id=2 type=meteorite effect=hit")
     life_at = messages.index("life lost lives=2")
     assert graze_at < touch_at < life_at
-    # On the last life the hit ends the run, and the final score has the graze in it.
+    # On the last life the hit starts the last life, and the final score has the graze in it.
     caplog.clear()
     last = scene(1)
-    assert last.game_over
+    assert last.last_life
+    assert not last.game_over
     assert last.lives == 0
     assert last.grazes == 1
     assert last.score == GRAZE_POINTS
-    assert [m for m in (r.getMessage() for r in caplog.records) if m.startswith("game over")] == [
-        "game over meters=0"
+    assert last.final_score == GRAZE_POINTS
+    assert [m for m in (r.getMessage() for r in caplog.records) if m.startswith("last life")] == [
+        f"last life score={GRAZE_POINTS}"
     ]
+    assert [m for m in (r.getMessage() for r in caplog.records) if m.startswith("game over")] == []
 
 
 def test_a_graze_on_a_fall_tick_pays_then_the_fall_counts(caplog: pytest.LogCaptureFixture) -> None:
@@ -886,9 +894,13 @@ def test_a_graze_on_a_fall_tick_pays_then_the_fall_counts(caplog: pytest.LogCapt
     assert messages.index("drifter graze id=1 type=meteorite") < messages.index("life lost lives=2")
 
 
-def _game_over_run(waves: bool) -> Run:
-    """A run on its last life whose rock paid a graze on tick 2 and whose second rock ends it on
-    tick 3. Custom graze values, with or without waves."""
+LONG_RULES: GrazeRules = replace(CUSTOM_RULES, popup_ticks=500, ring_ticks=500)
+"""A popup and a ring that outlast the last life, to see them frozen at game over."""
+
+
+def _last_life_run(waves: bool, rules: GrazeRules = CUSTOM_RULES) -> Run:
+    """A run whose rock paid a graze on tick 2 and whose second rock starts the last life on
+    tick 3 (the state after tick 3). Custom graze values, with or without waves."""
     book = WaveBook(
         waves={
             "w0": Wave(wave_id="w0", length_px=1_000_000.0, kind=WaveKind.FIXED, min_level=None)
@@ -896,7 +908,7 @@ def _game_over_run(waves: bool) -> Run:
         wave_zero_id="w0",
         playlists=tuple(LevelPlaylist() for _ in range(8)),
     )
-    base = start_run(start_waves(book, 20261019) if waves else None, CUSTOM_RULES)
+    base = start_run(start_waves(book, 20261019) if waves else None, rules)
     run = replace(
         base,
         lives=1,
@@ -906,19 +918,54 @@ def _game_over_run(waves: bool) -> Run:
     for gaps in ((IN, OUT), (OUT, OUT), (OUT, TOUCH)):
         placed = (at_gap(run.drifters[0], gaps[0]), at_gap(run.drifters[1], gaps[1], left=True))
         run = step_run(replace(run, ship=HOME, drifters=placed), NO_KEY)
+    assert run.last_life
+    assert not run.game_over
+    return run
+
+
+def _to_game_over(run: Run) -> Run:
+    """Step a last-life run, the ship put back at home each tick, until game over."""
+    for _ in range(LAST_LIFE_DELAY):
+        run = step_run(replace(run, ship=HOME), NO_KEY)
     assert run.game_over
     return run
 
 
 @pytest.mark.parametrize("waves", [False, True])
-def test_game_over_freezes_the_grazes_and_the_rings_and_a_retry_clears_them(waves: bool) -> None:
-    over = _game_over_run(waves)
+def test_the_last_life_pays_no_graze_and_game_over_freezes_the_rings_and_a_new_run_clears_them(
+    waves: bool,
+) -> None:
+    last = _last_life_run(waves)
+    assert last.grazes == 1
+    assert last.score == CUSTOM_RULES.points
+    assert last.final_score == CUSTOM_RULES.points
+    assert len(last.graze_rings) == 1
+    assert last.graze_rings[0].age_ticks == 1
+    assert last.popups[0].age_ticks == 1
+
+    # The last life: a rock that passes beside the ship pays nothing and keeps its graze state,
+    # and the score never moves. The popup (7 states) and the ring (4 states) age with the world:
+    # the death tick was tick 3, so on tick 4 they are at age 2.
+    run = replace(last, drifters=(*last.drifters, replace(rock(), uid=3)), next_uid=4)
+    ring_ages: list[list[int]] = []
+    popup_ages: list[list[int]] = []
+    for gap in (IN, OUT, IN, OUT, OUT, OUT, OUT, OUT):
+        run = step_at(run, gap, index=2)
+        assert run.grazes == 1
+        assert graze_state(run, 2) is GrazeState.OUTSIDE
+        assert run.score == last.score
+        ring_ages.append([r.age_ticks for r in run.graze_rings])
+        popup_ages.append([p.age_ticks for p in run.popups])
+    assert ring_ages == [[2], [3], [], [], [], [], [], []]
+    assert popup_ages == [[2], [3], [4], [5], [6], [], [], []]
+
+    # Game over with a popup and a ring still on screen: they freeze there like everything else.
+    long_last = _last_life_run(waves, LONG_RULES)
+    over = _to_game_over(long_last)
     assert over.grazes == 1
     assert over.score == CUSTOM_RULES.points
-    assert len(over.graze_rings) == 1
-    assert over.graze_rings[0].age_ticks == 1
-    assert over.popups[0].age_ticks == 1
-    assert over.retry_armed
+    assert [r.age_ticks for r in over.graze_rings] == [LAST_LIFE_DELAY + 1]
+    assert [p.age_ticks for p in over.popups] == [LAST_LIFE_DELAY + 1]
     # The ticks after: nothing changes, not the rings' or the popups' age, not a rock that now
     # sits inside the zone, not the score. The ship is put in front of a rock to show nothing runs.
     frozen = over
@@ -930,29 +977,29 @@ def test_game_over_freezes_the_grazes_and_the_rings_and_a_retry_clears_them(wave
         assert frozen.drifters == over.drifters
         assert frozen.score == over.score
         assert frozen.scroll == over.scroll
-    held = step_run(replace(over, retry_armed=False), UP)
+    held = step_run(over, UP)
     assert held.game_over
     assert held.grazes == 1
     assert held.graze_rings == over.graze_rings
-    # The retry: no grazes, no rings, no popups, no drifters, score 0, the same graze values.
-    retry = step_run(over, UP)
-    assert not retry.game_over
-    assert retry.grazes == 0
-    assert retry.graze_rings == ()
-    assert retry.popups == ()
-    assert retry.drifters == ()
-    assert retry.score == 0
-    assert retry.graze_rules == CUSTOM_RULES
-    assert (retry.waves is not None) is waves
+    # A new run: no grazes, no rings, no popups, no drifters, score 0, the same graze values.
+    fresh = next_run(over)
+    assert not fresh.game_over
+    assert fresh.grazes == 0
+    assert fresh.graze_rings == ()
+    assert fresh.popups == ()
+    assert fresh.drifters == ()
+    assert fresh.score == 0
+    assert fresh.graze_rules == LONG_RULES
+    assert (fresh.waves is not None) is waves
     # And it pays what it was given: one more graze in the new run.
     new_rock = replace(rock(), uid=1)
-    run = replace(retry, drifters=(new_rock,), next_uid=2)
+    run = replace(fresh, drifters=(new_rock,), next_uid=2)
     states = walk(run, [IN, OUT])
     assert states[1].grazes == 1
-    assert states[1].score == CUSTOM_RULES.points
-    assert states[1].popups[0].points == CUSTOM_RULES.points
-    assert states[1].popups[0].lifetime_ticks == CUSTOM_RULES.popup_ticks
-    assert states[1].graze_rings[0].lifetime_ticks == CUSTOM_RULES.ring_ticks
+    assert states[1].score == LONG_RULES.points
+    assert states[1].popups[0].points == LONG_RULES.points
+    assert states[1].popups[0].lifetime_ticks == LONG_RULES.popup_ticks
+    assert states[1].graze_rings[0].lifetime_ticks == LONG_RULES.ring_ticks
 
 
 def test_start_run_with_no_graze_values_has_the_gdd_defaults_and_the_old_score() -> None:

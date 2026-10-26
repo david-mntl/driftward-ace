@@ -1,4 +1,4 @@
-"""Run tests: lives, falls, the respawn wait, invulnerability, game over, retry.
+"""Run tests: lives, falls, the respawn wait, invulnerability, the last life, game over, next_run.
 
 Contract: docs/contracts/systems/run.md, Rules.
 Task: docs/contracts/DRA-23/tasks/DRA-23-04-qa-engineer.md. One test per behavior it lists.
@@ -10,7 +10,7 @@ from dataclasses import replace
 
 import pytest
 
-from core.run import Run, start_run, step_run
+from core.run import Run, next_run, start_run, step_run
 from core.scroll import Scroll, start_scroll
 from core.ship import Ship, Thrust, spawn, step
 
@@ -244,11 +244,27 @@ def test_a_fall_while_invulnerable_costs_no_life() -> None:
         assert run.invulnerable == (left > 1)
 
 
-def test_losing_the_last_life_ends_the_run() -> None:
+LAST_LIFE_DELAY: int = 120
+"""Ticks from the death tick to game over. Source: 02-game-flow.md, Values, last_life_delay
+(guess)."""
+
+
+def _over(run: Run, thrust: Thrust = NO_KEY) -> Run:
+    """Step the run until game over, the keys held being `thrust`."""
+    for _ in range(LAST_LIFE_DELAY + 1):
+        if run.game_over:
+            break
+        run = step_run(run, thrust)
+    assert run.game_over
+    return run
+
+
+def test_losing_the_last_life_starts_the_last_life() -> None:
     run = step_run(_falling_run(lives=1), NO_KEY)
 
     assert run.lives == 0
-    assert run.game_over
+    assert run.last_life
+    assert not run.game_over
     assert not run.waiting
     assert not run.invulnerable
     assert _top_edge(run.ship) >= SCREEN_H
@@ -257,8 +273,7 @@ def test_losing_the_last_life_ends_the_run() -> None:
 
 @pytest.mark.smoke
 def test_game_over_freezes_everything() -> None:
-    over = step_run(_falling_run(lives=1), NO_KEY)
-    assert over.game_over
+    over = _over(step_run(_falling_run(lives=1), NO_KEY))
 
     run = over
     for _ in range(300):
@@ -270,10 +285,9 @@ def test_game_over_freezes_everything() -> None:
 
 
 @pytest.mark.smoke
-def test_a_held_arrow_never_retries() -> None:
+def test_a_held_arrow_never_starts_a_new_run() -> None:
     right = Thrust(right=True)
-    over = step_run(_falling_run(lives=1, held=right), right)
-    assert over.game_over
+    over = _over(step_run(_falling_run(lives=1, held=right), right), right)
 
     run = over
     for _ in range(300):
@@ -289,40 +303,32 @@ def test_a_held_arrow_never_retries() -> None:
     run = _advance(run, Thrust(left=True), 5)
     assert run.game_over
 
-    # Every arrow released, then one pressed.
+    # Every arrow released, then one pressed: the run stays over. The game flow takes next_run.
     run = step_run(run, NO_KEY)
     assert run.game_over
     run = step_run(run, Thrust(up=True))
-    assert not run.game_over
-    _assert_fresh_run(run)
-
-
-def test_retry_has_no_delay_when_released_at_game_over() -> None:
-    over = step_run(_falling_run(lives=1), NO_KEY)
-    assert over.game_over
-
-    run = step_run(over, Thrust(down=True))
-
-    assert not run.game_over
-    _assert_fresh_run(run)
+    assert run.game_over
+    assert run.lives == 0
+    assert run.burst == over.burst
 
 
 def test_a_new_run_starts_like_the_first() -> None:
-    over = step_run(_falling_run(lives=1), NO_KEY)
-    run = step_run(over, Thrust(left=True))
+    over = _over(step_run(_falling_run(lives=1), NO_KEY))
+    run = next_run(over)
     _assert_fresh_run(run)
 
-    next_run = step_run(run, NO_KEY)
+    after = step_run(run, NO_KEY)
 
-    assert next_run.ship.vy == pytest.approx(GRAVITY)
-    assert next_run.ship.y == pytest.approx(START_Y + GRAVITY)
-    assert next_run.ship.x == pytest.approx(START_X)
-    assert next_run.scroll.ticks == 1
-    assert next_run.scroll.scrolled_ticks == 0
-    assert next_run.lives == LIVES_START
-    assert not next_run.invulnerable
-    assert not next_run.waiting
-    assert not next_run.game_over
+    assert after.ship.vy == pytest.approx(GRAVITY)
+    assert after.ship.y == pytest.approx(START_Y + GRAVITY)
+    assert after.ship.x == pytest.approx(START_X)
+    assert after.scroll.ticks == 1
+    assert after.scroll.scrolled_ticks == 0
+    assert after.lives == LIVES_START
+    assert not after.invulnerable
+    assert not after.waiting
+    assert not after.game_over
+    assert not after.last_life
 
 
 def test_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -> None:
@@ -374,19 +380,31 @@ def test_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -> None:
     run = _advance(run, NO_KEY, 40)
     caplog.clear()
 
-    # Last life: game over, no respawn line. Frozen ticks log nothing.
+    # Last life: `last life` after `life lost`, no respawn line, no game over yet.
     run = step_run(replace(run, ship=_falling_ship()), NO_KEY)
     lines = _lines(caplog)
-    assert run.game_over
+    assert run.last_life
+    assert not run.game_over
     assert _count(lines, "life lost") == 1
-    assert _count(lines, "game over") == 1
+    assert _count(lines, "last life") == 1
+    assert _count(lines, "game over") == 0
     assert _count(lines, "respawn from") == 0
+    assert lines[-1].startswith("last life score=")
+    caplog.clear()
+
+    # The last-life ticks log nothing here (no drifters, the scroll already runs), and game over
+    # logs once on the tick the burst finishes. Frozen ticks log nothing.
+    run = _advance(run, NO_KEY, LAST_LIFE_DELAY)
+    assert run.game_over
+    lines = _lines(caplog)
+    assert _count(lines, "game over") == 1
+    assert len(lines) == 1
     caplog.clear()
     run = _advance(run, NO_KEY, 100)
     assert _lines(caplog) == []
 
-    # Retry.
-    run = step_run(run, Thrust(up=True))
+    # A new run.
+    run = next_run(run)
     assert not run.game_over
     lines = _lines(caplog)
     assert _count(lines, "new run") == 1
