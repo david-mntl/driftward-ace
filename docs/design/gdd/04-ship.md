@@ -12,7 +12,7 @@ The ship has no weapon and no brake. Arrow keys add thrust, gravity always pulls
 | ship_h | 32 | px | — | guess | starting placeholder |
 | hitbox | an inverted T of two boxes: a bar 12 px wide, `ship_h` tall, centered; and a foot `ship_w` wide, 12 px tall, along the bottom | px | — | guess | Director (inverted T); sizes are a starting placeholder |
 | look | TBD | sprite, colors, animation | — | TBD | SH-06 |
-| look_reference | Small rocket with an orange flame | — | — | guess | Director |
+| look_reference | Sharp and swept, built from long blade-like wings: alien and elegant, not a plain rocket. Deep cobalt blue neon lines around the hull, silver-grey and pale plating between them, a blue engine flame. No fuchsia: the ship is untouched. Points up; blade tips may reach past the hitbox | — | — | guess | Director |
 | placeholder_look | white (255, 255, 255), filled, the same inverted T as `hitbox` | RGB | — | guess | Director: what you see matches what can be hit |
 | gravity | 0.16 | px/tick² | TBD | guess | Director tuning guess |
 | thrust_side | 0.42 | px/tick² | TBD | guess | Director tuning guess |
