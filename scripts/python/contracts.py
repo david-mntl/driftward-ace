@@ -50,7 +50,7 @@ DONE_STATUSES = {"fixed", "no action"}
 PARTS_BEGIN = "<!-- parts:begin -->"
 PARTS_END = "<!-- parts:end -->"
 HUB_MAX_BYTES = 6 * 1024
-PART_MAX_BYTES = 25 * 1024
+PART_MAX_BYTES = 27 * 1024
 TICKET_ID = re.compile(r"\b[A-Z]{2,}-\d+\b")
 
 
