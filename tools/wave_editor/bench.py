@@ -157,7 +157,7 @@ class Bench:
 
     @property
     def tick(self) -> int:
-        """Ticks played on the timeline. A retry in fly mode resets the run's own tick count."""
+        """Ticks played on the timeline."""
         return self.pos
 
     def _pin(self, run: Run) -> Run:
@@ -170,8 +170,14 @@ class Bench:
         )
 
     def _tick(self, run: Run, thrust: Thrust) -> Run | None:
-        """One tick, in app.frame's order. None when the wave ended on this tick."""
+        """One tick, in app.frame's order. None when the wave ended or the run is over on this tick.
+
+        Fly mode has no menu and no retry: game over, after the last life plays out, ends the
+        timeline like the wave's end.
+        """
         run = step_run(run, thrust)
+        if run.game_over:
+            return None
         waves = run.waves
         assert waves is not None
         if waves.resting or waves.start_px != 0.0 or waves.level != self.level:
