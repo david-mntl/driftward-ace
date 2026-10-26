@@ -178,3 +178,9 @@
 
 ## Contract split: waves Impact, 2026-10-25
 - `systems/waves.md`: Impact section and the Purpose task list removed (history is in git), no other change.
+
+## DRA-111, 2026-10-26
+- `systems/app.md`: 15 to 16, frozen.
+- `systems/drifters.md`: 9 to 10, frozen.
+- `systems/waves.md`: 2 to 3, frozen.
+- Electric ball: a purple drifter that charges, then fires a lightning circle as it falls. Its tuning loads from its own file.

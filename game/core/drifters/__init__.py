@@ -6,6 +6,7 @@ A new drifter adds one import line here.
 
 from core.drifters import chain_lightning as chain_lightning
 from core.drifters import coin as coin
+from core.drifters import electric_ball as electric_ball
 from core.drifters import fireball as fireball
 from core.drifters import floating_island as floating_island
 from core.drifters import meteorite as meteorite

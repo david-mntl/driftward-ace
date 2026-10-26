@@ -55,16 +55,16 @@
           "minimum": 0
         },
         "type": {
-          "description": "The drifter type value, e.g. \"meteorite\", \"satellite\", \"chain_lightning\", \"fireball\", \"coin\", \"floating_island\", \"planet\" or \"ufo\". A planet and a UFO are hazards: each needs at_px of at least 120.",
+          "description": "The drifter type value, e.g. \"meteorite\", \"satellite\", \"chain_lightning\", \"fireball\", \"coin\", \"floating_island\", \"planet\", \"ufo\" or \"electric_ball\" (DRA-111). A planet, a UFO and an electric ball are hazards: each needs at_px of at least 120.",
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
         },
         "x": {
-          "description": "Center x, screen px. Required for the meteorite, the chain lightning, the coin, the floating island and the planet. Left out for a satellite or a UFO (just outside the wall it enters from). For a fireball: as in the debug test spawn list (x alone an entry along the top; neither x nor y its corner entry).",
+          "description": "Center x, screen px. Required for the meteorite, the chain lightning, the coin, the floating island, the planet and the electric ball (its ball's center). Left out for a satellite or a UFO (just outside the wall it enters from). For a fireball: as in the debug test spawn list (x alone an entry along the top; neither x nor y its corner entry).",
           "type": "number"
         },
         "y": {
-          "description": "Center y, screen px, y down. Required for the satellite and the UFO; a UFO's y must lie inside its band, y 188 to 440 with the committed tuning (drifters/07-ufo.md, start and band). Left out for a meteorite, a chain lightning, a fireball, a coin, a floating island or a planet: just above the top edge (a planet with its field ring touching it). A coin or a floating island with x and y shows at that spot at once; a planet shows there after its entry warning.",
+          "description": "Center y, screen px, y down. Required for the satellite and the UFO; a UFO's y must lie inside its band, y 188 to 440 with the committed tuning (drifters/07-ufo.md, start and band). Left out for a meteorite, a chain lightning, a fireball, a coin, a floating island, a planet or an electric ball: just above the top edge (a planet with its field ring touching it; an electric ball with its ball touching it). A coin or a floating island with x and y shows at that spot at once; a planet shows there after its entry warning.",
           "type": "number"
         },
         "variant": {
@@ -73,7 +73,7 @@
           "pattern": "^[a-z][a-z0-9_]*$"
         },
         "invert": {
-          "description": "The drifter's invert (07-drifters.md, rule 13). Left out: false. A drifter without one refuses true; a floating island has one for its l_shape, t_shape and triangle only (05-floating-islands.md, rule 9).",
+          "description": "The drifter's invert (07-drifters.md, rule 13). Left out: false. A drifter without one refuses true; a floating island has one for its l_shape, t_shape and triangle only (05-floating-islands.md, rule 9). An electric ball accepts it and it changes nothing (drifters/10-electric-ball.md, rule 8; DRA-111).",
           "type": "boolean"
         },
         "specialty": {

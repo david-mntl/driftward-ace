@@ -1,0 +1,19 @@
+{
+  "default_variant": "standard",
+  "variants": {
+    "standard": {
+      "ball_size": 16,
+      "pulse_radius": 64
+    }
+  },
+  "speed_ratio": 0.375,
+  "entry_warning_ticks": 60,
+  "charge_ticks": 120,
+  "fire_ticks": 120,
+  "charge_rays": 4,
+  "ray_length": 6,
+  "ray_width": 1,
+  "outline_width": 1,
+  "rim_width": 2,
+  "fill_opacity": 0.35
+}

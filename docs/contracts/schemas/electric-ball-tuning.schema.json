@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/electric-ball-tuning.schema.json",
+  "title": "Electric ball tuning file",
+  "description": "The file game/tuning/drifters/electric_ball.json (DRA-111). Built on drifter-tuning.schema.json: the same default_variant, speed_ratio and entry_warning_ticks, plus the electric ball's own type values (its charge and fire cycle, its rays and the widths and opacity of its look), and variants that give the ball's size and the pulse radius instead of width, height and hitbox. The loader works those three out: width and height are ball_size (the electric ball's size is its ball), and the hitbox is one circle of radius pulse_radius on the ball's center, built by core.drifters.electric_ball.electric_ball_hitbox (docs/contracts/systems/drifters/electric-ball/core.md, Rules). Where each value comes from: default_variant, ball_size, pulse_radius, speed_ratio, charge_ticks, fire_ticks and fill_opacity from drifters/10-electric-ball.md, Values; entry_warning_ticks from 07-drifters.md, Values (the shared value); charge_rays and ray_length from drifters/03-chain-lightning.md, Values (reused for the electric ball: scope report DRA-111, Left to the Architect); ray_width and outline_width are the 1 px of drifters/10-electric-ball.md, placeholder_look; rim_width is its 2 px rim. Level scaling (drifters/10-electric-ball.md, rule 7) is applied at birth by core, never here: speed x the level's hazard speed; charge_ticks x the level's Timer x, rounded up, never below telegraph_min; fire_ticks, pulse_radius and everything else never scale. Colors are not here: they stay in the view. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app/tuning-loader.md). Rules this schema can't express, also enforced by the loader: default_variant is one of the variant names; in every variant pulse_radius > ball_size / 2 (core.drifters.electric_ball.check_electric_ball_variant). Owner of the schema: architect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_variant",
+    "variants",
+    "speed_ratio",
+    "entry_warning_ticks",
+    "charge_ticks",
+    "fire_ticks",
+    "charge_rays",
+    "ray_length",
+    "ray_width",
+    "outline_width",
+    "rim_width",
+    "fill_opacity"
+  ],
+  "properties": {
+    "default_variant": {
+      "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants. drifters/10-electric-ball.md, default_variant.",
+      "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+    },
+    "variants": {
+      "description": "Named sizes (drifters/10-electric-ball.md, variants). A new size is a new entry here and needs no code.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "drifter-tuning.schema.json#/$defs/variant_name" },
+      "additionalProperties": { "$ref": "#/$defs/variant" }
+    },
+    "speed_ratio": {
+      "description": "Level 1 speed straight down as a multiple of the ship's top sideways speed (drifters/10-electric-ball.md, speed_ratio).",
+      "$ref": "drifter-tuning.schema.json#/properties/speed_ratio"
+    },
+    "entry_warning_ticks": { "$ref": "drifter-tuning.schema.json#/properties/entry_warning_ticks" },
+    "charge_ticks": {
+      "description": "Charge length at Level 1, ticks: the telegraph before the circle fires. Timer x applies at birth, rounded up, never below telegraph_min (drifters/10-electric-ball.md, charge_ticks and rule 7).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "fire_ticks": {
+      "description": "Fire length, ticks. Never scales with level (drifters/10-electric-ball.md, fire_ticks).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "charge_rays": {
+      "description": "Most charge rays around the ball. One shows when the charge starts and one more each time another 1/charge_rays of the charge has passed (drifters/03-chain-lightning.md, charge_rays, reused).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "ray_length": {
+      "description": "Ray length out from the ball's edge, px (drifters/03-chain-lightning.md, ray_length, reused).",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "ray_width": {
+      "description": "Ray thickness, px (drifters/10-electric-ball.md, placeholder_look: 1 px rays).",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "outline_width": {
+      "description": "Thickness of the charge outline of the pulse circle, px (drifters/10-electric-ball.md, placeholder_look: a 1 px outline).",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "rim_width": {
+      "description": "Thickness of the firing circle's bright rim, px, drawn inside the circle (drifters/10-electric-ball.md, placeholder_look: a 2 px rim).",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "fill_opacity": {
+      "description": "How opaque the firing circle's fill is: more than 0 (invisible) and at most 1 (solid). The GDD says 'translucent' and gives no number: the value is the Director's (scope report DRA-111).",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ball_size", "pulse_radius"],
+      "properties": {
+        "ball_size": {
+          "description": "The ball's diameter, px: the electric ball's width and height. An even whole number, so the drawn ball has a whole-pixel radius (drifters/10-electric-ball.md, ball_size).",
+          "type": "integer",
+          "minimum": 2,
+          "multipleOf": 2
+        },
+        "pulse_radius": {
+          "description": "The pulse circle's radius, px, from the ball's center: the firing hitbox and the charge outline. A whole number, more than ball_size / 2 (checked by the loader) (drifters/10-electric-ball.md, pulse_radius).",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
