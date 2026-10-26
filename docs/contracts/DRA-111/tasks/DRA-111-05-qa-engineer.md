@@ -4,7 +4,7 @@ Assignee: qa-engineer
 Writes to: game/tests/
 Contract: docs/contracts/systems/waves.md, docs/contracts/systems/drifters.md
 Impact: docs/contracts/DRA-111/impact.md
-Status: open
+Status: done
 Linear: DRA-116
 
 ## Read in the contract

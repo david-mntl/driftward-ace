@@ -185,3 +185,9 @@
 - `systems/hud.md`: 4 to 5, frozen.
 - `systems/run.md`: 10 to 11, frozen.
 - Graze: a near miss scores points, draws a ring on the ship and shows a popup. The HUD counts grazes. New scoring file and graze margin in the hazards file.
+
+## DRA-111, 2026-10-26
+- `systems/app.md`: 15 to 16, frozen.
+- `systems/drifters.md`: 9 to 10, frozen.
+- `systems/waves.md`: 2 to 3, frozen.
+- Electric ball: a purple drifter that charges, then fires a lightning circle as it falls. Its tuning loads from its own file.
