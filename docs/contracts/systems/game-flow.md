@@ -1,6 +1,6 @@
 # Game flow: menu, instructions, leaderboard, pause and game over
-Version: 0
-Status: draft
+Version: 1
+Status: frozen
 Features: DRA-125
 Created by: architect
 

@@ -185,3 +185,10 @@
 - `systems/hud.md`: 4 to 5, frozen.
 - `systems/run.md`: 10 to 11, frozen.
 - Graze: a near miss scores points, draws a ring on the ship and shows a popup. The HUD counts grazes. New scoring file and graze margin in the hazards file.
+
+## DRA-125, 2026-10-26
+- `systems/app.md`: 16 to 17, frozen.
+- `systems/game-flow.md`: 0 to 1, frozen.
+- `systems/hud.md`: 5 to 6, frozen.
+- `systems/run.md`: 11 to 12, frozen.
+- Screens: menu, instructions, pause, the 2-second last life and one game-over screen with MENU and RETRY. New game-flow contract and last-life file.
