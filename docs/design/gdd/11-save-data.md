@@ -23,7 +23,7 @@ The game saves a local top 10 of runs in the browser's localStorage. Each entry 
 2. Keep the 10 best entries, ordered by `sort_and_ties`.
 3. **Best** = the score of the #1 entry. BEST on the HUD shows it.
 4. Key names and JSON shape belong to the save schema, not the GDD.
-5. If localStorage is empty, missing or broken, the game still runs. No BEST, no letter picker, nothing saved, and the game-over screen shows GAME OVER and the score.
+5. If localStorage is missing or can't be read or written, or the saved data is broken, the game still runs. No BEST, no letter picker, nothing saved, and the game-over screen shows GAME OVER and the score. Nothing saved yet is not broken: the list is empty and works.
 6. **Name entry** is the letter picker on the game-over screen. It shows only when the run's score makes the top 10 ([02-game-flow.md](02-game-flow.md) rule 9). A score off the list gets no picker and nothing is saved.
 7. The picker starts filled with `last_nickname`, so a returning player just confirms. With no `last_nickname` it starts blank.
 8. Blank slots at the end are dropped. A name of only blanks is empty. An empty name is not valid: confirming it saves nothing, and `last_nickname` stays as it was. RETRY and MENU then take over.
@@ -33,6 +33,7 @@ The game saves a local top 10 of runs in the browser's localStorage. Each entry 
 ## Edge cases
 - A score equal to #10's on score and level: the older entry stays above, so the new score is off the list. No letter picker.
 - The list is empty: the first score makes #1 and shows NEW BEST SCORE.
+- The level reached is the level when the last life is lost, frozen with the score. The waves running on during the last life don't change it.
 - The same nickname can hold several entries.
 - A different browser or computer has its own list. Clearing browser data clears it.
 
