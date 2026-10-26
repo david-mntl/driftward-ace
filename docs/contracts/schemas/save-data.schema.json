@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/save-data.schema.json",
+  "title": "Save data",
+  "description": "The text stored under one browser localStorage key (game/app/saves.py, SAVE_KEY): everything the game saves, as one JSON object. DRA-126. Fields are 11-save-data.md, entry_fields and last_nickname (locked), and nothing else (01-vision.md, locked decision 9; 11-save-data.md, rule 1). Design key names map as: entry_fields 'nickname' -> nickname, 'score' -> score, 'level reached' -> level_reached; last_nickname -> last_nickname; the top 10 itself -> entries. Written whole by the app after every saved entry; read and checked once at startup (docs/contracts/systems/app/save-storage.md). What the schema can't say, the app also checks: the entries are in the top-10 order (11-save-data.md, sort_and_ties; docs/contracts/systems/saves.md, Rules, Order). Data that fails any check is broken (11-save-data.md, rule 5). Owner of the schema: architect. Contract: docs/contracts/systems/saves.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entries", "last_nickname"],
+  "properties": {
+    "entries": {
+      "description": "The top 10 in place order, #1 first: score high first, then level reached high first, then the older entry above (11-save-data.md, sort_and_ties). At most top_n entries (11-save-data.md, top_n). Empty before the first save. Maps to core.saves.Saves.entries.",
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "last_nickname": {
+      "description": "The last nickname saved from the letter picker (11-save-data.md, last_nickname), or null before the first. Maps to core.saves.Saves.last_nickname.",
+      "oneOf": [
+        { "$ref": "#/$defs/nickname" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "entry": {
+      "description": "One run on the top 10. Maps to core.saves.ScoreEntry.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nickname", "score", "level_reached"],
+      "properties": {
+        "nickname": { "$ref": "#/$defs/nickname" },
+        "score": {
+          "description": "The run's final score, whole points (06-scoring.md). Never a bool.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "level_reached": {
+          "description": "The level the run reached, 1 to 8 (08-difficulty.md; core.levels FIRST_LEVEL to LEVEL_COUNT). Never a bool.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        }
+      }
+    },
+    "nickname": {
+      "description": "1 to 10 characters (11-save-data.md, nickname_length) from A-Z, 0-9, space and . - _ ! ? * (nickname_chars), never ending in a space: trailing blanks are dropped before saving (rule 8). Leading and inner spaces are kept. Matches core.saves.is_valid_nickname.",
+      "type": "string",
+      "pattern": "^[A-Z0-9 ._!?*-]{0,9}[A-Z0-9._!?*-]$"
+    }
+  }
+}
