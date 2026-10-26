@@ -1,4 +1,5 @@
 {
   "rehit_cooldown": 180,
-  "rehit_dim": 0.75
+  "rehit_dim": 0.75,
+  "graze_margin": 14
 }

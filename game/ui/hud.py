@@ -1,4 +1,4 @@
-"""HUD: the SCORE line top-left and the lives as hearts top-right, on top of the frame.
+"""HUD: the SCORE and GRAZE lines top-left and the lives as hearts top-right, on top of the frame.
 
 Source: docs/contracts/systems/hud.md, Interface and Presentation. The view only draws.
 It never fills, flips, logs per frame, catches an error, changes the run, or reads the run
@@ -12,7 +12,7 @@ import pygame
 
 from core.run import Run
 from ui.debug_overlay import overlay_text_bottom
-from ui.score_text import score_text
+from ui.score_text import graze_text, score_text
 
 log = logging.getLogger(__name__)
 
@@ -58,17 +58,19 @@ stand-in approved by the Director, not in the GDD (UI-01 and UI-02 are TBD)."""
 
 
 def draw_hud(surface: pygame.Surface, run: Run, below_overlay: bool) -> None:
-    """Draw the SCORE line top-left and one heart per life top-right. Units: pixels.
+    """Draw the SCORE and GRAZE lines top-left and one heart per life top-right. Units: pixels.
 
     The SCORE text is ``score_text(run.score)`` on HUD line 1, top-left at (HUD_MARGIN, hud_top).
-    ``hud_top`` is HUD_TOP, or the debug overlay's text bottom plus HUD_OVERLAY_GAP when
-    ``below_overlay`` is True. Line 2 stays empty. The hearts do not depend on
+    The GRAZE text is ``graze_text(run.grazes)`` on line 2, at (HUD_MARGIN, hud_top +
+    HUD_LINE_SPACING). ``hud_top`` is HUD_TOP, or the debug overlay's text bottom plus
+    HUD_OVERLAY_GAP when ``below_overlay`` is True. The hearts do not depend on
     ``below_overlay``. Needs ``pygame.font`` initialized.
     """
     hud_top: int = HUD_TOP
     if below_overlay:
         hud_top = overlay_text_bottom() + HUD_OVERLAY_GAP
     surface.blit(_score_surface(run.score), (HUD_MARGIN, hud_top))
+    surface.blit(_graze_surface(run.grazes), (HUD_MARGIN, hud_top + HUD_LINE_SPACING))
     _draw_hearts(surface, run.lives)
 
 
@@ -79,6 +81,15 @@ def _score_surface(score: int) -> pygame.Surface:
     Source: hud.md, Presentation, SCORE line; 15-tech-constraints.md, rule 5.
     """
     return _hud_font().render(score_text(score), True, HUD_COLOR)
+
+
+@lru_cache(maxsize=1)
+def _graze_surface(grazes: int) -> pygame.Surface:
+    """Return the GRAZE text for ``grazes``, rendered again only when the count differs.
+
+    Source: hud.md, Presentation, GRAZE line; 15-tech-constraints.md, rule 5.
+    """
+    return _hud_font().render(graze_text(grazes), True, HUD_COLOR)
 
 
 def _draw_hearts(surface: pygame.Surface, lives: int) -> None:

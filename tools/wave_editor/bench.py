@@ -1,8 +1,8 @@
 """The bench: the game's own sim, run tool-side with a timeline and hot reload. No pygame.
 
 Plays one source on the fixed 60 Hz tick through the game's `step_run` and `add_drifters`, in the
-same order as `app.frame`. The source is one wave file or the debug spawn list. Reads the game
-read-only. Every tick's thrust is recorded, so a scrub restores the nearest snapshot and replays
+same order as `app.frame`, with the graze values from `scoring.json`. The source is one wave file
+or the debug spawn list. Reads the game read-only. Every tick's thrust is recorded, so a scrub restores the nearest snapshot and replays
 to the exact same state.
 """
 
@@ -14,10 +14,11 @@ from pathlib import Path
 import doc as doc_module
 from app import tuning as tuning_module
 from app.debug_spawns import DebugSpawnList, debug_spawns_due, load_debug_spawns
-from app.tuning import load_tuning
+from app.tuning import load_graze_rules, load_tuning
 from core.drifters.base import Phase, TickContext
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning
+from core.graze import GrazeRules
 from core.levels import FIRST_LEVEL, LEVEL_COUNT
 from core.run import Run, add_drifters, start_run, step_run
 from core.scroll import SCROLL_START_DELAY, scroll_speed
@@ -56,20 +57,28 @@ class Bench:
             tuple[int, ...] | None, tuple[tuple[float, float, bool], ...]
         ] = (None, ())
         self.tuning: DrifterTuning
+        self.graze_rules: GrazeRules
         self.wave: Wave
         self.spawn_list: DebugSpawnList | None
-        self.tuning, self.wave, self.spawn_list = self._build()
+        self.tuning, self.graze_rules, self.wave, self.spawn_list = self._build()
         self._mtimes: dict[Path, float] = self._scan()
         self.restart()
 
     # ---- source -------------------------------------------------------------------------
 
-    def _build(self) -> tuple[DrifterTuning, Wave, DebugSpawnList | None]:
+    def _build(
+        self,
+    ) -> tuple[DrifterTuning, GrazeRules, Wave, DebugSpawnList | None]:
         """Check the document with the game's own loaders. Raises on any problem."""
-        tuning: DrifterTuning = load_merged(self.doc)
+        tuning, rules = load_merged(self.doc)
         if self.doc.wave is None:
-            return tuning, _blank_wave(), load_debug_spawns(tuning)
-        return tuning, _build_wave(self.doc.wave_id, self.doc.wave, tuning), None
+            return tuning, rules, _blank_wave(), load_debug_spawns(tuning)
+        return (
+            tuning,
+            rules,
+            _build_wave(self.doc.wave_id, self.doc.wave, tuning),
+            None,
+        )
 
     def _transaction(self, change: Callable[[], None]) -> bool:
         """Apply `change` to the document and rebuild. On any error the document and the old
@@ -77,7 +86,7 @@ class Bench:
         saved = self.doc.snapshot()
         try:
             change()
-            self.tuning, self.wave, self.spawn_list = self._build()
+            self.tuning, self.graze_rules, self.wave, self.spawn_list = self._build()
         except Exception as err:  # noqa: BLE001 - any bad file or value must not kill the tool
             self.doc.restore(saved)
             self.error = str(err)
@@ -144,7 +153,7 @@ class Bench:
             playlists=(LevelPlaylist(),) * LEVEL_COUNT,
         )
         waves = replace(start_waves(book, 0), level=self.level)
-        return self._pin(start_run(waves=waves))
+        return self._pin(start_run(waves=waves, graze_rules=self.graze_rules))
 
     @property
     def tick(self) -> int:
@@ -333,11 +342,11 @@ def _blank_wave() -> Wave:
     )
 
 
-def load_merged(doc: Doc) -> DrifterTuning:
-    """Load the drifter tuning with the document's layers over production.
+def load_merged(doc: Doc) -> tuple[DrifterTuning, GrazeRules]:
+    """Load the drifter tuning and the graze values with the document's layers over production.
 
-    Writes the merged tuning folder to a temp dir and calls the game's `load_tuning()` on it, so
-    the game's own checks validate every value.
+    Writes the merged tuning folder to a temp dir and calls the game's `load_tuning()` and
+    `load_graze_rules()` on it, so the game's own checks validate every value.
     """
     production: Path = tuning_module.TUNING_DIR
     with tempfile.TemporaryDirectory() as folder:
@@ -345,6 +354,6 @@ def load_merged(doc: Doc) -> DrifterTuning:
         doc.write_merged_dir(merged)
         tuning_module.TUNING_DIR = merged
         try:
-            return load_tuning()
+            return load_tuning(), load_graze_rules()
         finally:
             tuning_module.TUNING_DIR = production

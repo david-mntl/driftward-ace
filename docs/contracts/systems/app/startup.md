@@ -67,7 +67,7 @@ flowchart LR
   T -- yes --> TK["one tick:<br/>run = step_run(run, thrust)<br/>run = add_drifters(run, due, tuning), due =<br/>debug_spawns_due(spawn_list, run.scroll.ticks) when the list plays,<br/>else run.wave_spawns_due (DRA-76)"] --> T
   T -- no --> CAP{"acc still >= 1/60 s?"}
   CAP -- yes --> DROP["acc = 0<br/>(owed time dropped)"] --> D
-  CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, render_drifter for each drifter,<br/>draw_points_popup for each popup (DRA-62),<br/>draw_ship if run.ship_visible,<br/>draw_debug_hitboxes, draw_debug_overlay and<br/>draw_debug_wave_lines (DRA-76) if overlay_visible,<br/>draw_game_over(surface) then draw_final_score(surface, run.score)<br/>if run.game_over, then draw_hud"]
+  CAP -- no --> D["draw: fill ui.look.BACKGROUND,<br/>draw_starfield, render_drifter for each drifter,<br/>draw_points_popup for each popup (DRA-62),<br/>draw_ship if run.ship_visible,<br/>draw_graze_ring for each graze ring (DRA-117),<br/>draw_debug_hitboxes, draw_debug_overlay and<br/>draw_debug_wave_lines (DRA-76) if overlay_visible,<br/>draw_game_over(surface) then draw_final_score(surface, run.score)<br/>if run.game_over, then draw_hud"]
   D --> FL["display.flip()"]
   FL --> Y["await asyncio.sleep(0)"]
   Y --> F

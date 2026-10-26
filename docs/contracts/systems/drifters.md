@@ -1,7 +1,7 @@
 # Drifters: base, hitboxes, levels, spawner, every drifter and their views
 Version: 10
 Status: frozen
-Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111
+Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111, DRA-117
 Created by: architect
 
 ## Purpose
@@ -11,13 +11,13 @@ Every drifter in the game, hazards, pickups and blockers, is built on one shared
 <!-- parts:begin -->
 | Part | Holds | Read when | Size |
 |---|---|---|---|
-| [shared/base-interface](drifters/shared/base-interface.md) | Interface | you write or review code in `game/core/drifters/base.py`. | 14.3 KB |
-| [shared/base](drifters/shared/base.md) | Purpose, Diagram, Rules | you change what every drifter shares: phases, warning, hitbox, start, re-hit. | 24.8 KB |
+| [shared/base-interface](drifters/shared/base-interface.md) | Interface | you write or review code in `game/core/drifters/base.py`. | 15.5 KB |
+| [shared/base](drifters/shared/base.md) | Purpose, Diagram, Rules | you change what every drifter shares: phases, warning, hitbox, start, re-hit. | 25.9 KB |
 | [shared/collision](drifters/shared/collision.md) | Interface, Rules | you change hitbox shapes, the overlap test or the push-out. | 12.0 KB |
-| [shared/rationale](drifters/shared/rationale.md) | Rationale | you ask why a shared rule is the way it is. A drifter's own why is in its `rationale` part. | 13.1 KB |
-| [shared/spawner-registry-tuning](drifters/shared/spawner-registry-tuning.md) | Diagram, Interface, Rules | you change levels, the registry, the spawner or the shared tuning, or add a drifter. | 18.7 KB |
+| [shared/rationale](drifters/shared/rationale.md) | Rationale | you ask why a shared rule is the way it is. A drifter's own why is in its `rationale` part. | 13.8 KB |
+| [shared/spawner-registry-tuning](drifters/shared/spawner-registry-tuning.md) | Diagram, Interface, Rules | you change levels, the registry, the spawner or the shared tuning, or add a drifter. | 19.2 KB |
 | [shared/views](drifters/shared/views.md) | Diagram, Interface, Presentation | you change how drifters are drawn: view registry, brightness, entry warning, shapes. | 17.6 KB |
-| [chain-lightning/core](drifters/chain-lightning/core.md) | Diagram, Interface, Rules | you change how the chain lightning behaves (`chain_lightning.py`). | 17.7 KB |
+| [chain-lightning/core](drifters/chain-lightning/core.md) | Diagram, Interface, Rules | you change how the chain lightning behaves (`chain_lightning.py`). | 17.8 KB |
 | [chain-lightning/rationale](drifters/chain-lightning/rationale.md) | Rationale | you ask why the chain lightning is built the way it is. | 4.1 KB |
 | [chain-lightning/tuning](drifters/chain-lightning/tuning.md) | Rules | you change the chain lightning's tuning file or its checks. | 1.0 KB |
 | [chain-lightning/view](drifters/chain-lightning/view.md) | Interface, Presentation | you change how the chain lightning looks. | 3.5 KB |
@@ -25,7 +25,7 @@ Every drifter in the game, hazards, pickups and blockers, is built on one shared
 | [coin/rationale](drifters/coin/rationale.md) | Rationale | you ask why the coin is built the way it is. | 2.3 KB |
 | [coin/tuning](drifters/coin/tuning.md) | Rules | you change the coin's tuning file or its checks. | 1.4 KB |
 | [coin/view](drifters/coin/view.md) | Interface, Presentation | you change how the coin looks. | 4.4 KB |
-| [electric-ball/core](drifters/electric-ball/core.md) | Diagram, Interface, Rules | you change how the electric ball behaves (`electric_ball.py`) or its tuning file. | 19.1 KB |
+| [electric-ball/core](drifters/electric-ball/core.md) | Diagram, Interface, Rules | you change how the electric ball behaves (`electric_ball.py`) or its tuning file. | 19.3 KB |
 | [electric-ball/rationale](drifters/electric-ball/rationale.md) | Rationale | you ask why the electric ball is built the way it is. | 4.5 KB |
 | [electric-ball/view](drifters/electric-ball/view.md) | Interface, Presentation | you change how the electric ball looks. | 5.9 KB |
 | [fireball/core](drifters/fireball/core.md) | Diagram, Interface, Rules | you change how the fireball behaves (`fireball.py`). | 11.2 KB |
@@ -44,10 +44,10 @@ Every drifter in the game, hazards, pickups and blockers, is built on one shared
 | [planet/rationale](drifters/planet/rationale.md) | Rationale | you ask why the planet is built the way it is. | 3.5 KB |
 | [planet/tuning](drifters/planet/tuning.md) | Rules | you change the planet's tuning file or its checks. | 1.5 KB |
 | [planet/view](drifters/planet/view.md) | Interface, Presentation | you change how the planet looks. | 3.9 KB |
-| [satellite/core](drifters/satellite/core.md) | Diagram, Interface, Rules | you change how the satellite behaves (`satellite.py`). | 6.2 KB |
+| [satellite/core](drifters/satellite/core.md) | Diagram, Interface, Rules | you change how the satellite behaves (`satellite.py`). | 6.3 KB |
 | [satellite/rationale](drifters/satellite/rationale.md) | Rationale | you ask why the satellite is built the way it is. | 1.3 KB |
 | [satellite/view](drifters/satellite/view.md) | Interface, Presentation | you change how the satellite looks. | 1.7 KB |
-| [ufo/core](drifters/ufo/core.md) | Diagram, Interface, Rules | you change how the UFO behaves (`ufo.py`). | 20.4 KB |
+| [ufo/core](drifters/ufo/core.md) | Diagram, Interface, Rules | you change how the UFO behaves (`ufo.py`). | 20.5 KB |
 | [ufo/rationale](drifters/ufo/rationale.md) | Rationale | you ask why the UFO is built the way it is. | 5.7 KB |
 | [ufo/tuning](drifters/ufo/tuning.md) | Rules | you change the UFO's tuning file or its checks. | 2.8 KB |
 | [ufo/view](drifters/ufo/view.md) | Interface, Presentation | you change how the UFO looks. | 2.3 KB |

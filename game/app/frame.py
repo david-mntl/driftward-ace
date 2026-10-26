@@ -1,15 +1,15 @@
 """The async frame loop on the fixed 60 Hz tick. Imported only by app.loop.start, inside the guard.
 
-Before the first frame it loads and checks the drifter tuning and the wave files (both modes)
-and, in debug mode only, the debug test spawn list. The run plays the waves, except in debug
-mode when the spawn list plays (its `play` is "list", the default). Each frame: read events,
+Before the first frame it loads and checks the drifter tuning, the graze values and the wave files
+(both modes) and, in debug mode only, the debug test spawn list. The run plays the waves, except in
+debug mode when the spawn list plays (its `play` is "list", the default). Each frame: read events,
 build the thrust from the held arrow keys, run up to MAX_TICKS_PER_FRAME ticks (one
 core.run.step_run each, then the due drifters, the waves' or the spawn list's, through
 core.run.add_drifters), draw the starfield, the drifters, the points popups, the ship while the
-run shows it, the debug outlines and overlay with the wave and level lines if visible, the Game
-Over box with the final score at game over and the HUD, flip, then yield to the browser.
-The app holds one Run; core does the ship, the scroll, the drifters, the lives, the respawn
-wait, game over and retry.
+run shows it, the graze rings, the debug outlines and overlay with the wave and level lines if
+visible, the Game Over box with the final score at game over and the HUD, flip, then yield to the
+browser. The app holds one Run; core does the ship, the scroll, the drifters, the lives, the
+respawn wait, game over, retry and grazes.
 Source: docs/contracts/systems/app.md, Rules, Frame loop. 15-tech-constraints.md, rules 1 and 2.
 """
 
@@ -24,10 +24,11 @@ import pygame
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.mode import RunMode
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
-from app.tuning import load_tuning
+from app.tuning import load_graze_rules, load_tuning
 from app.waves import load_wave_book
 from core.drifters.spawner import Placement
 from core.drifters.tuning import DrifterTuning
+from core.graze import GrazeRules
 from core.run import Run, add_drifters, start_run, step_run
 from core.ship import Thrust
 from core.waves import WaveBook, start_waves
@@ -35,6 +36,7 @@ from core.world import SCREEN_H, SCREEN_W
 from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay, draw_debug_wave_lines
 from ui.drifters.registry import render_drifter
 from ui.game_over import draw_final_score, draw_game_over
+from ui.graze_view import draw_graze_ring
 from ui.hud import draw_hud
 from ui.look import BACKGROUND
 from ui.popup_view import draw_points_popup
@@ -60,10 +62,14 @@ async def frame_loop(mode: RunMode) -> None:
     surface: pygame.Surface = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     debug: bool = mode is RunMode.DEBUG
     tuning: DrifterTuning = load_tuning()
+    graze_rules: GrazeRules = load_graze_rules()
     book: WaveBook = load_wave_book(tuning)
     spawn_list: DebugSpawnList | None = load_debug_spawns(tuning) if debug else None
     list_plays: bool = spawn_list is not None and spawn_list.play == PLAY_LIST
-    run: Run = start_run(waves=None if list_plays else start_waves(book, random.getrandbits(64)))
+    run: Run = start_run(
+        waves=None if list_plays else start_waves(book, random.getrandbits(64)),
+        graze_rules=graze_rules,
+    )
     overlay_visible: bool = debug
     accumulator: float = 0.0
     was_capped: bool = False
@@ -165,12 +171,14 @@ def _apply_cap(accumulator: float, was_capped: bool) -> bool:
 
 def _draw(surface: pygame.Surface, run: Run, overlay_visible: bool, debug: bool) -> None:
     """Fill the background, then draw the starfield, the drifters, the points popups, the ship
-    while shown, the debug outlines, overlay and wave lines if visible, the Game Over box and its
-    final score line at game over, and the HUD last.
+    while shown, the graze rings on every frame, the debug outlines, overlay and wave lines if
+    visible, the Game Over box and its final score line at game over, and the HUD last.
 
     Drifters sit behind the ship, and the popups over the drifters and behind the ship. The HUD
     sits below the overlay's place for the whole run in debug mode, even while F3 hides the
-    overlay. Source: systems/app.md, Rules, Draw, Drifters behind the ship and below_overlay.
+    overlay. The graze rings sit over the ship and don't follow its blink.
+    Source: systems/app/frame-loop.md, Rules, Draw, Drifters behind the ship, Graze rings over
+    the ship and below_overlay.
     """
     surface.fill(BACKGROUND)
     draw_starfield(surface, run.scroll)
@@ -180,6 +188,8 @@ def _draw(surface: pygame.Surface, run: Run, overlay_visible: bool, debug: bool)
         draw_points_popup(surface, popup)
     if run.ship_visible:
         draw_ship(surface, run.ship)
+    for ring in run.graze_rings:
+        draw_graze_ring(surface, ring, run.ship)
     if overlay_visible:
         draw_debug_hitboxes(surface, run)
         draw_debug_overlay(surface, run.ship)

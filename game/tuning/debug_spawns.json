@@ -1,5 +1,5 @@
 {
-  "play": "list",
+  "play": "waves",
   "mode": "electric_ball",
   "loop_ticks": 200,
   "rows": [
@@ -17,6 +17,10 @@
       "type": "meteorite",
       "x": 480,
       "variant": "big"
+    },
+    {
+      "type": "meteorite",
+      "x": 357
     },
     {
       "type": "satellite",

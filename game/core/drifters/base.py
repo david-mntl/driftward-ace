@@ -23,7 +23,8 @@ from core.world import SCREEN_H, SCREEN_W
 log = logging.getLogger(__name__)
 
 GRAZE_MARGIN: Final[int] = 14
-"""Graze zone margin around a hazard's hitbox, px. Source: 06-scoring.md, graze_margin (locked)."""
+"""Graze zone margin around a hazard's hitbox, px. The default of `HazardRules.graze_margin`,
+`Birth.graze_margin` and `Drifter.graze_margin`. Source: 06-scoring.md, graze_margin (locked)."""
 
 ENTRY_WARNING_SIZE: Final[int] = 24
 """Entry warning diameter, px, the same for every drifter. Source: 07-drifters.md,
@@ -86,6 +87,19 @@ class Phase(Enum):
 
     GONE = "gone"
     """The drifter is finished. The run drops it this tick."""
+
+
+class GrazeState(Enum):
+    """Where the ship is against a drifter's graze zone. Set by the run's graze step."""
+
+    OUTSIDE = "outside"
+    """The ship is not in the zone. The drifter may still pay a graze."""
+
+    INSIDE = "inside"
+    """The ship was in the zone on the last check. The drifter may still pay."""
+
+    SPENT = "spent"
+    """The drifter touched the ship or already paid. It never pays a graze again."""
 
 
 class TouchEffect(Enum):
@@ -192,6 +206,9 @@ class Birth:
     seed: int | None = None
     """The placement's seed, for a seeded drifter. None for any other."""
 
+    graze_margin: float = GRAZE_MARGIN
+    """Px the graze zone grows each hitbox shape by, above 0. Source: game/tuning/hazards.json."""
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Specialty(ABC):
@@ -272,6 +289,12 @@ class Drifter(ABC):
     rehit_ticks_left: int = 0
     """Ticks of re-hit cooldown still to come. 0 means it may hit. Set by the run."""
 
+    graze_margin: float = GRAZE_MARGIN
+    """Px the graze zone grows each hitbox shape by, from the spawner."""
+
+    graze_state: GrazeState = GrazeState.OUTSIDE
+    """Where the ship is against the graze zone. Set by the run."""
+
     def current_hitbox(self) -> Hitbox:
         """Return the placed hitbox, or () unless the phase is ACTIVE."""
         if self.phase is not Phase.ACTIVE:
@@ -279,13 +302,13 @@ class Drifter(ABC):
         return place_hitbox(self.hitbox, self.x, self.y)
 
     def graze_zone(self) -> Hitbox:
-        """Return the current hitbox grown by GRAZE_MARGIN, or () unless a touch is a HIT.
+        """Return the current hitbox grown by `graze_margin`, or () unless a touch is a HIT.
 
         Source: 06-scoring.md, rules 3 and 5.
         """
         if self.effect_on_touch() is not TouchEffect.HIT:
             return ()
-        return grow_hitbox(self.current_hitbox(), GRAZE_MARGIN)
+        return grow_hitbox(self.current_hitbox(), self.graze_margin)
 
     def drawn_parts(self) -> tuple[Box, ...]:
         """Return upright boxes, screen px, that hold every pixel the view draws while ACTIVE.
@@ -466,6 +489,7 @@ def born_drifter[T: Drifter](cls: type[T], birth: Birth) -> T:
         warning_ticks=birth.warning_ticks,
         rehit_cooldown_ticks=birth.rehit_cooldown_ticks,
         rehit_dim=birth.rehit_dim,
+        graze_margin=birth.graze_margin,
     )
 
 

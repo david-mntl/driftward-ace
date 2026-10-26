@@ -2,13 +2,25 @@
 
 Stdlib only, no frame time, no randomness. Screen px, y down.
 
-Source: docs/contracts/systems/run.md, Interface, popup.py; drifters/04-coin.md, popup.
+Source: docs/contracts/systems/run.md, Interface, popup.py; drifters/04-coin.md, popup;
+06-scoring.md, graze_popup.
 """
 
 import logging
 from dataclasses import dataclass, replace
+from enum import Enum
 
 log = logging.getLogger(__name__)
+
+
+class PopupKind(Enum):
+    """What paid the points a popup shows. The view picks its color by it."""
+
+    COIN = "coin"
+    """A pickup's points. Source: drifters/04-coin.md, popup."""
+
+    GRAZE = "graze"
+    """A paid graze. Source: 06-scoring.md, graze_popup."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -32,6 +44,9 @@ class PointsPopup:
 
     age_ticks: int = 0
     """Ticks since it appeared. 0 on the state it appears."""
+
+    kind: PopupKind = PopupKind.COIN
+    """What paid the points. Source: systems/run.md, Interface (DRA-117)."""
 
     @property
     def y(self) -> float:

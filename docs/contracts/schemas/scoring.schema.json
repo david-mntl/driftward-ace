@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/scoring.schema.json",
+  "title": "Graze values",
+  "description": "The file game/tuning/scoring.json: the values a run pays and shows grazes with, read in both run modes. DRA-117. The file must exist; every field is optional, and a field left out keeps its default from core.graze (the DEFAULT_GRAZE_* constants, each the GDD's value). {} is a valid file. Key names are the GDD's key with the part of a compound key after it (06-scoring.md, Values: graze_points, graze_popup, graze_ring). The graze margin is not here: it is a value every hazard shares, in hazards.json. The two graze colors are not here: like every placeholder color they are view constants. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app/tuning-loader.md) into core.graze.GrazeRules. Owner of the schema: architect. Contract: docs/contracts/systems/run.md, Rules (step 5b, Score).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {
+    "graze_points": {
+      "description": "Points one graze adds to the score, and the number its popup shows. Default: 06-scoring.md, graze_points (locked). Maps to GrazeRules.points.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "graze_popup_ticks": {
+      "description": "States a graze popup shows on before it is gone, ticks. Default: 06-scoring.md, graze_popup (guess). Maps to GrazeRules.popup_ticks.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "graze_popup_rise_per_tick": {
+      "description": "Px a graze popup rises up the screen each tick. An int or a float, never a bool. Default: 06-scoring.md, graze_popup (guess). Maps to GrazeRules.popup_rise_per_tick.",
+      "type": "number",
+      "minimum": 0
+    },
+    "graze_ring_ticks": {
+      "description": "States a graze ring shows on while it grows and fades, ticks. Default: 06-scoring.md, graze_ring (guess). Maps to GrazeRules.ring_ticks.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "graze_ring_start_diameter": {
+      "description": "Px across a graze ring is on the state it appears. An int or a float, never a bool. Default: 06-scoring.md, graze_ring (guess). Maps to GrazeRules.ring_start_diameter.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "graze_ring_end_diameter": {
+      "description": "Px across a graze ring grows toward, reached as it fades out. An int or a float, never a bool. Default: 06-scoring.md, graze_ring (guess). Maps to GrazeRules.ring_end_diameter.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "graze_ring_width": {
+      "description": "Line width of a graze ring, px. Default: 06-scoring.md, graze_ring (guess). Maps to GrazeRules.ring_width.",
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

@@ -33,10 +33,7 @@ Status: `open`, or `blocking` (stops other work now).
 | LD-09 | On the last life: play the feedback first, then the game-over screen? How long between them? | 05-lives-and-damage.md, 02-game-flow.md | Game over | open |
 
 ## Scoring
-| ID | Question | File | Blocks | Status |
-|---|---|---|---|---|
-| SC-02 | The ship enters a graze zone while invulnerable and leaves after it ends. Does it pay? | 06-scoring.md | Graze | open |
-| SC-04 | A hazard leaves the screen while the ship is still in its zone. Does it pay? | 06-scoring.md | Graze | open |
+None open.
 
 ## Drifters, one per spec
 | ID | Question | File | Blocks | Status |

@@ -33,6 +33,7 @@ from core.drifters.base import (
     Drifter,
     DrifterType,
     DrifterTypeExtra,
+    GrazeState,
     Phase,
     TickContext,
     TouchEffect,
@@ -1320,8 +1321,11 @@ def test_touching_the_disc_or_the_dome_is_one_hit_and_the_cooldown_holds() -> No
         run = step_run(replace(run, ship=resting(current.x, current.y - 10.0)), NO_KEY)
         twin = twin.update(CTX).mark_entered()
         (after,) = ufos_of(run)
-        # It keeps flying and weaving exactly as one that was never touched.
-        assert replace(after, rehit_ticks_left=0, uid=0) == replace(twin, uid=0), tick
+        # It keeps flying and weaving exactly as one that was never touched, but for its graze
+        # state: a touch ends the hazard's graze for good (SPENT, DRA-117, run.md step 5b item 3).
+        assert after.graze_state is GrazeState.SPENT, tick
+        spent = replace(after, rehit_ticks_left=0, uid=0, graze_state=twin.graze_state)
+        assert spent == replace(twin, uid=0), tick
         assert after.weaving
         if tick == 1:
             assert run.lives == LIVES_START - 1

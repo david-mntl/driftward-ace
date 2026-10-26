@@ -1,11 +1,14 @@
-"""Load and check the drifter tuning files, the playtest switches and the shared hazard values.
+"""Load and check the drifter tuning files, the playtest switches, the shared hazard values and the
+graze values.
 
 Reads `tuning/playtest.json`, `tuning/hazards.json` and one
-`tuning/drifters/<drifter_type value>.json` per DrifterType, once, at startup. Checks every rule of
+`tuning/drifters/<drifter_type value>.json` per DrifterType, once, at startup (`load_tuning`), and
+`tuning/scoring.json` once, at startup (`load_graze_rules`). Checks every rule of
 their schemas by hand (pygbag has no schema library) and builds the core records. Core trusts what
 this returns. Any bad file raises ValueError naming the file and the field; a missing file raises
 FileNotFoundError as it is. Never falls back to a default for a missing file. A hazards field left
-out keeps its default from core.drifters.base.
+out keeps its default from core.drifters.base, and a scoring field left out keeps its default from
+core.graze.
 A drifter whose file has a schema of its own has a tuning module in `app.drifters`
 (`<drifter>_tuning.py`) that registers its loader by type: this module names no drifter. A drifter
 with none follows drifter-tuning.schema.json (`app.drifters.checks.load_generic`). The shared
@@ -14,19 +17,28 @@ Not a startup module: it imports core.drifters, so only app.frame imports it, in
 
 Source: docs/contracts/systems/app.md, Interface and Rules, Tuning loader;
 docs/contracts/schemas/drifter-tuning.schema.json, playtest-switches.schema.json and
-hazards.schema.json, and each drifter's own schema named in its tuning module.
+hazards.schema.json, and each drifter's own schema named in its tuning module;
+docs/contracts/systems/app/tuning-loader.md (DRA-117) and scoring.schema.json.
 """
 
 import json
 import logging
 from pathlib import Path
 
-from app.drifters.checks import check_boolean, check_fields, check_integer, is_number, load_generic
+from app.drifters.checks import (
+    check_boolean,
+    check_fields,
+    check_integer,
+    check_positive,
+    is_number,
+    load_generic,
+)
 from app.drifters.registry import TuningLoader, tuning_loader
 from core.drifters.base import (
     DEFAULT_REHIT_COOLDOWN_TICKS,
     DEFAULT_REHIT_DIM,
     DEFAULT_TELEGRAPH_MIN_TICKS,
+    GRAZE_MARGIN,
     DrifterType,
 )
 from core.drifters.tuning import (
@@ -34,6 +46,16 @@ from core.drifters.tuning import (
     DrifterTypeTuning,
     HazardRules,
     PlaytestSwitches,
+)
+from core.graze import (
+    DEFAULT_GRAZE_POINTS,
+    DEFAULT_GRAZE_POPUP_RISE_PER_TICK,
+    DEFAULT_GRAZE_POPUP_TICKS,
+    DEFAULT_GRAZE_RING_END_DIAMETER,
+    DEFAULT_GRAZE_RING_START_DIAMETER,
+    DEFAULT_GRAZE_RING_TICKS,
+    DEFAULT_GRAZE_RING_WIDTH,
+    GrazeRules,
 )
 
 log = logging.getLogger(__name__)
@@ -50,9 +72,25 @@ HAZARDS_FILE: str = "hazards.json"
 DRIFTERS_DIR: str = "drifters"
 """The drifter tuning folder, in TUNING_DIR. One `<drifter_type value>.json` per DrifterType."""
 
+SCORING_FILE: str = "scoring.json"
+"""The graze values file, in TUNING_DIR. Every field optional; the file must exist. DRA-117."""
+
 
 _SWITCH_FIELDS: frozenset[str] = frozenset({"hazard_speed_scaling", "timer_scaling"})
-_HAZARD_FIELDS: frozenset[str] = frozenset({"rehit_cooldown", "rehit_dim", "telegraph_min"})
+_HAZARD_FIELDS: frozenset[str] = frozenset(
+    {"rehit_cooldown", "rehit_dim", "telegraph_min", "graze_margin"}
+)
+_SCORING_FIELDS: frozenset[str] = frozenset(
+    {
+        "graze_points",
+        "graze_popup_ticks",
+        "graze_popup_rise_per_tick",
+        "graze_ring_ticks",
+        "graze_ring_start_diameter",
+        "graze_ring_end_diameter",
+        "graze_ring_width",
+    }
+)
 
 
 def load_tuning() -> DrifterTuning:
@@ -65,15 +103,77 @@ def load_tuning() -> DrifterTuning:
     }
     log.info(
         "tuning loaded drifters=%s hazard_speed_scaling=%s timer_scaling=%s "
-        "rehit_cooldown=%d rehit_dim=%.2f telegraph_min=%d",
+        "rehit_cooldown=%d rehit_dim=%.2f telegraph_min=%d graze_margin=%g",
         ",".join(drifter_type.value for drifter_type in drifters),
         switches.hazard_speed_scaling,
         switches.timer_scaling,
         hazards.rehit_cooldown_ticks,
         hazards.rehit_dim,
         hazards.telegraph_min_ticks,
+        hazards.graze_margin,
     )
     return DrifterTuning(drifters=drifters, switches=switches, hazards=hazards)
+
+
+def load_graze_rules() -> GrazeRules:
+    """Read and check the graze values file and build its record. `{}` is valid.
+
+    A field left out keeps its default from core.graze. A missing file raises FileNotFoundError;
+    a bad one raises ValueError naming the file and the field. Source: scoring.schema.json;
+    systems/app/tuning-loader.md, Rules, Scoring file.
+    """
+    name, data = _read_json(Path(SCORING_FILE))
+    fields: dict[str, object] = check_fields(
+        name, "", data, _SCORING_FIELDS, optional=_SCORING_FIELDS
+    )
+    rise: object = fields.get("graze_popup_rise_per_tick", DEFAULT_GRAZE_POPUP_RISE_PER_TICK)
+    if not is_number(rise) or rise < 0:
+        raise ValueError(f"{name}: graze_popup_rise_per_tick must be a number >= 0")
+    rules: GrazeRules = GrazeRules(
+        points=check_integer(
+            name, "graze_points", fields.get("graze_points", DEFAULT_GRAZE_POINTS), 0
+        ),
+        popup_ticks=check_integer(
+            name,
+            "graze_popup_ticks",
+            fields.get("graze_popup_ticks", DEFAULT_GRAZE_POPUP_TICKS),
+            1,
+        ),
+        popup_rise_per_tick=float(rise),
+        ring_ticks=check_integer(
+            name, "graze_ring_ticks", fields.get("graze_ring_ticks", DEFAULT_GRAZE_RING_TICKS), 1
+        ),
+        ring_start_diameter=float(
+            check_positive(
+                name,
+                "graze_ring_start_diameter",
+                fields.get("graze_ring_start_diameter", DEFAULT_GRAZE_RING_START_DIAMETER),
+            )
+        ),
+        ring_end_diameter=float(
+            check_positive(
+                name,
+                "graze_ring_end_diameter",
+                fields.get("graze_ring_end_diameter", DEFAULT_GRAZE_RING_END_DIAMETER),
+            )
+        ),
+        ring_width=check_integer(
+            name, "graze_ring_width", fields.get("graze_ring_width", DEFAULT_GRAZE_RING_WIDTH), 1
+        ),
+    )
+    log.info(
+        "scoring loaded graze_points=%d graze_popup_ticks=%d graze_popup_rise_per_tick=%g "
+        "graze_ring_ticks=%d graze_ring_start_diameter=%g graze_ring_end_diameter=%g "
+        "graze_ring_width=%d",
+        rules.points,
+        rules.popup_ticks,
+        rules.popup_rise_per_tick,
+        rules.ring_ticks,
+        rules.ring_start_diameter,
+        rules.ring_end_diameter,
+        rules.ring_width,
+    )
+    return rules
 
 
 def _read_json(relative: Path) -> tuple[str, object]:
@@ -118,8 +218,14 @@ def _load_hazards(relative: Path) -> HazardRules:
     telegraph_min: int = check_integer(
         name, "telegraph_min", fields.get("telegraph_min", DEFAULT_TELEGRAPH_MIN_TICKS), 0
     )
+    graze_margin: float = check_positive(
+        name, "graze_margin", fields.get("graze_margin", GRAZE_MARGIN)
+    )
     return HazardRules(
-        rehit_cooldown_ticks=cooldown, rehit_dim=dim, telegraph_min_ticks=telegraph_min
+        rehit_cooldown_ticks=cooldown,
+        rehit_dim=dim,
+        telegraph_min_ticks=telegraph_min,
+        graze_margin=float(graze_margin),
     )
 
 
