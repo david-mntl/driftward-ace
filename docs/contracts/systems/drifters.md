@@ -1,6 +1,6 @@
 # Drifters: base, hitboxes, levels, spawner, every drifter and their views
-Version: 9
-Status: draft
+Version: 10
+Status: frozen
 Features: DRA-29, DRA-39, DRA-47, DRA-56, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111
 Created by: architect
 
@@ -16,7 +16,7 @@ Every drifter in the game, hazards, pickups and blockers, is built on one shared
 | [shared/collision](drifters/shared/collision.md) | Interface, Rules | you change hitbox shapes, the overlap test or the push-out. | 12.0 KB |
 | [shared/rationale](drifters/shared/rationale.md) | Rationale | you ask why a shared rule is the way it is. A drifter's own why is in its `rationale` part. | 13.1 KB |
 | [shared/spawner-registry-tuning](drifters/shared/spawner-registry-tuning.md) | Diagram, Interface, Rules | you change levels, the registry, the spawner or the shared tuning, or add a drifter. | 18.7 KB |
-| [shared/views](drifters/shared/views.md) | Diagram, Interface, Presentation | you change how drifters are drawn: view registry, brightness, entry warning, shapes. | 17.5 KB |
+| [shared/views](drifters/shared/views.md) | Diagram, Interface, Presentation | you change how drifters are drawn: view registry, brightness, entry warning, shapes. | 17.6 KB |
 | [chain-lightning/core](drifters/chain-lightning/core.md) | Diagram, Interface, Rules | you change how the chain lightning behaves (`chain_lightning.py`). | 17.7 KB |
 | [chain-lightning/rationale](drifters/chain-lightning/rationale.md) | Rationale | you ask why the chain lightning is built the way it is. | 4.1 KB |
 | [chain-lightning/tuning](drifters/chain-lightning/tuning.md) | Rules | you change the chain lightning's tuning file or its checks. | 1.0 KB |
@@ -27,7 +27,7 @@ Every drifter in the game, hazards, pickups and blockers, is built on one shared
 | [coin/view](drifters/coin/view.md) | Interface, Presentation | you change how the coin looks. | 4.4 KB |
 | [electric-ball/core](drifters/electric-ball/core.md) | Diagram, Interface, Rules | you change how the electric ball behaves (`electric_ball.py`) or its tuning file. | 19.1 KB |
 | [electric-ball/rationale](drifters/electric-ball/rationale.md) | Rationale | you ask why the electric ball is built the way it is. | 4.5 KB |
-| [electric-ball/view](drifters/electric-ball/view.md) | Interface, Presentation | you change how the electric ball looks. | 5.8 KB |
+| [electric-ball/view](drifters/electric-ball/view.md) | Interface, Presentation | you change how the electric ball looks. | 5.9 KB |
 | [fireball/core](drifters/fireball/core.md) | Diagram, Interface, Rules | you change how the fireball behaves (`fireball.py`). | 11.2 KB |
 | [fireball/rationale](drifters/fireball/rationale.md) | Rationale | you ask why the fireball is built the way it is. | 3.2 KB |
 | [fireball/tuning](drifters/fireball/tuning.md) | Rules | you change the fireball's tuning file or its checks. | 0.9 KB |
