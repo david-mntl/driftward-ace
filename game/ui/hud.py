@@ -1,4 +1,4 @@
-"""HUD: the SCORE and GRAZE lines top-left and the lives as hearts top-right, on top of the frame.
+"""HUD: SCORE, BEST and GRAZE top-left and the lives as hearts top-right, on top of the frame.
 
 Source: docs/contracts/systems/hud.md, Interface and Presentation. The view only draws.
 It never fills, flips, logs per frame, catches an error, changes the run, or reads the run
@@ -7,12 +7,13 @@ mode or a key. The app passes ``below_overlay``.
 
 import logging
 from functools import cache, lru_cache
+from typing import Final
 
 import pygame
 
 from core.run import Run
 from ui.debug_overlay import overlay_text_bottom
-from ui.score_text import graze_text, score_text
+from ui.score_text import best_text, graze_text, score_text
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +41,10 @@ HUD_OVERLAY_GAP: int = 4
 """Gap between the overlay's text and HUD line 1 in debug mode, px. Scope report DRA-13, HUD
 layout approved by the Director, not in the GDD (UI-01 is TBD)."""
 
+HUD_BEST_X: Final[int] = 200
+"""Left edge of the BEST text on HUD line 1, px. Scope report DRA-126, Values needed (BEST: fixed
+x of 200 px), a stand-in approved by the Director, not in the GDD (UI-01 is TBD)."""
+
 HEART_COLOR: tuple[int, int, int] = (255, 255, 255)
 """Heart color, RGB. Scope report DRA-23, hearts, temporary stand-in approved by the Director,
 not in the GDD (UI-01 and UI-02 are TBD)."""
@@ -57,12 +62,15 @@ HEART_MARGIN: int = 8
 stand-in approved by the Director, not in the GDD (UI-01 and UI-02 are TBD)."""
 
 
-def draw_hud(surface: pygame.Surface, run: Run, below_overlay: bool) -> None:
-    """Draw the SCORE and GRAZE lines top-left and one heart per life top-right. Units: pixels.
+def draw_hud(
+    surface: pygame.Surface, run: Run, below_overlay: bool, best: int | None = None
+) -> None:
+    """Draw SCORE, BEST and GRAZE top-left and one heart per life top-right. Units: pixels.
 
     The SCORE text is ``score_text(run.score)`` on HUD line 1, top-left at (HUD_MARGIN, hud_top).
-    The GRAZE text is ``graze_text(run.grazes)`` on line 2, at (HUD_MARGIN, hud_top +
-    HUD_LINE_SPACING). ``hud_top`` is HUD_TOP, or the debug overlay's text bottom plus
+    The BEST text is ``best_text(best)`` on line 1, at (HUD_BEST_X, hud_top), drawn only when
+    ``best`` is not None. The GRAZE text is ``graze_text(run.grazes)`` on line 2, at (HUD_MARGIN,
+    hud_top + HUD_LINE_SPACING). ``hud_top`` is HUD_TOP, or the debug overlay's text bottom plus
     HUD_OVERLAY_GAP when ``below_overlay`` is True. The hearts do not depend on
     ``below_overlay``. Needs ``pygame.font`` initialized.
     """
@@ -70,6 +78,8 @@ def draw_hud(surface: pygame.Surface, run: Run, below_overlay: bool) -> None:
     if below_overlay:
         hud_top = overlay_text_bottom() + HUD_OVERLAY_GAP
     surface.blit(_score_surface(run.score), (HUD_MARGIN, hud_top))
+    if best is not None:
+        surface.blit(_best_surface(best), (HUD_BEST_X, hud_top))
     surface.blit(_graze_surface(run.grazes), (HUD_MARGIN, hud_top + HUD_LINE_SPACING))
     _draw_hearts(surface, run.lives)
 
@@ -81,6 +91,15 @@ def _score_surface(score: int) -> pygame.Surface:
     Source: hud.md, Presentation, SCORE line; 15-tech-constraints.md, rule 5.
     """
     return _hud_font().render(score_text(score), True, HUD_COLOR)
+
+
+@lru_cache(maxsize=1)
+def _best_surface(best: int) -> pygame.Surface:
+    """Return the BEST text for ``best``, rendered again only when the value differs.
+
+    Source: hud.md, Presentation, BEST line; 15-tech-constraints.md, rule 5.
+    """
+    return _hud_font().render(best_text(best), True, HUD_COLOR)
 
 
 @lru_cache(maxsize=1)

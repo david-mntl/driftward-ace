@@ -135,6 +135,10 @@ class Run:
     """The last-life values, from the app. A new run keeps them. Source: systems/run.md,
     Interface (DRA-125)."""
 
+    final_level: int | None = None
+    """The level on the tick lives reach 0, going into its waves step. None before. Source:
+    systems/run.md, Interface (DRA-126)."""
+
     @property
     def last_life(self) -> bool:
         """True from the tick lives reach 0 until game over: the world runs on without the ship.
@@ -187,6 +191,17 @@ class Run:
         if self.waves is None:
             return FIRST_LEVEL
         return self.waves.level
+
+    @property
+    def level_reached(self) -> int:
+        """The level the run reached, FIRST_LEVEL to LEVEL_COUNT: `final_level` once the last life
+        is lost, else `level`.
+
+        Source: systems/run.md, Interface (DRA-126); 11-save-data.md, Edge cases.
+        """
+        if self.final_level is not None:
+            return self.final_level
+        return self.level
 
     @property
     def wave_spawns_due(self) -> tuple[Placement, ...]:
@@ -491,8 +506,10 @@ def _apply_fall(stepped: Run, protected: bool, ground: Ground) -> Run:
 def _start_last_life(stepped: Run, burst_x: float, burst_y: float) -> Run:
     """Return the run on the tick lives reach 0: 0 lives, the score kept, the burst started.
 
-    `final_score` is the score so far this tick, the coin and graze of this tick included. The
-    ship stays where it is, the run is not over, and the tick goes on with steps 8 to 10.
+    `final_score` is the score so far this tick, the coin and graze of this tick included.
+    `final_level` is the level the tick was flown at: the waves step that may raise it comes
+    later in the tick. The ship stays where it is, the run is not over, and the tick goes on with
+    steps 8 to 10.
     Source: 05-lives-and-damage.md, rule 5; systems/run.md, Rules, The last life.
     """
     final: int = stepped.score
@@ -503,6 +520,7 @@ def _start_last_life(stepped: Run, burst_x: float, burst_y: float) -> Run:
         invuln_ticks_left=0,
         waiting=False,
         final_score=final,
+        final_level=stepped.level,
         burst=start_burst(stepped.last_life_rules, burst_x, burst_y),
     )
 
