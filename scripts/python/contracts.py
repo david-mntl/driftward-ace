@@ -49,7 +49,7 @@ ID_LIST = re.compile(r"[A-Z]+-\d+-\d+-F\d+")
 DONE_STATUSES = {"fixed", "no action"}
 PARTS_BEGIN = "<!-- parts:begin -->"
 PARTS_END = "<!-- parts:end -->"
-HUB_MAX_BYTES = 6 * 1024
+HUB_MAX_BYTES = 7 * 1024
 PART_MAX_BYTES = 27 * 1024
 TICKET_ID = re.compile(r"\b[A-Z]{2,}-\d+\b")
 

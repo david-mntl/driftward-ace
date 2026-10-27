@@ -1,14 +1,15 @@
-"""Load and check the drifter tuning files, the playtest switches, the shared hazard values and the
-graze values.
+"""Load and check the drifter tuning files, the playtest switches, the shared hazard values, the
+graze values and the last-life values.
 
 Reads `tuning/playtest.json`, `tuning/hazards.json` and one
 `tuning/drifters/<drifter_type value>.json` per DrifterType, once, at startup (`load_tuning`), and
-`tuning/scoring.json` once, at startup (`load_graze_rules`). Checks every rule of
+`tuning/scoring.json` once, at startup (`load_graze_rules`), and `tuning/last_life.json` once, at
+startup (`load_last_life_rules`). Checks every rule of
 their schemas by hand (pygbag has no schema library) and builds the core records. Core trusts what
 this returns. Any bad file raises ValueError naming the file and the field; a missing file raises
 FileNotFoundError as it is. Never falls back to a default for a missing file. A hazards field left
-out keeps its default from core.drifters.base, and a scoring field left out keeps its default from
-core.graze.
+out keeps its default from core.drifters.base, a scoring field left out keeps its default from
+core.graze, and a last-life field left out keeps its default from core.last_life.
 A drifter whose file has a schema of its own has a tuning module in `app.drifters`
 (`<drifter>_tuning.py`) that registers its loader by type: this module names no drifter. A drifter
 with none follows drifter-tuning.schema.json (`app.drifters.checks.load_generic`). The shared
@@ -18,7 +19,8 @@ Not a startup module: it imports core.drifters, so only app.frame imports it, in
 Source: docs/contracts/systems/app.md, Interface and Rules, Tuning loader;
 docs/contracts/schemas/drifter-tuning.schema.json, playtest-switches.schema.json and
 hazards.schema.json, and each drifter's own schema named in its tuning module;
-docs/contracts/systems/app/tuning-loader.md (DRA-117) and scoring.schema.json.
+docs/contracts/systems/app/tuning-loader.md (DRA-117) and scoring.schema.json;
+tuning-loader.md (DRA-125) and last-life.schema.json.
 """
 
 import json
@@ -57,6 +59,13 @@ from core.graze import (
     DEFAULT_GRAZE_RING_WIDTH,
     GrazeRules,
 )
+from core.last_life import (
+    DEFAULT_BURST_PARTICLE_COUNT,
+    DEFAULT_BURST_PARTICLE_SIZE,
+    DEFAULT_BURST_PARTICLE_SPEED,
+    DEFAULT_LAST_LIFE_DELAY_TICKS,
+    LastLifeRules,
+)
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +84,10 @@ DRIFTERS_DIR: str = "drifters"
 SCORING_FILE: str = "scoring.json"
 """The graze values file, in TUNING_DIR. Every field optional; the file must exist. DRA-117."""
 
+LAST_LIFE_FILE: str = "last_life.json"
+"""The last-life delay and burst file, in TUNING_DIR. Every field optional; the file must exist.
+DRA-125."""
+
 
 _SWITCH_FIELDS: frozenset[str] = frozenset({"hazard_speed_scaling", "timer_scaling"})
 _HAZARD_FIELDS: frozenset[str] = frozenset(
@@ -90,6 +103,9 @@ _SCORING_FIELDS: frozenset[str] = frozenset(
         "graze_ring_end_diameter",
         "graze_ring_width",
     }
+)
+_LAST_LIFE_FIELDS: frozenset[str] = frozenset(
+    {"last_life_delay", "burst_particle_count", "burst_particle_speed", "burst_particle_size"}
 )
 
 
@@ -172,6 +188,52 @@ def load_graze_rules() -> GrazeRules:
         rules.ring_start_diameter,
         rules.ring_end_diameter,
         rules.ring_width,
+    )
+    return rules
+
+
+def load_last_life_rules() -> LastLifeRules:
+    """Read and check the last-life values file and build its record. `{}` is valid.
+
+    A field left out keeps its default from core.last_life. A missing file raises
+    FileNotFoundError; a bad one raises ValueError naming the file and the field. Source:
+    last-life.schema.json; systems/app/tuning-loader.md, Rules, Last life file.
+    """
+    name, data = _read_json(Path(LAST_LIFE_FILE))
+    fields: dict[str, object] = check_fields(
+        name, "", data, _LAST_LIFE_FIELDS, optional=_LAST_LIFE_FIELDS
+    )
+    speed: object = fields.get("burst_particle_speed", DEFAULT_BURST_PARTICLE_SPEED)
+    if not is_number(speed) or speed < 0:
+        raise ValueError(f"{name}: burst_particle_speed must be a number >= 0")
+    rules: LastLifeRules = LastLifeRules(
+        delay_ticks=check_integer(
+            name,
+            "last_life_delay",
+            fields.get("last_life_delay", DEFAULT_LAST_LIFE_DELAY_TICKS),
+            1,
+        ),
+        burst_particle_count=check_integer(
+            name,
+            "burst_particle_count",
+            fields.get("burst_particle_count", DEFAULT_BURST_PARTICLE_COUNT),
+            1,
+        ),
+        burst_particle_speed=float(speed),
+        burst_particle_size=check_integer(
+            name,
+            "burst_particle_size",
+            fields.get("burst_particle_size", DEFAULT_BURST_PARTICLE_SIZE),
+            1,
+        ),
+    )
+    log.info(
+        "last life loaded last_life_delay=%d burst_particle_count=%d burst_particle_speed=%g "
+        "burst_particle_size=%d",
+        rules.delay_ticks,
+        rules.burst_particle_count,
+        rules.burst_particle_speed,
+        rules.burst_particle_size,
     )
     return rules
 

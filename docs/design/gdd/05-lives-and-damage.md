@@ -34,11 +34,11 @@ The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor i
 3. **Life-lost feedback.** On every lost life, all three play at once. They are looks only: none of them changes physics, control or the camera.
    1. **Screen flash.** A brief full-screen flash.
    2. **HUD life breaks.** The lost life in the top-right visibly breaks.
-   3. **Ship burst and rebuild.** The ship bursts into particles, which then pull back together into the ship while it blinks. The rebuild ends by the time invulnerability ends.
+   3. **Ship burst and rebuild.** The ship bursts into particles, which then pull back together into the ship while it blinks. The rebuild ends by the time invulnerability ends. On the last life there is no rebuild (rule 5).
 
    Look, colors and timings: [10-ui.md](10-ui.md), LD-08.
 4. **Invulnerable** means hazards pass through the ship with no hit. Lava walls count as hazards. A fall while invulnerable follows rule 2.6.
-5. **Game over** happens the tick lives reach 0. See [02-game-flow.md](02-game-flow.md). Whether the last life plays the feedback before the game-over screen is LD-09.
+5. **Last life.** The tick lives reach 0, the screen flash and the HUD life break play as in rule 3, and the ship bursts but never rebuilds. There is no invulnerability and no respawn. After a fall, the burst plays at the bottom edge, where the ship left the screen. Then the game waits `last_life_delay` before the next screen ([02-game-flow.md](02-game-flow.md) rule 8).
 6. The GDD has no way to gain a life. Adding one is a new feature and needs the Director's approval.
 
 ## Edge cases
@@ -50,7 +50,7 @@ The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor i
 - The ship's hitbox while it is drawn as particles: unchanged. The burst is a look, not a state.
 
 ## Open
-- LD-04, LD-08, LD-09.
+- LD-04, LD-08.
 
 ## How to extend
 A new way to lose a life must say where the ship ends up, whether invulnerability blocks it, and that it plays the life-lost feedback. Add it as a numbered rule here and link it from the drifter's spec.

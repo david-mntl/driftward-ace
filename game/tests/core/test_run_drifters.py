@@ -24,7 +24,7 @@ from core.drifters.tuning import (
     PlaytestSwitches,
     VariantTuning,
 )
-from core.run import Run, add_drifters, start_run, step_run
+from core.run import Run, add_drifters, next_run, start_run, step_run
 from core.scroll import Scroll, start_scroll
 from core.ship import Ship, Thrust, ship_hitbox, spawn
 
@@ -64,6 +64,10 @@ Source: drifters/01-meteorite.md and drifters/02-satellite.md, speed_ratio (gues
 
 WARNING_TICKS: int = 60
 """ticks. Source: 07-drifters.md, entry_warning_ticks (guess)."""
+
+LAST_LIFE_DELAY: int = 120
+"""Ticks from the death tick to game over. Source: 02-game-flow.md, Values, last_life_delay
+(guess)."""
 
 REHIT_COOLDOWN: int = 180
 """ticks. Source: 05-lives-and-damage.md, rehit_cooldown (guess)."""
@@ -491,22 +495,32 @@ def test_a_cooldown_counts_on_every_playing_tick_and_freezes_at_game_over() -> N
     assert dropped.lives == LIVES_START - 1
     assert only(dropped).rehit_ticks_left == cooling - 1
 
-    # On the tick that ends the run: the hit's drifter starts at the full cooldown, the other
-    # counts down. Then everything freezes, the counts included.
-    over: Run = step_run(
+    # On the tick the last life starts: the hit's drifter starts at the full cooldown, the other
+    # counts down. The last life's ticks count them down too, until game over freezes them.
+    last: Run = step_run(
         run_with(rock(), rock(x=50.0, y=100.0, rehit_ticks_left=cooling), lives=1), NO_KEY
     )
+    assert last.last_life
+    assert [drifter.rehit_ticks_left for drifter in last.drifters] == [REHIT_COOLDOWN, cooling - 1]
+    run: Run = last
+    for tick in range(1, LAST_LIFE_DELAY + 1):
+        run = step_run(run, NO_KEY)
+        assert [drifter.rehit_ticks_left for drifter in run.drifters] == [
+            REHIT_COOLDOWN - tick,
+            max(cooling - 1 - tick, 0),
+        ]
+    over: Run = run
     assert over.game_over
-    assert [drifter.rehit_ticks_left for drifter in over.drifters] == [REHIT_COOLDOWN, cooling - 1]
-    run: Run = over
+    assert [drifter.rehit_ticks_left for drifter in over.drifters] == [
+        REHIT_COOLDOWN - LAST_LIFE_DELAY,
+        0,
+    ]
     for _ in range(100):
         run = step_run(run, NO_KEY)
         assert run.drifters == over.drifters
 
-    # A retry starts with no drifters, and so no cooldown.
-    armed: Run = step_run(run, NO_KEY)
-    assert armed.drifters == over.drifters
-    fresh: Run = step_run(armed, Thrust(up=True))
+    # A new run starts with no drifters, and so no cooldown.
+    fresh: Run = next_run(run)
     assert not fresh.game_over
     assert fresh.drifters == ()
 
@@ -659,24 +673,37 @@ def test_a_graze_zone_overlap_is_not_a_hit() -> None:
     assert only(after).phase is Phase.ACTIVE
 
 
-def test_a_hit_on_the_last_life_ends_the_run() -> None:
+def test_a_hit_on_the_last_life_starts_the_last_life() -> None:
     speed: float = 0.5
     before: Run = run_with(rock(speed=speed), lives=1)
     expected: Run = step_run(replace(before, drifters=()), NO_KEY)
 
-    over: Run = step_run(before, NO_KEY)
+    last: Run = step_run(before, NO_KEY)
 
-    assert over.lives == 0
+    assert last.lives == 0
+    assert last.last_life
+    assert not last.game_over
+    assert not last.invulnerable
+    assert not last.waiting
+    assert last.ship == expected.ship
+    assert last.ship != spawn()
+    assert only(last).rehit_ticks_left == REHIT_COOLDOWN
+    assert only(last).y == pytest.approx(HOME_Y + speed)
+
+    # The last life's ticks: the drifter keeps falling, the ship stays, and drifters are added.
+    run: Run = last
+    for tick in range(1, LAST_LIFE_DELAY + 1):
+        run = step_run(run, NO_KEY)
+        assert only(run).y == pytest.approx(HOME_Y + speed * (tick + 1))
+        assert run.ship == last.ship
+        assert run.lives == 0
+    added: Run = add_drifters(last, [Placement(DrifterType.METEORITE, 10.0)], TUNING)
+    assert len(added.drifters) == 2
+    assert added.next_uid == last.next_uid + 1
+    over: Run = run
     assert over.game_over
-    assert not over.invulnerable
-    assert not over.waiting
-    assert over.ship == expected.ship
-    assert over.ship != spawn()
-    assert only(over).rehit_ticks_left == REHIT_COOLDOWN
-    assert only(over).y == pytest.approx(HOME_Y + speed)
 
     # Everything freezes on the next ticks. Drifters don't move, and nothing is added.
-    run: Run = over
     for _ in range(100):
         run = step_run(run, NO_KEY)
         assert run.game_over
@@ -724,11 +751,11 @@ def test_a_fall_and_a_touch_on_one_tick_cost_only_the_fall() -> None:
     assert only(run).rehit_ticks_left == 0
     assert not run.game_over
 
-    # On the last life the fall ends the run, still with no hit recorded.
-    over: Run = step_run(run_with(under, ship=fell, lives=1), NO_KEY)
-    assert over.game_over
-    assert over.lives == 0
-    assert only(over).rehit_ticks_left == 0
+    # On the last life the fall starts the last life, still with no hit recorded.
+    last: Run = step_run(run_with(under, ship=fell, lives=1), NO_KEY)
+    assert last.last_life
+    assert last.lives == 0
+    assert only(last).rehit_ticks_left == 0
 
 
 def test_an_drifter_is_dropped_when_its_top_edge_reaches_the_floor() -> None:
@@ -757,20 +784,23 @@ def test_an_drifter_is_dropped_when_its_top_edge_reaches_the_floor() -> None:
         assert len(falling.drifters) == 1
 
 
-def test_a_retry_starts_with_no_drifters() -> None:
-    over: Run = step_run(run_with(rock(), rock(x=50.0, y=100.0), lives=1), NO_KEY)
+def test_a_new_run_starts_with_no_drifters() -> None:
+    last: Run = step_run(run_with(rock(), rock(x=50.0, y=100.0), lives=1), NO_KEY)
+    assert last.last_life
+    assert len(last.drifters) == 2
+    assert last.next_uid == 3
+    over: Run = last
+    for _ in range(LAST_LIFE_DELAY):
+        over = step_run(over, NO_KEY)
     assert over.game_over
-    assert len(over.drifters) == 2
-    assert over.next_uid == 3
+    assert [d.uid for d in over.drifters] == [1, 2]
 
-    armed: Run = step_run(over, NO_KEY)
-    assert armed.drifters == over.drifters
-    run: Run = step_run(armed, Thrust(up=True))
+    run: Run = next_run(over)
 
     assert not run.game_over
     assert run.drifters == ()
     assert run.next_uid == 1
-    assert run == replace(start_run(), held=Thrust(up=True))
+    assert run == start_run()
 
     # The first drifter of the new run is uid 1 again.
     again: Run = add_drifters(run, [Placement(DrifterType.METEORITE, 10.0)], TUNING)

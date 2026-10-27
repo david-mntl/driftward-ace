@@ -9,3 +9,10 @@ Things to take care of later. Not scheduled yet.
 - **Why it matters:** Pillar 2, See it before it hits you. GDD `10-ui.md` rule 1 says the HUD must never hide a warning.
 - **Blocked on:** UI-01 (HUD margins), still `TBD` in `design/gdd/90-open-questions.md`. Both the HUD and the warning follow their contracts, so the contracts clash. It needs a Director call, then the Architect.
 - **Not only the fireball:** any drifter whose warning lands near the top-right corner can hit this.
+
+## The top-left corner warning is drawn under SCORE, GRAZE and BEST
+
+- **Found:** DRA-61 scope, kept in DRA-117 (GRAZE) and DRA-126 (BEST). See those scope reports, Objection 1 or 2.
+- **What happens:** the HUD text at the top left is drawn over any entry warning in that corner, such as the default fireball's.
+- **Why it matters:** Pillar 2, See it before it hits you. GDD `10-ui.md` rule 1 says the HUD must never hide a warning.
+- **Blocked on:** UI-01 (HUD margins) or the HUD redesign. The Director chose the override for now.

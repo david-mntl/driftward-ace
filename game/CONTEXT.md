@@ -42,7 +42,7 @@ Every agent that writes Python under `game/` follows this.
 
 ## Error handling (rule)
 Every agent that writes Python under `game/` follows this.
-- Catch the specific exception you expect. Never a bare `except`. `except Exception` is allowed in one place only: the top-level guard in `game/app/guard.py`.
+- Catch the specific exception you expect. Never a bare `except`. `except Exception` is allowed in two places only: the top-level guard in `game/app/guard.py`, and around the browser storage calls in `game/app/saves.py` (pygbag raises a bare `Exception` when the browser refuses localStorage; saves turn off with a WARNING).
 - Never swallow an error. Log it and handle it, or let it rise.
 - Validate at the edge (files, browser, player input). On bad data, raise with a message that says what was wrong and where. Trust values inside `game/core/`.
 - `game/core/` and `game/ui/` raise. They never show an error on screen and never decide to keep running.

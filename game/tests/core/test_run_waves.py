@@ -1,4 +1,4 @@
-"""The run's waves: the level, the due placements, the wave clock inside a tick, the retry.
+"""The run's waves: the level, the due placements, the wave clock inside a tick, the new run.
 
 Contract: docs/contracts/systems/run.md, Diagram (the one-tick flowchart, Drifters entering, the
 level rise timeline), Interface (`waves`, `level`, `wave_spawns_due`, `start_run`), Rules (The
@@ -29,7 +29,8 @@ from core.drifters.tuning import (
     PlaytestSwitches,
     VariantTuning,
 )
-from core.run import Run, add_drifters, start_run, step_run
+from core.last_life import LastLifeRules
+from core.run import Run, add_drifters, next_run, start_run, step_run
 from core.scroll import Scroll
 from core.ship import Ship, Thrust, spawn
 from core.waves import (
@@ -115,6 +116,10 @@ LEFT = Thrust(left=True)
 
 SCROLLING: Scroll = Scroll(ticks=100, scrolled_ticks=70)
 """A scroll already moving: 70 moving ticks, 77 px, and the next step moves the world."""
+
+LAST_LIFE_DELAY: int = 120
+"""Ticks from the death tick to game over. Source: 02-game-flow.md, Values, last_life_delay
+(guess)."""
 
 SEED: int = 20261019
 """A first seed for the runs below."""
@@ -298,11 +303,21 @@ def fly(run: Run, ticks: int) -> Run:
 
 
 def die(run: Run, thrust: Thrust = NO_KEY) -> Run:
-    """Step one tick on which the ship falls on its last life: the run ends on that tick."""
-    over: Run = step_run(replace(run, lives=1, ship=falling_ship()), thrust)
-    assert over.game_over
-    assert over.lives == 0
-    return over
+    """Step one tick on which the ship falls on its last life: the last life starts on that tick."""
+    last: Run = step_run(replace(run, lives=1, ship=falling_ship()), thrust)
+    assert last.last_life
+    assert not last.game_over
+    assert last.lives == 0
+    return last
+
+
+def finish(run: Run) -> Run:
+    """Step a last-life run until game over with no key: the delay's ticks, the world running."""
+    assert run.last_life
+    for _ in range(LAST_LIFE_DELAY):
+        run = step_run(run, NO_KEY)
+    assert run.game_over
+    return run
 
 
 def rock(x: float, y: float, *, uid: int = 1) -> Meteorite:
@@ -353,7 +368,7 @@ def walk_ids(run: Run, ticks: int) -> tuple[Run, list[str]]:
     return run, seen
 
 
-def test_a_run_with_no_waves_is_at_level_1_with_nothing_due_and_a_retry_has_no_waves(
+def test_a_run_with_no_waves_is_at_level_1_with_nothing_due_and_a_new_run_has_no_waves(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     for run in (start_run(), start_run(None)):
@@ -374,10 +389,13 @@ def test_a_run_with_no_waves_is_at_level_1_with_nothing_due_and_a_retry_has_no_w
     assert run.scroll.scrolled_ticks == 40
     assert run.scroll.raised_level_ticks == (0,) * (LEVEL_COUNT - 1)
 
-    over: Run = die(run)
+    last: Run = die(run)
+    assert last.waves is None
+    assert last.level == 1
+    assert last.wave_spawns_due == ()
+    over: Run = finish(last)
     assert over.waves is None
     assert over.level == 1
-    assert over.wave_spawns_due == ()
     frozen: Run = step_run(over, NO_KEY)
     assert frozen.waves is None
     assert frozen.scroll == over.scroll
@@ -385,7 +403,7 @@ def test_a_run_with_no_waves_is_at_level_1_with_nothing_due_and_a_retry_has_no_w
     caplog.set_level(logging.DEBUG, logger=RUN_LOGGER)
     caplog.set_level(logging.DEBUG, logger=WAVES_LOGGER)
     caplog.clear()
-    again: Run = step_run(frozen, UP)
+    again: Run = next_run(frozen)
     assert again.waves is None
     assert again.level == 1
     assert again.wave_spawns_due == ()
@@ -496,12 +514,12 @@ def test_the_waves_step_once_on_every_playing_tick() -> None:
 
     # The tick lives reach 0 by a fall, and by a hit.
     by_fall: Run = step_run(run_of(waves, ship=falling_ship(), lives=1), NO_KEY)
-    assert by_fall.game_over
+    assert by_fall.last_life
     assert by_fall.lives == 0
     assert_the_wave_clock_ran_once(by_fall)
     hit_run: Run = run_of(waves, lives=1, drifters=(rock(HOME_X, HOME_Y),))
     by_hit: Run = step_run(hit_run, NO_KEY)
-    assert by_hit.game_over
+    assert by_hit.last_life
     assert by_hit.lives == 0
     assert by_hit.ship != falling_ship()
     assert_the_wave_clock_ran_once(by_hit)
@@ -598,14 +616,16 @@ def test_game_over_freezes_the_waves_and_the_world() -> None:
     assert run.waves is not None
     assert run.waves.wave_id != WAVE_ZERO
 
-    over: Run = die(run, LEFT)
-    assert over.waves is not None
-    assert not over.retry_armed
-    assert over.waves.wave_id == run.waves.wave_id
-    assert over.scroll.ticks == run.scroll.ticks + 1
+    last: Run = die(run, LEFT)
+    assert last.waves is not None
+    assert last.waves.wave_id == run.waves.wave_id
+    assert last.scroll.ticks == run.scroll.ticks + 1
 
-    # Held arrows, a changed arrow, a release (it arms the retry), more release ticks: nothing
-    # moves, and the wave clock never runs.
+    # Held arrows, a changed arrow, a release, more release ticks: nothing moves, and the wave
+    # clock never runs.
+    over: Run = finish(last)
+    assert over.waves is not None
+    assert over.scroll.ticks == last.scroll.ticks + LAST_LIFE_DELAY
     frozen: Run = over
     for thrust in (LEFT, UP, UP, NO_KEY, NO_KEY, NO_KEY):
         frozen = step_run(frozen, thrust)
@@ -615,30 +635,36 @@ def test_game_over_freezes_the_waves_and_the_world() -> None:
         assert frozen.level == over.level
         assert frozen.scroll == over.scroll
         assert frozen.ship == over.ship
-    assert frozen.retry_armed
 
-    # A game over deep in the run, with a rest running: the countdown holds too.
-    last_life: Run = run_of(waves_ending_on_the_next_tick(), lives=1, ship=falling_ship())
-    resting: Run = step_run(last_life, NO_KEY)
-    assert resting.game_over
+    # A game over deep in the run, with a rest running: the countdown holds too. The last life
+    # here lasts one tick, so the clock runs on the death tick (rest 3) and once more (rest 2).
+    one_tick: Run = replace(
+        run_of(waves_ending_on_the_next_tick(), lives=1, ship=falling_ship()),
+        last_life_rules=LastLifeRules(delay_ticks=1),
+    )
+    resting: Run = step_run(one_tick, NO_KEY)
+    assert resting.last_life
     assert resting.waves is not None
     assert resting.waves.rest_ticks_left == 3
+    resting = step_run(resting, NO_KEY)
+    assert resting.game_over
+    assert resting.waves is not None
+    assert resting.waves.rest_ticks_left == 2
     for _ in range(5):
         resting = step_run(resting, NO_KEY)
         assert resting.waves is not None
-        assert resting.waves.rest_ticks_left == 3
+        assert resting.waves.rest_ticks_left == 2
         assert resting.waves.resting
 
 
-def test_a_retry_starts_wave_0_at_level_1_with_a_new_seed() -> None:
+def test_a_new_run_starts_wave_0_at_level_1_with_a_new_seed() -> None:
     book: WaveBook = picks_book()
     first: Run = start_run(start_waves(book, SEED))
     run, ids = walk_ids(first, 95)
     assert ids == expected_picks(SEED, 6)
 
-    over: Run = die(run)
-    assert over.retry_armed
-    retry: Run = step_run(over, UP)
+    over: Run = finish(die(run))
+    retry: Run = next_run(over)
 
     second_seed: int = next_seed(SEED)
     assert second_seed != SEED
@@ -666,8 +692,8 @@ def test_a_retry_starts_wave_0_at_level_1_with_a_new_seed() -> None:
     assert new_ids == expected_picks(second_seed, 6)
     assert new_ids != ids
 
-    # Every retry draws again from the seed of the run before it.
-    third: Run = step_run(die(fly(retry, 5)), UP)
+    # Every new run draws again from the seed of the run before it.
+    third: Run = next_run(finish(die(fly(retry, 5))))
     assert third.waves is not None
     assert third.waves.run_seed == next_seed(second_seed)
     assert third.waves.pick_seed == next_seed(second_seed)
@@ -675,16 +701,16 @@ def test_a_retry_starts_wave_0_at_level_1_with_a_new_seed() -> None:
 
 
 @pytest.mark.determinism
-def test_the_same_first_seed_gives_the_same_run_of_waves_and_retries() -> None:
+def test_the_same_first_seed_gives_the_same_run_of_waves_and_new_runs() -> None:
     def script(seed: int) -> list[Run]:
         run: Run = start_run(start_waves(picks_book(), seed))
         states: list[Run] = []
         for _ in range(95):
             run = step_run(hold(run), NO_KEY)
             states.append(run)
-        run = die(run)
+        run = finish(die(run))
         states.append(run)
-        run = step_run(run, UP)
+        run = next_run(run)
         states.append(run)
         for _ in range(95):
             run = step_run(hold(run), NO_KEY)
@@ -695,16 +721,16 @@ def test_the_same_first_seed_gives_the_same_run_of_waves_and_retries() -> None:
     assert script(SEED) != script(SEED + 1)
 
 
-def test_a_retry_logs_new_run_then_the_waves_start_and_a_tick_logs_the_waves_last(
+def test_a_new_run_logs_new_run_then_the_waves_start_and_a_tick_logs_the_waves_last(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.DEBUG, logger=RUN_LOGGER)
     caplog.set_level(logging.DEBUG, logger=WAVES_LOGGER)
 
-    # The retry tick.
-    over: Run = die(fly(start_run(start_waves(level_up_book(), SEED)), 3))
+    # The new run.
+    over: Run = finish(die(fly(start_run(start_waves(level_up_book(), SEED)), 3)))
     caplog.clear()
-    step_run(over, UP)
+    next_run(over)
     assert messages(caplog, RUN_LOGGER, WAVES_LOGGER) == [
         (RUN_LOGGER, "new run"),
         (WAVES_LOGGER, "wave start id=w0 level=1 random=False"),
@@ -729,15 +755,15 @@ def test_a_retry_logs_new_run_then_the_waves_start_and_a_tick_logs_the_waves_las
         "wave start id=long level=2 random=False",
     ]
 
-    # The same tick on the last life: the game over line, then the waves' lines.
+    # The same tick on the last life: the last life line, then the waves' lines.
     caplog.clear()
     ended: Run = step_run(replace(fall_tick, lives=1), NO_KEY)
-    assert ended.game_over
+    assert ended.last_life
     seen = messages(caplog, RUN_LOGGER, WAVES_LOGGER)
     assert [name for name, _ in seen] == [RUN_LOGGER] * 3 + [WAVES_LOGGER] * 3
     lines = [line for _, line in seen]
     assert lines[0] == "life lost lives=0"
-    assert lines[1] == "game over meters=2"
+    assert lines[1] == "last life score=2"
     assert lines[2].startswith("drifter gone id=1 type=meteorite")
     assert lines[3:] == [
         "wave end id=a",

@@ -6,11 +6,7 @@ When the Director answers a question: write the answer into the file named, remo
 Status: `open`, or `blocking` (stops other work now).
 
 ## Flow
-| ID | Question | File | Blocks | Status |
-|---|---|---|---|---|
-| FL-01 | Which key dismisses the control card and starts the run? Controls are arrow keys only. | 02-game-flow.md | Control card | open |
-| FL-03 | Saves are deferred, so there is no best score. What does "win" look like until saves ship? | 01-vision.md, 02-game-flow.md, 06-scoring.md, 10-ui.md | Game over screen | open |
-| FL-04 | Pause (week 4): which key, and does losing browser focus pause the game? | 02-game-flow.md, 13-scope-and-schedule.md | Pause card | open |
+None open.
 
 ## World and camera
 | ID | Question | File | Blocks | Status |
@@ -30,7 +26,6 @@ Status: `open`, or `blocking` (stops other work now).
 |---|---|---|---|---|
 | LD-04 | Blink speed while invulnerable. | 05-lives-and-damage.md | UI | open |
 | LD-08 | Life-lost feedback look: flash color and length, how the HUD life breaks, particle count, how long burst and rebuild take (rebuild must end within 30 ticks). Add screen shake too? | 05-lives-and-damage.md, 10-ui.md | UI, art | open |
-| LD-09 | On the last life: play the feedback first, then the game-over screen? How long between them? | 05-lives-and-damage.md, 02-game-flow.md | Game over | open |
 
 ## Scoring
 None open.
@@ -59,14 +54,11 @@ None open.
 |---|---|---|---|---|
 | UI-01 | HUD font, size, colors, margins and max score digits. | 10-ui.md | HUD | open |
 | UI-02 | Lives as icons or a number? | 10-ui.md | HUD | open |
-| UI-03 | Control card: exact text and look. | 10-ui.md | Control card | open |
-| UI-04 | Game-over screen: what it shows and the retry prompt. | 10-ui.md | Game over | open |
+| UI-03 | Instructions page: exact text, the icon for each section, font and layout. Content is set in 10-ui.md. | 10-ui.md | Instructions | open |
+| UI-04 | Look of the menu, leaderboard, pause box and game-over screen, letter picker included: font, layout, colors. Content is set in 10-ui.md. | 10-ui.md | Screens look | open |
 
-## Save data (stretch)
-| ID | Question | File | Blocks | Status |
-|---|---|---|---|---|
-| SV-01 | Nickname: max length, allowed characters, and how it's typed if controls are arrow keys only (arcade letter picker?). | 11-save-data.md | Saves | open |
-| SV-02 | Top 10: tie order, and is name entry shown for a score that doesn't make the list? | 11-save-data.md | Saves | open |
+## Save data
+None open.
 
 ## Art and audio
 | ID | Question | File | Blocks | Status |

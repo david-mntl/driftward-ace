@@ -144,7 +144,7 @@ Nudge or type a value and it becomes **W**. D on a W value drops it back to F or
 | drag the bar | scrub |
 
 **Ghost:** the ship is hidden and held at the start spot. It cannot be hit, so the wave plays by itself.
-**Fly:** you steer with the arrow keys (only while the game view has focus). Lives and game over work as in the game.
+**Fly:** you steer with the arrow keys (only while the game view has focus). Lives work as in the game. Losing the last life plays the 2-second burst, then the timeline starts over from tick 0, or stops if loop is off. The editor has no menu and no retry.
 
 ## Hot reload
 

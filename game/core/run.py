@@ -1,10 +1,11 @@
-"""One run of the game: lives, falls, hits, drifters, the respawn wait, game over, retry.
+"""One run of the game: lives, falls, hits, drifters, the respawn wait, last life, game over.
 
 `Run` holds the ship, the world scroll, the drifters and the lives, and `step_run` advances all
 of them one fixed 60 Hz tick. The ship step reports where the ship is (`is_below_floor`), the
 drifters report where they are and what a touch does; the run decides what a fall or a hit
-costs. `add_drifters` is the only way a drifter enters a run. No frame time, no randomness, no
-run mode. Stdlib and `core` only.
+costs. On the last life the ship bursts and the world runs on until game over. `add_drifters`
+is the only way a drifter enters a run, `next_run` the only way a run follows another. No frame
+time, no randomness, no run mode. Stdlib and `core` only.
 
 Source: docs/contracts/systems/run.md, Interface, Rules and Logging.
 """
@@ -28,6 +29,7 @@ from core.graze import (
     graze_ring,
     step_graze_rings,
 )
+from core.last_life import DEFAULT_LAST_LIFE_RULES, Burst, LastLifeRules, start_burst, step_burst
 from core.levels import FIRST_LEVEL
 from core.popup import PointsPopup, step_popups
 from core.scroll import Scroll, scroll_step_px, start_scroll, step_scroll
@@ -45,6 +47,7 @@ from core.ship import (
     step,
 )
 from core.waves import WaveRun, next_run_waves, step_waves
+from core.world import SCREEN_H
 
 log = logging.getLogger(__name__)
 
@@ -79,7 +82,7 @@ class Run:
     """The world scroll and distance (core.scroll)."""
 
     lives: int = LIVES_START
-    """Lives left, 0 to LIVES_START. 0 only in game over."""
+    """Lives left, 0 to LIVES_START. 0 only from the last life on (DRA-125)."""
 
     invuln_ticks_left: int = 0
     """Ticks of invulnerability still to come. 0 means not invulnerable."""
@@ -88,13 +91,10 @@ class Run:
     """The ship stands at the respawn point until an arrow press."""
 
     game_over: bool = False
-    """The Game Over box shows and everything is frozen."""
+    """The last-life delay has ended: the run is over and everything is frozen (DRA-125)."""
 
     held: Thrust = field(default_factory=Thrust)
     """The arrow keys held on the last tick, to tell a press from a hold."""
-
-    retry_armed: bool = False
-    """Game over only: every arrow has been released since the box appeared."""
 
     drifters: tuple[Drifter, ...] = ()
     """Drifters on the field, oldest first. Source: systems/run.md, Interface (DRA-29)."""
@@ -120,17 +120,44 @@ class Run:
     """Graze rings on screen, oldest first. Source: systems/run.md, Interface (DRA-117)."""
 
     graze_rules: GrazeRules = DEFAULT_GRAZE_RULES
-    """The graze values, from the app. A retry keeps them. Source: systems/run.md, Interface
+    """The graze values, from the app. A new run keeps them. Source: systems/run.md, Interface
     (DRA-117)."""
+
+    burst: Burst | None = None
+    """The last life's burst, from the tick lives reach 0. None before. Source: systems/run.md,
+    Interface (DRA-125)."""
+
+    final_score: int | None = None
+    """The score on the tick lives reach 0. None before. Source: systems/run.md, Interface
+    (DRA-125)."""
+
+    last_life_rules: LastLifeRules = DEFAULT_LAST_LIFE_RULES
+    """The last-life values, from the app. A new run keeps them. Source: systems/run.md,
+    Interface (DRA-125)."""
+
+    final_level: int | None = None
+    """The level on the tick lives reach 0, going into its waves step. None before. Source:
+    systems/run.md, Interface (DRA-126)."""
+
+    @property
+    def last_life(self) -> bool:
+        """True from the tick lives reach 0 until game over: the world runs on without the ship.
+
+        Source: systems/run.md, Interface (DRA-125).
+        """
+        return self.burst is not None and not self.game_over
 
     @property
     def score(self) -> int:
         """The run's score in whole points: meters flown times POINTS_PER_METER, plus coin points,
         plus the grazes times the graze points.
 
-        Worked out on each read, never stored. Source: systems/run.md, Rules, Score;
-        06-scoring.md, Summary and rules 1 and 2.
+        Once the last life is lost it is `final_score`, frozen while the scroll runs on. Source:
+        systems/run.md, Rules, Score; 06-scoring.md, Summary and rules 1 and 2; 02-game-flow.md,
+        rule 8.
         """
+        if self.final_score is not None:
+            return self.final_score
         graze_points: int = self.grazes * self.graze_rules.points
         return self.scroll.meters * POINTS_PER_METER + self.coin_points + graze_points
 
@@ -143,10 +170,13 @@ class Run:
     def ship_visible(self) -> bool:
         """True when the ship is drawn this frame.
 
-        Always True when not invulnerable. While invulnerable it blinks, starting visible,
-        one swap every BLINK_SWAP_TICKS. Source: 05-lives-and-damage.md, invuln_blink (locked);
-        scope report DRA-23, blink.
+        Always False once the ship has burst (the last life, never rebuilt). Otherwise True when
+        not invulnerable. While invulnerable it blinks, starting visible, one swap every
+        BLINK_SWAP_TICKS. Source: 05-lives-and-damage.md, invuln_blink (locked), rule 5; scope
+        report DRA-23, blink.
         """
+        if self.burst is not None:
+            return False
         if not self.invulnerable:
             return True
         elapsed: int = INVULN_TICKS - self.invuln_ticks_left
@@ -163,6 +193,17 @@ class Run:
         return self.waves.level
 
     @property
+    def level_reached(self) -> int:
+        """The level the run reached, FIRST_LEVEL to LEVEL_COUNT: `final_level` once the last life
+        is lost, else `level`.
+
+        Source: systems/run.md, Interface (DRA-126); 11-save-data.md, Edge cases.
+        """
+        if self.final_level is not None:
+            return self.final_level
+        return self.level
+
+    @property
     def wave_spawns_due(self) -> tuple[Placement, ...]:
         """The placements that came due on the last tick, or () with no waves.
 
@@ -173,22 +214,54 @@ class Run:
         return self.waves.spawns_due
 
 
-def start_run(waves: WaveRun | None = None, graze_rules: GrazeRules = DEFAULT_GRAZE_RULES) -> Run:
+def start_run(
+    waves: WaveRun | None = None,
+    graze_rules: GrazeRules = DEFAULT_GRAZE_RULES,
+    last_life_rules: LastLifeRules = DEFAULT_LAST_LIFE_RULES,
+) -> Run:
     """Return a new run: the ship at spawn, the scroll at tick 0, every other field default.
 
-    No drifters, next_uid 1, coin_points 0, grazes 0 (so the score is 0), no popups and no graze
-    rings. `waves` is the run's wave state from `core.waves.start_waves`, or None for a run with
-    no waves. `graze_rules` is kept in the run for its whole life and across a retry.
+    No drifters, next_uid 1, coin_points 0, grazes 0 (so the score is 0), no popups, no graze
+    rings, no burst and no final score. `waves` is the run's wave state from
+    `core.waves.start_waves`, or None for a run with no waves. `graze_rules` and
+    `last_life_rules` are kept in the run for its whole life and by `next_run`.
 
     Source: 02-game-flow.md, rule 3; systems/run.md, Interface.
     """
-    return Run(ship=spawn(), scroll=start_scroll(), waves=waves, graze_rules=graze_rules)
+    return Run(
+        ship=spawn(),
+        scroll=start_scroll(),
+        waves=waves,
+        graze_rules=graze_rules,
+        last_life_rules=last_life_rules,
+    )
+
+
+def next_run(run: Run) -> Run:
+    """Return a fresh run after `run`: Wave 0 again at Level 1, the graze and last-life values kept.
+
+    Logs INFO `new run` first, then builds `start_run` with the next waves (a new seed for the
+    picks) or None when `run` has none. Any run state may be given. Source: systems/run.md, Rules,
+    next_run; 02-game-flow.md, rules 5 and 11.
+    """
+    log.info("new run")
+    return start_run(_next_waves(run.waves), run.graze_rules, run.last_life_rules)
+
+
+def hold_arrows(run: Run, thrust: Thrust) -> Run:
+    """Return the run with `held = thrust` and nothing else changed. Pure, no logging.
+
+    The game flow calls it on paused ticks, so an arrow pressed during a pause is not a press
+    when play resumes. Source: systems/run.md, Rules, hold_arrows.
+    """
+    return replace(run, held=thrust)
 
 
 def add_drifters(run: Run, placements: Sequence[Placement], tuning: DrifterTuning) -> Run:
     """Spawn each placement in order and append it to the run, each with the next uid.
 
-    Returns `run` unchanged at game over or with no placements. New drifters are in WARNING and
+    Returns `run` unchanged at game over or with no placements; the last life still takes them.
+    New drifters are in WARNING and
     first update on the next `step_run`. Errors from `spawn_drifter` rise, and the run is not
     changed. Each one settles its entry warning from the ship as it is now. Source: systems/run.md,
     Rules, add_drifters.
@@ -248,18 +321,15 @@ def step_run(run: Run, thrust: Thrust) -> Run:
     Source: systems/run.md, Rules; 15-tech-constraints.md, rule 2.
     """
     if run.game_over:
-        return _step_game_over(run, thrust)
+        return hold_arrows(run, thrust)
+    if run.burst is not None:
+        return _step_last_life(run, run.burst, thrust)
     return _step_playing(run, thrust)
 
 
 def _arrows(thrust: Thrust) -> tuple[bool, bool, bool, bool]:
     """Return the four arrow states (up, down, left, right)."""
     return thrust.up, thrust.down, thrust.left, thrust.right
-
-
-def _any_arrow(thrust: Thrust) -> bool:
-    """True when at least one arrow is held."""
-    return any(_arrows(thrust))
 
 
 def _is_press(thrust: Thrust, held: Thrust) -> bool:
@@ -275,7 +345,8 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
     """A playing tick: press, timer, drifters, popups and rings, ground and wells, ship, scroll,
     collect, graze, fall or hit, cooldowns, drops, waves.
 
-    A hit is tested only when the ship did not fall. The level is read once, going into the tick.
+    The tick that loses the last life runs in full. A hit is tested only when the ship did not
+    fall. The level is read once, going into the tick.
     Source: systems/run.md, Rules, a playing tick, steps 1 to 10 with 3a, 5a, 5b and 9a.
     """
     press: bool = _is_press(thrust, run.held)
@@ -307,9 +378,9 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
     collected: Run = stepped if stands else _apply_collect(stepped)
     grazed: Run = _apply_graze(collected, may_pay=not protected and not stands)
     if is_below_floor(ship):
-        outcome: Run = _apply_fall(grazed, protected, thrust, ground)
+        outcome: Run = _apply_fall(grazed, protected, ground)
     else:
-        outcome = _apply_hit(grazed, protected, thrust)
+        outcome = _apply_hit(grazed, protected)
     return _step_run_waves(_drop_drifters(_cool_down(outcome, grazed.drifters)))
 
 
@@ -405,12 +476,13 @@ def _apply_graze(stepped: Run, *, may_pay: bool) -> Run:
     )
 
 
-def _apply_fall(stepped: Run, protected: bool, thrust: Thrust, ground: Ground) -> Run:
+def _apply_fall(stepped: Run, protected: bool, ground: Ground) -> Run:
     """Apply a fall to the run after its ship and scroll stepped.
 
     A protected fall respawns the ship with no wait and no life lost. An unprotected fall
-    costs a life and respawns it waiting with fresh invulnerability, or ends the run on the
-    last life. The respawn spot is the one nearest the respawn point that `ground` doesn't hold.
+    costs a life and respawns it waiting with fresh invulnerability, or starts the last life with
+    the burst on the bottom edge, where the ship left the screen. The respawn spot is the one
+    nearest the respawn point that `ground` doesn't hold.
     Source: 05-lives-and-damage.md, rules 2.1 to 2.7 and 5; systems/run.md, Rules, step 6.
     """
     fell = stepped.ship
@@ -428,22 +500,28 @@ def _apply_fall(stepped: Run, protected: bool, thrust: Thrust, ground: Ground) -
             waiting=True,
             invuln_ticks_left=INVULN_TICKS,
         )
-    return _end_run(stepped, thrust)
+    return _start_last_life(stepped, fell.x, SCREEN_H)
 
 
-def _end_run(stepped: Run, thrust: Thrust) -> Run:
-    """Return the run in game over with 0 lives. The ship stays where it is.
+def _start_last_life(stepped: Run, burst_x: float, burst_y: float) -> Run:
+    """Return the run on the tick lives reach 0: 0 lives, the score kept, the burst started.
 
-    Source: 05-lives-and-damage.md, rule 5; systems/run.md, Rules, steps 6.3 and 7.5.
+    `final_score` is the score so far this tick, the coin and graze of this tick included.
+    `final_level` is the level the tick was flown at: the waves step that may raise it comes
+    later in the tick. The ship stays where it is, the run is not over, and the tick goes on with
+    steps 8 to 10.
+    Source: 05-lives-and-damage.md, rule 5; systems/run.md, Rules, The last life.
     """
-    log.info("game over meters=%d", stepped.scroll.meters)
+    final: int = stepped.score
+    log.info("last life score=%d", final)
     return replace(
         stepped,
         lives=0,
-        game_over=True,
         invuln_ticks_left=0,
         waiting=False,
-        retry_armed=not _any_arrow(thrust),
+        final_score=final,
+        final_level=stepped.level,
+        burst=start_burst(stepped.last_life_rules, burst_x, burst_y),
     )
 
 
@@ -460,12 +538,13 @@ def _touches_ship(drifter: Drifter, ship_box: Hitbox) -> bool:
     )
 
 
-def _apply_hit(stepped: Run, protected: bool, thrust: Thrust) -> Run:
+def _apply_hit(stepped: Run, protected: bool) -> Run:
     """Apply a hit to the run after its ship, scroll and drifters stepped (step 7).
 
     Nothing happens with no touching drifter, or while protected. Otherwise one life is lost
     whatever the number of touching drifters, each starts its re-hit cooldown, and the run is
-    invulnerable again or over. The ship and the wait stay as they were.
+    invulnerable again or on its last life, with the burst at the ship's center. The ship and the
+    wait stay as they were.
     Source: 05-lives-and-damage.md, rules 1 and 4; systems/run.md, Rules, step 7.
     """
     ship_box: Hitbox = ship_hitbox(stepped.ship)
@@ -491,7 +570,7 @@ def _apply_hit(stepped: Run, protected: bool, thrust: Thrust) -> Run:
     hit = replace(stepped, drifters=tuple(drifters), lives=lives)
     if lives > 0:
         return replace(hit, invuln_ticks_left=INVULN_TICKS)
-    return _end_run(hit, thrust)
+    return _start_last_life(hit, hit.ship.x, hit.ship.y)
 
 
 def _cool_down(run: Run, before_hit: tuple[Drifter, ...]) -> Run:
@@ -555,19 +634,37 @@ def _log_respawn(fell_from: Ship, *, waits: bool) -> None:
     log.debug("respawn from x=%.2f y=%.2f wait=%s", fell_from.x, fell_from.y, waits)
 
 
-def _step_game_over(run: Run, thrust: Thrust) -> Run:
-    """A game-over tick: everything frozen, until every arrow is released and one is pressed.
+def _step_last_life(run: Run, burst: Burst, thrust: Thrust) -> Run:
+    """A last-life tick: the world runs on without the ship, the burst a tick older.
 
-    The retry press does not thrust: the new run is `start_run()`, or with waves, a run whose
-    waves restart from Wave 0 at Level 1 with a new seed (`next_run_waves`).
-    Source: 02-game-flow.md, rules 5 and 6; 91-decision-log.md, rows 30 and 31.
+    Drifters, popups, graze rings and scroll step as on a playing tick; there is no ship step, no
+    collect, graze, fall or hit, so the score stays frozen. Cooldowns, drops and waves follow,
+    and when the burst is finished the run is over. Source: systems/run.md, Rules, A last-life
+    tick.
     """
-    if not _any_arrow(thrust):
-        return replace(run, retry_armed=True, held=thrust)
-    if run.retry_armed:
-        log.info("new run")
-        return replace(start_run(_next_waves(run.waves), run.graze_rules), held=thrust)
-    return replace(run, held=thrust)
+    scroll_px: float = scroll_step_px(run.scroll, run.level)
+    drifters: tuple[Drifter, ...] = _update_drifters(run, scroll_px)
+    stepped = replace(
+        run,
+        scroll=step_scroll(run.scroll, run.level),
+        drifters=drifters,
+        popups=step_popups(run.popups),
+        graze_rings=step_graze_rings(run.graze_rings),
+        burst=step_burst(burst),
+        held=thrust,
+    )
+    return _end_last_life(_step_run_waves(_drop_drifters(_cool_down(stepped, drifters))))
+
+
+def _end_last_life(run: Run) -> Run:
+    """Return the run in game over once its burst is finished, else unchanged. Logs INFO.
+
+    Source: systems/run.md, Rules, A last-life tick, step 7.
+    """
+    if run.burst is None or not run.burst.finished:
+        return run
+    log.info("game over score=%d", run.score)
+    return replace(run, game_over=True)
 
 
 def _next_waves(waves: WaveRun | None) -> WaveRun | None:

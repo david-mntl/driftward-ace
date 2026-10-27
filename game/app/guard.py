@@ -2,7 +2,8 @@
 
 Source: 15-tech-constraints.md, rule 8. 10-ui.md, rule 8, error_screen, error_debug_line.
 docs/contracts/systems/app.md, Rules, Error guard and Import boundary.
-This module holds the game's only `except Exception`. At module level it imports only the
+This module holds the game's only general `except Exception` (the other one is around the
+browser storage calls in app/saves.py, save-storage.md, Errors). At module level it imports only the
 standard library and startup modules. pygame, core.world and ui.error_screen are imported
 in the error step.
 """

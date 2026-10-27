@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/last-life.schema.json",
+  "title": "Last life values",
+  "description": "The file game/tuning/last_life.json: the last-life delay and the stand-in burst the ship bursts into on the last life, read in both run modes. DRA-125. The file must exist; every field is optional, and a field left out keeps its default from core.last_life (the DEFAULT_* constants). {} is a valid file. last_life_delay is the GDD's key (02-game-flow.md, Values). The burst values are the stand-in the Director approved (scope report DRA-125, Values needed, Burst), not in the GDD, until LD-08 sets the life-lost feedback (10-ui.md, life_lost_feedback). The burst's color is not here: like every placeholder color it is a view constant. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app/tuning-loader.md) into core.last_life.LastLifeRules. Owner of the schema: architect. Contract: docs/contracts/systems/run.md, Rules (The last life, A last-life tick, Burst).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {
+    "last_life_delay": {
+      "description": "Ticks from the ship bursting on the last life to the game-over screen. The world runs on and the burst fades over exactly these ticks. Default: 02-game-flow.md, last_life_delay (guess). Maps to LastLifeRules.delay_ticks.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "burst_particle_count": {
+      "description": "Squares in the burst, flying out in that many evenly spread directions. Default: scope report DRA-125, Values needed, Burst (stand-in). Maps to LastLifeRules.burst_particle_count.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "burst_particle_speed": {
+      "description": "Px each square moves per tick, away from the burst's origin. An int or a float, never a bool. Default: scope report DRA-125, Values needed, Burst (stand-in). Maps to LastLifeRules.burst_particle_speed.",
+      "type": "number",
+      "minimum": 0
+    },
+    "burst_particle_size": {
+      "description": "Side of each square, px. Default: scope report DRA-125, Values needed, Burst (stand-in). Maps to LastLifeRules.burst_particle_size.",
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

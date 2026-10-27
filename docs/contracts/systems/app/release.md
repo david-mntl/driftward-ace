@@ -170,6 +170,29 @@ for ring in run.graze_rings:
 ```
 A retry needs no app call: `step_run` keeps `graze_rules` itself.
 
+DRA-125 calls. The app holds a `GameFlow` instead of a bare `Run`: one load and one wrap before the first frame, the confirm keys and the focus in the input, one `step_flow` and one `add_flow_drifters` per tick, and the draw chosen by the screen. Signatures are set in `systems/game-flow.md`, `systems/run.md` and `systems/app/tuning-loader.md`; the rules are in `systems/app/frame-loop.md`. From DRA-125 a retry is the flow's (`next_run`), not `step_run`'s.
+```python
+# before the first frame:
+last_life_rules = load_last_life_rules()  # app.tuning, both modes: last_life.json. A bad file raises here
+flow = start_flow(start_run(waves=..., graze_rules=graze_rules, last_life_rules=last_life_rules))
+# per frame, after the events:
+thrust = Thrust(up=..., down=..., left=..., right=...)
+confirm = <Enter or Space held now>
+# per tick, inside the accumulator loop:
+flow = step_flow(flow, TickInput(thrust=thrust, confirm=confirm, focus_lost=<a focus loss not yet given to a tick>))
+flow = add_flow_drifters(flow, due, tuning)  # due as before, read from flow.run
+# per frame, draw:
+surface.fill(BACKGROUND)
+if flow.screen is Screen.MENU: draw_menu(surface, flow.menu_selection)
+elif flow.screen is Screen.INSTRUCTIONS: draw_instructions(surface)
+elif flow.screen is Screen.LEADERBOARD: draw_leaderboard(surface)
+else:
+    ...  # the world as before, from flow.run, with draw_burst(surface, run.burst) in the ship's
+    # place while run.last_life; then the overlay; then draw_pause_box(surface) when PAUSED, or
+    # draw_game_over, draw_final_score(surface, run.score) and
+    # draw_game_over_choices(surface, flow.game_over_selection) when GAME_OVER; the HUD last
+```
+
 ### game/scripts/start-driftward-ace.sh (Integration Engineer)
 ```
 start-driftward-ace.sh            # serves the build, prints http://localhost:<PORT>
@@ -186,7 +209,7 @@ Launch script (`game/scripts/start-driftward-ace.sh`):
 - Keep running pygbag from the repo root, so it reads `pygbag.ini`.
 
 Release package (`pygbag.ini`):
-- The package (`game.apk` inside `game/build/web.zip`, and the live build the start script serves) holds only runtime files: `main.py`, `app/`, `ui/`, `core/`, and later the asset and data files the game reads. From DRA-6, `core/*.py` must be in it. From DRA-29, `tuning/` with its JSON files must be in it, along with the subpackages `core/drifters/` and `ui/drifters/`. From DRA-76, `waves/` with its JSON files. Source: Director decision (DRA-5 close-out, round 1 observations).
+- The package (`game.apk` inside `game/build/web.zip`, and the live build the start script serves) holds only runtime files: `main.py`, `app/`, `ui/`, `core/`, and later the asset and data files the game reads. From DRA-6, `core/*.py` must be in it. From DRA-29, `tuning/` with its JSON files must be in it, along with the subpackages `core/drifters/` and `ui/drifters/`. From DRA-76, `waves/` with its JSON files. From DRA-125, `tuning/last_life.json`, `core/game_flow.py`, `core/last_life.py` and the new views in `ui/`. Source: Director decision (DRA-5 close-out, round 1 observations).
 - Left out, at least: `tests/` (with its `CONTEXT.md` and `conftest.py`), `scripts/`, `CONTEXT.md`, `requirements.txt`, `ruff.toml`. Any non-runtime file added to `game/` later is left out the same way. Source: Director decision (DRA-5 close-out).
 - Configured only in `pygbag.ini` at the repo root, `[DEPENDENCIES]` section, `ignoreDirs` and `ignoreFiles`. Built by the Integration Engineer. Source: Director decision (DRA-5 close-out). docs/crew/roster.md, row 12.
 - No pygbag flag or template change. pygbag stays at 0.9.3. Source: 15-tech-constraints.md, web_build.
