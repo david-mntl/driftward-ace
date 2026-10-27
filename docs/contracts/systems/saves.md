@@ -1,6 +1,6 @@
 # Saves: the top 10, the last nickname, the letter picker and the place message
-Version: 0
-Status: draft
+Version: 1
+Status: frozen
 Features: DRA-126
 Created by: architect
 

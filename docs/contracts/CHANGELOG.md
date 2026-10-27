@@ -192,3 +192,11 @@
 - `systems/hud.md`: 5 to 6, frozen.
 - `systems/run.md`: 11 to 12, frozen.
 - Screens: menu, instructions, pause, the 2-second last life and one game-over screen with MENU and RETRY. New game-flow contract and last-life file.
+
+## DRA-126, 2026-10-27
+- `systems/app.md`: 17 to 18, frozen.
+- `systems/game-flow.md`: 1 to 2, frozen.
+- `systems/hud.md`: 6 to 7, frozen.
+- `systems/run.md`: 12 to 13, frozen.
+- `systems/saves.md`: 0 to 1, frozen.
+- Saves: top 10 scores in browser storage, a three-letter name picker at game over, place messages, BEST on the HUD and a filled leaderboard. New saves contract.

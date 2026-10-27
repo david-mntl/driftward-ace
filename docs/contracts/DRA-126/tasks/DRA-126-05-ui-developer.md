@@ -4,7 +4,7 @@ Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/game-flow.md
 Impact: docs/contracts/DRA-126/impact.md
-Status: open
+Status: done
 Linear: DRA-143
 
 ## Read in the contract

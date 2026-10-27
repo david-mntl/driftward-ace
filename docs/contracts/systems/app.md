@@ -1,6 +1,6 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
-Version: 17
-Status: draft
+Version: 18
+Status: frozen
 Features: DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111, DRA-117, DRA-125, DRA-126
 Created by: architect
 
@@ -12,7 +12,7 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 | Part | Holds | Read when | Size |
 |---|---|---|---|
 | [debug-spawns](app/debug-spawns.md) | Interface, Rules | you change the debug spawn list: its file, checks, rows or timing. | 13.1 KB |
-| [error-handling](app/error-handling.md) | Interface, Presentation, Rules | you change the error guard or the error screen. | 5.2 KB |
+| [error-handling](app/error-handling.md) | Interface, Presentation, Rules | you change the error guard or the error screen. | 5.4 KB |
 | [frame-loop](app/frame-loop.md) | Interface, Rules | you change the frame loop: ticks, keys, draw order, the catch-up cap. | 18.5 KB |
 | [general](app/general.md) | Purpose, Interface | you want the overview of the app, or a rule that fits no area. | 4.7 KB |
 | [integration-checks/DRA-104](app/integration-checks/DRA-104.md) | Rules | you run or extend the browser checks for the UFO (DRA-104). | 7.6 KB |
@@ -41,7 +41,7 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 | [rationale/frame-loop](app/rationale/frame-loop.md) | Rationale | you ask why the app's frame loop works as it does. | 3.9 KB |
 | [rationale/integration-checks](app/rationale/integration-checks.md) | Rationale | you ask why the app's integration checks works as it does. | 3.3 KB |
 | [rationale/release](app/rationale/release.md) | Rationale | you ask why the app's release works as it does. | 0.7 KB |
-| [rationale/save-storage](app/rationale/save-storage.md) | Rationale | you ask why the app's save storage works as it does. | 1.9 KB |
+| [rationale/save-storage](app/rationale/save-storage.md) | Rationale | you ask why the app's save storage works as it does. | 2.2 KB |
 | [rationale/startup](app/rationale/startup.md) | Rationale | you ask why the app's startup works as it does. | 3.1 KB |
 | [rationale/tuning-loader](app/rationale/tuning-loader.md) | Rationale | you ask why the app's tuning loader works as it does. | 2.6 KB |
 | [rationale/wave-loading](app/rationale/wave-loading.md) | Rationale | you ask why the app's wave loading works as it does. | 1.4 KB |

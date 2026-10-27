@@ -4,7 +4,7 @@ Assignee: gameplay-implementer
 Writes to: game/core/
 Contract: docs/contracts/systems/game-flow.md
 Impact: docs/contracts/DRA-126/impact.md
-Status: open
+Status: done
 Linear: DRA-140
 
 ## Read in the contract
