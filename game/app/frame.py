@@ -1,17 +1,19 @@
 """The async frame loop on the fixed 60 Hz tick. Imported only by app.loop.start, inside the guard.
 
 Before the first frame it loads and checks the drifter tuning, the graze values, the last-life
-values and the wave files (both modes) and, in debug mode only, the debug test spawn list, then
-builds the first run and wraps it in the game flow, which opens on the menu. The run plays the
+values, the saves from the browser's localStorage and the wave files (both modes) and, in debug
+mode only, the debug test spawn list, then builds the first run and wraps it with the saves in the
+game flow, which opens on the menu. The run plays the
 waves, except in debug mode when the spawn list plays (its `play` is "list", the default). Each
 frame: read events (arrows, Enter and Space, F3, the page losing focus), build the thrust from the
 held arrows and the confirm flag from Enter or Space, run up to MAX_TICKS_PER_FRAME ticks (one
 core.game_flow.step_flow each, then the due drifters, the waves' or the spawn list's, through
-core.game_flow.add_flow_drifters), draw by screen, flip, then yield to the browser. The app holds
+core.game_flow.add_flow_drifters, then the saves written after a tick that saved an entry), draw
+by screen, flip, then yield to the browser. The app holds
 one GameFlow; core does the screens, the pause, the ship, the scroll, the drifters, the lives, the
-respawn wait, the last life, game over, retry and grazes.
+respawn wait, the last life, game over, the place, the name picker, retry and grazes.
 Source: docs/contracts/systems/app/frame-loop.md, Rules, Frame loop. 15-tech-constraints.md,
-rules 1 and 2.
+rules 1 and 2. systems/app/save-storage.md.
 """
 
 import asyncio
@@ -24,22 +26,37 @@ import pygame
 
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.mode import RunMode
+from app.saves import load_saves, write_saves
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
 from app.waves import load_wave_book
 from core.drifters.spawner import Placement
 from core.drifters.tuning import DrifterTuning
-from core.game_flow import GameFlow, Screen, TickInput, add_flow_drifters, start_flow, step_flow
+from core.game_flow import (
+    GameFlow,
+    Screen,
+    TickInput,
+    add_flow_drifters,
+    start_flow,
+    step_flow,
+    stop_saves,
+)
 from core.graze import GrazeRules
 from core.last_life import LastLifeRules
 from core.run import Run, start_run
+from core.saves import Saves
 from core.ship import Thrust
 from core.waves import WaveBook, start_waves
 from core.world import SCREEN_H, SCREEN_W
 from ui.burst_view import draw_burst
 from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay, draw_debug_wave_lines
 from ui.drifters.registry import render_drifter
-from ui.game_over import draw_final_score, draw_game_over, draw_game_over_choices
+from ui.game_over import (
+    draw_final_score,
+    draw_game_over,
+    draw_game_over_choices,
+    draw_name_picker,
+)
 from ui.graze_view import draw_graze_ring
 from ui.hud import draw_hud
 from ui.instructions import draw_instructions
@@ -90,6 +107,7 @@ async def frame_loop(mode: RunMode) -> None:
     tuning: DrifterTuning = load_tuning()
     graze_rules: GrazeRules = load_graze_rules()
     last_life_rules: LastLifeRules = load_last_life_rules()
+    saves: Saves | None = load_saves()
     book: WaveBook = load_wave_book(tuning)
     spawn_list: DebugSpawnList | None = load_debug_spawns(tuning) if debug else None
     list_plays: bool = spawn_list is not None and spawn_list.play == PLAY_LIST
@@ -98,7 +116,7 @@ async def frame_loop(mode: RunMode) -> None:
         graze_rules=graze_rules,
         last_life_rules=last_life_rules,
     )
-    flow: GameFlow = start_flow(run)
+    flow: GameFlow = start_flow(run, saves)
     overlay_visible: bool = debug
     focus_lost_pending: bool = False
     accumulator: float = 0.0
@@ -195,7 +213,8 @@ def _run_ticks(
 
     Each tick is one step_flow call; a pending focus loss reaches the first tick only. Right after
     it the due placements go in through one add_flow_drifters call: the spawn list's when
-    list_plays, else the run's waves'. Never both. Returns (flow, accumulator left, focus loss
+    list_plays, else the run's waves'. Never both. Then the saves are written if that tick saved
+    an entry (_write_saves). Returns (flow, accumulator left, focus loss
     still pending: True only when no tick ran). Source: 15-tech-constraints.md, rules 2 and 7;
     systems/app/frame-loop.md, Rules, Focus and Tick.
     """
@@ -211,9 +230,22 @@ def _run_ticks(
             else flow.run.wave_spawns_due
         )
         flow = add_flow_drifters(flow, due, tuning)
+        flow = _write_saves(flow)
         accumulator -= TICK_SECONDS
         ticks += 1
     return flow, accumulator, focus_lost_pending
+
+
+def _write_saves(flow: GameFlow) -> GameFlow:
+    """Write the saves after a tick that saved an entry; turn saves off when the write fails.
+
+    Source: systems/app/frame-loop.md, Rules, Tick; systems/app/save-storage.md, write_saves.
+    """
+    if not flow.saves_changed or flow.saves is None:
+        return flow
+    if write_saves(flow.saves):
+        return flow
+    return stop_saves(flow)
 
 
 def _apply_cap(accumulator: float, was_capped: bool) -> bool:
@@ -241,7 +273,7 @@ def _draw(surface: pygame.Surface, flow: GameFlow, overlay_visible: bool, debug:
     elif flow.screen is Screen.INSTRUCTIONS:
         draw_instructions(surface)
     elif flow.screen is Screen.LEADERBOARD:
-        draw_leaderboard(surface)
+        draw_leaderboard(surface, flow.leaderboard)
     elif flow.screen in _RUN_SCREENS:
         _draw_run(surface, flow, overlay_visible, debug)
 
@@ -249,7 +281,8 @@ def _draw(surface: pygame.Surface, flow: GameFlow, overlay_visible: bool, debug:
 def _draw_run(surface: pygame.Surface, flow: GameFlow, overlay_visible: bool, debug: bool) -> None:
     """Draw the starfield, the drifters, the points popups, the ship while shown or the burst in
     the last life, the graze rings, the debug outlines, overlay and wave lines if visible, the
-    PAUSE box when paused or the game-over screen at game over, and the HUD last.
+    PAUSE box when paused or the game-over screen at game over (_draw_game_over), and the HUD
+    last, with BEST.
 
     Drifters sit behind the ship, and the popups over the drifters and behind the ship. The burst
     takes the ship's place. The HUD sits below the overlay's place for the whole run in debug mode,
@@ -276,7 +309,20 @@ def _draw_run(surface: pygame.Surface, flow: GameFlow, overlay_visible: bool, de
     if flow.screen is Screen.PAUSED:
         draw_pause_box(surface)
     elif flow.screen is Screen.GAME_OVER:
-        draw_game_over(surface)
-        draw_final_score(surface, run.score)
-        draw_game_over_choices(surface, flow.game_over_selection)
-    draw_hud(surface, run, below_overlay=debug)
+        _draw_game_over(surface, flow)
+    draw_hud(surface, run, below_overlay=debug, best=flow.best)
+
+
+def _draw_game_over(surface: pygame.Surface, flow: GameFlow) -> None:
+    """Draw the game-over box: the place message, the score, the letter picker when the run has
+    one, then RETRY and MENU, active once the picker no longer takes keys.
+
+    Source: systems/game-flow.md, Presentation (`flow.screen` GAME_OVER row);
+    systems/app/frame-loop.md, Rules, Draw.
+    """
+    picker_shown: bool = flow.picker is not None
+    draw_game_over(surface, flow.game_over_message, picker_shown)
+    draw_final_score(surface, flow.run.score, picker_shown)
+    if flow.picker is not None:
+        draw_name_picker(surface, flow.picker, flow.picking)
+    draw_game_over_choices(surface, flow.game_over_selection, picker_shown, active=not flow.picking)
