@@ -5,6 +5,8 @@ last-life table), Interface (DRA-125: `core/last_life.py`, `core/run.py`), Rules
 7.5, The last life, A last-life tick, A game-over tick, `next_run`, Burst, `hold_arrows`,
 `add_drifters`, Score, Other rules, Logging). Task:
 docs/contracts/DRA-125/tasks/DRA-125-09-qa-engineer.md. One test per behavior it lists.
+From DRA-126 (task DRA-126-06-qa-engineer.md) it also holds the level reached: `final_level`,
+`level_reached` (Interface, "DRA-126: the level reached"; Rules, The last life, Score, `next_run`).
 The last-life values are written here, never read from game/tuning/: the delay from
 02-game-flow.md, last_life_delay (guess), the burst's count, speed and size from scope report
 DRA-125, Values needed (Burst), which the GDD doesn't hold yet (LD-08). The drifter tuning is
@@ -1103,3 +1105,128 @@ def test_next_run_logs_new_run_then_the_waves_start(caplog: pytest.LogCaptureFix
     caplog.clear()
     next_run(no_waves)
     assert all_lines(caplog) == ["new run"]
+
+
+LEVEL_UP_TICK: int = 50
+"""The tick of a run from tick 1 on `BOOK` whose waves step raises the level to 2. Source: the
+book above (Wave 0 ends on tick 40 and `a` on tick 50; see `level_up_book`)."""
+
+
+def flown_to(ticks: int) -> Run:
+    """A run on `BOOK` from tick 1 with 3 lives, its ship put back at home before each tick.
+
+    The state after `ticks` ticks: nothing falls or touches it, so only the wave clock moves.
+    """
+    run: Run = run_of(waves=start_waves(BOOK, SEED), scroll=start_scroll())
+    for _ in range(ticks):
+        run = step_run(replace(run, ship=HOME_SHIP), NO_KEY)
+    return run
+
+
+def lose_last_life(before: Run, how: str) -> Run:
+    """The next tick of `before` on its last life, lost by a fall or by a hit on a still rock."""
+    if how == "fall":
+        return step_run(replace(before, ship=falling_ship(), lives=1), NO_KEY)
+    on_ship: Drifter = replace(rock(HOME_X, HOME_Y), uid=before.next_uid)
+    hit: Run = replace(
+        before,
+        ship=HOME_SHIP,
+        lives=1,
+        drifters=(*before.drifters, on_ship),
+        next_uid=before.next_uid + 1,
+    )
+    return step_run(hit, NO_KEY)
+
+
+@pytest.mark.parametrize("how", ["fall", "hit"])
+def test_final_level_is_the_level_on_the_tick_lives_reach_zero(how: str) -> None:
+    assert LEVEL_UP_TICK == 50
+    cases: dict[int, tuple[int, int]] = {
+        # death tick: (the level it was flown at, the level in the state after it)
+        1: (1, 1),
+        49: (1, 1),
+        LEVEL_UP_TICK: (1, 2),  # step 9a raises the level on the death tick itself
+        LEVEL_UP_TICK + 1: (2, 2),
+        90: (2, 2),
+    }
+    for death_tick, (flown_at, after) in cases.items():
+        before: Run = flown_to(death_tick - 1)
+        assert before.level == (2 if death_tick - 1 >= LEVEL_UP_TICK else 1)
+        assert before.final_level is None
+
+        run: Run = lose_last_life(before, how)
+
+        assert run.last_life, f"death tick {death_tick}"
+        assert run.lives == 0
+        assert run.final_level == flown_at, f"death tick {death_tick}"
+        assert run.level == after, f"death tick {death_tick}"
+        assert run.level_reached == flown_at, f"death tick {death_tick}"
+
+
+def test_level_reached_stays_through_the_last_life_when_the_level_rises() -> None:
+    before: Run = flown_to(LEVEL_UP_TICK - 3)
+    assert before.level == 1
+
+    states: list[Run] = [lose_last_life(before, "fall")]
+    while not states[-1].game_over:
+        states.append(step_run(states[-1], NO_KEY))
+
+    assert len(states) == LAST_LIFE_DELAY + 1, "death tick L, game over on L + delay"
+    for index, state in enumerate(states):
+        tick: int = LEVEL_UP_TICK - 2 + index  # the state after tick `tick`
+        assert state.lives == 0
+        assert state.level == (2 if tick >= LEVEL_UP_TICK else 1), f"level, tick {tick}"
+        assert state.final_level == 1, f"final_level, tick {tick}"
+        assert state.level_reached == 1, f"level_reached, tick {tick}"
+        assert state.final_score == states[0].final_score
+    assert states[-1].game_over
+    assert states[-1].level == 2, "the level rose during the last life"
+
+    over: Run = step_run(states[-1], UP)
+    assert (over.final_level, over.level, over.level_reached) == (1, 2, 1), "a game-over tick"
+
+
+def test_level_reached_is_the_level_before_the_last_life() -> None:
+    fresh: Run = start_run(start_waves(BOOK, SEED))
+    assert fresh.final_level is None
+    assert fresh.level_reached == fresh.level == 1
+    assert start_run().final_level is None
+    assert start_run().level_reached == 1
+
+    run: Run = run_of(waves=start_waves(BOOK, SEED), scroll=start_scroll())
+    for tick in range(1, 91):
+        run = step_run(replace(run, ship=HOME_SHIP), NO_KEY)
+        assert run.final_level is None, f"tick {tick}"
+        assert run.level_reached == run.level, f"tick {tick}"
+        assert run.level == (2 if tick >= LEVEL_UP_TICK else 1)
+    assert run.level_reached == 2
+
+    no_waves: Run = hit_run(lives=1)
+    assert no_waves.waves is None
+    assert no_waves.level_reached == 1
+    assert step_run(no_waves, NO_KEY).final_level == 1
+
+    # a life lost that is not the last one is not the last life
+    protected_fall: Run = step_run(
+        replace(flown_to(LEVEL_UP_TICK), ship=falling_ship(), lives=2), NO_KEY
+    )
+    assert protected_fall.lives == 1
+    assert not protected_fall.last_life
+    assert protected_fall.final_level is None
+    assert protected_fall.level_reached == protected_fall.level == 2
+
+
+def test_next_run_has_no_final_level() -> None:
+    with_waves: Run = over_run(lose_last_life(flown_to(LEVEL_UP_TICK + 5), "fall"))
+    assert with_waves.final_level == 2
+    no_waves: Run = over_run(hit_run())
+    assert no_waves.final_level == 1
+
+    for finished in (with_waves, no_waves):
+        fresh: Run = next_run(finished)
+        assert fresh.final_level is None
+        assert fresh.level == 1
+        assert fresh.level_reached == 1
+        assert fresh.final_score is None
+        assert finished.final_level in (1, 2), "the old run is left as it was"
+    assert next_run(with_waves) == start_run(next_run(with_waves).waves, GrazeRules(), RULES)

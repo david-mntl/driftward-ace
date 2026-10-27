@@ -4,6 +4,10 @@ Contract: docs/contracts/systems/game-flow.md, Diagram (the state diagram, the t
 two tables), Interface (`core/game_flow.py`), Rules (Presses, Start, MENU, INSTRUCTIONS and
 LEADERBOARD, PLAYING, PAUSED, GAME_OVER, `run_stepped`, `add_flow_drifters`, Pure, Logging).
 Task: docs/contracts/DRA-125/tasks/DRA-125-10-qa-engineer.md. One test per behavior it lists.
+From DRA-126 (docs/contracts/DRA-126/tasks/DRA-126-07-qa-engineer.md): the saves, the game-over
+message and letter picker, `saves_changed`, `stop_saves`, `best` and `leaderboard`, and their log
+lines (Diagram's game-over table; Rules: Presses, Start, Opening GAME_OVER, GAME_OVER,
+`saves_changed`, `stop_saves`, `best` and `leaderboard`, Pure, Logging).
 The run is built with `start_run`; the last life is reached with a ship that falls past the floor on
 its next step, at one life, with a short `LastLifeRules` delay. No expected number is imported from
 the code under test; the physics values below come from the GDD.
@@ -37,9 +41,11 @@ from core.game_flow import (
     add_flow_drifters,
     start_flow,
     step_flow,
+    stop_saves,
 )
 from core.last_life import LastLifeRules
 from core.run import Run, add_drifters, next_run, start_run, step_run
+from core.saves import GameOverMessage, NamePicker, Saves, ScoreEntry
 from core.ship import Ship, Thrust, spawn
 from core.waves import (
     LevelPlaylist,
@@ -888,7 +894,9 @@ def test_the_flow_logs_screen_changes_pauses_and_moves_only_and_the_run_lines_co
     assert lines == flow_line("screen playing")
 
     # The last life: the death tick and the ticks after it log nothing in the flow, and the tick
-    # that ends in game over writes the run's lines, then `screen game_over` and no select line.
+    # that ends in game over writes the run's lines, then the flow's two lines: the message and
+    # place (DRA-126, no saves: `game_over`, `none`) right before `screen game_over`. No select
+    # line.
     flow: GameFlow = flow_on(Screen.PLAYING, last_life_run())
     for _ in range(LAST_LIFE_DELAY + 5):
         flow, lines = step(flow, IDLE)
@@ -897,9 +905,9 @@ def test_the_flow_logs_screen_changes_pauses_and_moves_only_and_the_run_lines_co
         assert flow_lines(lines) == []
     assert flow.screen is Screen.GAME_OVER
     names: list[str] = [name for name, _ in lines]
-    assert names.count(FLOW_LOGGER) == 1
-    assert flow_lines(lines) == ["screen game_over"]
-    assert names[-1] == FLOW_LOGGER
+    assert names.count(FLOW_LOGGER) == 2
+    assert flow_lines(lines) == ["game over message=game_over place=none", "screen game_over"]
+    assert names[-2:] == [FLOW_LOGGER, FLOW_LOGGER]
     assert RUN_LOGGER in names, "the run logged its own game over line"
     assert any(message.startswith("game over") for name, message in lines if name == RUN_LOGGER)
 
@@ -942,3 +950,904 @@ def test_the_flow_logs_screen_changes_pauses_and_moves_only_and_the_run_lines_co
     assert names.count(FLOW_LOGGER) == 1
     assert flow_lines(lines) == ["screen playing"]
     assert WAVES_LOGGER in names
+
+
+# ---------------------------------------------------------------------------------------------
+# DRA-126: saves, the game-over message, the letter picker, `saves_changed`, `stop_saves`
+# ---------------------------------------------------------------------------------------------
+
+TOP_N: int = 10
+"""Entries on the list. Source: 11-save-data.md, top_n (locked)."""
+
+PICKER_SLOTS: int = 10
+"""Slots of the picker. Source: 11-save-data.md, nickname_length and nickname_input (locked)."""
+
+CHARACTERS: str = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_!?*"
+"""The picker's characters in turn order: blank, A to Z, 0 to 9, then `. - _ ! ? *`. Source:
+11-save-data.md, nickname_chars (locked), nickname_char_order (guess: up moves forward)."""
+
+RUN_SCORE: int = 500
+"""The score the test game overs are given (the run's frozen `final_score`)."""
+
+FAR_SCORE: int = 1_000_000
+"""A score far above any test run: an entry with it always ranks above the run."""
+
+BOTH_ARROWS = Thrust(up=True, down=True, left=True, right=True)
+
+
+def entry(nickname: str, score: int, level: int) -> ScoreEntry:
+    """One saved entry."""
+    return ScoreEntry(nickname=nickname, score=score, level_reached=level)
+
+
+def saves_of(*rows: tuple[str, int, int], last: str | None = None) -> Saves:
+    """A list in the order given, #1 first: (nickname, score, level) rows."""
+    return Saves(entries=tuple(entry(*row) for row in rows), last_nickname=last)
+
+
+def beating(count: int, *, last: str | None = None) -> Saves:
+    """`count` entries that all rank above a run of RUN_SCORE: that run takes place `count + 1`.
+
+    With ten entries no run of RUN_SCORE has a place.
+    """
+    return saves_of(*((f"N{i + 1}", FAR_SCORE - 100 * i, 1) for i in range(count)), last=last)
+
+
+def picker_of(name: str, cursor: int = 0) -> NamePicker:
+    """A picker holding `name` from slot 0, blanks after."""
+    return NamePicker(slots=tuple(name.ljust(PICKER_SLOTS)), cursor=cursor)
+
+
+def message_of(place: int | None) -> GameOverMessage:
+    """#1 NEW BEST SCORE, #2 to 3 TOP 3, #4 to 10 TOP 10, off the list GAME OVER. Source:
+    10-ui.md, game_over_message (locked)."""
+    if place is None:
+        return GameOverMessage.GAME_OVER
+    if place == 1:
+        return GameOverMessage.NEW_BEST_SCORE
+    if place <= 3:
+        return GameOverMessage.TOP_3
+    return GameOverMessage.TOP_10
+
+
+def game_over_from(base: GameFlow, *, score: int = RUN_SCORE, level: int = 1) -> GameFlow:
+    """`base` played through a real last life to GAME_OVER, the run's score and level as given.
+
+    The run is a one-life run that falls on the first tick. Its `final_score` and `final_level` are
+    set on the state after the death tick (the last life keeps them), so the flow opens GAME_OVER
+    on its own tick, from the saves and every other field `base` holds. No key is held after.
+    """
+    start: GameFlow = replace(
+        base, screen=Screen.PLAYING, run=last_life_run(), confirm_held=False, arrows_held=NO_KEY
+    )
+    death: GameFlow = step_flow(start, IDLE)
+    assert death.run.last_life
+    assert death.screen is Screen.PLAYING
+    frozen: Run = replace(death.run, final_score=score, final_level=level)
+    return to_game_over(replace(death, run=frozen))
+
+
+def game_over_with(saves: Saves | None, *, score: int = RUN_SCORE, level: int = 1) -> GameFlow:
+    """The flow on GAME_OVER after a run of `score` and `level` with `saves` held."""
+    return game_over_from(replace(flow_on(Screen.PLAYING), saves=saves), score=score, level=level)
+
+
+def picked(picker: NamePicker, thrust: Thrust) -> NamePicker:
+    """The picker after one tick of fresh presses of `thrust`: the cursor's slot turns (up one
+    forward, down one back), then the cursor moves (right one on, left one back). Up with down and
+    left with right cancel out. Source: systems/game-flow.md, Rules, Presses and GAME_OVER."""
+    turn: int = int(thrust.up) - int(thrust.down)
+    shift: int = int(thrust.right) - int(thrust.left)
+    slots: list[str] = list(picker.slots)
+    slots[picker.cursor] = CHARACTERS[
+        (CHARACTERS.index(slots[picker.cursor]) + turn) % len(CHARACTERS)
+    ]
+    return NamePicker(slots=tuple(slots), cursor=(picker.cursor + shift) % PICKER_SLOTS)
+
+
+def test_start_flow_holds_no_saves_or_the_saves_it_is_given_and_every_other_new_field_default() -> (
+    None
+):
+    plain: GameFlow = start_flow(RUN)
+    assert plain.saves is None
+    assert plain.game_over_message is GameOverMessage.GAME_OVER
+    assert plain.picker is None
+    assert not plain.picking
+    assert not plain.saves_changed
+    assert plain.best is None
+    assert plain.leaderboard == ()
+    assert start_flow(RUN, None) == plain
+
+    for saves in (
+        Saves(),
+        saves_of(("ACE", 900, 2), ("BOB", 400, 1), last="ACE"),
+        beating(TOP_N, last="N1"),
+    ):
+        before: Saves = copy.deepcopy(saves)
+        given: GameFlow = start_flow(RUN, saves)
+        assert given.saves is saves
+        assert saves == before
+        # The rest is what `start_flow(run)` builds: the menu, every key held, nothing opened.
+        assert given == replace(plain, saves=saves)
+        assert given.screen is Screen.MENU
+        assert given.menu_selection is MENU_START_SELECTION
+        assert given.game_over_selection is GAME_OVER_START_SELECTION
+        assert given.run == RUN
+        assert given.confirm_held
+        assert given.arrows_held == BOTH_ARROWS
+        assert not given.run_stepped
+        assert given.game_over_message is GameOverMessage.GAME_OVER
+        assert given.picker is None
+        assert not given.picking
+        assert not given.saves_changed
+
+
+@pytest.mark.parametrize("last", [None, "ACE"])
+@pytest.mark.parametrize("beaten_by", range(TOP_N + 1))
+def test_game_over_opens_with_the_message_and_picker_of_the_runs_place(
+    beaten_by: int, last: str | None
+) -> None:
+    saves: Saves = beating(beaten_by, last=last)
+    place: int | None = beaten_by + 1 if beaten_by < TOP_N else None
+
+    over: GameFlow = game_over_with(saves)
+
+    assert over.screen is Screen.GAME_OVER
+    assert over.run.score == RUN_SCORE
+    assert over.run.level_reached == 1
+    assert over.game_over_message is message_of(place)
+    assert over.game_over_selection is GameOverChoice.RETRY
+    assert over.saves is saves
+    assert not over.saves_changed
+    if place is None:
+        assert over.picker is None
+        assert not over.picking
+        # RETRY and MENU take keys from the first frame.
+        assert step_flow(over, TickInput(thrust=DOWN)).game_over_selection is GameOverChoice.MENU
+        assert step_flow(over, CONFIRM).screen is Screen.PLAYING
+        menu: GameFlow = step_flow(replace(over, game_over_selection=GameOverChoice.MENU), CONFIRM)
+        assert menu.screen is Screen.MENU
+    else:
+        assert over.picker == picker_of(last or "")
+        assert over.picker is not None
+        assert over.picker.cursor == 0
+        assert over.picking
+        # The picker has the keys: a confirm saves (it never picks RETRY), down turns a character.
+        assert step_flow(over, CONFIRM).screen is Screen.GAME_OVER
+        down: GameFlow = step_flow(over, TickInput(thrust=DOWN))
+        assert down.game_over_selection is GameOverChoice.RETRY
+        assert down.picker != over.picker
+
+
+def test_a_flow_with_no_saves_opens_game_over_with_no_picker_and_retry_and_menu_at_once() -> None:
+    over: GameFlow = game_over_with(None)
+
+    assert over.saves is None
+    assert over.game_over_message is GameOverMessage.GAME_OVER
+    assert over.picker is None
+    assert not over.picking
+    assert over.game_over_selection is GameOverChoice.RETRY
+    assert step_flow(over, TickInput(thrust=UP)).game_over_selection is GameOverChoice.MENU
+    assert step_flow(over, CONFIRM).screen is Screen.PLAYING
+    # The same flow built through the plain helper (no saves at all).
+    plain: GameFlow = over_flow()
+    assert plain.game_over_message is GameOverMessage.GAME_OVER
+    assert plain.picker is None
+    assert not plain.picking
+    assert plain.best is None
+    assert plain.leaderboard == ()
+
+
+@pytest.mark.parametrize(
+    ("count", "entry_score", "entry_level", "score", "level", "place"),
+    [
+        # one entry, 500 on level 2: a tie on score is decided by the level
+        (1, 500, 2, 500, 1, 2),
+        (1, 500, 2, 500, 2, 2),
+        (1, 500, 2, 500, 3, 1),
+        (1, 500, 2, 501, 1, 1),
+        (1, 500, 2, 499, 8, 2),
+        # a full list of 500 on level 2: only a higher level, or a higher score, gets in
+        (TOP_N, 500, 2, 500, 1, None),
+        (TOP_N, 500, 2, 500, 2, None),
+        (TOP_N, 500, 2, 499, 8, None),
+        (TOP_N, 500, 2, 500, 3, 1),
+        (TOP_N, 500, 2, 501, 1, 1),
+    ],
+)
+def test_the_message_follows_the_score_and_the_level_the_run_reached(
+    count: int,
+    entry_score: int,
+    entry_level: int,
+    score: int,
+    level: int,
+    place: int | None,
+) -> None:
+    saves: Saves = saves_of(*((f"N{i}", entry_score, entry_level) for i in range(count)))
+
+    over: GameFlow = game_over_with(saves, score=score, level=level)
+
+    assert over.run.score == score
+    assert over.run.level_reached == level
+    assert over.game_over_message is message_of(place)
+    assert (over.picker is not None) == (place is not None)
+    assert over.picking == (place is not None)
+
+
+def test_a_run_beating_only_the_tenth_takes_place_ten() -> None:
+    nine_above: tuple[tuple[str, int, int], ...] = tuple(
+        (f"N{i}", FAR_SCORE - i, 1) for i in range(TOP_N - 1)
+    )
+    saves: Saves = saves_of(*nine_above, ("LAST", RUN_SCORE - 1, 1))
+
+    over: GameFlow = game_over_with(saves)
+
+    assert over.game_over_message is GameOverMessage.TOP_10
+    assert over.picking
+    saved: GameFlow = step_flow(replace(over, picker=picker_of("ME")), CONFIRM)
+    assert saved.saves is not None
+    assert len(saved.saves.entries) == TOP_N
+    assert saved.saves.entries[-1] == entry("ME", RUN_SCORE, 1)
+    assert all(e.nickname != "LAST" for e in saved.saves.entries)
+
+
+def test_each_opening_sets_the_message_picker_and_picking_again_and_keeps_nothing_before() -> None:
+    # A natural story: an empty list, a picker, a name saved, RETRY, a second game over.
+    first: GameFlow = game_over_with(Saves())
+    assert first.game_over_message is GameOverMessage.NEW_BEST_SCORE
+    named: GameFlow = step_flow(after(first, TickInput(thrust=UP), IDLE), CONFIRM)
+    assert named.saves is not None
+    assert named.saves.entries == (entry("A", RUN_SCORE, 1),)
+    retried: GameFlow = after(named, IDLE, CONFIRM)
+    assert retried.screen is Screen.PLAYING
+    second: GameFlow = game_over_from(retried, score=300)
+    assert second.game_over_message is GameOverMessage.TOP_3, "place 2"
+    assert second.picker == picker_of("A"), "filled from last_nickname, the cursor back on slot 0"
+    assert second.picking
+    assert second.game_over_selection is GameOverChoice.RETRY
+
+    # Stale fields from an earlier game over, one case each, set again by the opening.
+    half_edited: NamePicker = picker_of("ZZ", cursor=7)
+    cases: list[tuple[str, dict[str, object], Saves | None, GameOverMessage, NamePicker | None]] = [
+        (
+            "picking, half-edited, then off the list",
+            {
+                "picker": half_edited,
+                "picking": True,
+                "game_over_message": GameOverMessage.TOP_10,
+                "game_over_selection": GameOverChoice.MENU,
+            },
+            beating(TOP_N),
+            GameOverMessage.GAME_OVER,
+            None,
+        ),
+        (
+            "after a save, then saves that don't work",
+            {
+                "picker": half_edited,
+                "picking": False,
+                "game_over_message": GameOverMessage.NEW_BEST_SCORE,
+                "game_over_selection": GameOverChoice.MENU,
+            },
+            None,
+            GameOverMessage.GAME_OVER,
+            None,
+        ),
+        (
+            "off the list, then place 4",
+            {
+                "picker": None,
+                "picking": False,
+                "game_over_message": GameOverMessage.GAME_OVER,
+                "game_over_selection": GameOverChoice.MENU,
+            },
+            beating(3, last="BOB"),
+            GameOverMessage.TOP_10,
+            picker_of("BOB"),
+        ),
+        (
+            "a half-edited picker, then place 1 with no last name",
+            {
+                "picker": half_edited,
+                "picking": True,
+                "game_over_message": GameOverMessage.TOP_10,
+                "game_over_selection": GameOverChoice.MENU,
+            },
+            Saves(),
+            GameOverMessage.NEW_BEST_SCORE,
+            picker_of(""),
+        ),
+    ]
+    for label, stale, saves, message, picker in cases:
+        base: GameFlow = replace(flow_on(Screen.PLAYING), saves=saves, **stale)  # type: ignore[arg-type]
+        over: GameFlow = game_over_from(base)
+        assert over.game_over_message is message, label
+        assert over.picker == picker, label
+        assert over.picking == (picker is not None), label
+        assert over.game_over_selection is GameOverChoice.RETRY, label
+
+
+@pytest.mark.parametrize("beaten_by", [0, 1, 2, 3, 9, 10])
+def test_the_message_never_changes_while_game_over_shows_the_save_included(
+    beaten_by: int,
+) -> None:
+    saves: Saves = beating(beaten_by)
+    over: GameFlow = game_over_with(saves)
+    message: GameOverMessage = over.game_over_message
+    script: list[TickInput] = [
+        TickInput(thrust=UP),
+        IDLE,
+        TickInput(thrust=RIGHT),
+        IDLE,
+        FOCUS_LOST,
+        IDLE,
+        # Saves a name when a picker shows (slot 0 was turned to A). Off the list a confirm would
+        # pick RETRY and leave the screen, so there is none.
+        CONFIRM if over.picking else IDLE,
+        IDLE,
+        TickInput(thrust=DOWN),
+        IDLE,
+        TickInput(thrust=UP),
+        IDLE,
+        TickInput(thrust=BOTH_ARROWS),
+        IDLE,
+    ]
+    flow: GameFlow = over
+    saved_somewhere: bool = False
+    for keys in script:
+        flow = step_flow(flow, keys)
+        assert flow.screen is Screen.GAME_OVER
+        assert flow.game_over_message is message
+        saved_somewhere = saved_somewhere or flow.saves != saves
+
+    # With a picker the confirm saved the run, and the message still says what it said before.
+    assert saved_somewhere == (beaten_by < TOP_N)
+    # Saves that stop working on the screen change nothing shown.
+    assert stop_saves(flow).game_over_message is message
+    assert stop_saves(over).game_over_message is message
+    # The next confirm picks RETRY or MENU; the screen was GAME_OVER until then.
+    assert step_flow(flow, CONFIRM).screen in (Screen.PLAYING, Screen.MENU)
+
+
+def test_while_picking_up_and_down_turn_the_character_and_left_and_right_move_the_cursor() -> None:
+    over: GameFlow = game_over_with(beating(0))
+    assert over.picker == picker_of("")
+
+    # Up goes forward through the characters, down goes back, one per fresh press, wrapping.
+    assert step_flow(over, TickInput(thrust=UP)).picker == picker_of("A")
+    assert step_flow(over, TickInput(thrust=DOWN)).picker == picker_of("*")
+    forward: GameFlow = over
+    backward: GameFlow = over
+    for i in range(len(CHARACTERS)):
+        forward = after(forward, TickInput(thrust=UP), IDLE)
+        backward = after(backward, TickInput(thrust=DOWN), IDLE)
+        assert forward.picker == picker_of(CHARACTERS[(i + 1) % len(CHARACTERS)])
+        assert backward.picker == picker_of(CHARACTERS[-(i + 1) % len(CHARACTERS)])
+    assert forward.picker == picker_of("")
+    assert backward.picker == picker_of("")
+
+    # Left and right move the cursor, wrapping, and change no character.
+    assert step_flow(over, TickInput(thrust=RIGHT)).picker == picker_of("", cursor=1)
+    assert step_flow(over, TickInput(thrust=LEFT)).picker == picker_of("", cursor=PICKER_SLOTS - 1)
+    lap: GameFlow = over
+    for i in range(PICKER_SLOTS):
+        lap = after(lap, TickInput(thrust=RIGHT), IDLE)
+        assert lap.picker == picker_of("", cursor=(i + 1) % PICKER_SLOTS)
+
+    # A held arrow never repeats, whatever the length of the hold.
+    for thrust, expected in (
+        (UP, picker_of("A")),
+        (DOWN, picker_of("*")),
+        (RIGHT, picker_of("", cursor=1)),
+        (LEFT, picker_of("", cursor=PICKER_SLOTS - 1)),
+    ):
+        held: GameFlow = over
+        for _ in range(30):
+            held = step_flow(held, TickInput(thrust=thrust))
+        assert held.picker == expected
+
+    # Up with down and left with right cancel out; so do both pairs together.
+    for thrust in (Thrust(up=True, down=True), Thrust(left=True, right=True), BOTH_ARROWS):
+        assert step_flow(over, TickInput(thrust=thrust)).picker == over.picker
+
+    # A turn and a move on one tick both act: the turn lands in the slot the cursor was on.
+    both: GameFlow = step_flow(over, TickInput(thrust=Thrust(up=True, right=True)))
+    assert both.picker == NamePicker(slots=("A",) + (" ",) * 9, cursor=1)
+    both_back: GameFlow = step_flow(over, TickInput(thrust=Thrust(down=True, left=True)))
+    assert both_back.picker == NamePicker(slots=("*",) + (" ",) * 9, cursor=PICKER_SLOTS - 1)
+    # Only the fresh arrow acts: up held, then right pressed on top of it moves the cursor alone.
+    up_held: GameFlow = step_flow(over, TickInput(thrust=UP))
+    right_on_top: GameFlow = step_flow(up_held, TickInput(thrust=Thrust(up=True, right=True)))
+    assert right_on_top.picker == NamePicker(slots=("A",) + (" ",) * 9, cursor=1)
+
+
+@pytest.mark.parametrize("cursor", [0, 3, PICKER_SLOTS - 1])
+def test_while_picking_every_arrow_combination_acts_by_the_rules_and_retry_and_menu_never_move(
+    cursor: int,
+) -> None:
+    over: GameFlow = game_over_with(beating(2, last="AB C"))
+    assert over.picker is not None
+    start: NamePicker = replace(over.picker, cursor=cursor)
+    flow: GameFlow = replace(over, picker=start)
+
+    for thrust in ALL_KEYS:
+        for focus in (False, True):
+            out: GameFlow = step_flow(flow, TickInput(thrust=thrust, focus_lost=focus))
+            assert out.picker == picked(start, thrust), (thrust, focus)
+            assert out.picking
+            assert out.screen is Screen.GAME_OVER
+            assert out.game_over_selection is GameOverChoice.RETRY, "RETRY and MENU never move"
+            assert out.game_over_message is over.game_over_message
+            assert out.run == over.run
+            assert not out.run_stepped
+            assert not out.saves_changed
+            assert out.saves is over.saves
+            assert out.arrows_held == thrust
+
+    # An arrow held through the last life and into game over is a hold: it does nothing there.
+    through: GameFlow = replace(
+        flow_on(Screen.PLAYING, last_life_run(), arrows=UP), saves=beating(0)
+    )
+    held_over: GameFlow = to_game_over(through, TickInput(thrust=UP))
+    assert held_over.picker == picker_of("")
+    for _ in range(5):
+        held_over = step_flow(held_over, TickInput(thrust=UP))
+        assert held_over.picker == picker_of("")
+    assert after(held_over, IDLE, TickInput(thrust=UP)).picker == picker_of("A")
+
+
+def test_a_fresh_confirm_while_picking_saves_the_entry_with_the_runs_score_and_level() -> None:
+    first, second = entry("AAA", 900, 2), entry("BBB", 300, 1)
+    saves: Saves = saves_of(("AAA", 900, 2), ("BBB", 300, 1), last="OLD")
+    over: GameFlow = game_over_with(saves, score=500, level=3)
+    assert over.picker == picker_of("OLD")
+    typed: GameFlow = replace(over, picker=picker_of("ACE", cursor=4))
+
+    saved: GameFlow = step_flow(typed, CONFIRM)
+
+    new: ScoreEntry = entry("ACE", 500, 3)
+    assert saved.saves == Saves(entries=(first, new, second), last_nickname="ACE")
+    assert saved.saves_changed
+    assert not saved.picking
+    assert saved.picker == typed.picker, "the picker stays, holding the slots as picked"
+    assert saved.screen is Screen.GAME_OVER
+    assert saved.game_over_selection is GameOverChoice.RETRY
+    assert saved.game_over_message is over.game_over_message
+    assert saved.run == over.run
+    assert not saved.run_stepped
+    assert saved.best == 900
+    assert saved.leaderboard == (first, new, second)
+
+    # `saves_changed` is True for that tick only, whatever comes next.
+    for keys in (IDLE, CONFIRM, TickInput(thrust=UP), FOCUS_LOST):
+        after_save: GameFlow = step_flow(saved, keys)
+        assert not after_save.saves_changed
+        assert after_save.saves == saved.saves
+
+    # Arrows pressed on the confirm tick change nothing: not the picker, not the choice.
+    for thrust in ALL_KEYS:
+        out: GameFlow = step_flow(typed, TickInput(confirm=True, thrust=thrust))
+        assert out.saves == saved.saves
+        assert out.picker == typed.picker
+        assert out.game_over_selection is GameOverChoice.RETRY
+        assert out.saves_changed
+        assert not out.picking
+
+    # A confirm with arrows held but no fresh confirm is no save: the held confirm does nothing.
+    held: GameFlow = replace(typed, confirm_held=True)
+    nothing: GameFlow = step_flow(held, CONFIRM)
+    assert nothing.picking
+    assert nothing.saves is typed.saves
+    assert not nothing.saves_changed
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["A", "AB", " A", "A B", "A  B", "ABCDEFGHIJ", "-.*_!?09Z", "  X"],
+)
+def test_a_saved_name_has_its_trailing_blanks_dropped_and_nothing_else_changed(name: str) -> None:
+    over: GameFlow = game_over_with(Saves(), score=RUN_SCORE, level=2)
+    typed: GameFlow = replace(over, picker=picker_of(name))
+
+    saved: GameFlow = step_flow(typed, CONFIRM)
+
+    assert saved.saves is not None
+    assert saved.saves.entries == (entry(name.rstrip(" "), RUN_SCORE, 2),)
+    assert saved.saves.last_nickname == name.rstrip(" ")
+    assert saved.saves_changed
+    assert saved.best == RUN_SCORE
+
+
+def test_a_name_saved_on_a_full_list_pushes_the_tenth_out() -> None:
+    full: Saves = saves_of(
+        *((f"N{i + 1}", 1000 - 100 * i, 3) for i in range(TOP_N)), last="N10"
+    )  # 1000 down to 100
+    over: GameFlow = game_over_with(full, score=450, level=3)
+    assert over.game_over_message is GameOverMessage.TOP_10, "place 7"
+    saved: GameFlow = step_flow(replace(over, picker=picker_of("ME")), CONFIRM)
+
+    assert saved.saves is not None
+    names: list[str] = [e.nickname for e in saved.saves.entries]
+    assert names == ["N1", "N2", "N3", "N4", "N5", "N6", "ME", "N7", "N8", "N9"], "N10 is out"
+    assert saved.saves_changed
+    assert saved.saves.last_nickname == "ME"
+
+    top: GameFlow = step_flow(
+        replace(game_over_with(full, score=5000, level=1), picker=picker_of("TOP")), CONFIRM
+    )
+    assert top.saves is not None
+    assert [e.nickname for e in top.saves.entries][:2] == ["TOP", "N1"]
+    assert len(top.saves.entries) == TOP_N
+
+
+@pytest.mark.parametrize("last", [None, "OLD"])
+def test_confirming_an_all_blank_name_saves_nothing_and_leaves_the_last_nickname(
+    last: str | None,
+) -> None:
+    saves: Saves = saves_of(("AAA", 900, 2), last=last)
+    over: GameFlow = game_over_with(saves)
+    blank: GameFlow = replace(over, picker=picker_of(""))
+
+    empty: GameFlow = step_flow(blank, CONFIRM)
+
+    assert empty.saves is saves
+    assert empty.saves is not None
+    assert empty.saves.last_nickname == last
+    assert not empty.saves_changed
+    assert not empty.picking
+    assert empty.picker == blank.picker
+    assert empty.game_over_selection is GameOverChoice.RETRY
+    assert empty.screen is Screen.GAME_OVER
+    # Arrows on the confirm tick change nothing either.
+    for thrust in ALL_KEYS:
+        out: GameFlow = step_flow(blank, TickInput(confirm=True, thrust=thrust))
+        assert out.saves is saves
+        assert out.picker == blank.picker
+        assert not out.saves_changed
+        assert not out.picking
+    # RETRY and MENU take over: a move, then a pick.
+    moved: GameFlow = after(empty, IDLE, TickInput(thrust=DOWN))
+    assert moved.game_over_selection is GameOverChoice.MENU
+    assert after(moved, IDLE, CONFIRM).screen is Screen.MENU
+
+
+@pytest.mark.parametrize("blank", [False, True])
+def test_the_confirm_that_saves_never_picks_retry_held_and_a_fresh_press_does(blank: bool) -> None:
+    # The Diagram's game-over table: Enter down on tick S, held to S + 30, up on S + 31, down
+    # again on S + 32. An all-blank name takes the same path (nothing saved, the same keys).
+    over: GameFlow = game_over_with(beating(0, last=None if blank else "ACE"))
+    assert over.picking
+    expected_picker: NamePicker = picker_of("" if blank else "ACE")
+    assert over.picker == expected_picker
+
+    flow: GameFlow = step_flow(over, CONFIRM)  # tick S
+    assert flow.screen is Screen.GAME_OVER
+    assert not flow.picking
+    assert flow.saves_changed is (not blank)
+    assert flow.confirm_held
+    for _ in range(30):  # ticks S + 1 to S + 30
+        flow = step_flow(flow, CONFIRM)
+        assert flow.screen is Screen.GAME_OVER
+        assert not flow.picking
+        assert not flow.saves_changed
+        assert flow.game_over_selection is GameOverChoice.RETRY
+        assert flow.run == over.run
+    flow = step_flow(flow, IDLE)  # tick S + 31: the key is up
+    assert flow.screen is Screen.GAME_OVER
+    retried: GameFlow = step_flow(flow, CONFIRM)  # tick S + 32: a fresh press
+    assert retried.screen is Screen.PLAYING
+    assert retried.run == next_run(over.run)
+
+
+def test_saves_are_kept_through_retry_menu_and_later_runs() -> None:
+    saves: Saves = saves_of(("AAA", 900, 2), last="AAA")
+    over: GameFlow = game_over_with(saves, score=500)
+    saved: GameFlow = step_flow(over, CONFIRM)
+    assert saved.saves is not None
+    kept: Saves = saved.saves
+    assert kept.entries == (entry("AAA", 900, 2), entry("AAA", 500, 1))
+
+    # RETRY: the saves go on, the flag is gone, and a run plays on with them.
+    retry: GameFlow = after(saved, IDLE, CONFIRM)
+    assert retry.screen is Screen.PLAYING
+    assert retry.saves is kept
+    assert not retry.saves_changed
+    playing: GameFlow = after(retry, *[IDLE] * 5)
+    assert playing.saves is kept
+    assert playing.best == 900
+    paused: GameFlow = after(playing, CONFIRM)
+    assert paused.screen is Screen.PAUSED
+    assert paused.saves is kept
+
+    # A later game over is placed against the saves as they are now: 500 on level 1 ties the
+    # saved 500 on level 1, goes under it, and is place 3.
+    second: GameFlow = game_over_from(retry, score=500)
+    assert second.saves is kept
+    assert second.game_over_message is GameOverMessage.TOP_3
+    assert second.picker == picker_of("AAA")
+    # A game over off the list keeps the saves as they are.
+    off: GameFlow = game_over_from(replace(retry, saves=beating(TOP_N)))
+    assert off.saves == beating(TOP_N)
+    assert not off.saves_changed
+
+    # MENU: the saves go on, to Play and to the leaderboard page.
+    to_menu: GameFlow = after(saved, IDLE, TickInput(thrust=DOWN), IDLE, CONFIRM, IDLE)
+    assert to_menu.screen is Screen.MENU
+    assert to_menu.saves is kept
+    assert step_flow(to_menu, CONFIRM).saves is kept
+    board: GameFlow = after(to_menu, TickInput(thrust=UP), IDLE, CONFIRM)
+    assert board.screen is Screen.LEADERBOARD
+    assert board.saves is kept
+    assert board.leaderboard == kept.entries
+
+
+def test_stop_saves_clears_the_saves_and_the_flag_and_changes_nothing_else() -> None:
+    saves: Saves = saves_of(("AAA", 900, 2), ("BBB", 300, 1), last="BBB")
+    over: GameFlow = game_over_with(saves)
+    saved: GameFlow = step_flow(replace(over, picker=picker_of("ACE")), CONFIRM)
+    assert saved.saves_changed
+    flows: list[GameFlow] = [
+        start_flow(RUN, saves),
+        start_flow(RUN),
+        flow_on(Screen.PLAYING, MOVING),
+        replace(flow_on(Screen.PAUSED, MOVING), saves=saves),
+        replace(flow_on(Screen.LEADERBOARD), saves=saves),
+        over,
+        saved,
+        over_flow(),
+    ]
+    for flow in flows:
+        before: GameFlow = copy.deepcopy(flow)
+        stopped: GameFlow = stop_saves(flow)
+        assert flow == before, "the input is not mutated"
+        assert stopped == replace(flow, saves=None, saves_changed=False)
+        assert stopped.saves is None
+        assert not stopped.saves_changed
+        assert stopped.best is None
+        assert stopped.leaderboard == ()
+        assert stop_saves(stopped) == stopped
+        assert stop_saves(flow) == stopped, "the same input gives the same flow"
+
+    # The screen the player is on stays as it is: the message, the picker, both selections.
+    stopped_over: GameFlow = stop_saves(over)
+    assert stopped_over.screen is Screen.GAME_OVER
+    assert stopped_over.game_over_message is over.game_over_message
+    assert stopped_over.picker == over.picker
+    assert stopped_over.picking == over.picking
+    assert stopped_over.game_over_selection is over.game_over_selection
+    assert stop_saves(saved).screen is Screen.GAME_OVER
+
+    # From then on there is no picker and no best: the next game over is GAME OVER.
+    playing: GameFlow = stop_saves(replace(flow_on(Screen.PLAYING), saves=beating(0, last="ACE")))
+    later: GameFlow = game_over_from(playing)
+    assert later.saves is None
+    assert later.game_over_message is GameOverMessage.GAME_OVER
+    assert later.picker is None
+    assert not later.picking
+    assert later.best is None
+    assert later.leaderboard == ()
+
+
+def test_stop_saves_writes_no_log_line(flow_log: pytest.LogCaptureFixture) -> None:
+    over: GameFlow = game_over_with(beating(1))
+    flow_log.clear()
+
+    stop_saves(over)
+    stop_saves(start_flow(RUN))
+
+    assert flow_log.records == []
+
+
+def test_best_and_leaderboard_read_the_saves_and_best_changes_only_on_a_save() -> None:
+    # None and empty without saves, and with an empty list.
+    for none_flow in (start_flow(RUN), start_flow(RUN, Saves()), over_flow()):
+        assert none_flow.best is None
+        assert none_flow.leaderboard == ()
+
+    saves: Saves = saves_of(("AAA", 1000, 2), ("BBB", 400, 1), last="BBB")
+    menu: GameFlow = start_flow(RUN, saves)
+    assert menu.best == 1000
+    assert menu.leaderboard == saves.entries
+    assert isinstance(menu.leaderboard, tuple)
+
+    # During a run: a score above the best does not change it.
+    rich: Run = replace(RUN, coin_points=5000)
+    playing: GameFlow = replace(flow_on(Screen.PLAYING, rich), saves=saves)
+    for _ in range(10):
+        playing = step_flow(playing, IDLE)
+        assert playing.run.score >= 5000
+        assert playing.best == 1000
+
+    # At game over with a new top score, while picking: still the best saved before.
+    over: GameFlow = game_over_with(saves, score=5000, level=2)
+    assert over.run.score == 5000
+    assert over.game_over_message is GameOverMessage.NEW_BEST_SCORE
+    assert over.best == 1000
+    keys: list[TickInput] = [
+        TickInput(thrust=UP),
+        IDLE,
+        TickInput(thrust=RIGHT),
+        IDLE,
+        FOCUS_LOST,
+        TickInput(thrust=BOTH_ARROWS),
+    ]
+    flow: GameFlow = over
+    for tick in keys:
+        flow = step_flow(flow, tick)
+        assert flow.best == 1000
+        assert flow.leaderboard == saves.entries
+
+    # Only the save changes it, on the save tick, and for good.
+    saved: GameFlow = step_flow(flow, CONFIRM)
+    assert saved.saves_changed
+    assert saved.best == 5000
+    assert saved.leaderboard[0] == entry("CBB", 5000, 2), "BBB with slot 0 turned up to C"
+    assert saved.leaderboard[1:] == saves.entries
+    assert after(saved, IDLE, TickInput(thrust=DOWN)).best == 5000
+
+    # An all-blank confirm, or a game over off the list, leaves it where it was.
+    blank: GameFlow = step_flow(replace(over, picker=picker_of("")), CONFIRM)
+    assert blank.best == 1000
+    assert blank.leaderboard == saves.entries
+    off: GameFlow = game_over_with(beating(TOP_N), score=5000, level=1)
+    assert off.best == FAR_SCORE
+    assert after(off, TickInput(thrust=DOWN), IDLE, CONFIRM).best == FAR_SCORE
+
+
+def saves_flows() -> list[GameFlow]:
+    """Flows that hold saves, on every screen, with the picker in several states."""
+    saves: Saves = beating(2, last="ACE")
+    over: GameFlow = game_over_with(saves)
+    assert over.picker is not None
+    moved: GameFlow = replace(over, picker=replace(over.picker, cursor=2))
+    blank: GameFlow = replace(over, picker=picker_of(""))
+    saved: GameFlow = step_flow(over, CONFIRM)
+    assert saved.saves_changed
+
+    # One tick before the game over that opens a picker.
+    before_open: GameFlow = replace(flow_on(Screen.PLAYING, last_life_run()), saves=saves)
+    before_open = step_flow(before_open, IDLE)
+    for _ in range(LAST_LIFE_DELAY - 1):
+        before_open = step_flow(before_open, IDLE)
+    assert before_open.screen is Screen.PLAYING
+    assert step_flow(before_open, IDLE).screen is Screen.GAME_OVER
+
+    return [
+        start_flow(RUN, saves),
+        replace(flow_on(Screen.MENU, MOVING), saves=saves),
+        replace(flow_on(Screen.LEADERBOARD, MOVING), saves=saves),
+        replace(flow_on(Screen.PLAYING, MOVING), saves=saves),
+        replace(flow_on(Screen.PAUSED, MOVING), saves=saves),
+        before_open,
+        over,
+        moved,
+        blank,
+        saved,
+        game_over_with(beating(TOP_N)),
+        game_over_with(None),
+    ]
+
+
+@pytest.mark.determinism
+def test_step_flow_with_saves_never_mutates_its_input_and_gives_the_same_flow_twice() -> None:
+    inputs: list[TickInput] = [
+        TickInput(thrust=thrust, confirm=confirm, focus_lost=focus)
+        for thrust in ALL_KEYS
+        for confirm in (False, True)
+        for focus in (False, True)
+    ]
+    for flow in saves_flows():
+        for keys in inputs:
+            before: GameFlow = copy.deepcopy(flow)
+            first: GameFlow = step_flow(flow, keys)
+            second: GameFlow = step_flow(flow, keys)
+            assert flow == before, (flow.screen, flow.picking, keys)
+            assert first == second, (flow.screen, flow.picking, keys)
+            assert first is not flow
+            assert first.saves is None or first.saves == flow.saves or first.saves_changed
+
+    saves: Saves = beating(3, last="ACE")
+    saves_before: Saves = copy.deepcopy(saves)
+    assert start_flow(RUN, saves) == start_flow(RUN, saves)
+    assert saves == saves_before
+    over: GameFlow = game_over_with(saves)
+    assert stop_saves(over) == stop_saves(over)
+    assert over.saves == saves_before
+
+
+def test_the_new_log_lines_come_in_the_contracts_order_and_wording(
+    flow_log: pytest.LogCaptureFixture,
+) -> None:
+    flow_log.set_level(logging.DEBUG, logger="core.saves")
+
+    def step(flow: GameFlow, keys: TickInput) -> tuple[GameFlow, list[tuple[str, str]]]:
+        return lines_after(flow_log, flow, keys)
+
+    def flow_line(*messages: str) -> list[tuple[str, str]]:
+        return [(FLOW_LOGGER, message) for message in messages]
+
+    # The opening: the run's own lines, then the message and place, then `screen game_over`.
+    cases: list[tuple[int, str]] = [
+        (0, "game over message=new_best_score place=1"),
+        (1, "game over message=top_3 place=2"),
+        (2, "game over message=top_3 place=3"),
+        (3, "game over message=top_10 place=4"),
+        (9, "game over message=top_10 place=10"),
+        (TOP_N, "game over message=game_over place=none"),
+    ]
+    for beaten_by, text in cases:
+        flow: GameFlow = replace(flow_on(Screen.PLAYING, last_life_run()), saves=beating(beaten_by))
+        lines: list[tuple[str, str]] = []
+        for _ in range(LAST_LIFE_DELAY + 5):
+            flow, lines = step(flow, IDLE)
+            if flow.screen is Screen.GAME_OVER:
+                break
+        assert flow.screen is Screen.GAME_OVER
+        assert flow_lines(lines) == [text, "screen game_over"]
+        names: list[str] = [name for name, _ in lines]
+        assert names[-2:] == [FLOW_LOGGER, FLOW_LOGGER]
+        run_at: int = next(
+            i
+            for i, (name, message) in enumerate(lines)
+            if name == RUN_LOGGER and message.startswith("game over")
+        )
+        assert run_at < names.index(FLOW_LOGGER), "the run's lines come first"
+        assert "core.saves" not in names
+
+    # The picker's lines, once per press: the slot and its new character, the new cursor.
+    over: GameFlow = game_over_with(beating(1), score=500, level=3)
+    at_slot_three: GameFlow = replace(over, picker=replace(over.picker, cursor=3))  # type: ignore[type-var]
+    _, lines = step(over, TickInput(thrust=UP))
+    assert lines == flow_line("picker slot=0 char='A'")
+    _, lines = step(over, TickInput(thrust=DOWN))
+    assert lines == flow_line("picker slot=0 char='*'")
+    _, lines = step(over, TickInput(thrust=RIGHT))
+    assert lines == flow_line("picker cursor=1")
+    _, lines = step(over, TickInput(thrust=LEFT))
+    assert lines == flow_line("picker cursor=9")
+    _, lines = step(at_slot_three, TickInput(thrust=UP))
+    assert lines == flow_line("picker slot=3 char='A'")
+    # A turn and a move on one tick: the turn's line, then the move's.
+    _, lines = step(over, TickInput(thrust=Thrust(up=True, right=True)))
+    assert lines == flow_line("picker slot=0 char='A'", "picker cursor=1")
+    _, lines = step(over, TickInput(thrust=Thrust(down=True, left=True)))
+    assert lines == flow_line("picker slot=0 char='*'", "picker cursor=9")
+    # Cancels, a focus loss and an idle tick log nothing, and a held arrow logs nothing more.
+    for keys in (
+        TickInput(thrust=Thrust(up=True, down=True)),
+        TickInput(thrust=Thrust(left=True, right=True)),
+        TickInput(thrust=BOTH_ARROWS),
+        FOCUS_LOST,
+        IDLE,
+    ):
+        _, lines = step(over, keys)
+        assert lines == [], keys
+    turned: GameFlow
+    turned, lines = step(over, TickInput(thrust=UP))
+    assert len(lines) == 1
+    for _ in range(5):
+        turned, lines = step(turned, TickInput(thrust=UP))
+        assert lines == []
+
+    # A save: one line with the name, its place, the score and the level reached.
+    named: GameFlow = replace(over, picker=picker_of("ACE"))
+    saved: GameFlow
+    saved, lines = step(named, CONFIRM)
+    assert lines == flow_line("name saved nickname='ACE' place=2 score=500 level=3")
+    # An all-blank name: one line, and nothing else.
+    _, lines = step(replace(over, picker=picker_of("")), CONFIRM)
+    assert lines == flow_line("name empty, nothing saved")
+    # After the save the choices take the arrows: the select line, never a picker line.
+    _, lines = step(saved, TickInput(thrust=DOWN))
+    assert lines == flow_line("game over select menu")
+    _, lines = step(saved, TickInput(thrust=UP))
+    assert lines == flow_line("game over select menu")
+    # While picking, down turns a character and logs no select line.
+    _, lines = step(over, TickInput(thrust=DOWN))
+    assert lines == flow_line("picker slot=0 char='*'")
+    # The held confirm after the save logs nothing; a fresh press picks RETRY.
+    held: GameFlow
+    held, lines = step(saved, CONFIRM)
+    assert lines == []
+    _, lines = step(replace(held, confirm_held=False), CONFIRM)
+    assert lines == [(RUN_LOGGER, "new run"), (FLOW_LOGGER, "screen playing")]

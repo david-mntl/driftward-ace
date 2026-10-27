@@ -9,6 +9,7 @@ and the debug overlay must never overlap (Director, scope report DRA-13, Decisio
 hearts show the lives left (scope report DRA-23, Values needed).
 """
 
+import dataclasses
 from collections.abc import Callable
 
 import pygame
@@ -25,6 +26,7 @@ from ui.hud import (
     HEART_GAP,
     HEART_MARGIN,
     HEART_SIZE,
+    HUD_BEST_X,
     HUD_COLOR,
     HUD_FONT_SIZE,
     HUD_LINE_SPACING,
@@ -33,7 +35,7 @@ from ui.hud import (
     HUD_TOP,
     draw_hud,
 )
-from ui.score_text import graze_text, score_text
+from ui.score_text import best_text, graze_text, score_text
 
 SURFACE_SIZE: tuple[int, int] = (640, 480)
 """Test surface. Source: 03-world-and-camera.md, screen_w, screen_h (guess)."""
@@ -63,6 +65,9 @@ WHITE: tuple[int, int, int] = (255, 255, 255)
 assert HUD_COLOR == WHITE
 assert (HUD_MARGIN, HUD_LINE_SPACING, HUD_TOP, HUD_OVERLAY_GAP) == (4, 20, 4, 4)
 assert HUD_FONT_SIZE == 16
+
+# Scope report DRA-126, Values needed (BEST: on HUD line 1 at a fixed x of 200 px).
+assert HUD_BEST_X == 200
 
 # Scope report DRA-23, Values needed (hearts, approved by the Director, not in the GDD).
 assert HEART_COLOR == WHITE
@@ -606,3 +611,216 @@ def test_hud_graze_text_is_rendered_again_only_when_the_count_changes(
     assert calls == {"graze": 1, "score": 1}, f"a new score re-rendered the GRAZE text: {calls}"
     frame(41, 1235)
     assert calls == {"graze": 2, "score": 1}, f"a changed count did not render again: {calls}"
+
+
+# BEST line tests, from DRA-126. Contract: systems/hud.md, Presentation (BEST line) and Rules.
+# Scope report DRA-126, Values needed: `BEST 1 234` in SCORE's look (default font, 16 px, white,
+# antialiased, digits grouped) on HUD line 1 at a fixed x of 200 px. Drawn only when `best` is not
+# None.
+
+BESTS: tuple[int, ...] = (0, 5, 999, 1234, 1234567, 10**11)
+"""Bests drawn: 0, one digit, a full group, two groups, three groups, twelve digits. Source:
+systems/hud.md, Presentation, best_text (`BEST 0`, `BEST 999`, `BEST 1 234`)."""
+
+BEST_SCORES: tuple[int, ...] = (0, 1234, 10**11)
+"""Scores drawn beside BEST: the shortest, a middle one and the longest SCORE text. The longest
+(12 digits) still ends left of `HUD_BEST_X`, so no run here overlaps the two."""
+
+
+def _bytes(surface: pygame.Surface) -> bytes:
+    return pygame.image.tobytes(surface, "RGB")
+
+
+def _best_surface(run: Run, below_overlay: bool, best: int | None) -> pygame.Surface:
+    """The HUD on a black surface with the best passed as the contract says (None: left out)."""
+    surface = _blank()
+    if best is None:
+        draw_hud(surface, run, below_overlay)
+    else:
+        draw_hud(surface, run, below_overlay, best=best)
+    return surface
+
+
+def _reference_best(best: int) -> pygame.Surface:
+    """The BEST text as the contract sets its look: SCORE's, from `best_text`."""
+    return pygame.font.Font(None, HUD_FONT_SIZE).render(best_text(best), True, HUD_COLOR)
+
+
+def _expected_with_best(run: Run, below_overlay: bool, best: int | None) -> bytes:
+    """SCORE at the margin, BEST at (HUD_BEST_X, hud_top) when there is one, and GRAZE on line 2."""
+    surface = _blank()
+    top = _hud_top(below_overlay)
+    surface.blit(_reference_text(run.score), (HUD_MARGIN, top))
+    if best is not None:
+        surface.blit(_reference_best(best), (HUD_BEST_X, top))
+    surface.blit(_reference_graze(run.grazes), (HUD_MARGIN, top + HUD_LINE_SPACING))
+    return _bytes(surface)
+
+
+def _changed_pixels(first: bytes, second: bytes) -> list[int]:
+    """The pixel indexes where two black-and-white pictures differ (the red level is enough)."""
+    return [i for i, (a, b) in enumerate(zip(first[::3], second[::3], strict=True)) if a != b]
+
+
+def test_hud_best_is_on_line_one_at_its_fixed_x_in_both_modes(pygame_headless: None) -> None:
+    width = SURFACE_SIZE[0]
+    for below_overlay in (False, True):
+        top = _hud_top(below_overlay)
+        for score in BEST_SCORES:
+            run = _score_run(score)
+            without = _bytes(_best_surface(run, below_overlay, None))
+            for best in BESTS:
+                tag = f"{score=}, {best=}, {below_overlay=}"
+                drawn = _bytes(_best_surface(run, below_overlay, best))
+                # The whole surface: SCORE and BEST on line 1 at their x, GRAZE on line 2.
+                assert drawn == _expected_with_best(run, below_overlay, best), f"{tag}: not BEST"
+                # BEST's own pixels are what the call adds: all at or right of HUD_BEST_X, and on
+                # the rows SCORE's text box covers (the same top, the same font).
+                added = _changed_pixels(without, drawn)
+                assert added, f"{tag}: nothing drawn for BEST"
+                columns = [i % width for i in added]
+                rows = [i // width for i in added]
+                assert min(columns) >= HUD_BEST_X, f"{tag}: BEST ink left of {HUD_BEST_X}"
+                score_rows = range(top, top + _reference_text(score).get_height())
+                assert all(row in score_rows for row in rows), f"{tag}: BEST off SCORE's rows"
+                best_box = _reference_best(best).get_bounding_rect()
+                assert min(rows) == top + best_box.top, f"{tag}: BEST's top is not hud_top"
+                assert min(columns) == HUD_BEST_X + best_box.left, f"{tag}: BEST's left moved"
+
+
+def test_hud_best_stays_at_its_x_however_long_the_score_grows(pygame_headless: None) -> None:
+    width = SURFACE_SIZE[0]
+    for below_overlay in (False, True):
+        for best in (0, 1234):
+            added: list[list[int]] = []
+            for score in SCORES:
+                run = _score_run(score)
+                added.append(
+                    _changed_pixels(
+                        _bytes(_best_surface(run, below_overlay, None)),
+                        _bytes(_best_surface(run, below_overlay, best)),
+                    )
+                )
+            tag = f"{best=}, {below_overlay=}"
+            assert all(pixels == added[0] for pixels in added), f"{tag}: BEST moved with SCORE"
+            assert min(i % width for i in added[0]) >= HUD_BEST_X, f"{tag}: BEST left of its x"
+
+
+def test_hud_draws_no_best_when_best_is_none_and_the_old_call_draws_what_it_drew(
+    pygame_headless: None,
+) -> None:
+    width = SURFACE_SIZE[0]
+    for below_overlay in (False, True):
+        top = _hud_top(below_overlay)
+        for lives in (0, 3):
+            for score in BEST_SCORES:
+                run = _score_run(score, lives)
+                tag = f"{score=}, {lives=}, {below_overlay=}"
+                old_call = _blank()
+                draw_hud(old_call, run, below_overlay)
+                explicit_none = _blank()
+                draw_hud(explicit_none, run, below_overlay, best=None)
+                positional_none = _blank()
+                draw_hud(positional_none, run, below_overlay, None)
+                assert _bytes(old_call) == _bytes(explicit_none) == _bytes(positional_none), tag
+                # What it drew before: SCORE and GRAZE and the hearts, and no ink in BEST's place
+                # on line 1 (hearts are right of it, at HEART_AREA_LEFT and beyond).
+                drawn = _bytes(old_call)
+                text_rows = range(top, top + HUD_LINE_SPACING)
+                for y in text_rows:
+                    row = drawn[(y * width + HUD_BEST_X) * 3 : (y * width + HEART_AREA_LEFT) * 3]
+                    assert not any(row), f"{tag}: ink in BEST's place on row {y} with no best"
+                left_text = [row[:HEART_AREA_LEFT] for row in _pixels(old_call)]
+                expected = _pixels(_surface_of(_expected_with_best(run, below_overlay, None)))
+                assert left_text == [row[:HEART_AREA_LEFT] for row in expected], tag
+
+
+def _surface_of(data: bytes) -> pygame.Surface:
+    return pygame.image.frombytes(data, SURFACE_SIZE, "RGB")
+
+
+def test_hud_best_leaves_the_hearts_and_the_other_lines_where_they_were(
+    pygame_headless: None,
+) -> None:
+    for below_overlay in (False, True):
+        run = _graze_run(7, lives=3, coin_points=1234)
+        plain = _pixels(_best_surface(run, below_overlay, None))
+        top = _hud_top(below_overlay)
+        for best in BESTS:
+            with_best = _pixels(_best_surface(run, below_overlay, best))
+            tag = f"{best=}, {below_overlay=}"
+            assert [row[HEART_AREA_LEFT:] for row in with_best] == [
+                row[HEART_AREA_LEFT:] for row in plain
+            ], f"{tag}: the hearts moved"
+            below_line_one = top + HUD_LINE_SPACING
+            assert with_best[below_line_one:] == plain[below_line_one:], f"{tag}: line 2 moved"
+            # SCORE's own columns, left of BEST, are the same pixels.
+            assert [row[:HUD_BEST_X] for row in with_best] == [row[:HUD_BEST_X] for row in plain], (
+                f"{tag}: SCORE changed"
+            )
+
+
+def test_hud_best_text_is_rendered_again_only_when_the_best_changes(
+    pygame_headless: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The BEST text is built by `best_text` only when its own number is new.
+
+    The calls are counted through the name `ui.hud` imports from `ui.score_text`; the cache is
+    one slot per text (hud.md, BEST line). A best that no earlier test drew (4141) is drawn once
+    before counting, so the one-slot cache holds it whatever ran before.
+    """
+    calls: dict[str, int] = {"best": 0, "graze": 0, "score": 0}
+
+    def counting(name: str, real: Callable[[int], str]) -> Callable[[int], str]:
+        def wrapper(number: int) -> str:
+            calls[name] += 1
+            return real(number)
+
+        return wrapper
+
+    surface = _blank()
+    run = _graze_run(41, rules=NO_GRAZE_POINTS)
+    draw_hud(surface, run, False, best=4141)
+    monkeypatch.setattr(hud_module, "best_text", counting("best", best_text))
+    monkeypatch.setattr(hud_module, "graze_text", counting("graze", graze_text))
+    monkeypatch.setattr(hud_module, "score_text", counting("score", score_text))
+
+    def frame(best: int | None, coin_points: int = 1234) -> None:
+        draw_hud(
+            surface, _graze_run(41, coin_points=coin_points, rules=NO_GRAZE_POINTS), False, best
+        )
+
+    for _ in range(5):
+        frame(4141)
+    assert calls == {"best": 0, "graze": 0, "score": 0}, f"the same best re-rendered: {calls}"
+    frame(4142)
+    assert calls["best"] == 1, f"a new best did not render once: {calls}"
+    for _ in range(5):
+        frame(4142)
+    assert calls["best"] == 1, f"the same best re-rendered: {calls}"
+    frame(4142, coin_points=1235)
+    assert calls["best"] == 1, f"a new score rendered the BEST text again: {calls}"
+    frame(None)
+    frame(None, coin_points=1236)
+    assert calls["best"] == 1, f"no best rendered a BEST text: {calls}"
+    frame(4141)
+    assert calls["best"] == 2, f"a changed best did not render again: {calls}"
+    # SCORE and GRAZE render only for their own new numbers (the score went 1234, 1235, 1234,
+    # 1236, 1234 across the frames above: four new ones), never for BEST's.
+    assert calls["score"] == 4, f"SCORE rendered for something but a new score: {calls}"
+    assert calls["graze"] == 0, f"GRAZE rendered for something but a new count: {calls}"
+
+
+def test_hud_with_best_draws_the_same_pixels_twice_and_changes_nothing_but_the_surface(
+    pygame_headless: None, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(0)
+    run = _graze_run(7, lives=3, coin_points=1234)
+    before = dataclasses.replace(run)
+    for below_overlay in (False, True):
+        first = _best_surface(run, below_overlay, 5678)
+        second = _best_surface(run, below_overlay, 5678)
+        assert _bytes(first) == _bytes(second), f"{below_overlay=}: two draws, two pictures"
+        assert first.get_size() == SURFACE_SIZE
+    assert run == before, "the draw changed the run"
+    assert caplog.records == [], "the HUD logged"
