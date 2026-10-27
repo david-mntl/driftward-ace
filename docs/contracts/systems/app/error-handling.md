@@ -8,7 +8,8 @@ Read when: you change the error guard or the error screen.
 ```python
 async def guarded(body: Callable[[], Awaitable[None]], mode: RunMode) -> None:
     ...
-    # Awaits body(). Holds the project's only `except Exception`.
+    # Awaits body(). Holds the project's only general `except Exception`
+    # (the other one, around the storage calls in app/saves.py, is in save-storage.md, Errors).
     # Module level: stdlib and app.mode only. pygame, core.world and
     # ui.error_screen are imported inside the error step, never at the top.
 ```
@@ -45,7 +46,7 @@ The app draws nothing itself beyond the background fill. The ship view and the d
 ## Rules
 
 Error guard (`app/guard.py`):
-- The only `except Exception` in the game. Source: game/CONTEXT.md, Error handling.
+- The only general `except Exception` in the game. The one other `except Exception` is around the browser storage calls in `app/saves.py` (`save-storage.md`, Errors). Source: game/CONTEXT.md, Error handling.
 - On an exception from `body`:
   1. `log.exception("unexpected error, showing the error screen")`. That is ERROR level with the full traceback. Source: 15-tech-constraints.md, rule 8.
   2. `detail = None` in normal mode. In debug mode, `detail = f"{type(exc).__name__}: {exc}"` with every newline replaced by a space, so it is one line, and every null character (`\x00`) removed, so the error screen can render it. Source: 10-ui.md, error_screen, error_debug_line. Null characters: scope report DRA-19, item 4; review DRA-5-01-ui-developer, finding 3; 15-tech-constraints.md, rule 8.

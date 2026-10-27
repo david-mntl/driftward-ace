@@ -37,7 +37,8 @@ Where saves work. Source: 11-save-data.md, storage (locked) and rule 5; 15-tech-
 - The whole document is written each time, so the list and the last nickname never disagree.
 
 Errors:
-- Catch only the error the browser bridge raises for a failed storage call and the data errors (`json.JSONDecodeError`, and the `ValueError`/`TypeError` the checks raise). game/CONTEXT.md allows `except Exception` only in the guard. The browser check must show which exception class pygbag 0.9.3 raises when localStorage throws; if it is only a bare `Exception`, stop and report it: that is a contract change, not a fix.
+- Data errors: catch only `json.JSONDecodeError` and the `ValueError`/`TypeError` the checks raise.
+- Storage errors: pygbag 0.9.3 raises a bare `Exception` for a refused storage call. `app/saves.py` catches `Exception` around the `platform.window.localStorage` read and the one `getItem` or `setItem` call only, and logs the WARNING line of step 1 or of the write. No other code sits inside those `try` blocks. Source: game/CONTEXT.md, Error handling (the `app/saves.py` exception).
 - Neither function lets a storage or data problem reach the guard: a save problem never shows the error screen. Source: 11-save-data.md, rule 5 ("the game still runs").
 
 Same in both modes. Debug mode loads and writes the same key, the same way. Source: 91-decision-log.md, row 93; 15-tech-constraints.md, rule 7.
