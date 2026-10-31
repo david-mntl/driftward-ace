@@ -30,7 +30,7 @@ The player never reads this. It gives the art a feeling to aim at.
 | placeholder_bg | (0, 0, 0) | RGB | — | guess | starting placeholder |
 | art_style | smooth: drawn large first, 8× the game size for sprites up to 64 px on their longest side and 4× for bigger ones, with gradients and glossy rims, then shrunk to game size. The large master is kept so details can be redrawn. Not pixel art. Shown at 1× | — | — | guess | Director (8× for small sprites: Director 2026-10-31, "generate the pictures a bit bigger so we can shrink them") |
 | palette | the color language below. Exact RGB values come with the drawn art | — | — | guess | Director |
-| glow | hazards, warnings and coins in play. The screens (menu, pause box, game over, instructions, leaderboard) have their own soft glow ([10-ui.md](10-ui.md#values), `ui_glow`). The HUD stays flat. The ship: SH-06 | — | — | guess | Director |
+| glow | hazards, warnings and coins only. The HUD and the screens stay flat ([10-ui.md](10-ui.md#values), `ui_glow`). The ship: SH-06 | — | — | guess | Director |
 | hud_look | the side panel and cockpit frame: see [10-ui.md](10-ui.md#values) (`hud_*`, `cockpit_frame`) and the HUD colors below. Drawn at 4× and shrunk like every sprite, shown at 1×. Text is drawn at 1× | — | — | guess | Director |
 | motion | look only. 2 or 3 states per object (for example idle, charge, fire), each a short loop of frames drawn ahead of time | — | — | guess | Director |
 | background | three layers, described below | — | — | guess | Director |

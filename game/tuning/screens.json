@@ -27,11 +27,11 @@
   },
   "glow": {
     "box_radius": 9,
-    "box_strength": 0.55,
+    "box_strength": 0.0,
     "text_radius": 5,
-    "text_strength": 0.6,
+    "text_strength": 0.0,
     "icon_radius": 4,
-    "icon_strength": 0.5
+    "icon_strength": 0.0
   },
   "fonts": {
     "text_file": "fonts/ShareTechMono.ttf",

@@ -50,11 +50,30 @@ def test_text_lands_on_its_anchor_and_returns_its_rect(look: ScreenLook) -> None
     assert _ink(surface) is not None
 
 
+def _glowing(look: ScreenLook) -> ScreenLook:
+    """A look with the same rules but every glow switched on (the shipped file has them at 0)."""
+    glow = dataclasses.replace(
+        look.rules.glow, box_strength=0.55, text_strength=0.6, icon_strength=0.5
+    )
+    return ScreenLook(dataclasses.replace(look.rules, glow=glow), look._fonts)
+
+
+def test_the_shipped_screens_are_flat(look: ScreenLook) -> None:
+    glow = look.rules.glow
+    assert (glow.box_strength, glow.text_strength, glow.icon_strength) == (0.0, 0.0, 0.0)
+    plain = _surface()
+    look.blit_text(plain, "PAUSE", "title", (255, 255, 255), {"center": (400, 200)}, glow=True)
+    flat = _surface()
+    look.blit_text(flat, "PAUSE", "title", (255, 255, 255), {"center": (400, 200)}, glow=False)
+    assert pygame.image.tobytes(plain, "RGB") == pygame.image.tobytes(flat, "RGB")
+
+
 def test_glow_adds_light_around_the_text_but_not_far(look: ScreenLook) -> None:
+    glowing = _glowing(look)
     flat, lit = _surface(), _surface()
     anchor = {"center": (400, 200)}
-    look.blit_text(flat, "PAUSE", "title", (255, 255, 255), anchor, glow=False)
-    look.blit_text(lit, "PAUSE", "title", (255, 255, 255), anchor, glow=True)
+    glowing.blit_text(flat, "PAUSE", "title", (255, 255, 255), anchor, glow=False)
+    glowing.blit_text(lit, "PAUSE", "title", (255, 255, 255), anchor, glow=True)
     glyphs = _ink(flat)
     assert glyphs is not None
     just_above = (glyphs.centerx, glyphs.top - 3)
@@ -62,6 +81,21 @@ def test_glow_adds_light_around_the_text_but_not_far(look: ScreenLook) -> None:
     assert max(flat.get_at(just_above)[:3]) == 0
     assert max(lit.get_at(just_above)[:3]) > 0
     assert max(lit.get_at(far_above)[:3]) == 0
+
+
+def test_glass_glow_reaches_past_the_brackets_only_when_it_is_on(look: ScreenLook) -> None:
+    box = pygame.Rect(300, 200, 200, 100)
+    flat, lit = _surface(), _surface()
+    look.glass(flat, box, blur=False)
+    _glowing(look).glass(lit, box, blur=False)
+    outside = box.inflate(
+        2 * look.rules.glass.bracket_out + 6, 2 * look.rules.glass.bracket_out + 6
+    )
+    lit_ink, flat_ink = _ink(lit), _ink(flat)
+    assert lit_ink is not None
+    assert flat_ink is not None
+    assert not outside.contains(lit_ink)
+    assert outside.contains(flat_ink)
 
 
 def test_alpha_dims_the_text(look: ScreenLook) -> None:

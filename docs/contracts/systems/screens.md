@@ -15,7 +15,7 @@ It closes UI-03 and UI-04. It replaces the white default-font stand-ins of DRA-1
  +------------------------------+     +------------------+
  |:      T I T L E            :|     |[  P A U S E      ]|   glass: blurred picture, dark fill,
  |:  +--------+  +--------+   :|     |   [ENTER][SPACE]▸|   scan lines, border, corner brackets,
- |:  | card   |  | card   |   :|     +------------------+   soft glow round the lines
+ |:  | card   |  | card   |   :|     +------------------+   soft glow round the lines (off: strength 0)
  |:  +--------+  +--------+   :|     320 × 120 pause, 320 × 160 game over,
  |:   [ENTER][SPACE] BACK     :|     400 × 280 game over with the picker
  +------------------------------+     (: = ruler ticks on both sides)

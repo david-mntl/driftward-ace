@@ -207,7 +207,7 @@ Field names carry their range. `*_alpha` is a whole number from 0 to 255. `*_str
 |---|---|
 | `palette` | 13 colors as `#rrggbb`. Meanings are in `docs/design/gdd/12-art-and-audio.md`, Screen colors. Not the HUD palette. |
 | `glass` | The see-through panel every box and card shares: fill, border, corner brackets, scan lines, and `blur_down` (how much the picture behind is blurred; 1 is off). |
-| `glow` | The soft glow's radius (px) and strength (0 to 1) round boxes, behind text and behind icons. 0 strength turns a glow off. |
+| `glow` | The soft glow's radius (px) and strength (0 to 1) round boxes, behind text and behind icons. A strength of 0 turns that glow off. All three ship at 0: the screens are flat. |
 | `fonts` | The font file and one entry per text role: size (px) and letter-spacing (em). Every role in the file must be there once. |
 | `rulers` | The tick marks down both sides of the full-window pages. `enabled` turns them off. |
 | `keycap` | The small key caps (ENTER, SPACE, arrows) and the gaps between them. |
