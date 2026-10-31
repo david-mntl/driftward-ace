@@ -47,7 +47,7 @@ class ScreenLook:
         self._caps: dict[tuple[int, int], pygame.Surface] = {}
         self._panels: dict[tuple[int, int, RGB], tuple[pygame.Surface, int]] = {}
         self._fades: dict[tuple[int, int], pygame.Surface] = {}
-        self._rulers: dict[tuple[int, int], pygame.Surface] = {}
+        self._rulers: dict[tuple[int, int], tuple[tuple[pygame.Surface, tuple[int, int]], ...]] = {}
 
     # ---- text -------------------------------------------------------------------------------
 
@@ -356,35 +356,41 @@ class ScreenLook:
     # ---- page parts -------------------------------------------------------------------------
 
     def blit_rulers(self, surface: pygame.Surface) -> None:
-        """Draw the tick marks down both sides of a full-window page, when ``rulers.enabled``."""
+        """Draw the tick marks down both sides of a full-window page, when ``rulers.enabled``.
+
+        Two thin strips, not a window-sized picture: blending a mostly clear full-window surface
+        every frame cost as much as the rest of the page in the browser.
+        """
         rulers = self.rules.rulers
         if not rulers.enabled:
             return
         size: tuple[int, int] = surface.get_size()
-        image: pygame.Surface | None = self._rulers.get(size)
-        if image is None:
-            image = self._build_rulers(size)
-            self._rulers[size] = image
-        surface.blit(image, (0, 0))
+        strips: tuple[tuple[pygame.Surface, tuple[int, int]], ...] | None = self._rulers.get(size)
+        if strips is None:
+            strips = self._build_rulers(size)
+            self._rulers[size] = strips
+        for strip, position in strips:
+            surface.blit(strip, position)
 
-    def _build_rulers(self, size: tuple[int, int]) -> pygame.Surface:
-        """Bake both rulers: short ticks, a long one every ``major_pitch``. Right mirrors left."""
+    def _build_rulers(
+        self, size: tuple[int, int]
+    ) -> tuple[tuple[pygame.Surface, tuple[int, int]], ...]:
+        """Bake both rulers as strips with their top-left: short ticks, a long one every
+        ``major_pitch``. The right strip mirrors the left."""
         rulers = self.rules.rulers
         cyan: RGB = self.palette["frame_lights"]
-        image: pygame.Surface = pygame.Surface(size, pygame.SRCALPHA)
-        top: int = rulers.inset_y
-        for offset in range(0, size[1] - 2 * rulers.inset_y, rulers.minor_pitch):
+        height: int = max(size[1] - 2 * rulers.inset_y, 1)
+        left: pygame.Surface = pygame.Surface((rulers.w, height), pygame.SRCALPHA)
+        for offset in range(0, height, rulers.minor_pitch):
             major: bool = offset % rulers.major_pitch == 0
             length: int = rulers.w if major else rulers.minor_w
-            color: tuple[int, int, int, int] = (
-                *cyan,
-                rulers.major_alpha if major else rulers.minor_alpha,
-            )
-            image.fill(color, pygame.Rect(rulers.inset_x, top + offset, length, 1))
-            image.fill(
-                color, pygame.Rect(size[0] - rulers.inset_x - length, top + offset, length, 1)
-            )
-        return image
+            alpha: int = rulers.major_alpha if major else rulers.minor_alpha
+            left.fill((*cyan, alpha), pygame.Rect(0, offset, length, 1))
+        right: pygame.Surface = pygame.transform.flip(left, True, False)
+        return (
+            (left, (rulers.inset_x, rulers.inset_y)),
+            (right, (size[0] - rulers.inset_x - rulers.w, rulers.inset_y)),
+        )
 
 
 def halo(image: pygame.Surface, radius: int, strength: float) -> pygame.Surface:
