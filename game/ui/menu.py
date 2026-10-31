@@ -33,9 +33,6 @@ MENU_ITEM_TEXTS: Final[Mapping[MenuItem, str]] = MappingProxyType(
 )
 """Each item's label, in capitals like RETRY and MENU. 02-game-flow.md, menu_items."""
 
-HINT_ALPHA: Final[int] = 153
-"""Brightness of the hint line, 0..255: about 60%, like the other key hints. Mock-up value."""
-
 
 def draw_menu(surface: pygame.Surface, look: ScreenLook, selection: MenuItem) -> None:
     """Draw the title, the three items, the hint and the rulers onto ``surface``. Units: px.
@@ -73,5 +70,5 @@ def draw_menu(surface: pygame.Surface, look: ScreenLook, selection: MenuItem) ->
         palette["plating"],
         {"midbottom": (width // 2, height - rules.hint_bottom)},
         glow=False,
-        alpha=HINT_ALPHA,
+        alpha=look.rules.menu.hint_alpha,
     )

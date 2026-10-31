@@ -1,0 +1,94 @@
+DRIFTER ART, AWAY LOG
+Started 2026-10-31 by the main session (Opus 5.5), while the Director is away.
+Every sub-agent runs on claude-sonnet-5-5 (Agent model: sonnet).
+
+============================================================
+WHAT THE DIRECTOR ASKED (before leaving)
+============================================================
+- Act as art director. Make the main design for every drifter that has no art yet.
+  Movement frames come later, from the chosen design.
+- Research Piskel (github.com/piskelapp/piskel) first. Set it up and use it if it helps.
+- Use /ui-art-loop. Only designs that pass count. 5 passing designs per drifter.
+- Answers given in chat before leaving:
+  - Drifters (7): meteorite, coin, floating islands, fireball, UFO, planet,
+    electric ball. Chain lightning is skipped.
+  - Keep starting runs until 5 designs pass. Stop a drifter after 3 failed runs.
+  - Art by Pillow scripts (+ Piskel if useful). PixelLab is not used
+    (14 trial generations left = about 2 images).
+  - Commit nothing.
+- Added later: draw the pictures bigger so they shrink with good detail.
+  Don't touch game code. Images only.
+
+============================================================
+DECISIONS
+============================================================
+D1  Piskel: useful, but not as a generator.
+    - What it is: a browser pixel editor you draw in by hand (Apache 2.0,
+      maintained; last commit 2026-10-28).
+    - Its CLI only exports an existing .piskel to PNG, and it needs PhantomJS
+      (dead). There is no drawing API. Driving its UI from a browser would be
+      slower and less exact than the Pillow scripts the art agent already uses.
+    - Its file format is plain JSON with one base64 PNG strip per layer, so we
+      can write it from Python.
+    - So: every design is also saved as a layered .piskel file. The Director
+      can open it in Piskel to touch it up, and later draw the movement frames
+      with onion skin.
+    - Set up: built locally in local/piskel/ (gitignored, never committed).
+      Run it:  cd local/piskel && node scripts/serve.js --test
+      then open http://localhost:9001 and load the .piskel file
+      (Open / Import). Or use piskelapp.com, which reads the same files.
+    - Helper: tools/art/piskel_file.py (PNG layers -> .piskel), written by the
+      art agent. Checked: a 2-layer, 3-frame test file loaded in the local
+      Piskel build in headless Chromium (16x16, both layers, 3 frames each,
+      pixel colors kept).
+
+D2  Draw bigger: masters at 8x the game size for sprites up to 64 px on their
+    longest side, 4x for bigger ones (the island). The master is kept next to
+    each round as <asset>-r<n>-master.png.
+    GDD 12 art_style updated; decision-log row 128.
+
+D3  GDD gaps filled (`guess`): each of the 7 specs got an `art_canvas` row,
+    the image size the design is drawn at. Decision-log row 129.
+      meteorite      28 x 28, one still frame of the medium rock
+      coin           24 x 24 per coin, a strip of two: common, rare (48 x 24)
+      floating isl.  320 x 120, the rectangle, ground fills the box exactly
+      fireball       64 x 64, flying down-right at 35 deg, head center (44, 44)
+      UFO            40 x 20, disc in the bottom 10 rows, dome above
+      planet         64 x 64, fills the hitbox circle; field rings not included
+      electric ball  24 x 24, 16 px ball centered, arcs may reach the edge
+    Small/big variants are the same art shrunk or grown.
+
+D4  Agent edits (Director gave the go-ahead for the art/critic pair):
+    .claude/agents/art-audio-engineer.md
+    - 8x / 4x masters, master kept (matches D2).
+    - New round outputs: <asset>-r<n>-master.png and <asset>-r<n>.piskel.
+    - One script per asset (tools/art/<asset>.py), so parallel loops never
+      edit the same file.
+    - Staged CREDITS: one shell append per loop round, never a rewrite
+      (parallel loops share the file).
+    ui-art-critic.md: not changed. Its rubric already fits.
+
+D5  /ui-art-loop has disable-model-invocation set, so the main session can't
+    call it as a skill. The main session runs its steps exactly as written in
+    .claude/skills/ui-art-loop/SKILL.md (make, measure, score, refine; stop
+    rule; max 3 rounds). One run = one design.
+
+D6  What counts as a pass: a run whose round meets the skill's stop rule
+    (Score >= 8, Lowest >= 6, Size >= 8). A run that reaches round 3 without
+    it is a fail. The passing round is the design.
+
+D7  Asset names: <drifter>-d<k>, k = design number. Example meteorite-d1,
+    files staging/assets/sprites/meteorite-d1-r1.png ...
+    Each design gets its own direction in the brief, so the 5 differ.
+    Each drifter has 7 directions ready (5 + 2 spare for fails).
+
+D8  Pace: up to 2 runs per drifter at once, all 7 drifters side by side.
+    A new run starts only while (passes + running) < 5 and
+    (fails + running) < 3, so neither cap can be overshot.
+
+(more decisions are added below as they come up)
+
+============================================================
+STATUS PER DRIFTER
+============================================================
+(filled in as runs finish)

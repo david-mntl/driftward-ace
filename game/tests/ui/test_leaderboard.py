@@ -404,3 +404,21 @@ def test_blur_flag_is_read_from_the_values(look: ScreenLook, screen_rules: Scree
 def test_other_surface_sizes_draw_without_error(look: ScreenLook, size: tuple[int, int]) -> None:
     surface = _page(look, _entries(), size)
     assert _ink(surface, surface.get_rect(), 150) is not None
+
+
+def test_one_and_three_entries_draw_inside_the_window_with_their_rank_colors(
+    look: ScreenLook, screen_rules: ScreenRules
+) -> None:
+    for count in (1, 3):
+        surface = _page(look, _entries(count))
+        assert _ink(surface, surface.get_rect()) is not None
+    three = _page(look, _entries(3))
+    found = {
+        rank: any(
+            tuple(three.get_at((x, y))[:3]) == screen_rules.palette[rank]
+            for x in range(0, three.get_width(), 1)
+            for y in range(100, 280, 1)
+        )
+        for rank in ("rank_1", "rank_2", "rank_3")
+    }
+    assert all(found.values()), found

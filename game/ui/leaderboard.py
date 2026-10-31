@@ -41,12 +41,6 @@ TOP_COUNT: Final[int] = 3
 TABLE_ROWS: Final[int] = 10
 """Rows of a full top 10. The block is centered as if it were always full, so rows never move."""
 
-EMPTY_ALPHA: Final[int] = 166
-"""Brightness of the empty-list line, 0..255: about 65%. Mock-up value, not in the GDD."""
-
-PLACE_ALPHA: Final[int] = 128
-"""Brightness of a plain row's place number, 0..255: about 50%. Mock-up value, not in the GDD."""
-
 _VIEW_BOX: Final[int] = 32
 """Side of the square the medal pictures are drawn in, before they are scaled to ``medal_size``."""
 
@@ -103,7 +97,7 @@ def draw_leaderboard(
             palette["plating"],
             {"midtop": (width // 2, body_top + rules.empty_top)},
             glow=False,
-            alpha=EMPTY_ALPHA,
+            alpha=rules.empty_alpha,
         )
     look.blit_keys(
         surface,
@@ -176,7 +170,7 @@ def _draw_plain_row(
         palette["plating"],
         {"midright": (inner.left + rules.place_w, rect.centery)},
         glow=False,
-        alpha=PLACE_ALPHA,
+        alpha=rules.place_alpha,
     )
     _draw_cells(
         surface,
@@ -263,7 +257,7 @@ def _medal(look: ScreenLook, place: int) -> pygame.Surface:
     else:
         pygame.draw.lines(canvas, rank, False, _scaled(_RIBBON), 2 * _SUPERSAMPLE)
         center: tuple[int, int] = (16 * _SUPERSAMPLE, 20 * _SUPERSAMPLE)
-        pygame.draw.circle(canvas, (*rank, 56), center, 10 * _SUPERSAMPLE)
+        pygame.draw.circle(canvas, (*rank, rules.medal_fill_alpha), center, 10 * _SUPERSAMPLE)
         pygame.draw.circle(canvas, rank, center, 10 * _SUPERSAMPLE, 2 * _SUPERSAMPLE)
     medal: pygame.Surface = pygame.transform.smoothscale(canvas, (rules.medal_size,) * 2)
     if place != 1:

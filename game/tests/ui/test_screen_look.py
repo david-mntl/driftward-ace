@@ -4,6 +4,8 @@ Source: docs/contracts/systems/screens.md, Interface (`ScreenLook`); 10-ui.md, `
 `ui_glow`. Positions are read from the drawn pixels, never from a font size.
 """
 
+import dataclasses
+
 import pygame
 
 from ui.screen_look import ScreenLook
@@ -130,7 +132,11 @@ def test_blur_off_leaves_the_picture_alone(look: ScreenLook) -> None:
     surface = _surface(gray=90)
     surface.fill((200, 10, 10), pygame.Rect(150, 150, 20, 20))
     before = pygame.image.tobytes(surface, "RGB")
-    look.blur_behind(surface, pygame.Rect(0, 0, 1, 1))
+    flat = ScreenLook(
+        dataclasses.replace(look.rules, glass=dataclasses.replace(look.rules.glass, blur_down=1)),
+        look._fonts,
+    )
+    flat.blur_behind(surface, pygame.Rect(100, 100, 120, 120))
     assert pygame.image.tobytes(surface, "RGB") == before
 
 
@@ -180,14 +186,22 @@ def test_rulers_mark_both_sides_and_leave_the_middle_clear(look: ScreenLook) -> 
     look.blit_rulers(surface)
     inset = look.rules.rulers.inset_x
     assert _ink(surface) is not None
-    assert max(surface.get_at((x, 200))[2] for x in range(inset, inset + 8)) >= 0
+    rulers = look.rules.rulers
+    left = {
+        surface.get_at((x, y))[2] for x in range(inset, inset + rulers.w) for y in range(60, 200)
+    }
+    right = {
+        surface.get_at((SIZE[0] - 1 - x, y))[2]
+        for x in range(inset, inset + rulers.w)
+        for y in range(60, 200)
+    }
+    assert max(left) > 0
+    assert left == right
     middle = surface.subsurface(pygame.Rect(100, 0, SIZE[0] - 200, SIZE[1]))
     assert _ink(middle) is None
 
 
 def test_rulers_can_be_switched_off(look: ScreenLook, screen_rules: ScreenRules) -> None:
-    import dataclasses
-
     off = ScreenLook(
         dataclasses.replace(
             screen_rules, rulers=dataclasses.replace(screen_rules.rulers, enabled=False)
@@ -197,3 +211,27 @@ def test_rulers_can_be_switched_off(look: ScreenLook, screen_rules: ScreenRules)
     surface = _surface()
     off.blit_rulers(surface)
     assert _ink(surface) is None
+
+
+def test_every_nickname_character_has_a_glyph_in_the_screen_font(look: ScreenLook) -> None:
+    from core.saves import NICKNAME_CHARACTERS
+
+    font = look._fonts["picker"]
+    for character in NICKNAME_CHARACTERS:
+        if character == " ":
+            continue
+        assert font.metrics(character)[0] is not None, character
+    assert font.metrics("\u2212")[0] is not None
+
+
+def test_text_size_is_the_same_the_second_time(look: ScreenLook) -> None:
+    first = look.text_size("LEADERBOARD", "title")
+    assert look.text_size("LEADERBOARD", "title") == first
+
+
+def test_a_cached_picture_is_not_changed_by_drawing_it_dimmed(look: ScreenLook) -> None:
+    bright_before, bright_after = _surface(), _surface()
+    look.blit_text(bright_before, "RETRY", "button", (255, 255, 255), {"center": (100, 40)}, False)
+    look.blit_text(_surface(), "RETRY", "button", (255, 255, 255), {"center": (100, 40)}, False, 60)
+    look.blit_text(bright_after, "RETRY", "button", (255, 255, 255), {"center": (100, 40)}, False)
+    assert pygame.image.tobytes(bright_before, "RGB") == pygame.image.tobytes(bright_after, "RGB")

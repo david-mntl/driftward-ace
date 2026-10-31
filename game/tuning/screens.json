@@ -36,23 +36,91 @@
   "fonts": {
     "text_file": "fonts/ShareTechMono.ttf",
     "roles": [
-      { "name": "title", "size": 28, "spacing": 0.3 },
-      { "name": "message", "size": 25, "spacing": 0.18 },
-      { "name": "menu_title", "size": 32, "spacing": 0.3 },
-      { "name": "menu_item", "size": 18, "spacing": 0.3 },
-      { "name": "button", "size": 14, "spacing": 0.3 },
-      { "name": "label", "size": 10, "spacing": 0.26 },
-      { "name": "digit", "size": 22, "spacing": 0.05 },
-      { "name": "picker", "size": 24, "spacing": 0.0 },
-      { "name": "key", "size": 10, "spacing": 0.1 },
-      { "name": "hint", "size": 10, "spacing": 0.2 },
-      { "name": "row", "size": 14, "spacing": 0.05 },
-      { "name": "top_name", "size": 20, "spacing": 0.1 },
-      { "name": "top_score", "size": 24, "spacing": 0.04 },
-      { "name": "level", "size": 12, "spacing": 0.1 },
-      { "name": "card_title", "size": 15, "spacing": 0.22 },
-      { "name": "card_text", "size": 12, "spacing": 0.02 },
-      { "name": "empty", "size": 20, "spacing": 0.2 }
+      {
+        "name": "title",
+        "size": 28,
+        "spacing": 0.3
+      },
+      {
+        "name": "message",
+        "size": 25,
+        "spacing": 0.18
+      },
+      {
+        "name": "menu_title",
+        "size": 32,
+        "spacing": 0.3
+      },
+      {
+        "name": "menu_item",
+        "size": 18,
+        "spacing": 0.3
+      },
+      {
+        "name": "button",
+        "size": 14,
+        "spacing": 0.3
+      },
+      {
+        "name": "label",
+        "size": 10,
+        "spacing": 0.26
+      },
+      {
+        "name": "digit",
+        "size": 22,
+        "spacing": 0.05
+      },
+      {
+        "name": "picker",
+        "size": 24,
+        "spacing": 0.0
+      },
+      {
+        "name": "key",
+        "size": 10,
+        "spacing": 0.1
+      },
+      {
+        "name": "hint",
+        "size": 10,
+        "spacing": 0.2
+      },
+      {
+        "name": "row",
+        "size": 14,
+        "spacing": 0.05
+      },
+      {
+        "name": "top_name",
+        "size": 20,
+        "spacing": 0.1
+      },
+      {
+        "name": "top_score",
+        "size": 24,
+        "spacing": 0.04
+      },
+      {
+        "name": "level",
+        "size": 12,
+        "spacing": 0.1
+      },
+      {
+        "name": "card_title",
+        "size": 15,
+        "spacing": 0.22
+      },
+      {
+        "name": "card_text",
+        "size": 12,
+        "spacing": 0.02
+      },
+      {
+        "name": "empty",
+        "size": 20,
+        "spacing": 0.2
+      }
     ]
   },
   "rulers": {
@@ -63,7 +131,8 @@
     "minor_pitch": 12,
     "major_pitch": 60,
     "minor_alpha": 153,
-    "major_alpha": 255
+    "major_alpha": 255,
+    "minor_w": 5
   },
   "keycap": {
     "min_w": 18,
@@ -74,7 +143,10 @@
     "border_alpha": 153,
     "gap": 4,
     "hint_gap": 8,
-    "group_gap": 16
+    "group_gap": 16,
+    "word_alpha": 153,
+    "play_w": 6,
+    "arrow_size": 4
   },
   "choice": {
     "fade_alpha": 61,
@@ -112,14 +184,17 @@
     "cursor_alpha": 36,
     "arrow_size": 5,
     "arrow_gap": 5,
-    "blur": true
+    "blur": true,
+    "label_alpha": 140,
+    "dim_digit_alpha": 56
   },
   "menu": {
     "item_w": 260,
     "item_h": 30,
     "item_gap": 10,
     "title_gap": 36,
-    "hint_bottom": 40
+    "hint_bottom": 40,
+    "hint_alpha": 153
   },
   "instructions": {
     "margin_x": 40,
@@ -135,7 +210,8 @@
     "pad_y": 6,
     "text_gap": 12,
     "caption_gap": 3,
-    "blur": false
+    "blur": false,
+    "caption_alpha": 224
   },
   "leaderboard": {
     "margin_top": 20,
@@ -157,6 +233,9 @@
     "medal_size": 30,
     "rule_alpha": 36,
     "empty_top": 110,
-    "blur": false
+    "blur": false,
+    "empty_alpha": 166,
+    "place_alpha": 128,
+    "medal_fill_alpha": 56
   }
 }

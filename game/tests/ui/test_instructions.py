@@ -208,7 +208,7 @@ def test_a_caption_wraps_to_fit_its_width(look: ScreenLook) -> None:
 
 
 def test_a_word_wider_than_the_width_keeps_its_own_line(look: ScreenLook) -> None:
-    assert _wrap(look, "WARNING now", 5) == ["WARNING", "now"]
+    assert _wrap(look, "WARNING now", 5) == ("WARNING", "now")
 
 
 def test_cards_are_see_through_glass(look: ScreenLook) -> None:
@@ -296,3 +296,17 @@ def test_the_page_fits_other_surface_sizes(look: ScreenLook) -> None:
         area = pygame.Rect((0, 0), size)
         assert all(area.contains(r) for r in rects)
         assert _ink(_page(look, size), area) is not None
+
+
+def test_each_card_takes_the_palette_key_the_gdd_gives_it() -> None:
+    from ui.instructions import CARD_COLOR_KEYS, INSTRUCTION_SECTIONS
+
+    topics = [title for title, _ in INSTRUCTION_SECTIONS]
+    assert dict(zip(topics, CARD_COLOR_KEYS, strict=True)) == {
+        "FLY": "frame_lights",
+        "PAUSE": "ship_lines_light",
+        "GRAZE": "graze",
+        "WARNING": "last_life",
+        "FALL": "ship_lines",
+        "COINS": "level",
+    }

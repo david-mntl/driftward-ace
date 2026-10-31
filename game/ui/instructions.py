@@ -52,9 +52,6 @@ BACK_KEYS: Final[tuple[str, ...]] = ("ENTER", "SPACE")
 BACK_WORD: Final[str] = "BACK"
 """The word after the footer's key caps. 10-ui.md, instructions_text_and_look."""
 
-CAPTION_ALPHA: Final[int] = 224
-"""How bright a caption is against full plating, of 255 (about 88%). Look only."""
-
 _DESIGN_W: Final[int] = 176
 _DESIGN_H: Final[int] = 96
 """The icons' drawing space, the mock-up's 176 x 96. Each icon is scaled to fit its box."""
@@ -155,7 +152,7 @@ def _draw_card(surface: pygame.Surface, look: ScreenLook, index: int, card: pyga
     box: pygame.Rect = icon_rect(look, card)
     surface.blit(icon, (box.left - pad, box.top - pad))
     text_left: int = box.right + rules.text_gap
-    lines: list[str] = _wrap(look, caption, card.right - rules.pad_x - text_left)
+    lines: tuple[str, ...] = _wrap(look, caption, card.right - rules.pad_x - text_left)
     title_h: int = look.text_size(title, "card_title")[1]
     line_h: int = look.text_size(caption, "card_text")[1]
     block: int = title_h + rules.caption_gap + len(lines) * line_h
@@ -170,12 +167,13 @@ def _draw_card(surface: pygame.Surface, look: ScreenLook, index: int, card: pyga
             look.palette["plating"],
             {"topleft": (text_left, top)},
             glow=False,
-            alpha=CAPTION_ALPHA,
+            alpha=rules.caption_alpha,
         )
         top += line_h
 
 
-def _wrap(look: ScreenLook, text: str, width: int) -> list[str]:
+@cache
+def _wrap(look: ScreenLook, text: str, width: int) -> tuple[str, ...]:
     """Split ``text`` into lines no wider than ``width`` px at the caption size, breaking at spaces.
 
     A single word wider than ``width`` stays on a line of its own.
@@ -190,7 +188,7 @@ def _wrap(look: ScreenLook, text: str, width: int) -> list[str]:
         else:
             current = trial
     lines.append(current)
-    return lines
+    return tuple(lines)
 
 
 @cache
@@ -533,7 +531,7 @@ def _draw_fall(c: _Canvas) -> list[Label]:
     c.line([(82, 40), (88, 46), (82, 52)], k)
     c.heart(98, 26, 1.7)
     c.line([(118, 28), (112, 40), (120, 44), (113, 56)], floor, 3)
-    return [("-1", "row", k, (150, 46))]
+    return [("−1", "row", k, (150, 46))]
 
 
 def _draw_coins(c: _Canvas) -> list[Label]:

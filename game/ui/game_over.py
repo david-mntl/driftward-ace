@@ -115,7 +115,13 @@ def draw_final_score(
     centery: int = layout.score_top + _score_height(look) // 2
     plating: RGB = look.palette["plating"]
     look.blit_text(
-        surface, SCORE_LABEL, "label", plating, {"midleft": (left, centery)}, glow=False, alpha=140
+        surface,
+        SCORE_LABEL,
+        "label",
+        plating,
+        {"midleft": (left, centery)},
+        glow=False,
+        alpha=rules.label_alpha,
     )
     left += label_w + rules.score_gap
     for char, dim in cells:
@@ -128,7 +134,7 @@ def draw_final_score(
             "digit",
             look.palette["score"],
             {"center": (left + rules.score_cell_w // 2, centery)},
-            alpha=56 if dim else 255,
+            alpha=rules.dim_digit_alpha if dim else 255,
         )
         left += rules.score_cell_w
 
@@ -268,9 +274,15 @@ def _slot_cells(look: ScreenLook, layout: _Layout, count: int) -> list[pygame.Re
 
 def _fill(surface: pygame.Surface, rect: pygame.Rect, color: RGB, alpha: int) -> None:
     """Blend ``color`` at ``alpha`` (0..255) over ``rect``."""
-    image: pygame.Surface = pygame.Surface(rect.size, pygame.SRCALPHA)
+    surface.blit(_plate(rect.size, color, alpha), rect.topleft)
+
+
+@cache
+def _plate(size: tuple[int, int], color: RGB, alpha: int) -> pygame.Surface:
+    """Return a ``size`` plate of ``color`` at ``alpha``, made once."""
+    image: pygame.Surface = pygame.Surface(size, pygame.SRCALPHA)
     image.fill((*color, alpha))
-    surface.blit(image, rect.topleft)
+    return image
 
 
 def _blit_arrows(

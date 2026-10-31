@@ -116,6 +116,7 @@ class RulerRules:
     w: int
     minor_pitch: int
     major_pitch: int
+    minor_w: int
     minor_alpha: int
     major_alpha: int
 
@@ -133,6 +134,9 @@ class KeyCapRules:
     gap: int
     hint_gap: int
     group_gap: int
+    word_alpha: int
+    play_w: int
+    arrow_size: int
 
 
 @dataclass(frozen=True)
@@ -177,6 +181,8 @@ class GameOverRules:
     score_gap: int
     score_cell_w: int
     score_group_gap: int
+    label_alpha: int
+    dim_digit_alpha: int
     choice_w: int
     choice_h: int
     choice_gap: int
@@ -201,6 +207,7 @@ class MenuRules:
     item_gap: int
     title_gap: int
     hint_bottom: int
+    hint_alpha: int
 
 
 @dataclass(frozen=True)
@@ -220,6 +227,7 @@ class InstructionsRules:
     pad_y: int
     text_gap: int
     caption_gap: int
+    caption_alpha: int
     blur: bool
 
 
@@ -246,6 +254,9 @@ class LeaderboardRules:
     medal_size: int
     rule_alpha: int
     empty_top: int
+    empty_alpha: int
+    place_alpha: int
+    medal_fill_alpha: int
     blur: bool
 
 

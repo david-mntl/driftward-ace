@@ -298,7 +298,8 @@
         "minor_pitch",
         "major_pitch",
         "minor_alpha",
-        "major_alpha"
+        "major_alpha",
+        "minor_w"
       ],
       "properties": {
         "enabled": {
@@ -341,6 +342,11 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 255
+        },
+        "minor_w": {
+          "description": "Length of a short tick, px. 0 or more.",
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -357,7 +363,10 @@
         "border_alpha",
         "gap",
         "hint_gap",
-        "group_gap"
+        "group_gap",
+        "word_alpha",
+        "play_w",
+        "arrow_size"
       ],
       "properties": {
         "min_w": {
@@ -404,6 +413,22 @@
         },
         "group_gap": {
           "description": "Space between two hints in the name picker's hint row, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "word_alpha": {
+          "description": "How bright the short word after the key caps is, 0 to 255 (153 is about 60%).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "play_w": {
+          "description": "Width of the small play triangle that closes the pause hint, px. 1 or more.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "arrow_size": {
+          "description": "Half the size of an arrow drawn on an arrow key, px. 0 or more.",
           "type": "integer",
           "minimum": 0
         }
@@ -505,7 +530,9 @@
         "cursor_alpha",
         "arrow_size",
         "arrow_gap",
-        "blur"
+        "blur",
+        "label_alpha",
+        "dim_digit_alpha"
       ],
       "properties": {
         "w": {
@@ -628,6 +655,18 @@
         "blur": {
           "description": "Whether the picture behind the box is blurred, drawn live every frame.",
           "type": "boolean"
+        },
+        "label_alpha": {
+          "description": "How bright the label SCORE is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "dim_digit_alpha": {
+          "description": "How bright a leading zero of the score is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
         }
       }
     },
@@ -640,7 +679,8 @@
         "item_h",
         "item_gap",
         "title_gap",
-        "hint_bottom"
+        "hint_bottom",
+        "hint_alpha"
       ],
       "properties": {
         "item_w": {
@@ -667,6 +707,12 @@
           "description": "Distance of the hint line's bottom from the window's bottom edge, px.",
           "type": "integer",
           "minimum": 0
+        },
+        "hint_alpha": {
+          "description": "How bright the hint line is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
         }
       }
     },
@@ -688,7 +734,8 @@
         "pad_y",
         "text_gap",
         "caption_gap",
-        "blur"
+        "blur",
+        "caption_alpha"
       ],
       "properties": {
         "margin_x": {
@@ -759,6 +806,12 @@
         "blur": {
           "description": "Whether the picture behind the cards is blurred, drawn live every frame. Off keeps the frame rate on the moving background.",
           "type": "boolean"
+        },
+        "caption_alpha": {
+          "description": "How bright a caption is against full plating, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
         }
       }
     },
@@ -786,7 +839,10 @@
         "medal_size",
         "rule_alpha",
         "empty_top",
-        "blur"
+        "blur",
+        "empty_alpha",
+        "place_alpha",
+        "medal_fill_alpha"
       ],
       "properties": {
         "margin_top": {
@@ -888,6 +944,24 @@
         "blur": {
           "description": "Whether the picture behind the medal rows is blurred, drawn live every frame. Off keeps the frame rate on the moving background.",
           "type": "boolean"
+        },
+        "empty_alpha": {
+          "description": "How bright the empty-list line is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "place_alpha": {
+          "description": "How bright a plain row's place number is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "medal_fill_alpha": {
+          "description": "Alpha of the fill inside a second or third place medal, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
         }
       }
     }

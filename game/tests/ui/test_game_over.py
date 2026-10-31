@@ -269,3 +269,13 @@ def test_it_draws_on_another_surface_size(look: ScreenLook) -> None:
     draw_game_over_choices(surface, look, GameOverChoice.MENU)
     assert abs(_ink(surface).centerx - 320) <= 2
     assert abs(_ink(surface).centery - 240) <= 2
+
+
+def test_scores_from_zero_to_eight_digits_stay_inside_the_box(look: ScreenLook) -> None:
+    layout = _layout(look, SIZE, False)
+    for score in (0, 9_999_999, 99_999_999):
+        surface = _surface()
+        draw_final_score(surface, look, score)
+        ink = _ink(surface)
+        assert ink.width > 0
+        assert layout.box.contains(ink), score

@@ -27,9 +27,6 @@ PLAY_SIGN: Final[str] = "PLAY"
 _CACHE_LIMIT: Final[int] = 512
 """Most text pictures kept. The cache is cleared when it grows past this."""
 
-_PLAY_W: Final[int] = 6
-"""Width of the play triangle, px."""
-
 _ARROW_ANGLES: Final[Mapping[str, int]] = {"UP": 0, "LEFT": 90, "DOWN": 180, "RIGHT": 270}
 """Rotation of the arrow picture, degrees counter-clockwise, from one that points up."""
 
@@ -46,6 +43,8 @@ class ScreenLook:
         self._fonts: Mapping[str, pygame.font.Font] = fonts
         self._spacing: Mapping[str, float] = {r.name: r.spacing for r in rules.fonts.roles}
         self._texts: dict[tuple[str, str, RGB, bool, int], tuple[pygame.Surface, int]] = {}
+        self._sizes: dict[tuple[str, str], tuple[int, int]] = {}
+        self._caps: dict[tuple[int, int], pygame.Surface] = {}
         self._panels: dict[tuple[int, int, RGB], tuple[pygame.Surface, int]] = {}
         self._fades: dict[tuple[int, int], pygame.Surface] = {}
         self._rulers: dict[tuple[int, int], pygame.Surface] = {}
@@ -54,10 +53,17 @@ class ScreenLook:
 
     def text_size(self, string: str, role: str) -> tuple[int, int]:
         """Return the width and height of ``string`` in ``role``, px, letter-spacing included."""
-        font: pygame.font.Font = self._fonts[role]
-        gap: int = self._gap(role)
-        width: int = sum(font.size(char)[0] for char in string) + gap * max(len(string) - 1, 0)
-        return width, font.get_height()
+        key: tuple[str, str] = (string, role)
+        found: tuple[int, int] | None = self._sizes.get(key)
+        if found is None:
+            font: pygame.font.Font = self._fonts[role]
+            gap: int = self._gap(role)
+            width: int = sum(font.size(char)[0] for char in string) + gap * max(len(string) - 1, 0)
+            found = (width, font.get_height())
+            if len(self._sizes) >= _CACHE_LIMIT:
+                self._sizes.clear()
+            self._sizes[key] = found
+        return found
 
     def blit_text(
         self,
@@ -218,7 +224,7 @@ class ScreenLook:
 
     def _word_width(self, word: str) -> int:
         """Return the width of the word after the key caps, px. The play sign is a triangle."""
-        return _PLAY_W if word == PLAY_SIGN else self.text_size(word, "hint")[0]
+        return self.rules.keycap.play_w if word == PLAY_SIGN else self.text_size(word, "hint")[0]
 
     def blit_keys(
         self,
@@ -245,23 +251,20 @@ class ScreenLook:
             hint_left: int = left - caps.gap + caps.hint_gap
             plating: RGB = self.palette["plating"]
             if word == PLAY_SIGN:
-                _play_triangle(surface, (hint_left + _PLAY_W // 2, row.centery), plating)
+                _play_triangle(
+                    surface, (hint_left + caps.play_w // 2, row.centery), plating, caps.play_w
+                )
             else:
                 anchor_word: Anchor = {"midleft": (hint_left, row.centery)}
-                self.blit_text(surface, word, "hint", plating, anchor_word, False, min(alpha, 153))
+                self.blit_text(
+                    surface, word, "hint", plating, anchor_word, False, min(alpha, caps.word_alpha)
+                )
         return row
 
     def _keycap(self, surface: pygame.Surface, label: str, cap: pygame.Rect, alpha: int) -> None:
         """Draw one key cap: a faint cyan fill, a thin cyan border, the label in cyan."""
-        caps = self.rules.keycap
         cyan: RGB = self.palette["frame_lights"]
-        image: pygame.Surface = pygame.Surface(cap.size, pygame.SRCALPHA)
-        body: pygame.Rect = image.get_rect()
-        pygame.draw.rect(image, (*cyan, caps.fill_alpha), body, border_radius=caps.radius)
-        pygame.draw.rect(image, (*cyan, caps.border_alpha), body, 1, border_radius=caps.radius)
-        if alpha < 255:
-            image.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
-        surface.blit(image, cap.topleft)
+        surface.blit(self._cap_image(cap.size, alpha), cap.topleft)
         if label in ARROW_KEYS:
             self._blit_arrow(surface, label, cap.center, cyan)
         else:
@@ -269,11 +272,28 @@ class ScreenLook:
                 surface, label, "key", cyan, {"center": cap.center}, glow=False, alpha=alpha
             )
 
+    def _cap_image(self, size: tuple[int, int], alpha: int) -> pygame.Surface:
+        """Return a key cap's body at ``size``, dimmed to ``alpha`` (0..255): drawn once, kept."""
+        key: tuple[int, int] = (size[0], alpha)
+        found: pygame.Surface | None = self._caps.get(key)
+        if found is not None:
+            return found
+        caps = self.rules.keycap
+        cyan: RGB = self.palette["frame_lights"]
+        image: pygame.Surface = pygame.Surface(size, pygame.SRCALPHA)
+        body: pygame.Rect = image.get_rect()
+        pygame.draw.rect(image, (*cyan, caps.fill_alpha), body, border_radius=caps.radius)
+        pygame.draw.rect(image, (*cyan, caps.border_alpha), body, 1, border_radius=caps.radius)
+        if alpha < 255:
+            image.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
+        self._caps[key] = image
+        return image
+
     def _blit_arrow(
         self, surface: pygame.Surface, name: str, center: tuple[int, int], color: RGB
     ) -> None:
         """Draw a small solid triangle pointing ``name`` at ``center``."""
-        size: int = max(self.rules.keycap.h // 4, 2)
+        size: int = self.rules.keycap.arrow_size
         up: list[tuple[int, int]] = [(0, -size), (size, size), (-size, size)]
         angle: float = math.radians(_ARROW_ANGLES[name])
         points: list[tuple[float, float]] = [
@@ -354,7 +374,7 @@ class ScreenLook:
         top: int = rulers.inset_y
         for offset in range(0, size[1] - 2 * rulers.inset_y, rulers.minor_pitch):
             major: bool = offset % rulers.major_pitch == 0
-            length: int = rulers.w if major else max(rulers.w * 5 // 8, 1)
+            length: int = rulers.w if major else rulers.minor_w
             color: tuple[int, int, int, int] = (
                 *cyan,
                 rulers.major_alpha if major else rulers.minor_alpha,
@@ -397,7 +417,10 @@ def _blur(image: pygame.Surface, radius: int, strength: float) -> pygame.Surface
     return out
 
 
-def _play_triangle(surface: pygame.Surface, center: tuple[int, int], color: RGB) -> None:
-    """Draw a small solid triangle pointing right, centered on ``center``."""
+def _play_triangle(
+    surface: pygame.Surface, center: tuple[int, int], color: RGB, width: int
+) -> None:
+    """Draw a small solid triangle ``width`` px wide pointing right, centered on ``center``."""
     x, y = center
-    pygame.draw.polygon(surface, color, [(x - 3, y - 4), (x + 3, y), (x - 3, y + 4)])
+    half: int = width // 2
+    pygame.draw.polygon(surface, color, [(x - half, y - 4), (x + half, y), (x - half, y + 4)])
