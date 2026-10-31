@@ -67,7 +67,7 @@ The player never reads this. It gives the art a feeling to aim at.
 10. **A fixed pool of looks.** A drifter with several looks picks one from a fixed pool each time it appears. Art is never made new per run. Source: Director.
 11. **Painted once.** Background layers are images made ahead of time and loaded by the game, never drawn shape by shape each frame. Source: Director.
 12. **Words, not pictures.** The style is defined in words in this file. Images from other works are never part of this design and never ship. Only art made for the game, or converted from a source that is free to use and credited, ships. Source: Director.
-13. **Motion must show at game size.** A turn smaller than about 20° does not read on a sprite this small. A turning object uses a full turn in steps of 45° or less, so the loop has no back-and-forth. The light and the rim stay fixed while the shape turns. Frames sit in one strip, all the same size. Source: Director.
+13. **Motion must show at game size.** A turn smaller than about 20° does not read on a sprite this small. A turning object uses a full turn in steps of 45° or less, so the loop has no back-and-forth. One exception: a part that swings on a fixed body, like the satellite's panels, goes back and forth. The light and the rim stay fixed while the shape turns. Frames sit in one strip, all the same size. Source: Director.
 
 ## Edge cases
 - Art for a drifter whose spec is still draft: wait, or use a placeholder shape the Director approves.
