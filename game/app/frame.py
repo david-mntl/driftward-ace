@@ -24,6 +24,8 @@ from collections.abc import Sequence
 
 import pygame
 
+from app.assets import load_background
+from app.background_tuning import load_background_rules
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.mode import RunMode
 from app.saves import load_saves, write_saves
@@ -48,6 +50,7 @@ from core.saves import Saves
 from core.ship import Thrust
 from core.waves import WaveBook, start_waves
 from core.world import SCREEN_H, SCREEN_W
+from ui.background_view import BackgroundArt, draw_background
 from ui.burst_view import draw_burst
 from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay, draw_debug_wave_lines
 from ui.drifters.registry import render_drifter
@@ -61,7 +64,6 @@ from ui.graze_view import draw_graze_ring
 from ui.hud import draw_hud
 from ui.instructions import draw_instructions
 from ui.leaderboard import draw_leaderboard
-from ui.look import BACKGROUND
 from ui.menu import draw_menu
 from ui.pause_box import draw_pause_box
 from ui.popup_view import draw_points_popup
@@ -95,6 +97,10 @@ FOCUS_LOST_EVENTS: frozenset[int] = frozenset(
 _LOGGED_KEYS: dict[int, str] = {**ARROW_NAMES, **CONFIRM_NAMES}
 """Keys whose down and up events are logged with the ship's x/y."""
 
+BACKGROUND_MAX_STEP: float = 0.1
+"""Longest stretch of real time the background moves for in one frame, s. A tab that was away
+doesn't make it jump. Look only, no design meaning."""
+
 _RUN_SCREENS: frozenset[Screen] = frozenset({Screen.PLAYING, Screen.PAUSED, Screen.GAME_OVER})
 """Screens that show the run's world and the HUD."""
 
@@ -103,6 +109,7 @@ async def frame_loop(mode: RunMode) -> None:
     """Open the window and run frames until pygame.QUIT (desktop only)."""
     pygame.init()
     surface: pygame.Surface = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+    background: BackgroundArt = load_background(load_background_rules())
     debug: bool = mode is RunMode.DEBUG
     tuning: DrifterTuning = load_tuning()
     graze_rules: GrazeRules = load_graze_rules()
@@ -121,6 +128,7 @@ async def frame_loop(mode: RunMode) -> None:
     focus_lost_pending: bool = False
     accumulator: float = 0.0
     was_capped: bool = False
+    background_ticks: float = 0.0
     previous: float = time.perf_counter()
     while True:
         keep_running, overlay_visible, focus_lost = _read_events(flow.run, debug, overlay_visible)
@@ -130,6 +138,8 @@ async def frame_loop(mode: RunMode) -> None:
         thrust, confirm = _held_keys()
         now: float = time.perf_counter()
         accumulator += now - previous
+        if flow.screen is not Screen.PAUSED:
+            background_ticks += min(now - previous, BACKGROUND_MAX_STEP) * TICK_RATE
         previous = now
         flow, accumulator, focus_lost_pending = _run_ticks(
             flow,
@@ -144,7 +154,7 @@ async def frame_loop(mode: RunMode) -> None:
         was_capped = _apply_cap(accumulator, was_capped)
         if was_capped:
             accumulator = 0.0
-        _draw(surface, flow, overlay_visible, debug)
+        _draw(surface, background, background_ticks, flow, overlay_visible, debug)
         pygame.display.flip()
         await asyncio.sleep(0)
     log.info("quit")
@@ -260,14 +270,21 @@ def _apply_cap(accumulator: float, was_capped: bool) -> bool:
     return capped
 
 
-def _draw(surface: pygame.Surface, flow: GameFlow, overlay_visible: bool, debug: bool) -> None:
-    """Fill the background, then draw the screen the flow shows.
+def _draw(
+    surface: pygame.Surface,
+    background: BackgroundArt,
+    background_ticks: float,
+    flow: GameFlow,
+    overlay_visible: bool,
+    debug: bool,
+) -> None:
+    """Draw the background at `background_ticks`, then draw the screen the flow shows.
 
     The menu, the instructions page and the leaderboard page show alone: no world, no overlay, no
     HUD. Playing, paused and game over show the run's world (_draw_run).
     Source: systems/app/frame-loop.md, Rules, Draw; systems/game-flow.md, Presentation.
     """
-    surface.fill(BACKGROUND)
+    draw_background(surface, background, background_ticks)
     if flow.screen is Screen.MENU:
         draw_menu(surface, flow.menu_selection)
     elif flow.screen is Screen.INSTRUCTIONS:

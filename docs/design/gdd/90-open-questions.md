@@ -62,7 +62,7 @@ None open.
 ## Art and audio
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| AA-02 | Background numbers: how fast the middle and near layers scroll, how many river lights at most, the swirl loop length, how strong the bottom glow is. The design is set in 12-art-and-audio.md. Measure the frame rate in a browser build first. | 12-art-and-audio.md | Background | open |
+| AA-02 | Background numbers (guesses set, 2026-10-29; the near layer has none): how fast the middle and near layers scroll, how many river lights at most, the swirl loop length, how strong the bottom glow is. The design is set in 12-art-and-audio.md. Measure the frame rate in a browser build first. | 12-art-and-audio.md | Background | open |
 | AA-03 | Which sounds and music, and is audio in the MVP? | 12-art-and-audio.md | Audio | open |
 | AA-04 | Particle cap. | 12-art-and-audio.md | Effects | open |
 

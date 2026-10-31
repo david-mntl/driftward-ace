@@ -1,0 +1,13 @@
+{
+  "sway_loop_ticks": 600,
+  "planet_count": 3,
+  "planet_speed": 0.15,
+  "planet_scale": 1.0,
+  "river_light_count": 30,
+  "river_light_loop_ticks": 1800,
+  "river_light_strength": 0.6,
+  "swirl_count": 8,
+  "swirl_loop_ticks": 720,
+  "glow_height": 40,
+  "glow_strength": 0.25
+}
