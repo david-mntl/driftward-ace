@@ -38,7 +38,7 @@ File status: `draft` (being written), `review` (Director checking), `locked` (do
 | Waves, Wave 0, wave order, wave_check rules | [09-waves.md](09-waves.md) |
 | HUD, what each screen shows (menu, instructions, pause box, leaderboard, game over with the letter picker) | [10-ui.md](10-ui.md) |
 | Saves, nickname, letter picker, top 10, best score | [11-save-data.md](11-save-data.md) |
-| Art style, palette, sprite sizes, sound | [12-art-and-audio.md](12-art-and-audio.md) |
+| Art style, world brief, color language, glow, background, sound | [12-art-and-audio.md](12-art-and-audio.md) |
 | Schedule, priorities, cut order, stretch goals | [13-scope-and-schedule.md](13-scope-and-schedule.md) |
 | What a term means | [14-glossary.md](14-glossary.md) |
 | Engine, browser build, audio format, hosting | [15-tech-constraints.md](15-tech-constraints.md) |

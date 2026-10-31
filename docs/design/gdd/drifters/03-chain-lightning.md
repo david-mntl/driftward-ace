@@ -31,7 +31,7 @@ Two or three glowing nodes fall from the top in a fixed layout. They charge with
 | ray_length | 6, out from the node's edge, one per diagonal (45°, 135°, 225°, 315°), in that order | px | — | guess | Director (value proposed in chat) |
 | specialty | none | — | — | locked | Director |
 | graze | yes, only while an arc fires, and once per chain lightning | — | — | locked | Director |
-| look_reference | Blue electricity, very powerful lightning: cyan glowing nodes, a jagged white-blue arc, blue rays while charging | — | — | guess | Director |
+| look_reference | Very powerful lightning: glowing nodes and a jagged arc, each a pale white-cyan core with thin purple and fuchsia arcs; pale white-cyan rays while charging | — | — | guess | Director |
 | placeholder_look | nodes: filled cyan circles (0, 220, 255), 12 px. Charge: 1 px rays (120, 200, 255), `ray_length` long, `charge_rays` of them. Arc: a band (220, 240, 255) `arc_width` thick, node to node | RGB | — | guess | Director |
 
 **Layouts.** Arcs join neighbouring nodes along the shape: left to middle to right. The triangle also joins its two ends, so all three sides fire. `invert` (a placement field) mirrors the layout exactly.

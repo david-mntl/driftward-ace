@@ -27,7 +27,7 @@ A single glowing ball falls from the top. It charges, and a faint ring shows how
 | specialty | none | — | — | locked | Director |
 | graze | yes, only while it fires, and once per electric ball | — | — | locked | Director |
 | fill_opacity | 0.35, the firing circle's fill (the rim is opaque) | 0–1 | — | guess | Director (away decision, DRA-111) |
-| look_reference | Purple spiky glowing orb | — | — | guess | Director |
+| look_reference | A spiky glowing orb: a pale white-cyan core with thin purple and fuchsia arcs | — | — | guess | Director |
 | placeholder_look | ball: filled purple circle (170, 80, 255), 16 px. Charge: short 1 px rays (200, 150, 255) around the ball, more as the charge fills, and a 1 px outline of the pulse circle in the same color, brighter as it fills. Fire: the pulse circle filled translucent (200, 160, 255) at `fill_opacity` with a 2 px bright rim (240, 220, 255) | RGB | — | guess | Director |
 
 ## Rules
