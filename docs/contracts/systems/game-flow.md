@@ -93,7 +93,7 @@ run.held        as before     the arrows held now        same           held = t
 wait            frozen        frozen                     frozen         still waiting     still waiting          ends: thrust
 ```
 
-Screens (stand-ins, centered across the surface they draw on, white default-font text on the background). From HUD-PANEL that surface is the whole 896 × 518 window for every screen: the menu, instructions and leaderboard fill it with the background and no panel or frame (`WindowBackdrop`); PAUSED and GAME_OVER are centered on the window, over the play area and the panel, and the window is dimmed first (`HudView.dim`, `systems/hud.md`). Layouts read the surface's size, so no layout number changes:
+Screens (stand-ins, centered across the surface they draw on, white default-font text on the background). From HUD-PANEL that surface is the whole 856 × 518 window for every screen: the menu, instructions and leaderboard fill it with the background and no panel or frame (`WindowBackdrop`); PAUSED and GAME_OVER are centered on the window, over the play area and the panel, and the window is dimmed first (`HudView.dim`, `systems/hud.md`). Layouts read the surface's size, so no layout number changes:
 ```
 MENU                          INSTRUCTIONS                          LEADERBOARD
                               HOW TO PLAY                           LEADERBOARD

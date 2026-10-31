@@ -4,7 +4,7 @@ Contracts reopened from frozen: `systems/hud.md` (version 7, rewritten for the p
 
 This feature ran in one main session, without Linear tasks, at the Director's request. There are no task files. The Director is the approval gate and the main session reviewed and tested it. It is `HUD-PANEL`, not a `DRA-` key, for that reason.
 
-What changes on purpose: the window grows from 640 × 480 to 896 × 518; the play area stays 640 × 480 at (16, 10); the text HUD becomes a panel; the menu, instructions and leaderboard fill the window; the pause box and game over center on the window and dim it. `core` doesn't change.
+What changes on purpose: the window grows from 640 × 480 to 856 × 518; the play area stays 640 × 480 at (16, 10); the text HUD becomes a panel; the menu, instructions and leaderboard fill the window; the pause box and game over center on the window and dim it. `core` doesn't change.
 
 ## Files that depend on the changed contracts
 

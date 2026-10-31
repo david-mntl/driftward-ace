@@ -9,12 +9,12 @@ Writes these files into game/assets/ (overwrites them):
   hud_radar.png   one strip, motion.sweep_frames cells: the sweep wedge, one full turn
   hud_ring.png    one strip, motion.ring_frames cells: the graze ring growing
   hud_scan.png    the scan line
-  hud_lamp.png    the last-life pillar lamp, lit
 
 Text is not baked: the game draws it at 1x from the fonts. Shapes are drawn at 4x and shrunk with
 smoothscale, because pygame.draw has no smooth edges. Colors, sizes and positions all come from
 hud.json; the game reads the same file, so run this again after changing a color or the position
-or size of a baked part. Needs pygame-ce only. Run from the repo root:
+or size of a baked part. Parts drawn from fixed shapes (wireframe, hearts, dial, footer) are laid
+out on the mock-up's grid and scaled by panel.scale; thin strokes stay 1 px. Needs pygame-ce only. Run from the repo root:
     python3 tools/art/hud_panel.py
 """
 
@@ -163,6 +163,8 @@ class Baker:
         self.c: dict[str, Color] = {k: rgb(v) for k, v in rules["palette"].items()}
         self.win = rules["window"]
         self.panel = rules["panel"]
+        self.k: float = rules["panel"]["scale"]
+        self.pillar: int = rules["frame"]["pillar_width"]
 
     # ----- frame -----
 
@@ -219,7 +221,7 @@ class Baker:
     def _corner_lights(self, big, fx: int, fy: int, fw: int, fh: int, spill: float) -> None:
         """Four lights in the ring's corners; the bottom left one takes the spill color."""
         c = self.c
-        r = self.r["frame"]["lamp_radius"] + 0.4
+        r = self.r["frame"]["light_radius"]
         for x, y, key, al in (
             (fx - 8, fy - 5, "frame_lights", 1),
             (fx + fw + 8, fy - 5, "frame_lights", 1),
@@ -229,7 +231,7 @@ class Baker:
             circle(big, (x, y), r, c[key], al)
 
     def _pillar(self, big, h: int, fr: dict) -> None:
-        """The pillar: seam, dashes, rivets, two caps and three lamps. The last lamp is dark here."""
+        """The pillar: seam, dashes, rivets, and two caps."""
         c = self.c
         cx = self.panel["x"] + fr["pillar_width"] / 2
         half = fr["pillar_width"] / 2
@@ -252,11 +254,6 @@ class Baker:
         ):
             poly(big, pts, c["frame_highlight"])
             poly(big, pts, c["frame_lights"], 0.5, 1)
-        lx, ly = fr["last_lamp"]
-        r = fr["lamp_radius"]
-        circle(big, (lx - 12, ly), r, c["ship_lines_light"])
-        circle(big, (lx - 6, ly - 12), r, c["lamp_off"])
-        circle(big, (lx, ly), r, c["lamp_off"])
 
     def sheen(self) -> pygame.Surface:
         """Two faint diagonal bands over the glass, the play area's size."""
@@ -279,7 +276,7 @@ class Baker:
     def bevel(self, dst, x, y, w, h) -> None:
         """A box with a cut top-right and bottom-left corner, edge line and a dark gradient fill."""
         c = self.c
-        cut = 10
+        cut = 10 * self.k
         outer = [(x, y), (x + w - cut, y), (x + w, y + cut), (x + w, y + h), (x + cut, y + h), (x, y + h - cut)]
         poly(dst, outer, lerp(c["panel_body"], c["ship_lines"], 0.6))
         inner = [(x + 1, y + 1), (x + w - cut, y + 1), (x + w - 1, y + cut), (x + w - 1, y + h - 1), (x + cut, y + h - 1), (x + 1, y + h - cut - 0.4)]
@@ -312,14 +309,14 @@ class Baker:
         for k in range(0, 360, 12):  # dashed ring
             a0, a1 = math.radians(k), math.radians(k + 5)
             line(content, (dcx + inner * math.cos(a0), dcy + inner * math.sin(a0)), (dcx + inner * math.cos(a1), dcy + inner * math.sin(a1)), ring2, 1.0, 1)
-        arm = gz["radius"] - 2
+        arm = gz["radius"] - 2 * self.k
         line(content, (dcx, dcy - arm), (dcx, dcy + arm), ring2, 1.0, 1)
         line(content, (dcx - arm, dcy), (dcx + arm, dcy), ring2, 1.0, 1)
         bx, bw = s["box"][0], s["box"][2]
-        foot_y = 461.5
-        circle(content, (bx + 4.5, foot_y), 4.5, c["ship_lines"])
-        circle(content, (bx + bw - 4.5, foot_y), 4.5, c["footer_dot"], 1.0, 1)
-        line(content, (bx + 19, foot_y), (bx + bw - 19, foot_y), c["line"], 1.0, 1)
+        foot_y, dot = 461.5 * self.k, 4.5 * self.k
+        circle(content, (bx + dot, foot_y), dot, c["footer_dot"], 1.0, 1)
+        circle(content, (bx + bw - dot, foot_y), dot, c["footer_dot"], 1.0, 1)
+        line(content, (bx + 19 * self.k, foot_y), (bx + bw - 19 * self.k, foot_y), c["line"], 1.0, 1)
         big.blit(content, (0, self.panel["content_y"] * SS))
         return shrink(big, pw, ph).convert()
 
@@ -328,11 +325,17 @@ class Baker:
     SC = 0.85
     """Scale of the wireframe against the HUD's 200 x 228 grid, from the mock-up."""
 
+    def stroke(self, width: float) -> float:
+        """A stroke of the mock-up's ``width`` on the wireframe grid, scaled, never under 1 px."""
+        return max(1.0, width * self.SC * self.k)
+
     def _sv(self, dx: float, sy: float) -> Point:
         return (100 + dx * 5, 22 + (sy - 16) * 4.6)
 
     def _v(self, p: Point) -> Point:
-        return (38 + p[0] * self.SC, 126 + p[1] * self.SC)
+        """A point of the mock-up's wireframe grid to panel space at this scale."""
+        x, y = 38 + p[0] * self.SC, 126 + p[1] * self.SC
+        return (self.pillar + (x - self.pillar) * self.k, y * self.k)
 
     def socket_centers(self) -> list[Point]:
         """Where the three heart sockets sit on the wireframe, panel space, from hud.json."""
@@ -343,7 +346,7 @@ class Baker:
         c, hr = self.c, self.r["hearts"]
         bx, by, bw, bh = hr["ship_box"]
         big = hires(bw, bh)
-        sc = self.SC
+        sc = self.SC * self.k
 
         def at(p: Point) -> Point:
             return (p[0] - bx, p[1] - by)
@@ -354,18 +357,18 @@ class Baker:
         outline = [sv(dx, sy) for dx, sy in right] + [sv(-dx, sy) for dx, sy in reversed(right[1:])]
         body = [v(p) for p in outline]
         poly(big, body, c["ship_lines"], 0.12)
-        poly(big, body, c["ship_lines_light"], 1.0, 1.3 * sc)
+        poly(big, body, c["ship_lines_light"], 1.0, self.stroke(1.3))
         for a, b in [((0, 19), (0, 50)), ((6, 37), (15.2, 43)), ((8.4, 33), (14, 40.5)), ((4.8, 44.6), (4.2, 48))]:
-            line(big, v(sv(*a)), v(sv(*b)), c["ship_lines"], 1.0, 1 * sc)
-            line(big, v(sv(-a[0], a[1])), v(sv(-b[0], b[1])), c["ship_lines"], 1.0, 1 * sc)
-        poly(big, [v(p) for p in ellipse_pts(*sv(0, 27.5), 7, 13)], c["plating"], 1.0, 1.2 * sc)
+            line(big, v(sv(*a)), v(sv(*b)), c["ship_lines"], 1.0, self.stroke(1))
+            line(big, v(sv(-a[0], a[1])), v(sv(-b[0], b[1])), c["ship_lines"], 1.0, self.stroke(1))
+        poly(big, [v(p) for p in ellipse_pts(*sv(0, 27.5), 7, 13)], c["plating"], 1.0, self.stroke(1.2))
         for jx, tipy, half in ((0, 60, 1.9), (-10.4, 57, 1.1), (10.4, 57, 1.1)):
             by_ = 50.6 if jx == 0 else 50.2
             poly(big, [v(sv(jx - half, by_)), v(sv(jx, tipy)), v(sv(jx + half, by_))], c["ship_lines_light"], 0.85)
         for cx, cy in self.socket_centers():
             ax, ay = cx - bx, cy - by
             circle(big, (ax, ay), 17 * sc, c["panel_body"])
-            circle(big, (ax, ay), 17 * sc, c["ship_lines"], 1.0, 1 * sc)
+            circle(big, (ax, ay), 17 * sc, c["ship_lines"], 1.0, self.stroke(1))
         return shrink(big, bw, bh)
 
     def hearts_picture(self) -> pygame.Surface:
@@ -383,7 +386,7 @@ class Baker:
         }
         big = hires(cw * len(HEART_CELLS), ch)
         hp = heart_pts()
-        sc = self.SC
+        sc = self.SC * self.k
         for i, name in enumerate(HEART_CELLS):
             color, alpha = looks[name]
             cx, cy = i * cw + cw / 2, ch / 2
@@ -433,16 +436,8 @@ class Baker:
         """The scan line: soft, 28 percent, the second line color."""
         w = self.r["motion"]["scan_w"]
         big = hires(w, 3)
-        line(big, (0, 1.5), (w, 1.5), self.c["ship_lines_light"], 0.28, 2 * self.SC)
+        line(big, (0, 1.5), (w, 1.5), self.c["ship_lines_light"], 0.28, self.stroke(2))
         return shrink(big, w, 3)
-
-    def lamp_picture(self) -> pygame.Surface:
-        """The lit last-life lamp."""
-        r = self.r["frame"]["lamp_radius"]
-        size = math.ceil(2 * r) + 2
-        big = hires(size, size)
-        circle(big, (size / 2, size / 2), r, self.c["last_life"])
-        return shrink(big, size, size)
 
 
 def main() -> None:
@@ -460,7 +455,6 @@ def main() -> None:
         "hud_radar.png": baker.radar_picture(),
         "hud_ring.png": baker.ring_picture(),
         "hud_scan.png": baker.scan_picture(),
-        "hud_lamp.png": baker.lamp_picture(),
     }
     ASSETS.mkdir(parents=True, exist_ok=True)
     for name, surface in pictures.items():

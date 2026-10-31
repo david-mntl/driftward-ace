@@ -39,7 +39,6 @@ PALETTE_KEYS: tuple[str, ...] = (
     "dim",
     "line",
     "tile_bg",
-    "lamp_off",
     "footer_dot",
 )
 """The palette's keys. Source: 12-art-and-audio.md, HUD colors."""
@@ -58,22 +57,25 @@ class WindowRules:
 
 @dataclass(frozen=True)
 class PanelRules:
-    """The side panel: left edge in the window, width, and the row where its space starts, px."""
+    """The side panel: left edge in the window, width, and the row where its space starts, px.
+
+    ``scale`` is the design's size against the mock-up. Only the art tool reads it.
+    """
 
     x: int
     width: int
     content_y: int
+    scale: float
 
 
 @dataclass(frozen=True)
 class FrameRules:
-    """The frame: pillar width, glass sheen on or off, the last-life lamp's center in window px."""
+    """The frame: pillar width, glass sheen on or off and its strips, corner light radius, px."""
 
     pillar_width: int
     sheen: bool
     sheen_rows: int
-    last_lamp: Point2
-    lamp_radius: float
+    light_radius: float
     spill: float
 
 
@@ -167,8 +169,6 @@ class MotionRules:
     beat_peak_at: float
     beat_end_at: float
     beat_steps: int
-    lamp_ticks: int
-    lamp_low: float
     break_ticks: int
     break_keys: tuple[BreakKey, ...]
     bump_ticks: int

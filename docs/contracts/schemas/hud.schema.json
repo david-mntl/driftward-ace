@@ -19,7 +19,7 @@
   ],
   "properties": {
     "palette": {
-      "description": "The HUD colors as #rrggbb, 18 of them. Meanings: 12-art-and-audio.md, HUD colors. The tool tools/art/hud_panel.py bakes them into the pictures; run it again after a change.",
+      "description": "The HUD colors as #rrggbb, 17 of them. Meanings: 12-art-and-audio.md, HUD colors. The tool tools/art/hud_panel.py bakes them into the pictures; run it again after a change.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -39,7 +39,6 @@
         "dim",
         "line",
         "tile_bg",
-        "lamp_off",
         "footer_dot"
       ],
       "properties": {
@@ -64,7 +63,7 @@
           "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "last_life": {
-          "description": "Warning: the last heart, the last lamp, high level.",
+          "description": "Warning: the last heart, high level.",
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$"
         },
@@ -123,11 +122,6 @@
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$"
         },
-        "lamp_off": {
-          "description": "An unlit pillar lamp.",
-          "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}$"
-        },
         "footer_dot": {
           "description": "The footer's empty dot outline.",
           "type": "string",
@@ -182,7 +176,8 @@
       "required": [
         "x",
         "width",
-        "content_y"
+        "content_y",
+        "scale"
       ],
       "properties": {
         "x": {
@@ -199,6 +194,12 @@
           "description": "Distance from the window's top to the panel space's row 0. All panel positions below add it. Centers the content in the taller window.",
           "type": "integer",
           "minimum": 0
+        },
+        "scale": {
+          "description": "Size of the panel's design against the mock-up, a multiple. Read by the art tool only: it scales the parts it draws from fixed shapes (wireframe, hearts, dial, footer). Every position and size in this file is already at this scale.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
         }
       }
     },
@@ -210,8 +211,7 @@
         "pillar_width",
         "sheen",
         "sheen_rows",
-        "last_lamp",
-        "lamp_radius",
+        "light_radius",
         "spill"
       ],
       "properties": {
@@ -221,7 +221,7 @@
           "minimum": 1
         },
         "sheen": {
-          "description": "Show the glass sheen over the play area.",
+          "description": "Show the glass sheen over the play area. Off by default: nothing is drawn over the play area.",
           "type": "boolean"
         },
         "sheen_rows": {
@@ -229,18 +229,8 @@
           "type": "integer",
           "minimum": 1
         },
-        "last_lamp": {
-          "description": "Centre of the pillar lamp that turns orange on the last life, window px.",
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
-          "items": {
-            "type": "integer",
-            "minimum": 0
-          }
-        },
-        "lamp_radius": {
-          "description": "Radius of the pillar lamps, px.",
+        "light_radius": {
+          "description": "Radius of the four corner lights of the frame, px.",
           "type": "number",
           "exclusiveMinimum": 0
         },
@@ -619,8 +609,6 @@
         "beat_peak_at",
         "beat_end_at",
         "beat_steps",
-        "lamp_ticks",
-        "lamp_low",
         "break_ticks",
         "break_keys",
         "bump_ticks",
@@ -694,17 +682,6 @@
           "description": "Pre-scaled sizes between normal and biggest.",
           "type": "integer",
           "minimum": 1
-        },
-        "lamp_ticks": {
-          "description": "One pulse of the last-life lamp.",
-          "type": "integer",
-          "minimum": 1
-        },
-        "lamp_low": {
-          "description": "Lamp brightness at the pulse's low, 0..1.",
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
         },
         "break_ticks": {
           "description": "Length of a heart's break.",

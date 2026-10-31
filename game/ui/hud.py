@@ -78,7 +78,6 @@ class HudArt:
     radar: tuple[pygame.Surface, ...]
     ring: tuple[pygame.Surface, ...]
     scan: pygame.Surface
-    lamp: pygame.Surface
     label_font: pygame.font.Font
     fonts: Mapping[str, pygame.font.Font]
     """Exo 2 Bold at the sizes of hud.json: `value`, `tile`, `graze` and `level`."""
@@ -147,18 +146,6 @@ def bump_scale_at(elapsed: int, motion: MotionRules) -> float:
     return motion.bump_scale - grow * (share - motion.bump_peak_at) / (1.0 - motion.bump_peak_at)
 
 
-def lamp_level_at(elapsed: int, motion: MotionRules) -> float:
-    """Return the last-life lamp's brightness, ``lamp_low``..1: bright, down to low halfway, bright
-
-    again.
-    """
-    share: float = (elapsed % motion.lamp_ticks) / motion.lamp_ticks
-    swing: float = 1.0 - motion.lamp_low
-    if share < 0.5:
-        return 1.0 - swing * 2.0 * share
-    return motion.lamp_low + swing * (2.0 * share - 1.0)
-
-
 def break_state_at(elapsed: int, motion: MotionRules) -> tuple[float, str] | None:
     """Return (brightness 0..1, look) of a heart's break ``elapsed`` ticks in, or None once it is
     over.
@@ -216,7 +203,6 @@ class HudView:
         self._bar: tuple[tuple[pygame.Rect, RGB], ...] = self._bar_cells()
         self._beat: tuple[pygame.Surface, ...] = self._beat_hearts()
         self._hearts: tuple[pygame.Surface, ...] = tuple(heart.copy() for heart in art.hearts)
-        self._lamp: pygame.Surface = art.lamp.copy()
         self._level_numbers: dict[int, pygame.Surface] = {}
         self._graze_numbers: dict[int, pygame.Surface] = {}
         self._best_numbers: dict[int, pygame.Surface] = {}
@@ -250,8 +236,6 @@ class HudView:
             window.blit(strip, position)
         for piece, position in self._sheen_pieces:
             window.blit(piece, position)
-        if run.lives == 1:
-            self._draw_lamp(window, tick)
 
     def dim(self, window: pygame.Surface) -> None:
         """Darken the whole window: black at ``window.dim_alpha``. Draw the box after it.
@@ -578,10 +562,3 @@ class HudView:
                 image = pygame.transform.smoothscale(image, (limit, height))
             self._graze_numbers[grazes] = image
         return self._graze_numbers[grazes]
-
-    def _draw_lamp(self, window: pygame.Surface, tick: int) -> None:
-        """Draw the pillar's last-life lamp, pulsing between ``lamp_low`` and full."""
-        motion: MotionRules = self._rules.motion
-        lamp: pygame.Surface = self._lamp
-        lamp.set_alpha(round(255 * lamp_level_at(tick, motion)))
-        window.blit(lamp, lamp.get_rect(center=self._rules.frame.last_lamp))

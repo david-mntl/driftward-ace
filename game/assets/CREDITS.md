@@ -16,7 +16,7 @@
 
 ## Side panel HUD
 
-- hud_frame.png, hud_sheen.png, hud_panel.png, hud_ship.png, hud_hearts.png, hud_radar.png, hud_ring.png, hud_scan.png and hud_lamp.png: the side panel's frame, panel, wireframe, hearts and motion frames. Drawn by tools/art/hud_panel.py (pygame-ce) from tuning/hud.json, after the Director's mock-up. Own work.
+- hud_frame.png, hud_sheen.png, hud_panel.png, hud_ship.png, hud_hearts.png, hud_radar.png, hud_ring.png and hud_scan.png: the side panel's frame, panel, wireframe, hearts and motion frames. Drawn by tools/art/hud_panel.py (pygame-ce) from tuning/hud.json, after the Director's mock-up. Own work.
 
 ## Fonts
 

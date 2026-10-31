@@ -66,7 +66,6 @@ _AT_LEAST_ONE: frozenset[str] = frozenset(
         "motion.scan_w",
         "motion.beat_ticks",
         "motion.beat_steps",
-        "motion.lamp_ticks",
         "motion.break_ticks",
         "motion.bump_ticks",
         "motion.ring_ticks",
@@ -84,7 +83,6 @@ _AT_LEAST_ONE: frozenset[str] = frozenset(
 _SHARES: frozenset[str] = frozenset(
     {
         "frame.spill",
-        "motion.lamp_low",
         "fonts.label_mix",
         "fonts.value_mix",
         "level.tier_mid_mix",
@@ -100,7 +98,9 @@ _SHARES_ABOVE_ZERO: frozenset[str] = frozenset(
 _AT_LEAST_ONE_FLOAT: frozenset[str] = frozenset({"motion.beat_scale", "motion.bump_scale"})
 """Float fields that must be 1 or more (a size multiple that only grows)."""
 
-_ABOVE_ZERO: frozenset[str] = frozenset({"frame.lamp_radius", "motion.ring_from", "motion.ring_to"})
+_ABOVE_ZERO: frozenset[str] = frozenset(
+    {"frame.light_radius", "panel.scale", "motion.ring_from", "motion.ring_to"}
+)
 """Float fields that must be above 0."""
 
 
@@ -253,12 +253,6 @@ def _check_geometry(name: str, rules: HudRules) -> None:
             f"{name}: panel.x + frame.pillar_width must reach past the play area "
             "and fit window.width"
         )
-    lamp_x, lamp_y = rules.frame.last_lamp
-    if (
-        window.field_x <= lamp_x < window.field_x + SCREEN_W
-        and window.field_y <= lamp_y < window.field_y + SCREEN_H
-    ):
-        raise ValueError(f"{name}: frame.last_lamp must lie outside the play area")
     score = rules.score
     if score.bar_w <= (score.bar_segments - 1) * score.bar_gap:
         raise ValueError(

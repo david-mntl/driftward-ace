@@ -57,7 +57,7 @@ def _drop(path: str) -> dict[str, object]:
 
 def test_the_shipped_file_loads() -> None:
     rules = load_hud_rules()
-    assert (rules.window.width, rules.window.height) == (896, 518)
+    assert (rules.window.width, rules.window.height) == (856, 518)
     assert (rules.window.field_x, rules.window.field_y) == (16, 10)
     assert rules.score.tile_count == 7
     assert rules.level.bars == 8
@@ -106,14 +106,14 @@ def test_invalid_json_names_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyP
     [
         ("window.width", 0),
         ("window.width", -5),
-        ("window.width", 896.5),
+        ("window.width", 856.5),
         ("window.width", True),
         ("window.dim_alpha", 256),
         ("panel.content_y", -1),
         ("frame.sheen", "yes"),
         ("frame.spill", 1.5),
-        ("frame.lamp_radius", 0),
-        ("frame.last_lamp", [1]),
+        ("frame.light_radius", 0),
+        ("panel.scale", 0),
         ("score.tile_count", 0),
         ("score.bar_segments", 0),
         ("score.best_separator", 5),
@@ -126,7 +126,6 @@ def test_invalid_json_names_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyP
         ("motion.beat_scale", 0.5),
         ("motion.beat_peak_at", 0),
         ("motion.beat_peak_at", 0.9),
-        ("motion.lamp_low", -0.1),
         ("motion.scan_from", 999),
         ("motion.break_keys", [[0, 1, "white"]]),
         ("motion.break_keys", [[0.1, 1, "white"], [1, 0.2, "plain"]]),
@@ -229,7 +228,6 @@ def test_a_missing_font_file_is_an_error(pygame_headless: None, rules: HudRules)
         ("window.field_y", 100),
         ("panel.width", 400),
         ("frame.pillar_width", 300),
-        ("frame.last_lamp", [300, 200]),
         ("score.bar_gap", 40),
     ],
 )

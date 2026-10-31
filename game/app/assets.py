@@ -72,7 +72,6 @@ def load_hud_art(rules: HudRules) -> HudArt:
     box = rules.hearts.ship_box
     wedge: int = 2 * rules.graze.wedge_radius + 2
     ring: int = 2 * math.ceil(motion.ring_radius * motion.ring_to) + 2
-    lamp: int = math.ceil(2 * rules.frame.lamp_radius) + 2
     art: HudArt = HudArt(
         frame=_load_sized("hud_frame.png", True, frame_size),
         sheen=_load_sized("hud_sheen.png", True, (SCREEN_W, SCREEN_H)),
@@ -84,7 +83,6 @@ def load_hud_art(rules: HudRules) -> HudArt:
         radar=_load_cells("hud_radar.png", wedge, wedge, motion.sweep_frames),
         ring=_load_cells("hud_ring.png", ring, ring, motion.ring_frames),
         scan=_load_wide("hud_scan.png", motion.scan_w),
-        lamp=_load_sized("hud_lamp.png", True, (lamp, lamp)),
         label_font=pygame.font.Font(ASSETS_DIR / rules.fonts.label_file, rules.fonts.label_size),
         fonts={
             "value": pygame.font.Font(ASSETS_DIR / rules.fonts.ui_file, rules.fonts.value_size),

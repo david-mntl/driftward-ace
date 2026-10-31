@@ -19,7 +19,6 @@ from ui.hud import (
     break_state_at,
     bump_scale_at,
     clamp_score,
-    lamp_level_at,
     lit_segments,
     tier_color_key,
 )
@@ -163,13 +162,6 @@ def test_the_graze_count_swells_once_then_rests(rules: HudRules) -> None:
     assert bump_scale_at(-1, motion) == 1.0
 
 
-def test_the_lamp_pulses_down_to_its_low_halfway(rules: HudRules) -> None:
-    motion = rules.motion
-    assert lamp_level_at(0, motion) == 1.0
-    assert lamp_level_at(motion.lamp_ticks // 2, motion) == pytest.approx(motion.lamp_low)
-    assert lamp_level_at(motion.lamp_ticks, motion) == 1.0
-
-
 def test_a_heart_break_runs_through_its_keys_then_ends(rules: HudRules) -> None:
     motion = rules.motion
     start = break_state_at(0, motion)
@@ -297,16 +289,14 @@ def test_no_life_left_shows_three_dim_hearts(
         assert not _near(pixel, rules.palette["last_life"], 60)
 
 
-def test_the_pillar_lamp_lights_only_on_the_last_life(
+def test_the_pillar_holds_no_lamp_on_any_life_count(
     view: HudView, window: pygame.Surface, rules: HudRules
 ) -> None:
-    lamp = rules.frame.last_lamp
-    _draw(view, window, FakeRun(lives=2))
-    assert not _near(window.get_at(lamp), rules.palette["last_life"], 60)
-    _draw(view, window, FakeRun(lives=1), tick=0)
-    assert _near(window.get_at(lamp), rules.palette["last_life"], 30)
-    _draw(view, window, FakeRun(lives=1), tick=rules.motion.lamp_ticks // 2)
-    assert not _near(window.get_at(lamp), rules.palette["last_life"], 30)
+    for lives in (3, 2, 1, 0):
+        _draw(view, window, FakeRun(lives=lives), tick=0)
+        for x in range(rules.panel.x, rules.panel.x + rules.frame.pillar_width):
+            for y in range(rules.window.height - 80, rules.window.height):
+                assert not _near(window.get_at((x, y)), rules.palette["last_life"], 60), lives
 
 
 # ----- level -----
@@ -547,10 +537,10 @@ def test_drawing_never_changes_the_loaded_pictures(
     rules: HudRules, art: HudArt, window: pygame.Surface
 ) -> None:
     before = [pygame.image.tobytes(heart, "RGBA") for heart in art.hearts]
-    alphas = [heart.get_alpha() for heart in art.hearts] + [art.lamp.get_alpha()]
+    alphas = [heart.get_alpha() for heart in art.hearts]
     view = HudView(rules, art)
     _draw(view, window, FakeRun(lives=3), tick=0)
     _draw(view, window, FakeRun(lives=1), tick=1)
     _draw(view, window, FakeRun(lives=0), tick=2)
     assert [pygame.image.tobytes(heart, "RGBA") for heart in art.hearts] == before
-    assert [heart.get_alpha() for heart in art.hearts] + [art.lamp.get_alpha()] == alphas
+    assert [heart.get_alpha() for heart in art.hearts] == alphas

@@ -6,12 +6,12 @@ Depends on: [04-ship.md](04-ship.md), [05-lives-and-damage.md](05-lives-and-dama
 The play area is a fixed 640×480 view, the glass of a cockpit window. It never follows the ship. The world scrolls down past it at a steady speed set by the level, so the ship feels like it flies forward. Distance counts that scroll, wherever the ship is on screen. The top line is a ceiling, the bottom edge is the floor, and the side walls are solid. The window is larger: a frame runs round the play area and a side panel sits to its right. Neither covers a pixel of it.
 
 ```
- window 896 × 518
+ window 856 × 518
  +------------------------------------------------------+ y=0
  | frame                                    |pillar|     |
  |  +-----------------------------+         |      |     |
  |  | play area 640 × 480         |         | side panel |
- |  |        hazards v            |         | 224 wide   |
+ |  |        hazards v            |         | 184 wide   |
  |  |- - - - - TOP LINE - - - - - |         |            |
  |  |             A  ship         |         |            |
  |  |#############################|         |            |
@@ -33,7 +33,7 @@ Walls, top line, floor and every wave coordinate count from the play area's own 
 | scroll_start_delay | 30 | ticks (0.5 s) after play starts | — | guess | Director |
 | distance_start | 0 | m, when play starts | — | locked | Director |
 | ship_start | (320, 240), at rest: the same point as `fall_respawn` ([05-lives-and-damage.md](05-lives-and-damage.md#values)) | screen x, y | — | guess | Director |
-| window_w | 896 | px | — | guess | Director |
+| window_w | 856 | px | — | guess | Director |
 | window_h | 518 | px | — | guess | Director |
 | play_area_x | 16. Distance from the window's left edge to the play area | px | — | guess | Director |
 | play_area_y | 10. Distance from the window's top edge to the play area | px | — | guess | Director |

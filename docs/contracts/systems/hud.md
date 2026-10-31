@@ -5,7 +5,7 @@ Features: DRA-13, DRA-23, DRA-61, DRA-76, DRA-117, DRA-125, DRA-126, HUD-PANEL
 Created by: architect
 
 ## Purpose
-Keep the run's numbers in view while the run is on screen: playing, the last life, paused and game over. From HUD-PANEL the HUD is a side panel in the ship's hull, to the right of the play area, inside a window of 896 × 518 px, with a cockpit window frame round the play area (`10-ui.md`, `hud_*`, `cockpit_frame`). The play area itself stays 640 × 480 and nothing of the HUD is ever drawn over it. The panel shows the score as 7 digit tiles with a 14 segment progress bar, the best score, the lives as hearts on a hull wireframe, the level as a number with climb bars, and the grazes on a radar dial. It moves in seven ways (`10-ui.md`, `hud_motion`). It only reads core state. It doesn't show on the menu, the instructions page or the leaderboard page.
+Keep the run's numbers in view while the run is on screen: playing, the last life, paused and game over. From HUD-PANEL the HUD is a side panel in the ship's hull, to the right of the play area, inside a window of 856 × 518 px, with a cockpit window frame round the play area (`10-ui.md`, `hud_*`, `cockpit_frame`). The play area itself stays 640 × 480 and nothing of the HUD is ever drawn over it. The panel shows the score as 7 digit tiles with a 14 segment progress bar, the best score, the lives as hearts on a hull wireframe, the level as a number with climb bars, and the grazes on a radar dial. It moves in six ways (`10-ui.md`, `hud_motion`). It only reads core state. It doesn't show on the menu, the instructions page or the leaderboard page.
 
 This contract also sets the score's text, `score_text`, which the game-over screen uses, and the digit grouping, `group_digits`, which the leaderboard page uses (`docs/contracts/systems/game-flow.md`, Presentation).
 
@@ -13,9 +13,9 @@ The text HUD of DRA-13 to DRA-126 (SCORE, BEST and GRAZE lines at the top left, 
 
 ## Diagram
 ```
- window 896 × 518 (x right, y down)
+ window 856 × 518 (x right, y down)
  +--------------------------------------------+------+----------------+
- | frame                                      |pillar| panel (224 wide)|
+ | frame                                      |pillar| panel (184 wide)|
  |   +------------------------------------+   |      |  SCORE tiles   |
  |   | play area 640 × 480 at (16, 10)    |   |      |  score bar     |
  |   | glass: nothing drawn over it       |   |      |  BEST          |
@@ -44,10 +44,10 @@ RGB = tuple[int, int, int]
 
 @dataclass(frozen=True)
 class HudRules:
-    palette: Mapping[str, RGB]   # the 18 keys of the schema's palette, as RGB
+    palette: Mapping[str, RGB]   # the 17 keys of the schema's palette, as RGB
     window: WindowRules          # width, height, field_x, field_y, dim_alpha
-    panel: PanelRules            # x, width, content_y
-    frame: FrameRules            # pillar and sheen: sheen on or off, the last-life lamp's centre
+    panel: PanelRules            # x, width, content_y, scale (read by the art tool only)
+    frame: FrameRules            # pillar and sheen: sheen on or off, the corner lights' radius
     score: ScoreRules            # tiles, score bar, labels, best, caps
     hearts: HeartRules           # the three slot centres in panel space, the image cell size
     level: LevelRules            # label, number anchor, bars, tier steps
@@ -70,7 +70,6 @@ class HudArt:
     radar: tuple[pygame.Surface, ...]    # hud_radar.png cells: the sweep wedge, one full turn
     ring: tuple[pygame.Surface, ...]     # hud_ring.png cells: the graze ring's growth
     scan: pygame.Surface         # hud_scan.png: the scan line
-    lamp: pygame.Surface         # hud_lamp.png: the last-life lamp, on
     label_font: pygame.font.Font # Share Tech Mono
     fonts: Mapping[str, pygame.font.Font]  # Exo 2 Bold at the schema's sizes: value, tile, graze, level
 
@@ -133,10 +132,10 @@ Pause and game over: the app calls `HudView.dim(window)` after the HUD, then dra
 
 ## Rules
 - The HUD shows in both modes, from the first frame of every run, through the last life, while paused and while the game-over screen shows. It never shows on the menu, the instructions page or the leaderboard page. Source: 10-ui.md, `window_screens`.
-- Nothing of the HUD covers a pixel of the play area. The one translucent layer over it is the glass sheen, a faint white band, off with `frame.sheen`. Source: 10-ui.md, rule 1; 03-world-and-camera.md, rule 10.
+- Nothing of the HUD covers a pixel of the play area. The only layer that could go over it is the glass sheen, a faint white band; it is off (`frame.sheen` false) and nothing draws over the play area. Source: 10-ui.md, rule 1; 03-world-and-camera.md, rule 10.
 - The debug overlay sits inside the play area, so the HUD and the overlay never overlap and the HUD takes no `below_overlay`. Source: 10-ui.md, rule 1.
 - The HUD only reads game state. It never changes it. It keeps only view state: the last lives, the last grazes and the start tick of each running motion. Source: 10-ui.md, rule 5.
-- **Motions** (all from `tuning/hud.json`, `motion`): the radar wedge turns once per `sweep_ticks`; the scan line falls once per `scan_ticks`; on the last life the last heart swells to `beat_scale` and back over `beat_ticks` and the lamp pulses to `lamp_low` over `lamp_ticks`; when `lives` drops, the heart that went plays its break (`break_keys`) over `break_ticks`, then stays dim; when `grazes` rises, the count swells to `bump_scale` over `bump_ticks` and a ring grows over `ring_ticks`. A rise in lives, or a fall in grazes, is a new run: all motions reset, none plays. The motions run on the `tick` the app passes, which stops while paused. Source: 10-ui.md, `hud_motion`.
+- **Motions** (all from `tuning/hud.json`, `motion`): the radar wedge turns once per `sweep_ticks`; the scan line falls once per `scan_ticks`; on the last life the last heart swells to `beat_scale` and back over `beat_ticks`; when `lives` drops, the heart that went plays its break (`break_keys`) over `break_ticks`, then stays dim; when `grazes` rises, the count swells to `bump_scale` over `bump_ticks` and a ring grows over `ring_ticks`. A rise in lives, or a fall in grazes, is a new run: all motions reset, none plays. The motions run on the `tick` the app passes, which stops while paused. Source: 10-ui.md, `hud_motion`.
 - Colors, sizes, positions, counts and timings all come from the tuning file. No value is written in code. The pictures `tools/art/hud_panel.py` bakes read the same file; changing a color or a position needs the tool run again for the baked parts. Source: 10-ui.md, rule 12.
 - The sheen is never blended as one play-area-sized picture: measured in the browser build, that one blit took the game from 59 to 32 frames a second. Source: 15-tech-constraints.md, rule 5.
 - Per frame the HUD makes no new surface, except the count's and the best's text when they change and the count's swell frames while it swells. Source: 10-ui.md, rule 11; 15-tech-constraints.md, rule 5.
@@ -151,7 +150,9 @@ Pause and game over: the app calls `HudView.dim(window)` after the HUD, then dra
 - **A class, not functions.** The motions need to remember the last lives and grazes. `HudView` holds that and nothing else. The old module-level `lru_cache` text surfaces went with the text HUD.
 - **View clock is a parameter.** The view never reads time. The app passes the same clock it gives the background, which stops while paused, so a paused panel is calm and a test can set any tick.
 - **All motion is frames made ahead of time.** The sweep, the ring and the heart's break are image cells or alpha blends of one image. The beat uses pre-scaled hearts. Only the count's swell scales text at run time, on a surface a few px wide.
-- **Panel content centered in a taller window.** The window is 38 px taller than the mock-up. Centering with `content_y` keeps every distance inside the panel as drawn, and moves nothing else.
+- **Panel content centered in a taller window.** The panel is drawn at 80% of the mock-up (`panel.scale`), so its content is 384 rows tall in a 518 px window. Centering with `content_y` (67) keeps every distance inside the panel in proportion and moves nothing else.
+- **80% size, 184 px panel.** The Director found the panel too big and too eye-catching. Every position, size and font size in `hud.json` is the mock-up's value scaled by 0.8 and rounded; the pillar stays 24 px and the frame keeps its size. The art tool draws the fixed shapes (wireframe, hearts, dial, footer) on the mock-up's grid and scales them by `panel.scale`; strokes never go under 1 px.
+- **No pillar lamps.** The Director removed the three lamps. The last life shows through the orange heart and its beat only.
 - **The play area is a subsurface.** Everything already drawn in play-area coordinates keeps working, so `SCREEN_W` and `SCREEN_H` stay as the play area for the 25 files that use them, and core is untouched.
 - **Rules and window numbers in the tuning file.** The window size is in `hud.json` with the panel, so the tool and the game read one home. The loader checks every baked image against it, so a mismatch fails at startup with the file named.
 - **Why `HUD-PANEL` is not a `DRA-` key.** The feature ran in one session without Linear tasks. Its impact is in `docs/contracts/HUD-PANEL/impact.md`.

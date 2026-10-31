@@ -182,10 +182,10 @@ The game checks every picture against these numbers at startup. A mismatch shows
 
 | Section | What it holds |
 |---|---|
-| `palette` | 18 colors as `#rrggbb`. Meanings are in `docs/design/gdd/12-art-and-audio.md`, HUD colors. |
+| `palette` | 17 colors as `#rrggbb`. Meanings are in `docs/design/gdd/12-art-and-audio.md`, HUD colors. |
 | `window` | Window size, where the play area sits, how dark the pause and game-over dim is (`dim_alpha`, 0 to 255). |
-| `panel` | Where the panel sits and how wide it is. `content_y` centers its content in the taller window. |
-| `frame` | The pillar's width, the glass sheen on or off and its strip height (`sheen_rows`: the game blends only the pixels that have sheen, in strips this tall; the full-size blit halved the browser's frame rate), the last-life lamp. |
+| `panel` | Where the panel sits and how wide it is. `content_y` centers its content in the taller window. `scale` is the design's size against the mock-up (0.8); only the art tool reads it, and every other number in the file is already at that scale. |
+| `frame` | The pillar's width, the glass sheen on or off and its strip height (`sheen_rows`: the game blends only the pixels that have sheen, in strips this tall; the full-size blit halved the browser's frame rate), the corner lights' size. |
 | `score` | The score box, the 7 tiles, the 14 segment bar, BEST. `best_separator` is the text between digit groups. |
 | `hearts` | Where the three hearts sit, and the wireframe's box. |
 | `level` | The level box, the number, the 8 climb bars, the levels where the number warms up (`tier_mid`, `tier_high`) and how far the middle tier goes toward the last-life color (`tier_mid_mix`). |
