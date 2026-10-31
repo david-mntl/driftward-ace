@@ -1,7 +1,7 @@
 # Game flow: menu, instructions, leaderboard, pause, game over and name entry
 Version: 2
-Status: frozen
-Features: DRA-125, DRA-126
+Status: draft
+Features: DRA-125, DRA-126, HUD-PANEL
 Created by: architect
 
 ## Purpose
@@ -93,7 +93,7 @@ run.held        as before     the arrows held now        same           held = t
 wait            frozen        frozen                     frozen         still waiting     still waiting          ends: thrust
 ```
 
-Screens (stand-ins, centered across the 640 × 480 canvas, white default-font text on the background):
+Screens (stand-ins, centered across the surface they draw on, white default-font text on the background). From HUD-PANEL that surface is the whole 896 × 518 window for every screen: the menu, instructions and leaderboard fill it with the background and no panel or frame (`WindowBackdrop`); PAUSED and GAME_OVER are centered on the window, over the play area and the panel, and the window is dimmed first (`HudView.dim`, `systems/hud.md`). Layouts read the surface's size, so no layout number changes:
 ```
 MENU                          INSTRUCTIONS                          LEADERBOARD
                               HOW TO PLAY                           LEADERBOARD
@@ -104,7 +104,7 @@ DRIFTWARD ACE                 [] FLY                                No scores ye
    Leaderboard
                               Press Enter or Space to go back.      Press Enter or Space to go back.
 
-PAUSED (over the frozen world, HUD on top)      GAME_OVER, no picker (over the frozen world, HUD on top)
+PAUSED (over the frozen world, panel and frame, dimmed)      GAME_OVER, no picker (same)
         +------------------+                            +------------------+
         |      PAUSE       |                            |    GAME OVER     |
         +------------------+                            |   SCORE 1 234    |
@@ -317,11 +317,11 @@ The app picks what to draw from `flow.screen` (`systems/app/frame-loop.md`, Draw
 
 | Core field | Shown as |
 |---|---|
-| `flow.screen` MENU, INSTRUCTIONS, LEADERBOARD | the background, then that page alone: `draw_menu`, `draw_instructions` or `draw_leaderboard`. No world, no HUD, no debug overlay. Source: scope report DRA-125, Values needed ("white text on the black background"); 02-game-flow.md, rules 2 to 4 |
+| `flow.screen` MENU, INSTRUCTIONS, LEADERBOARD | the background filling the whole window (`WindowBackdrop`), then that page alone, centered on the window: `draw_menu`, `draw_instructions` or `draw_leaderboard`. No world, no HUD, no debug overlay. Source: scope report DRA-125, Values needed ("white text on the black background"); 02-game-flow.md, rules 2 to 4 |
 | `flow.menu_selection` | which menu item has the marker. Source: 10-ui.md, menu_screen ("the selected one marked") |
-| `flow.screen` PLAYING | the world, the HUD on top (`systems/run.md`, Presentation), the burst during the last life |
-| `flow.screen` PAUSED | the world exactly as it was on the last tick played, then `draw_pause_box`, then the HUD on top. Source: 02-game-flow.md, rule 7; 10-ui.md, pause_box; scope report DRA-125, Values needed ("The HUD stays visible") |
-| `flow.screen` GAME_OVER | the frozen world, then `draw_game_over(surface, flow.game_over_message, picker_shown)`, `draw_final_score(surface, flow.run.score, picker_shown)`, `draw_name_picker(surface, flow.picker, flow.picking)` only when `flow.picker` is not None, and `draw_game_over_choices(surface, flow.game_over_selection, picker_shown, active=not flow.picking)`, then the HUD on top. `picker_shown` is `flow.picker is not None`. Source: 02-game-flow.md, rules 9 and 10; 10-ui.md, game_over_screen |
+| `flow.screen` PLAYING | the world in the play area, the panel and frame round it (`systems/hud.md`), the burst during the last life |
+| `flow.screen` PAUSED | the world exactly as it was on the last tick played, the panel and frame, the whole window dimmed (`HudView.dim`), then `draw_pause_box` centered on the window. Source: 02-game-flow.md, rule 7; 10-ui.md, pause_box; scope report DRA-125, Values needed ("The HUD stays visible") |
+| `flow.screen` GAME_OVER | the frozen world, the panel and frame, the whole window dimmed (`HudView.dim`), then, centered on the window, `draw_game_over(surface, flow.game_over_message, picker_shown)`, `draw_final_score(surface, flow.run.score, picker_shown)`, `draw_name_picker(surface, flow.picker, flow.picking)` only when `flow.picker` is not None, and `draw_game_over_choices(surface, flow.game_over_selection, picker_shown, active=not flow.picking)`, then the HUD on top. `picker_shown` is `flow.picker is not None`. Source: 02-game-flow.md, rules 9 and 10; 10-ui.md, game_over_screen |
 | `flow.run.score` | the game-over screen's score line: the final score, frozen since the last life (`systems/run.md`, Score) |
 | `flow.game_over_selection` | which of RETRY and MENU has the marker, once they take the keys. Source: 02-game-flow.md, game_over_choices |
 | `flow.game_over_message` (DRA-126) | the game-over screen's first line: `MESSAGE_TEXTS[message]`. Source: 10-ui.md, game_over_message (locked); 11-save-data.md, rule 10 |

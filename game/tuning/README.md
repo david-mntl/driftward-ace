@@ -161,3 +161,35 @@ Every field is optional. A field left out keeps its default from the Default col
 | `flame_ticks_per_frame` | `4` | 1 or more | Ticks each flame and streak flicker frame shows. 60 ticks = 1 second. Smaller flickers faster. |
 
 The sprites are `game/assets/sprites/ship.png` (3 lean frames), `ship_flame.png` (8 flame frames) and `ship_streaks.png` (4 air streak frames). `tools/art/ship_final.py` makes all three from the chosen pose. Run it from the repo root, then copy the PNGs from `staging/assets/sprites/` to `game/assets/sprites/`. How strong the lean is and how long the streaks are is fixed when the images are made: edit the constants at the top of that script.
+
+# hud.json
+
+The side panel and the cockpit frame: colors, sizes, positions, counts and timings. You edit it by hand. The game reads it once at startup, in both run modes. Every field is required.
+
+The loader is `game/app/hud_tuning.py`. The schema is `docs/contracts/schemas/hud.schema.json`, with every field described. These values change how the HUD looks and nothing else. They never change play.
+
+## What needs the tool
+
+Text, digit tiles, bars, the heart that is lit, the radar frame and the motions' timings are drawn from these values when the game starts, so a change shows after a reload. The panel, the frame, the wireframe, the hearts, the radar wedge and the ring are pictures made ahead of time. After changing a color in `palette`, or a size or position of a baked part (`window`, `panel`, `frame`, `score.box`, `level.box`, `hearts`, `graze`, the motion frame counts), run the tool from the repo root, then reload:
+
+```
+python3 tools/art/hud_panel.py
+```
+
+The game checks every picture against these numbers at startup. A mismatch shows the error screen with the file named.
+
+## Sections
+
+| Section | What it holds |
+|---|---|
+| `palette` | 16 colors as `#rrggbb`. Meanings are in `docs/design/gdd/12-art-and-audio.md`, HUD colors. |
+| `window` | Window size, where the play area sits, how dark the pause and game-over dim is (`dim_alpha`, 0 to 255). |
+| `panel` | Where the panel sits and how wide it is. `content_y` centers its content in the taller window. |
+| `frame` | The pillar's width, the glass sheen on or off, the last-life lamp. |
+| `score` | The score box, the 7 tiles, the 14 segment bar, BEST. `best_separator` is the text between digit groups. |
+| `hearts` | Where the three hearts sit, and the wireframe's box. |
+| `level` | The level box, the number, the 8 climb bars, the levels where the number warms up. |
+| `graze` | The dial's centre and radii, the label. |
+| `motion` | Every period in ticks (60 per second) and every scale. `break_keys` is the heart's break. |
+| `fonts` | The two font files, the sizes, the label spacing. |
+

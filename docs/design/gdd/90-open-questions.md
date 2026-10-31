@@ -11,7 +11,6 @@ None open.
 ## World and camera
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| WC-07 | Is the whole 640×480 window the play area, with HUD and warnings drawn on top? Or is part of it a HUD strip (top) or warning margins (sides)? If so, how big? | 03-world-and-camera.md, 10-ui.md | Walls, top line, wave coordinates, HUD | open |
 
 ## Ship
 | ID | Question | File | Blocks | Status |
@@ -25,7 +24,7 @@ None open.
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | LD-04 | Blink speed while invulnerable. | 05-lives-and-damage.md | UI | open |
-| LD-08 | Life-lost feedback look: flash color and length, how the HUD life breaks, particle count, how long burst and rebuild take (rebuild must end within 30 ticks). Add screen shake too? | 05-lives-and-damage.md, 10-ui.md | UI, art | open |
+| LD-08 | Life-lost feedback: flash color and length, particle count, how long burst and rebuild take (rebuild must end within 30 ticks). Add screen shake too? The HUD heart's break is set in 10-ui.md. | 05-lives-and-damage.md, 10-ui.md | UI, art |
 
 ## Scoring
 None open.
@@ -52,9 +51,8 @@ None open.
 ## UI
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| UI-01 | HUD text size, colors, margins and max score digits. The font is set (`ui_font`). | 10-ui.md | HUD | open |
 | UI-03 | Instructions page: exact text, the icon for each section, and layout. Content and font are set in 10-ui.md. | 10-ui.md | Instructions | open |
-| UI-04 | Look of the menu, leaderboard, pause box and game-over screen, letter picker included: layout and colors. Content and font are set in 10-ui.md. | 10-ui.md | Screens look | open |
+| UI-04 | Look of the text on the menu, leaderboard, pause box and game-over screen, letter picker included: layout and colors. Content and font are set in 10-ui.md; where each sits in the window is set too. | 10-ui.md | Screens look | open |
 
 ## Save data
 None open.

@@ -1,0 +1,196 @@
+{
+  "palette": {
+    "ship_lines": "#ff00ae",
+    "ship_lines_light": "#bd7cfe",
+    "plating": "#f7f7f7",
+    "hearts": "#f79afe",
+    "last_life": "#ff8a3d",
+    "score": "#b48cff",
+    "level": "#ffc800",
+    "graze": "#f89ffe",
+    "panel_body": "#0a1029",
+    "frame_metal": "#080f24",
+    "frame_highlight": "#080e23",
+    "frame_lights": "#3dfffc",
+    "fuchsia_spill": "#000000",
+    "dim": "#29346a",
+    "line": "#232c55",
+    "tile_bg": "#04061a"
+  },
+  "window": {
+    "width": 896,
+    "height": 518,
+    "field_x": 16,
+    "field_y": 10,
+    "dim_alpha": 110
+  },
+  "panel": {
+    "x": 672,
+    "width": 224,
+    "content_y": 19
+  },
+  "frame": {
+    "pillar_width": 24,
+    "sheen": true,
+    "last_lamp": [
+      690,
+      478
+    ],
+    "lamp_radius": 2.6,
+    "spill": 0.5
+  },
+  "score": {
+    "box": [
+      34,
+      12,
+      178,
+      106
+    ],
+    "label_x": 46,
+    "label_y": 27,
+    "tile_count": 7,
+    "tile_x": 50,
+    "tile_y": 41,
+    "tile_w": 19,
+    "tile_h": 31,
+    "tile_pitch": 21,
+    "tile_top": 2,
+    "bar_x": 46,
+    "bar_y": 81,
+    "bar_w": 154,
+    "bar_h": 6,
+    "bar_segments": 14,
+    "bar_gap": 2,
+    "bar_step": 10000,
+    "best_label_x": 46,
+    "best_y": 102,
+    "best_right": 200,
+    "best_separator": ","
+  },
+  "hearts": {
+    "slots": [
+      [
+        123,
+        227
+      ],
+      [
+        172,
+        231
+      ],
+      [
+        74,
+        231
+      ]
+    ],
+    "cell_w": 30,
+    "cell_h": 28,
+    "ship_box": [
+      36,
+      136,
+      174,
+      190
+    ]
+  },
+  "level": {
+    "box": [
+      34,
+      328,
+      82,
+      94
+    ],
+    "label_x": 42,
+    "label_y": 343,
+    "number_x": 42,
+    "number_y": 395,
+    "bars": 8,
+    "bar_w": 3,
+    "bar_pitch": 4,
+    "bar_base_h": 5,
+    "bar_step_h": 4,
+    "bars_right": 107,
+    "bars_bottom": 412,
+    "tier_mid": 4,
+    "tier_high": 7
+  },
+  "graze": {
+    "center": [
+      168,
+      372
+    ],
+    "radius": 40,
+    "inner_radius": 26,
+    "wedge_radius": 39,
+    "count_limit": 60,
+    "label_x": 168,
+    "label_y": 428
+  },
+  "motion": {
+    "sweep_ticks": 300,
+    "sweep_frames": 36,
+    "scan_ticks": 270,
+    "scan_x": 50,
+    "scan_w": 146,
+    "scan_from": 131,
+    "scan_to": 303,
+    "beat_ticks": 54,
+    "beat_scale": 1.2,
+    "beat_peak_at": 0.3,
+    "beat_end_at": 0.6,
+    "beat_steps": 8,
+    "lamp_ticks": 60,
+    "lamp_low": 0.4,
+    "break_ticks": 54,
+    "break_keys": [
+      [
+        0,
+        1,
+        "white"
+      ],
+      [
+        0.12,
+        0.15,
+        "white"
+      ],
+      [
+        0.24,
+        1,
+        "hue"
+      ],
+      [
+        0.38,
+        0.1,
+        "hue"
+      ],
+      [
+        0.52,
+        0.8,
+        "hue"
+      ],
+      [
+        1,
+        0.16,
+        "plain"
+      ]
+    ],
+    "bump_ticks": 18,
+    "bump_scale": 1.2,
+    "bump_peak_at": 0.4,
+    "ring_ticks": 30,
+    "ring_frames": 10,
+    "ring_from": 0.6,
+    "ring_to": 2.6,
+    "ring_radius": 15
+  },
+  "fonts": {
+    "ui_file": "fonts/Exo2-Bold.ttf",
+    "label_file": "fonts/ShareTechMono.ttf",
+    "label_size": 10,
+    "value_size": 12,
+    "tile_size": 20,
+    "graze_size": 28,
+    "level_size": 36,
+    "label_spacing": 2,
+    "label_mix": 0.5,
+    "value_mix": 0.78
+  }
+}

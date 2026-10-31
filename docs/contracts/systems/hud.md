@@ -1,222 +1,153 @@
 # HUD
 Version: 7
-Status: frozen
-Features: DRA-13, DRA-23, DRA-61, DRA-76, DRA-117, DRA-125, DRA-126
+Status: draft
+Features: DRA-13, DRA-23, DRA-61, DRA-76, DRA-117, DRA-125, DRA-126, HUD-PANEL
 Created by: architect
 
 ## Purpose
-Keep the run's numbers in view while the run is on screen: playing, the last life, paused and game over. The HUD shows the score at the top left, on HUD line 1, as `SCORE 1 234`, the best score next to it on line 1 as `BEST 2 345`, the graze count below the score, on HUD line 2 at the left margin, as `GRAZE 5`, and the lives left as white hearts at the top right. BEST is the #1 score on the top 10; it is hidden while the list is empty or saves don't work. LV comes in a later feature, on line 2 too, and pushes GRAZE to the right then. The HUD only reads core state. It doesn't show on the menu, the instructions page or the leaderboard page.
+Keep the run's numbers in view while the run is on screen: playing, the last life, paused and game over. From HUD-PANEL the HUD is a side panel in the ship's hull, to the right of the play area, inside a window of 896 × 518 px, with a cockpit window frame round the play area (`10-ui.md`, `hud_*`, `cockpit_frame`). The play area itself stays 640 × 480 and nothing of the HUD is ever drawn over it. The panel shows the score as 7 digit tiles with a 14 segment progress bar, the best score, the lives as hearts on a hull wireframe, the level as a number with climb bars, and the grazes on a radar dial. It moves in seven ways (`10-ui.md`, `hud_motion`). It only reads core state. It doesn't show on the menu, the instructions page or the leaderboard page.
 
-In debug mode the HUD's lines sit below the debug overlay's text, so the two never overlap. The hearts are at the top right, away from the overlay, and don't move.
+This contract also sets the score's text, `score_text`, which the game-over screen uses, and the digit grouping, `group_digits`, which the leaderboard page uses (`docs/contracts/systems/game-flow.md`, Presentation).
 
-This contract also sets the score's text, `score_text`, which the game-over screen uses too, and the digit grouping, `group_digits`, which the leaderboard page uses (`docs/contracts/systems/game-flow.md`, Presentation).
+The text HUD of DRA-13 to DRA-126 (SCORE, BEST and GRAZE lines at the top left, hearts at the top right, `below_overlay`) is replaced. Its constants (`HUD_COLOR`, `HUD_FONT_SIZE`, `HUD_MARGIN`, `HUD_LINE_SPACING`, `HUD_TOP`, `HUD_OVERLAY_GAP`, `HUD_BEST_X`, `HEART_*`) are removed. Every value now comes from `game/tuning/hud.json`.
 
 ## Diagram
-Normal mode:
 ```
- x=4                                        x=544   576   608  632
-  +----------------------------------------------------------------+  y=0
-  | SCORE 1 234             BEST 2 345          [♥]   [♥]   [♥]    |  y=4 HUD_TOP, line 1; BEST at x=HUD_BEST_X (DRA-126); hearts y=8 to 31
-  | GRAZE 5                                                        |  y=24  HUD_TOP + HUD_LINE_SPACING, line 2
-  |                                                                |
-```
-Hearts, each `HEART_SIZE` (24) square, `HEART_GAP` (8) apart, `HEART_MARGIN` (8) from the top and right edges. Slot 0 is the rightmost. A lost life empties the leftmost filled slot:
-```
-lives 3:   [♥]   [♥]   [♥]     slots 2, 1, 0 filled
-lives 2:         [♥]   [♥]     slots 1, 0
-lives 1:               [♥]     slot 0
-lives 0:                       none (game over)
-```
-Debug mode, overlay shown or hidden by F3:
-```
-  +----------------------------------------------------------------+  y=0
-  | x 320.00                                    [♥]   [♥]   [♥]    |  y=4   overlay line 1
-  | y 240.00                                                       |
-  | vx 0.00                                                        |
-  | vy 0.00                                                        |  overlay line 4
-  | wave l1_a                                                      |  overlay line 5 (DRA-76)
-  | level 1                                                        |  overlay line 6 (DRA-76)
-  |                                                                |  overlay_text_bottom()
-  | SCORE 1 234                                                    |  hud top = overlay_text_bottom() + HUD_OVERLAY_GAP
-  | GRAZE 5                                                        |  hud top + HUD_LINE_SPACING
-  |- - - - - - - - - - - - - - TOP LINE - - - - - - - - - - - - - -|  y=168
+ window 896 × 518 (x right, y down)
+ +--------------------------------------------+------+----------------+
+ | frame                                      |pillar| panel (224 wide)|
+ |   +------------------------------------+   |      |  SCORE tiles   |
+ |   | play area 640 × 480 at (16, 10)    |   |      |  score bar     |
+ |   | glass: nothing drawn over it       |   |      |  BEST          |
+ |   | (the sheen is the one translucent  |   |      |  hull wireframe|
+ |   |  layer, see Rules)                 |   |      |  + 3 hearts    |
+ |   +------------------------------------+   |      |  LEVEL | GRAZE |
+ | frame                                      |      |  footer line   |
+ +--------------------------------------------+------+----------------+
 ```
 ```mermaid
 flowchart LR
-  APP["app.frame<br/>below_overlay = debug mode<br/>best = flow.best (DRA-126)"] --> H["ui.hud.draw_hud"]
-  R["core.run.Run<br/>score, grazes, lives"] --> H
-  H --> T["ui.score_text.score_text<br/>ui.score_text.graze_text"]
-  O["ui.debug_overlay<br/>overlay_text_bottom()"] -. "only when below_overlay" .-> H
+  T["tuning/hud.json"] --> L["app.hud_tuning<br/>load_hud_rules"]
+  L --> R["ui.hud_rules<br/>HudRules"]
+  A["assets/hud_*.png, fonts"] --> LA["app.assets<br/>load_hud_art"]
+  R --> V["ui.hud<br/>HudView"]
+  LA --> V
+  RUN["core.run.Run"] --> V
+  V --> W["window surface"]
+  X["tools/art/hud_panel.py"] -. "bakes the PNGs from hud.json" .-> A
 ```
 
 ## Interface
 ```python
-# game/ui/score_text.py (DRA-61)
-# Imports: stdlib only (logging). Never pygame, core or app.
-SCORE_LABEL: str = "SCORE"   # scope report DRA-61, Limits (format); the label from the 10-ui.md mockup
-DIGIT_GROUP: int = 3         # scope report DRA-61, Limits: digits in groups of three
-GROUP_SEPARATOR: str = " "   # scope report DRA-61, Limits: split by a single space (Director: "Space: 1 234 567")
+# game/ui/hud_rules.py. Imports: stdlib only. Frozen records that mirror docs/contracts/schemas/hud.schema.json.
+RGB = tuple[int, int, int]
 
-def score_text(score: int) -> str: ...
-    # The text shown for a score. score is a whole number >= 0, from core; trusted, not checked.
-```
-
-```python
-# game/ui/hud.py
-# Imports: pygame, core.run, ui.debug_overlay, ui.score_text (DRA-61). Never app. Never reads the run mode.
-HUD_COLOR: tuple[int, int, int] = (255, 255, 255)   # scope report DRA-13, HUD text (temporary stand-in); kept by DRA-61
-HUD_FONT_SIZE: int = 16                             # scope report DRA-13, HUD text: default font, 16 px; kept by DRA-61
-HUD_MARGIN: int = 4                                 # scope report DRA-13, HUD left margin
-HUD_LINE_SPACING: int = 20                          # scope report DRA-13, HUD line spacing (16 px font + 4 px)
-HUD_TOP: int = 4                                    # scope report DRA-13, normal mode: first line at y 4
-HUD_OVERLAY_GAP: int = 4                            # scope report DRA-13, debug mode: 4 px below the overlay's last text line
-HEART_COLOR: tuple[int, int, int] = (255, 255, 255) # scope report DRA-23, hearts: white (temporary stand-in)
-HEART_SIZE: int = 24                                # scope report DRA-23, hearts: 24 × 24 px each
-HEART_GAP: int = 8                                  # scope report DRA-23, hearts: 8 px apart
-HEART_MARGIN: int = 8                               # scope report DRA-23, hearts: 8 px from the top and right edges
-
-def draw_hud(surface: pygame.Surface, run: Run, below_overlay: bool) -> None: ...   # unchanged signature
-```
-
-DRA-117 adds, nothing else changes in either module (existing signatures are read from the code):
-```python
-# game/ui/score_text.py
-GRAZE_LABEL: str  # scope report DRA-117, Limits ("GRAZE <n>"); the label from the 10-ui.md mockup
-
-def graze_text(grazes: int) -> str: ...
-    # The text shown for a graze count. grazes is a whole number >= 0, from core; trusted, not checked.
+@dataclass(frozen=True)
+class HudRules:
+    palette: Mapping[str, RGB]   # the 16 keys of the schema's palette, as RGB
+    window: WindowRules          # width, height, field_x, field_y, dim_alpha
+    panel: PanelRules            # x, width, content_y
+    frame: FrameRules            # pillar and sheen: sheen on or off, the last-life lamp's centre
+    score: ScoreRules            # tiles, score bar, labels, best, caps
+    hearts: HeartRules           # the three slot centres in panel space, the image cell size
+    level: LevelRules            # label, number anchor, bars, tier steps
+    graze: DialRules             # centre, radius, number size, label anchor, count limit
+    motion: MotionRules          # every period in ticks and every scale, the break keys
+    fonts: FontRules             # the two font files, the sizes, label letter spacing, text mixes
 ```
 ```python
-# game/ui/hud.py
-# draw_hud keeps its signature and also draws the GRAZE line from run.grazes.
-```
+# game/ui/hud.py. Imports: pygame, core.run, ui.hud_rules. Never app. Never reads the run mode.
+@dataclass(frozen=True)
+class HudArt:
+    frame: pygame.Surface        # hud_frame.png: frame body and pillar, glass and panel transparent
+    sheen: pygame.Surface        # hud_sheen.png: the glass sheen, play-area sized
+    panel: pygame.Surface        # hud_panel.png: panel background with boxes, tile backs, dial rings, footer
+    ship: pygame.Surface         # hud_ship.png: the wireframe with empty heart sockets
+    hearts: tuple[pygame.Surface, ...]   # hud_hearts.png cells: lit, dim, last, break_white, break_hue
+    radar: tuple[pygame.Surface, ...]    # hud_radar.png cells: the sweep wedge, one full turn
+    ring: tuple[pygame.Surface, ...]     # hud_ring.png cells: the graze ring's growth
+    scan: pygame.Surface         # hud_scan.png: the scan line
+    lamp: pygame.Surface         # hud_lamp.png: the last-life lamp, on
+    label_font: pygame.font.Font # Share Tech Mono
+    fonts: Mapping[str, pygame.font.Font]  # Exo 2 Bold at the schema's sizes: value, tile, graze, level
 
-DRA-126 adds and changes (existing signatures are read from the code):
+class HudView:
+    def __init__(self, rules: HudRules, art: HudArt) -> None: ...
+        # Builds once: the panel composite (panel, wireframe, static labels), 20 digit images (10 lit,
+        # 10 dim), the pre-scaled last-life hearts, the dim layer, the frame's strips.
+    def draw(self, window: pygame.Surface, run: Run, best: int | None, tick: int) -> None: ...
+        # Draws the panel, the frame and the sheen on `window`. `tick` is the view clock (ticks, int).
+        # Never touches the play area except for the sheen. Keeps the last lives and grazes to start the motions.
+    def dim(self, window: pygame.Surface) -> None: ...
+        # Black at window.dim_alpha over the whole window. Called before the pause box and the game-over screen.
+
+def clamp_score(score: int, digits: int) -> int: ...   # min(score, 10**digits - 1). Pure.
+def lit_segments(score: int, best: int | None, segments: int, step: int) -> int: ...   # the score bar. Pure.
+def tier_color_key(level: int, tier_mid: int, tier_high: int) -> str: ...   # "level", "mid" or "last_life". Pure.
+```
 ```python
-# game/ui/score_text.py
-BEST_LABEL: Final[str]   # scope report DRA-126, Values needed (BEST: `BEST 1 234`)
-
-def group_digits(number: int) -> str: ...
-    # new, public: the decimal digits of number in groups of DIGIT_GROUP from the right, joined by
-    # GROUP_SEPARATOR. The grouping score_text and graze_text already use, now with one public home.
-    # number is a whole number >= 0, trusted. Pure.
-def best_text(best: int) -> str: ...
-    # BEST_LABEL, one GROUP_SEPARATOR, then group_digits(best). Pure.
+# game/ui/window_view.py. Imports: pygame, core.world, ui.background_view.
+class WindowBackdrop:
+    def __init__(self, window_size: tuple[int, int]) -> None: ...
+    def draw(self, window: pygame.Surface, art: BackgroundArt, ticks: float) -> None: ...
+        # The full-window background for the menu, the instructions and the leaderboard: the
+        # background drawn at play-area size, scaled up to cover the window, bottom-aligned.
 ```
 ```python
-# game/ui/hud.py
-HUD_BEST_X: Final[int]   # scope report DRA-126, Values needed (BEST: fixed x on HUD line 1)
-
-def draw_hud(surface: pygame.Surface, run: Run, below_overlay: bool, best: int | None = None) -> None: ...
-    # changed: also draws BEST when best is not None. draw_hud(surface, run, below_overlay) draws
-    # exactly what it drew before.
+# game/app/hud_tuning.py. Not a startup module (imports ui); only app.frame imports it, inside the guard.
+def load_hud_rules() -> HudRules: ...
+    # Reads tuning/hud.json, checks every rule of hud.schema.json by hand. Missing file: FileNotFoundError.
+    # Bad file: ValueError naming the file and the field. Every field is required: no defaults in code.
+# game/app/assets.py
+def load_hud_art(rules: HudRules) -> HudArt: ...
+    # Reads the hud_*.png files and the two fonts. A missing file raises FileNotFoundError. An image whose
+    # size doesn't match the rules (window, panel, cells) raises ValueError naming the file.
 ```
-The app passes `best=flow.best` (`docs/contracts/systems/game-flow.md`, Interface; `systems/app/frame-loop.md`, Draw).
-
-```python
-# game/ui/debug_overlay.py. Set in docs/contracts/systems/debug-overlay.md.
-def overlay_text_bottom() -> int: ...
-    # The first screen row below every pixel the overlay's text lines can cover: six lines from
-    # DRA-76 (OVERLAY_TEXT_LINES). Needs pygame.font initialized. Uses the overlay's cached font.
-```
+The app opens the window from the rules: `pygame.display.set_mode((rules.window.width, rules.window.height))`, keeps the play area as `window.subsurface(Rect(field_x, field_y, SCREEN_W, SCREEN_H))` and draws the world on it. `core.world.SCREEN_W` and `SCREEN_H` don't change.
 
 ## Presentation
-`draw_hud` reads only these core fields. It draws on top of everything else in the frame.
+`HudView.draw` reads only: `run.score`, `run.lives`, `run.grazes`, `run.level`, and `best` (a parameter, from the saves). Positions are in panel space (origin at the panel's top-left, `content_y` below the window's top) and live in the tuning file.
 
-| Core field | Shown as |
-|---|---|
-| `run.score` | HUD line 1: `score_text(run.score)`, e.g. `SCORE 0`, `SCORE 999`, `SCORE 1 234`, `SCORE 1 234 567`. Top-left corner at (`HUD_MARGIN`, `hud_top`): (4, 4) in normal mode. Source: scope report DRA-61, Limits (SCORE on line 1, format, look); 10-ui.md, hud_score (top left, locked), rule 2 |
-| `run.grazes` | HUD line 2 (DRA-117): `graze_text(run.grazes)`, e.g. `GRAZE 0`, `GRAZE 5`, `GRAZE 1 234`. Top-left corner at (`HUD_MARGIN`, `hud_top + HUD_LINE_SPACING`): (4, 24) in normal mode. Source: 10-ui.md, hud_level_grazes (below the score, locked), rule 2; 06-scoring.md, rule 8; scope report DRA-117, Limits (left margin of line 2, digits grouped like SCORE, SCORE's stand-in look) |
-| `flow.best`, as `best` (DRA-126) | HUD line 1: `best_text(best)`, e.g. `BEST 0`, `BEST 1 234`, with its top-left corner at (`HUD_BEST_X`, `hud_top`). Nothing when `best` is None: the top 10 is empty or saves don't work. Source: 10-ui.md, hud_best (locked) and rule 2; 11-save-data.md, rule 3; scope report DRA-126, Values needed (BEST) and Objection 1 |
-| `run.lives` | that many white hearts at the top right, one per slot, filling slots 0 to `lives - 1`. Slot `i` has its 24 × 24 box's top-left corner at (`width - HEART_MARGIN - HEART_SIZE - i * (HEART_SIZE + HEART_GAP)`, `HEART_MARGIN`), with `width` from `surface.get_width()`: (608, 8), (576, 8) and (544, 8) on the 640-px screen. Source: scope report DRA-23, Values needed (hearts, temporary stand-in approved by the Director, not in the GDD; UI-01 and UI-02 are TBD); 10-ui.md, hud_lives (top right, locked) |
+| Part | What is drawn | Cached or drawn |
+|---|---|---|
+| Panel background | gradient, score box, level box, tile backs, dial rings and cross, footer | once, `hud_panel.png` |
+| Wireframe | the ship's hull outline with three empty sockets | once, `hud_ship.png` |
+| Labels SCORE, LEVEL, GRAZE | Share Tech Mono, letter-spaced, at the label mix of panel body and plating | once, on the panel composite |
+| Score tiles | 7 digit images, one per tile, leading zeros in the dim image. Tile top bar: score color, dim for leading zeros | 10 lit and 10 dim digit images made once; per frame 7 blits and 7 rect fills |
+| Score bar | 14 segments, lit ones on a ramp from `ship_lines` to `score`, the rest `dim` | rect fills per frame |
+| BEST | label and the grouped number (comma), right-aligned, only when `best` is not None | the number is rendered again only when `best` changes |
+| Hearts | slots center, right, left: slot `i` lit while `i < lives`. Lit: the lit image; lost: dim; last life (`lives == 1`) the lit slot uses the last image | blits |
+| Scan line | `scan` at a y that falls from `y0` to `y1` once per `scan_ticks` | one blit |
+| Level | the number in the tier color, the bars: lit up to the level, ramp `level` to `last_life`; bars past `level` are `dim` | number cached by level; rect fills |
+| Radar | frame `(tick % sweep_ticks) * frames // sweep_ticks` of the wedge | one blit |
+| Graze count | cached by value, centered in the dial, shrunk to fit `count_limit` | rendered again only when the count changes |
+| Frame | the strips of `hud_frame.png` round the play area and at the pillar, then the sheen over the play area when `frame.sheen` is on | blits |
+| Motions | see Rules | frames made ahead of time |
 
-`score_text(score)`:
-- `SCORE_LABEL`, one `GROUP_SEPARATOR` space, then the score's decimal digits. No leading zeros: 0 is the single digit `0`.
-- The digits are split into groups of `DIGIT_GROUP` (3) counted from the right, the groups joined by `GROUP_SEPARATOR`, a single space. The leftmost group has 1 to 3 digits. So `SCORE 0`, `SCORE 999`, `SCORE 1 000`, `SCORE 1 234`, `SCORE 1 000 007`, `SCORE 1 234 567`.
-- No digit limit: every whole number gets all its digits. Source: scope report DRA-61, Limits (format; "No digit limit") and Decision log (Director: "score should be able to be infinite").
-- Pure: no pygame, logs nothing (the module still has its `log`, game/CONTEXT.md, Logging), same number in, same text out.
+States: lives 3, 2 and 1 show 3, 2 and 1 lit hearts, the last one orange; lives 0 (game over) shows none lit; a level or graze count past the limits is clamped as the GDD says.
 
-`graze_text(grazes)` (DRA-117):
-- `GRAZE_LABEL`, one `GROUP_SEPARATOR` space, then the count's decimal digits, grouped exactly as `score_text` groups the score: `GRAZE 0`, `GRAZE 5`, `GRAZE 999`, `GRAZE 1 000`, `GRAZE 1 234`. No leading zeros, no digit limit. The grouping has one home in the module, shared by both functions. Source: scope report DRA-117, Limits ("`GRAZE <n>`, digits grouped like SCORE (`GRAZE 1 234`)"); 06-scoring.md, graze_cap (no limit).
-- Pure, like `score_text`.
-
-`group_digits(number)` and `best_text(best)` (DRA-126):
-- `group_digits` is that one home, made public: `group_digits(0)` is `0`, `group_digits(1234)` is `1 234`, `group_digits(1000007)` is `1 000 007`. `score_text`, `graze_text` and `best_text` are each their label, one `GROUP_SEPARATOR`, then `group_digits`. So a change to the grouping changes all four places the numbers show: SCORE, GRAZE, BEST and the leaderboard's score. Source: scope report DRA-126, Values needed (BEST and the leaderboard's score, "digits grouped like SCORE").
-- `best_text`: `BEST 0`, `BEST 999`, `BEST 1 234`. No digit limit. Pure.
-
-BEST line (DRA-126):
-- `best_text(best)` with its top-left corner at (`HUD_BEST_X`, `hud_top`), with `hud_top` as for the SCORE line, so it moves with SCORE in debug mode and never overlaps the overlay. Source: scope report DRA-126, Values needed (BEST: "on HUD line 1 at a fixed x").
-- SCORE's look: the same font, size, antialiasing and `HUD_COLOR`. A stand-in until UI-01. Source: same ("SCORE's look").
-- Drawn only when `best` is not None. It shows from the first frame of a run once the list has an entry, through the last life, the pause and the game-over screen, and it changes only when the app passes another value: when an entry is saved at #1. Source: 10-ui.md, hud_best and rule 2; 11-save-data.md, rule 3.
-- It stays at `HUD_BEST_X` however long SCORE grows. A SCORE text reaching `HUD_BEST_X` overlaps it; no run gets near that, and the overlap edge case stays with UI-01 (10-ui.md, Edge cases).
-- The rendered BEST text is built again only when `best` differs from the one it was last rendered for. Source: 15-tech-constraints.md, rule 5.
-
-SCORE line:
-- `hud_top` is `HUD_TOP` (4) when `below_overlay` is False. Source: scope report DRA-13, HUD layout (normal mode).
-- `hud_top` is `overlay_text_bottom() + HUD_OVERLAY_GAP` when `below_overlay` is True. Source: scope report DRA-13, HUD layout (debug mode).
-- HUD line 1, at `hud_top`, holds the SCORE text. Source: scope report DRA-61, Limits; 10-ui.md, rule 2.
-- HUD line 2, at `hud_top + HUD_LINE_SPACING`, holds the GRAZE line (DRA-117, below). The meters readout (`312 m`) is gone. Source: scope report DRA-61, Limits ("The meters readout ... is removed"); 10-ui.md, hud_level_grazes.
-- Text in the default font at 16 px (`pygame.font.Font(None, HUD_FONT_SIZE)`), antialiased, in `HUD_COLOR`, (255, 255, 255). Source: scope report DRA-13, HUD text (temporary stand-in); scope report DRA-61, Limits (the SCORE text uses the DRA-13 HUD look).
-- The text grows to the right as the score gets more digits. No cut, no shrink.
-- The rendered SCORE text is built again only when the score differs from the one it was last rendered for. Frames with the same score reuse it. Source: 15-tech-constraints.md, rule 5.
-
-GRAZE line (DRA-117):
-- `graze_text(run.grazes)` with its top-left corner at (`HUD_MARGIN`, `hud_top + HUD_LINE_SPACING`), with `hud_top` as for the SCORE line, so it moves with SCORE in debug mode and never overlaps the overlay. Source: scope report DRA-117, Limits (line 2, left margin); 10-ui.md, hud_level_grazes.
-- The SCORE line's look: the same font, size, antialiasing and `HUD_COLOR`. A stand-in until UI-01 and the HUD redesign. Source: scope report DRA-117, Limits ("in the same stand-in look as SCORE").
-- It shows from the first frame, in both modes and while the Game Over box shows: `GRAZE 0` at the start of every run and again after a retry. Source: scope report DRA-117, Feature ("It starts at 0 and goes back to 0 on retry").
-- It grows to the right as the count gets more digits. No cut, no shrink. Source: 06-scoring.md, graze_cap (no limit).
-- The rendered GRAZE text is built again only when the count differs from the one it was last rendered for. Source: 15-tech-constraints.md, rule 5.
-- Line 2 ends one line height below line 2's top, far above the top line on row 168 in both modes, and far left of the hearts. Source: 10-ui.md, rule 1.
-
-Hearts:
-- Each heart is a filled heart shape in `HEART_COLOR`, (255, 255, 255): two round lobes side by side at the top, meeting in a point at the bottom center. Drawn with `pygame.draw` shapes, no image file. Every heart pixel lies inside its 24 × 24 box. The shape spans the box's full width (it reaches the box's left and right columns) and its point reaches the box's bottom row. Source: scope report DRA-23 ("3 white hearts", 24 × 24 px).
-- The heart is drawn once onto a 24 × 24 `pygame.SRCALPHA` surface, on the first draw, and kept. Each frame blits it once per life. Never redrawn per frame. Source: 15-tech-constraints.md, rule 5.
-- A lost life empties the leftmost filled slot. The other hearts don't move, and the visible hearts always end 8 px from the right edge. Source: scope report DRA-23 ("A lost life makes one heart disappear"; 8 px from the right edge).
-- The hearts are in the same place in both modes and whatever `below_overlay` is. They never touch the overlay's text, which stays at the left, or the SCORE line. Their lowest row is 31, far above the top line on row 168. Source: 10-ui.md, rule 1; scope report DRA-13, Decision log (no overlap).
-- `lives` 0 draws no heart. That only happens from the last life on (DRA-125), through game over.
-
-Both:
-- Fonts and the heart surface are created once, on the first draw, and kept. Never per frame. Source: 15-tech-constraints.md, rule 5.
-- The HUD only draws. It never fills, never flips, never logs per frame, never catches an error, never changes the run, never reads the run mode or a key. Source: 10-ui.md, rule 5; game/CONTEXT.md, Run modes.
-
-`overlay_text_bottom()`:
-- Its formula and lines are set in `docs/contracts/systems/debug-overlay.md`, Interface and Presentation: from DRA-76 it is the row below the overlay's sixth text line (`level <n>`). No overlay text pixel is on that row or below it. The HUD only reads it.
-- So in debug mode the SCORE line sits `HUD_OVERLAY_GAP` below the six lines, two line-heights lower than with four. Its line 2 still ends far above the top line on row 168. Source: scope report DRA-13, HUD layout; 10-ui.md, debug_overlay_layout (six lines, guess).
+Pause and game over: the app calls `HudView.dim(window)` after the HUD, then draws the pause box or the game-over screen on the whole window, centered on it (`systems/game-flow.md`, Presentation).
 
 ## Rules
-- The HUD shows SCORE, BEST (DRA-126) when there is a best, GRAZE (DRA-117) and the lives as hearts. No meters readout, no LV. Source: scope report DRA-61, Limits and Out; scope report DRA-23, Limits; scope report DRA-117, Limits and Out; scope report DRA-126, Limits; 10-ui.md, hud_best.
-- BEST's place, format and look are a stand-in the Director approved, not in the GDD (UI-01 is TBD). Source: scope report DRA-126, Values needed (BEST).
-- GRAZE's place, format and look are a stand-in the Director approved, not in the GDD (UI-01 is TBD; the HUD redesign comes later). LV, when it ships, sits at the left of line 2 and pushes GRAZE right. Source: scope report DRA-117, Values needed and Decision log (Q5).
-- SCORE replaces the meters readout. The meters are still counted in core and are part of the score; only their own readout goes. Source: scope report DRA-61, Decision log (Director: "SCORE replaces it").
-- The SCORE format, label and look are the Director's, not in the GDD (UI-01 is TBD). The look is the DRA-13 stand-in, kept. Source: scope report DRA-61, Values needed.
-- The hearts are a temporary stand-in. 10-ui.md, lives_display is TBD (UI-02). Source: scope report DRA-23, Values needed.
-- The HUD shows in both modes, from the first frame of every run, through the last life, while paused and while the game-over screen shows. It never shows on the menu, the instructions page or the leaderboard page: the app doesn't call `draw_hud` there (`docs/contracts/systems/app/frame-loop.md`, Draw). SCORE reads `SCORE 0` until the world has scrolled 10 px, and `SCORE 0` again in a new run. From the last life on it shows the frozen final score (`docs/contracts/systems/run.md`, Score). Three hearts show from the first frame of every run. Source: scope report DRA-61, Player sees; scope report DRA-23, Player sees; scope report DRA-125, Values needed (the pages are text on the background; "The HUD stays visible" on pause).
-- In debug mode the HUD sits below the overlay's text and never overlaps it. Source: scope report DRA-13, Decision log (Director: "Overlap is not acceptable").
-- In debug mode the HUD stays below the overlay's place even while F3 hides the overlay, so it never jumps. The app passes `below_overlay` from the run mode, never from `overlay_visible`. Source: scope report DRA-13, HUD layout.
-- The HUD draws on top of everything. Source: 10-ui.md, rule 1.
-- **Corner warnings, by Director override.** SCORE, BEST and GRAZE at the top left and the hearts at the top right are drawn over any entry warning in those corners, such as the default fireball's at the top-left corner. 10-ui.md, rule 1 says the HUD never hides a warning. The Director chose not to fix it in DRA-61, and kept that override for GRAZE in DRA-117 and for BEST in DRA-126; rule 1 stays the target and docs/TODO.md tracks it. Source: scope report DRA-61, Objection 2 and Decision log; scope report DRA-117, Objection 1; scope report DRA-126, Objection 1.
-- The HUD only reads game state. It never changes it. Source: 10-ui.md, rule 5.
-- The HUD never covers the top line. Its lowest line ends far above row 168 in both modes. Source: 10-ui.md, rule 1.
+- The HUD shows in both modes, from the first frame of every run, through the last life, while paused and while the game-over screen shows. It never shows on the menu, the instructions page or the leaderboard page. Source: 10-ui.md, `window_screens`.
+- Nothing of the HUD covers a pixel of the play area. The one translucent layer over it is the glass sheen, a faint white band, off with `frame.sheen`. Source: 10-ui.md, rule 1; 03-world-and-camera.md, rule 10.
+- The debug overlay sits inside the play area, so the HUD and the overlay never overlap and the HUD takes no `below_overlay`. Source: 10-ui.md, rule 1.
+- The HUD only reads game state. It never changes it. It keeps only view state: the last lives, the last grazes and the start tick of each running motion. Source: 10-ui.md, rule 5.
+- **Motions** (all from `tuning/hud.json`, `motion`): the radar wedge turns once per `sweep_ticks`; the scan line falls once per `scan_ticks`; on the last life the last heart swells to `beat_scale` and back over `beat_ticks` and the lamp pulses to `lamp_low` over `lamp_ticks`; when `lives` drops, the heart that went plays its break (`break_keys`) over `break_ticks`, then stays dim; when `grazes` rises, the count swells to `bump_scale` over `bump_ticks` and a ring grows over `ring_ticks`. A rise in lives, or a fall in grazes, is a new run: all motions reset, none plays. The motions run on the `tick` the app passes, which stops while paused. Source: 10-ui.md, `hud_motion`.
+- Colors, sizes, positions, counts and timings all come from the tuning file. No value is written in code. The pictures `tools/art/hud_panel.py` bakes read the same file; changing a color or a position needs the tool run again for the baked parts. Source: 10-ui.md, rule 12.
+- Per frame the HUD makes no new surface, except the count's and the best's text when they change and the count's swell frames while it swells. Source: 10-ui.md, rule 11; 15-tech-constraints.md, rule 5.
+- The score shows `min(score, 10**tile_count - 1)`. The tiles never show a number the score doesn't have. Source: 10-ui.md, `hud_score`.
+- Score bar: with `best` not None and above 0, the target is `best`; else the next multiple of `bar_step` above the score. Lit segments are `ceil(min(1, score / target) * segments)`, 0 at score 0. Source: 10-ui.md, `hud_score_bar`.
+- The level bars count `level.bars` (8). `lit = min(level, bars)`. Source: 10-ui.md, `hud_level`; 08-difficulty.md, rule 1.
+- Fonts: Exo 2 Bold for the numbers, Share Tech Mono for the labels. Both are static files in `assets/fonts/`. Source: 10-ui.md, `hud_fonts`.
+- `score_text`, `graze_text`, `best_text` and `group_digits` in `ui/score_text.py` are unchanged. The HUD doesn't use `score_text`, `graze_text` or `best_text`. The game-over screen and the leaderboard still do. BEST on the panel groups with `score.best_separator` instead of the space of `group_digits`. Source: scope DRA-61 and DRA-126 for the other screens; 10-ui.md, `hud_best`.
 
 ## Rationale
-- **The HUD contract no longer restates the overlay's formula (DRA-76).** One fact, one home: the overlay owns its lines and their bottom. The HUD only reads the bottom, so a new overlay line moves the HUD with no HUD change.
-- **`draw_hud` takes the run (DRA-23).** The HUD reads two core fields, `score` and `lives`, both on the run. Passing the run gives it one source, and LV can join later without another signature change.
-- **SCORE on line 1, line 2 left empty (DRA-61).** Line 1 was kept for SCORE from DRA-13. Leaving line 2's slot keeps the place for LV and GRAZE (10-ui.md, hud_level_grazes), so they land without moving SCORE. Collapsing it now would only move things again later.
-- **Core gives the number, UI gives the text (DRA-61).** The score is a rule, so it is a core field. Grouping digits and adding a label is a look, so it lives in `ui`. No view works out the score.
-- **The format has one home, `ui/score_text.py` (DRA-61).** The HUD and the Game Over box show the score the same way. One function keeps them from drifting apart. It has no pygame, so it can be tested as plain text, and the Game Over box can use it without importing the HUD.
-- **No digit limit (DRA-61).** The Director chose none. Score grows by 6.6 a second from meters at Level 1, and coins add 50 or 100 each. The 532 px between the left margin and the hearts' area hold well over 40 digits of 16 px text, far beyond any run. The overlap edge case in 10-ui.md (Max digits, UI-01) stays open.
-- **The HUD tests change in two steps around the SCORE line (DRA-61).** The `/implement` flow runs QA's full check right after each implementer task. A test that says line 1 is empty would fail right after the SCORE line lands, and a test that says SCORE is on line 1 would fail before it does. So the two line-1 tests are first reworded to what holds in both states: no ink left of the margin or above the top, and the gap below the overlay. The SCORE line comes next, and only then the exact tests for it (Director, DRA-61 revision: "keep QA clean").
-- **The SCORE text is rendered again only when the score changes (DRA-61).** It changes about 6.6 times a second; frames come 60 times a second. Python in WebAssembly is slow (15-tech-constraints.md, rule 5).
-- **Hearts in fixed slots from the right.** "8 px from the top and right edges" holds for the visible hearts at every life count only if the leftmost heart is the one that goes. Fixed slots also mean no heart ever moves.
-- **One heart surface, blitted.** The shape is drawn once and copied per life. Python in WebAssembly is slow (15-tech-constraints.md, rule 5).
-- **The hearts don't follow `below_overlay`.** The overlay is at the top left, the hearts at the top right. They can't meet, so the hearts keep one place in both modes.
-- **`below_overlay` comes from the app.** game/CONTEXT.md lets only `game/app/` and the debug overlay read the run mode. The app knows the mode and passes a layout flag, the same way it passes `detail` to the error screen.
-- **The overlay's bottom comes from the overlay.** The overlay's line height is a font metric, not a fixed number, and only the overlay owns its font.
-- **`max(linesize, font height)`.** pygame's line size is usually at least the rendered text height, but not for every font. Taking the larger of the two guarantees the gap.
-- **SCORE starts at the left margin.** It is the only item at the left margin of line 1. BEST sits next to it at a fixed x (10-ui.md, rule 2; scope report DRA-126), so it never shifts while the score grows.
-- **`best` is a plain parameter with a default (DRA-126).** BEST is not a run's number: it lives in the saves, which the game flow holds. Passing the value keeps the HUD free of the flow and the saves, and `draw_hud(surface, run, below_overlay)` keeps drawing what it drew, so the HUD tests stay valid until the BEST task lands.
-- **`group_digits` made public (DRA-126).** The leaderboard shows scores grouped like SCORE but with no label. Giving the existing private grouping a public name keeps one home for it instead of a copy in the leaderboard view.
-- **The HUD is drawn last.** 10-ui.md, rule 1 puts the HUD on top of everything.
-- **GRAZE fills line 2's slot (DRA-117).** DRA-61 kept the slot free for it, so SCORE and the hearts don't move. GRAZE takes the left margin now; LV moves it right when LV ships (scope report DRA-117, Decision log, Q5).
-- **One grouping for SCORE and GRAZE (DRA-117).** Both numbers read the same way, so one private helper in `ui/score_text.py` groups the digits and each function adds its own label. A change to the grouping changes both, which is what the Director asked for ("digits grouped like SCORE").
-- **HUD values live in `ui/hud.py`, not `ui/look.py`.** Only the HUD uses them, and they are temporary stand-ins waiting for UI-01 and UI-02. The game-over screen takes its score line's size from `ui/screen_look.py` (DRA-125), not from the HUD, so the screens can be redesigned (UI-04) without touching the HUD.
+- **Baked pictures, live values.** The frame, the panel, the wireframe, the hearts, the radar and the rings are drawn at 4× and shrunk once, offline, because pygame draws no smooth edges and Python in WebAssembly is slow. Per frame the view only copies images and fills rects. Digits are 20 cached images, so a score change costs 7 blits and never a text render (15-tech-constraints.md, rule 5).
+- **A class, not functions.** The motions need to remember the last lives and grazes. `HudView` holds that and nothing else. The old module-level `lru_cache` text surfaces went with the text HUD.
+- **View clock is a parameter.** The view never reads time. The app passes the same clock it gives the background, which stops while paused, so a paused panel is calm and a test can set any tick.
+- **All motion is frames made ahead of time.** The sweep, the ring and the heart's break are image cells or alpha blends of one image. The beat uses pre-scaled hearts. Only the count's swell scales text at run time, on a surface a few px wide.
+- **Panel content centered in a taller window.** The window is 38 px taller than the mock-up. Centering with `content_y` keeps every distance inside the panel as drawn, and moves nothing else.
+- **The play area is a subsurface.** Everything already drawn in play-area coordinates keeps working, so `SCREEN_W` and `SCREEN_H` stay as the play area for the 25 files that use them, and core is untouched.
+- **Rules and window numbers in the tuning file.** The window size is in `hud.json` with the panel, so the tool and the game read one home. The loader checks every baked image against it, so a mismatch fails at startup with the file named.
+- **Why `HUD-PANEL` is not a `DRA-` key.** The feature ran in one session without Linear tasks. Its impact is in `docs/contracts/HUD-PANEL/impact.md`.
