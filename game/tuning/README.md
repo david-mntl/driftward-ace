@@ -182,7 +182,7 @@ The game checks every picture against these numbers at startup. A mismatch shows
 
 | Section | What it holds |
 |---|---|
-| `palette` | 16 colors as `#rrggbb`. Meanings are in `docs/design/gdd/12-art-and-audio.md`, HUD colors. |
+| `palette` | 18 colors as `#rrggbb`. Meanings are in `docs/design/gdd/12-art-and-audio.md`, HUD colors. |
 | `window` | Window size, where the play area sits, how dark the pause and game-over dim is (`dim_alpha`, 0 to 255). |
 | `panel` | Where the panel sits and how wide it is. `content_y` centers its content in the taller window. |
 | `frame` | The pillar's width, the glass sheen on or off, the last-life lamp. |

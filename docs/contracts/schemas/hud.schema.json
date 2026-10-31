@@ -19,7 +19,7 @@
   ],
   "properties": {
     "palette": {
-      "description": "The HUD colors as #rrggbb. Meanings: 12-art-and-audio.md, HUD colors. The tool tools/art/hud_panel.py bakes them into the pictures; run it again after a change.",
+      "description": "The HUD colors as #rrggbb, 18 of them. Meanings: 12-art-and-audio.md, HUD colors. The tool tools/art/hud_panel.py bakes them into the pictures; run it again after a change.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -38,7 +38,9 @@
         "fuchsia_spill",
         "dim",
         "line",
-        "tile_bg"
+        "tile_bg",
+        "lamp_off",
+        "footer_dot"
       ],
       "properties": {
         "ship_lines": {
@@ -118,6 +120,16 @@
         },
         "tile_bg": {
           "description": "The digit tile's dark glass.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "lamp_off": {
+          "description": "An unlit pillar lamp.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "footer_dot": {
+          "description": "The footer's empty dot outline.",
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$"
         }

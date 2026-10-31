@@ -69,6 +69,8 @@ The HUD has its own colors, set by the Director. Under the anomaly's magnetism e
 | dim | #29346a | off | unlit tile tops, unlit bars, dim zeros |
 | line | #232c55 | thin rules | the footer line |
 | tile_bg | #04061a | the tile's dark glass | behind each digit |
+| lamp_off | #1b2350 | an unlit lamp | the pillar's lamps |
+| footer_dot | #33408a | the footer's empty dot | the footer line's right end |
 
 ### Background
 - **Far layer.** One large painting. Rivers of stars, gas and debris curve toward a dim, distant black hole at the bottom left, mostly off screen. The rays sway very slowly, and a soft patch of light turns along the hole's rim. It is a loop of frames made ahead of time, faded from one to the next, and it keeps the painting's brightness. The sway is slow and small, so it never pulls the eye off the objects.

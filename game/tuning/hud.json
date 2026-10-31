@@ -15,7 +15,9 @@
     "fuchsia_spill": "#000000",
     "dim": "#29346a",
     "line": "#232c55",
-    "tile_bg": "#04061a"
+    "tile_bg": "#04061a",
+    "lamp_off": "#1b2350",
+    "footer_dot": "#33408a"
   },
   "window": {
     "width": 896,

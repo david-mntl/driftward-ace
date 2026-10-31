@@ -44,7 +44,7 @@ RGB = tuple[int, int, int]
 
 @dataclass(frozen=True)
 class HudRules:
-    palette: Mapping[str, RGB]   # the 16 keys of the schema's palette, as RGB
+    palette: Mapping[str, RGB]   # the 18 keys of the schema's palette, as RGB
     window: WindowRules          # width, height, field_x, field_y, dim_alpha
     panel: PanelRules            # x, width, content_y
     frame: FrameRules            # pillar and sheen: sheen on or off, the last-life lamp's centre
