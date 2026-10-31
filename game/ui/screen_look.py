@@ -168,7 +168,8 @@ class ScreenLook:
         if found is not None:
             return found
         glass, glow = self.rules.glass, self.rules.glow
-        margin: int = 2 * glow.box_radius + glass.bracket_out + glass.bracket_w
+        reach: int = 2 * glow.box_radius if glow.box_strength > 0 else 0
+        margin: int = reach + glass.bracket_out + glass.bracket_w
         size: tuple[int, int] = (width + 2 * margin, height + 2 * margin)
         lines: pygame.Surface = pygame.Surface(size, pygame.SRCALPHA)
         body: pygame.Rect = pygame.Rect(margin, margin, width, height)

@@ -221,6 +221,8 @@ def _icon(look: ScreenLook, index: int) -> tuple[pygame.Surface, int]:
         )
         look.blit_text(small, string, role, color, {"center": center}, glow=False)
     glow = look.rules.glow
+    if glow.icon_strength <= 0:
+        return small, 0
     return halo(small, glow.icon_radius, glow.icon_strength), 2 * glow.icon_radius
 
 
