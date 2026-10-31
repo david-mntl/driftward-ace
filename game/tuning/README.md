@@ -142,3 +142,22 @@ python3 tools/art/background_sway.py
 | `KEYFRAMES` | `12` | Frames in the loop. More frames fade more smoothly when the sway is big or fast, and cost about 280 KB of download and 1.2 MB of memory each. If you change it, change `SWAY_FRAMES` in `game/app/assets.py` to match. |
 
 Every frame is balanced to the painting's own brightness, so a bigger sway never makes the background brighter.
+
+# ship_look.json
+
+When the ship leans, when its air streaks show and how fast its flame flickers. You edit it by hand. The game reads it once at startup, in both run modes, so change a value and reload the page.
+
+The loader is `game/app/ship_tuning.py`. The schema is `docs/contracts/schemas/ship-look.schema.json`. These values change how the ship looks and nothing else. They never change play or the hitbox.
+
+Every field is optional. A field left out keeps its default from the Default column. `{}` is a valid file. An unknown field, or a value out of range, shows the error screen with the file and the field.
+
+## Fields
+
+| Field | Default | Range | What it does |
+|---|---|---|---|
+| `lean_speed` | `1.0` | above 0 | Sideways speed (px/tick) from which the ship leans. About 3 ticks of holding an arrow. Top sideways speed is about 6.6. |
+| `streak_speed` | `1.0` | above 0 | Sideways speed (px/tick) from which short air streaks trail behind the ship. |
+| `streak_long_speed` | `4.0` | above `streak_speed` | Sideways speed (px/tick) from which the streaks are long. About 15 ticks of holding. |
+| `flame_ticks_per_frame` | `4` | 1 or more | Ticks each flame and streak flicker frame shows. 60 ticks = 1 second. Smaller flickers faster. |
+
+The sprites are `game/assets/sprites/ship.png` (3 lean frames), `ship_flame.png` (8 flame frames) and `ship_streaks.png` (4 air streak frames). `tools/art/ship_final.py` makes all three from the chosen pose. Run it from the repo root, then copy the PNGs from `staging/assets/sprites/` to `game/assets/sprites/`. How strong the lean is and how long the streaks are is fixed when the images are made: edit the constants at the top of that script.

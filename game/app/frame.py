@@ -30,6 +30,7 @@ from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_d
 from app.mode import RunMode
 from app.saves import load_saves, write_saves
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
+from app.ship_tuning import load_ship_look
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
 from app.waves import load_wave_book
 from core.drifters.spawner import Placement
@@ -67,7 +68,7 @@ from ui.leaderboard import draw_leaderboard
 from ui.menu import draw_menu
 from ui.pause_box import draw_pause_box
 from ui.popup_view import draw_points_popup
-from ui.ship_view import draw_ship
+from ui.ship_view import ShipLook, draw_ship
 from ui.starfield import draw_starfield
 
 log = logging.getLogger(__name__)
@@ -110,6 +111,7 @@ async def frame_loop(mode: RunMode) -> None:
     pygame.init()
     surface: pygame.Surface = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     background: BackgroundArt = load_background(load_background_rules())
+    ship_look: ShipLook = load_ship_look()
     debug: bool = mode is RunMode.DEBUG
     tuning: DrifterTuning = load_tuning()
     graze_rules: GrazeRules = load_graze_rules()
@@ -154,7 +156,7 @@ async def frame_loop(mode: RunMode) -> None:
         was_capped = _apply_cap(accumulator, was_capped)
         if was_capped:
             accumulator = 0.0
-        _draw(surface, background, background_ticks, flow, overlay_visible, debug)
+        _draw(surface, background, background_ticks, ship_look, flow, overlay_visible, debug)
         pygame.display.flip()
         await asyncio.sleep(0)
     log.info("quit")
@@ -274,6 +276,7 @@ def _draw(
     surface: pygame.Surface,
     background: BackgroundArt,
     background_ticks: float,
+    ship_look: ShipLook,
     flow: GameFlow,
     overlay_visible: bool,
     debug: bool,
@@ -292,18 +295,27 @@ def _draw(
     elif flow.screen is Screen.LEADERBOARD:
         draw_leaderboard(surface, flow.leaderboard)
     elif flow.screen in _RUN_SCREENS:
-        _draw_run(surface, flow, overlay_visible, debug)
+        _draw_run(surface, flow, overlay_visible, debug, ship_look, int(background_ticks))
 
 
-def _draw_run(surface: pygame.Surface, flow: GameFlow, overlay_visible: bool, debug: bool) -> None:
+def _draw_run(
+    surface: pygame.Surface,
+    flow: GameFlow,
+    overlay_visible: bool,
+    debug: bool,
+    ship_look: ShipLook,
+    ticks: int,
+) -> None:
     """Draw the starfield, the drifters, the points popups, the ship while shown or the burst in
     the last life, the graze rings, the debug outlines, overlay and wave lines if visible, the
     PAUSE box when paused or the game-over screen at game over (_draw_game_over), and the HUD
     last, with BEST.
 
-    Drifters sit behind the ship, and the popups over the drifters and behind the ship. The burst
-    takes the ship's place. The HUD sits below the overlay's place for the whole run in debug mode,
-    even while F3 hides the overlay. The graze rings sit over the ship and don't follow its blink.
+    Drifters sit behind the ship, and the popups over the drifters and behind the ship. The ship
+    shows its flames only while it flies: not paused, not waiting to respawn. `ticks` steps the
+    flame flicker. The burst takes the ship's place. The HUD sits below the overlay's place for
+    the whole run in debug mode, even while F3 hides the overlay. The graze rings sit over the
+    ship and don't follow its blink.
     Source: systems/app/frame-loop.md, Rules, Draw, Drifters behind the ship, Graze rings over
     the ship and below_overlay.
     """
@@ -314,7 +326,8 @@ def _draw_run(surface: pygame.Surface, flow: GameFlow, overlay_visible: bool, de
     for popup in run.popups:
         draw_points_popup(surface, popup)
     if run.ship_visible:
-        draw_ship(surface, run.ship)
+        flying: bool = flow.screen is Screen.PLAYING and not run.waiting
+        draw_ship(surface, run.ship, run.held if flying else None, ticks, ship_look)
     if run.last_life and run.burst is not None:
         draw_burst(surface, run.burst)
     for ring in run.graze_rings:

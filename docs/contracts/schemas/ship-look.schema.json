@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/ship-look.schema.json",
+  "title": "Ship look values",
+  "description": "The file game/tuning/ship_look.json: when the ship leans, when its air streaks show and how fast its flame flickers, read in both run modes. The file must exist; every field is optional, and a field left out keeps its default from game/ui/ship_view.py (DEFAULT_SHIP_LOOK). {} is a valid file. All defaults are guesses (04-ship.md, look); tune them by eye. Loaded and checked by game/app/ship_tuning.py at startup into ui.ship_view.ShipLook. Look only: no field changes play. Owner of the schema: architect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {
+    "lean_speed": {
+      "description": "Sideways speed in px/tick from which the ship leans, left or right. Top sideways speed is about 6.6.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "streak_speed": {
+      "description": "Sideways speed in px/tick from which short air streaks trail behind the ship.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "streak_long_speed": {
+      "description": "Sideways speed in px/tick from which the air streaks are long. Must be greater than streak_speed.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "flame_ticks_per_frame": {
+      "description": "Ticks each flame and streak flicker frame is shown. 60 ticks = 1 second.",
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

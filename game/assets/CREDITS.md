@@ -9,3 +9,7 @@
 ## Satellite
 
 - sprites/satellite.png and sprites/satellite_field.png: the satellite's swing frames and its turning magnetism field. Cut and animated by tools/art/satellite_swing.py from a PixelLab image (trial account) made with the Director's reference: staging/art-inbox/satellite-pixellab-a.png. Commercial use on the PixelLab trial is unconfirmed: playtest only until checked.
+
+## Ship
+
+- sprites/ship.png, sprites/ship_flame.png and sprites/ship_streaks.png: the ship's 3 lean frames, its 8 flame frames (2 flicker frames for each of 4 jets) and its 4 air streak frames. Made by tools/art/ship_final.py (script, Pillow + numpy) from a PixelLab image (trial account, Pro Flash, styled on the Director's ChatGPT image): staging/assets/sprites/ship-glide-src-center-f.png, chosen by the Director 2026-10-30. Lean frames are that image squashed and shaded; flames and air streaks are drawn by the script. Commercial use on the PixelLab trial is unconfirmed: playtest only until checked.

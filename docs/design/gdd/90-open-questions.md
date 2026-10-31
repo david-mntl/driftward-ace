@@ -19,7 +19,7 @@ None open.
 | SH-02 | Slider min and max for gravity, the three thrusts, drag_x, fall_cap and scroll_base. | 04-ship.md, 03-world-and-camera.md | Tuning tool | open |
 | SH-04 | Keep the ship at 32×32 px? | 04-ship.md | Art, wave_check gaps | open |
 | SH-05 | Confirm: no vertical drag and no cap on upward speed. | 04-ship.md | Physics | open |
-| SH-06 | Ship look, what `look_reference` leaves open. (1) Do the neon lines glow a little, tight to the lines, or stay bright with no halo? (2) Does the flame show only while thrusting, and in the direction of each held arrow key? (3) Does the ship tilt when moving sideways (look only)? | 04-ship.md | Ship art | open |
+| SH-06 | Ship look, what `look_reference` leaves open. Still open: (1) do the neon lines glow a little, tight to the lines, or stay bright with no halo? The built look has no halo. Answered 2026-10-30: (2) the flame shows only while an arrow is held, one jet per arrow; (3) the ship leans when moving sideways, look only (decisions 109, 110). | 04-ship.md | Ship art | open |
 
 ## Lives and damage
 | ID | Question | File | Blocks | Status |
