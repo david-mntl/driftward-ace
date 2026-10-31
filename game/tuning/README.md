@@ -188,7 +188,7 @@ The game checks every picture against these numbers at startup. A mismatch shows
 | `frame` | The pillar's width, the glass sheen on or off and its strip height (`sheen_rows`: the game blends only the pixels that have sheen, in strips this tall; the full-size blit halved the browser's frame rate), the last-life lamp. |
 | `score` | The score box, the 7 tiles, the 14 segment bar, BEST. `best_separator` is the text between digit groups. |
 | `hearts` | Where the three hearts sit, and the wireframe's box. |
-| `level` | The level box, the number, the 8 climb bars, the levels where the number warms up. |
+| `level` | The level box, the number, the 8 climb bars, the levels where the number warms up (`tier_mid`, `tier_high`) and how far the middle tier goes toward the last-life color (`tier_mid_mix`). |
 | `graze` | The dial's centre and radii, the label. |
 | `motion` | Every period in ticks (60 per second) and every scale. `break_keys` is the heart's break. |
 | `fonts` | The two font files, the sizes, the label spacing. |

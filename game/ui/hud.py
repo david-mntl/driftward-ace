@@ -2,10 +2,9 @@
 
 Source: docs/contracts/systems/hud.md, Interface, Presentation and Rules; 10-ui.md, `hud_*` and
 `cockpit_frame`. The view only draws. It never fills, flips, logs per frame, catches an error,
-changes
-the run, or reads the run mode or a key. Everything baked (panel, wireframe, hearts, radar, ring,
-frame)
-is a picture made ahead of time by tools/art/hud_panel.py; per frame only values change.
+changes the run, or reads the run mode or a key. Everything baked (panel, wireframe, hearts, radar,
+ring, frame) is a picture made ahead of time by tools/art/hud_panel.py; per frame only values
+change.
 """
 
 import itertools
@@ -32,6 +31,12 @@ HEART_LAST: int = 2
 HEART_WHITE: int = 3
 HEART_HUE: int = 4
 """Indexes into HudArt.hearts. Cells of hud_hearts.png, left to right (tools/art/hud_panel.py)."""
+
+HEART_CELL_COUNT: int = 5
+"""Cells in hud_hearts.png, one per index above. Must match HEART_CELLS in the art tool."""
+
+TEXT_CACHE_SIZE: int = 8
+"""Most text images kept for a changing value (BEST, graze count) before the oldest are dropped."""
 
 type Anchor = str
 """Where a text image sits on its point: left, center or right (vertical center always)."""
@@ -80,9 +85,9 @@ class HudArt:
 
 
 def clamp_score(score: int, digits: int) -> int:
-    """Return the score the tiles can show: at most ``10 ** digits - 1``. ``score`` >= 0."""
+    """Return the score the tiles can show: 0 to ``10 ** digits - 1``."""
     maximum: int = 10**digits - 1
-    return min(score, maximum)
+    return max(0, min(score, maximum))
 
 
 def lit_segments(score: int, best: int | None, segments: int, step: int) -> int:
@@ -184,8 +189,9 @@ def _mix(a: RGB, b: RGB, share: float) -> RGB:
 
 class HudView:
     """The side panel and frame. Keeps the view state the motions need: the last lives and grazes
-    and
-    the tick each running motion started on. Needs ``pygame.font`` initialized and a display set."""
+    and the tick each running motion started on. Needs ``pygame.font`` initialized and a display
+    set.
+    """
 
     def __init__(self, rules: HudRules, art: HudArt) -> None:
         palette: Mapping[str, RGB] = rules.palette
@@ -209,6 +215,8 @@ class HudView:
         self._panel: pygame.Surface = self._compose_panel()
         self._bar: tuple[tuple[pygame.Rect, RGB], ...] = self._bar_cells()
         self._beat: tuple[pygame.Surface, ...] = self._beat_hearts()
+        self._hearts: tuple[pygame.Surface, ...] = tuple(heart.copy() for heart in art.hearts)
+        self._lamp: pygame.Surface = art.lamp.copy()
         self._level_numbers: dict[int, pygame.Surface] = {}
         self._graze_numbers: dict[int, pygame.Surface] = {}
         self._best_numbers: dict[int, pygame.Surface] = {}
@@ -216,7 +224,7 @@ class HudView:
         self._sheen_pieces: tuple[tuple[pygame.Surface, tuple[int, int]], ...] = (
             self._sheen_slices()
         )
-        self._dim_layer: pygame.Surface = self._make_dim()
+        self._dim_level: int = 255 - rules.window.dim_alpha
         self._lives: int | None = None
         self._grazes: int = 0
         self._breaks: dict[int, int] = {}
@@ -228,8 +236,7 @@ class HudView:
         ticks.
 
         Never draws on the play area except the sheen. Starts the heart's break and the graze
-        motions
-        when ``run.lives`` falls or ``run.grazes`` rises since the last call.
+        motions when ``run.lives`` falls or ``run.grazes`` rises since the last call.
         """
         self._update(run, tick)
         rules: HudRules = self._rules
@@ -247,11 +254,11 @@ class HudView:
             self._draw_lamp(window, tick)
 
     def dim(self, window: pygame.Surface) -> None:
-        """Darken the whole window: black at ``window.dim_alpha``. Draw the pause box or game over
+        """Darken the whole window: black at ``window.dim_alpha``. Draw the box after it.
 
-        after it.
+        A multiply fill, not a blended layer: the same result for black, and about twice as fast.
         """
-        window.blit(self._dim_layer, (0, 0))
+        window.fill((self._dim_level,) * 3, special_flags=pygame.BLEND_RGB_MULT)
 
     # ----- state -----
 
@@ -376,8 +383,9 @@ class HudView:
 
     def _sheen_slices(self) -> tuple[tuple[pygame.Surface, tuple[int, int]], ...]:
         """Return the sheen cut into strips ``sheen_rows`` tall, each trimmed to where it has any
-        sheen, with its window position. Empty when the sheen is off. Blending only these pixels is
-        what keeps the browser build at full speed: the whole play area costs about half the frame.
+        sheen, with its window position. Empty when the sheen is off. Blending only these pixels
+        is what keeps the browser build at full speed: the whole play area costs about half the
+        frame.
         """
         rules = self._rules
         if not rules.frame.sheen:
@@ -398,13 +406,6 @@ class HudView:
                     )
                 )
         return tuple(pieces)
-
-    def _make_dim(self) -> pygame.Surface:
-        """Return the window-sized dim layer, black at ``dim_alpha``."""
-        win = self._rules.window
-        layer: pygame.Surface = pygame.Surface((win.width, win.height), pygame.SRCALPHA)
-        layer.fill((0, 0, 0, win.dim_alpha))
-        return layer
 
     # ----- per frame -----
 
@@ -444,7 +445,7 @@ class HudView:
     def _best_number(self, best: int) -> pygame.Surface:
         """Return the best score's text image, grouped with the file's separator. Kept per value."""
         if best not in self._best_numbers:
-            if len(self._best_numbers) > 4:
+            if len(self._best_numbers) >= TEXT_CACHE_SIZE:
                 self._best_numbers.clear()
             text: str = group_digits(best).replace(" ", self._rules.score.best_separator)
             self._best_numbers[best] = self._art.fonts["value"].render(
@@ -465,7 +466,7 @@ class HudView:
 
     def _heart_image(self, slot: int, lives: int, tick: int, motion: MotionRules) -> pygame.Surface:
         """Return heart ``slot``'s picture: its break while one runs, else lit, last or dim."""
-        hearts = self._art.hearts
+        hearts = self._hearts
         started: int | None = self._breaks.get(slot)
         state = break_state_at(tick - started, motion) if started is not None else None
         if state is not None:
@@ -526,7 +527,9 @@ class HudView:
             palette: Mapping[str, RGB] = self._rules.palette
             key: str = tier_color_key(level, spec.tier_mid, spec.tier_high)
             color: RGB = (
-                _mix(palette["level"], palette["last_life"], 0.5) if key == "mid" else palette[key]
+                _mix(palette["level"], palette["last_life"], spec.tier_mid_mix)
+                if key == "mid"
+                else palette[key]
             )
             self._level_numbers[level] = self._art.fonts["level"].render(str(level), True, color)
         return self._level_numbers[level]
@@ -564,7 +567,7 @@ class HudView:
     def _graze_number(self, grazes: int) -> pygame.Surface:
         """Return the graze count's image, shrunk to fit ``count_limit``. Kept per value."""
         if grazes not in self._graze_numbers:
-            if len(self._graze_numbers) > 4:
+            if len(self._graze_numbers) >= TEXT_CACHE_SIZE:
                 self._graze_numbers.clear()
             image: pygame.Surface = self._art.fonts["graze"].render(
                 str(grazes), True, self._rules.palette["graze"]
@@ -579,6 +582,6 @@ class HudView:
     def _draw_lamp(self, window: pygame.Surface, tick: int) -> None:
         """Draw the pillar's last-life lamp, pulsing between ``lamp_low`` and full."""
         motion: MotionRules = self._rules.motion
-        lamp: pygame.Surface = self._art.lamp
+        lamp: pygame.Surface = self._lamp
         lamp.set_alpha(round(255 * lamp_level_at(tick, motion)))
         window.blit(lamp, lamp.get_rect(center=self._rules.frame.last_lamp))

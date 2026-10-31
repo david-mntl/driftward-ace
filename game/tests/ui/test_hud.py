@@ -112,6 +112,7 @@ def test_clamp_score_stops_at_the_last_number_the_tiles_can_show() -> None:
     assert clamp_score(9_999_999, 7) == 9_999_999
     assert clamp_score(12_000_000, 7) == 9_999_999
     assert clamp_score(0, 7) == 0
+    assert clamp_score(-5, 7) == 0
 
 
 @pytest.mark.parametrize(
@@ -540,3 +541,16 @@ def test_every_pixel_of_the_window_is_drawn_by_the_play_area_plus_the_hud(
 
 
 SENTINEL_BYTES: bytes = bytes(SENTINEL)
+
+
+def test_drawing_never_changes_the_loaded_pictures(
+    rules: HudRules, art: HudArt, window: pygame.Surface
+) -> None:
+    before = [pygame.image.tobytes(heart, "RGBA") for heart in art.hearts]
+    alphas = [heart.get_alpha() for heart in art.hearts] + [art.lamp.get_alpha()]
+    view = HudView(rules, art)
+    _draw(view, window, FakeRun(lives=3), tick=0)
+    _draw(view, window, FakeRun(lives=1), tick=1)
+    _draw(view, window, FakeRun(lives=0), tick=2)
+    assert [pygame.image.tobytes(heart, "RGBA") for heart in art.hearts] == before
+    assert [heart.get_alpha() for heart in art.hearts] + [art.lamp.get_alpha()] == alphas

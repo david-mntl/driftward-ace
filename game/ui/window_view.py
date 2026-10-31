@@ -1,7 +1,7 @@
 """The full-window background for the screens that fill the whole window.
 
-Source: docs/contracts/systems/hud.md, Interface (`WindowBackdrop`); 10-ui.md, `window_screens`.
-The view only draws. The painted background is made for the play area (SCREEN_W x SCREEN_H), so the
+Source: docs/contracts/systems/hud.md, Interface (`WindowBackdrop`); 10-ui.md, `window_screens`. The
+view only draws. The painted background is made for the play area (SCREEN_W x SCREEN_H), so the
 menu, the instructions page and the leaderboard page get it drawn at that size, then scaled up to
 cover the window and cut to it, keeping the bottom left where the black hole is.
 """

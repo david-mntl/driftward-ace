@@ -113,7 +113,8 @@
     "bars_right": 107,
     "bars_bottom": 412,
     "tier_mid": 4,
-    "tier_high": 7
+    "tier_high": 7,
+    "tier_mid_mix": 0.5
   },
   "graze": {
     "center": [

@@ -1,8 +1,8 @@
 """The HUD's values as frozen records, one per section of tuning/hud.json.
 
 Source: docs/contracts/schemas/hud.schema.json and docs/contracts/systems/hud.md, Interface. The
-records hold what the file says and nothing else: app/hud_tuning.py checks the file and builds
-them, ui/hud.py reads them. Positions marked panel space count from the panel's top-left plus
+records hold what the file says and nothing else: app/hud_tuning.py checks the file and builds them,
+ui/hud.py reads them. Positions marked panel space count from the panel's top-left plus
 ``PanelRules.content_y``. Stdlib only.
 """
 
@@ -135,6 +135,7 @@ class LevelRules:
     bars_bottom: int
     tier_mid: int
     tier_high: int
+    tier_mid_mix: float
 
 
 @dataclass(frozen=True)

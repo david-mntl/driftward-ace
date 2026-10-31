@@ -132,6 +132,7 @@ def test_invalid_json_names_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyP
         ("motion.break_keys", [[0.1, 1, "white"], [1, 0.2, "plain"]]),
         ("motion.break_keys", [[0, 1, "glow"], [1, 0.2, "plain"]]),
         ("motion.break_keys", [[0, 2, "white"], [1, 0.2, "plain"]]),
+        ("level.tier_mid_mix", 2),
         ("fonts.label_mix", 2),
         ("fonts.ui_file", 7),
         ("palette.hearts", "pink"),
@@ -217,3 +218,24 @@ def test_a_missing_font_file_is_an_error(pygame_headless: None, rules: HudRules)
     )
     with pytest.raises(FileNotFoundError):
         load_hud_art(odd)
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        ("window.width", 600),
+        ("window.height", 400),
+        ("window.field_x", 100),
+        ("window.field_y", 100),
+        ("panel.width", 400),
+        ("frame.pillar_width", 300),
+        ("frame.last_lamp", [300, 200]),
+        ("score.bar_gap", 40),
+    ],
+)
+def test_numbers_that_do_not_fit_together_are_caught_with_the_file_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path: str, value: object
+) -> None:
+    _write(tmp_path, monkeypatch, _set(path, value))
+    with pytest.raises(ValueError, match=r"tuning/hud\.json: "):
+        load_hud_rules()

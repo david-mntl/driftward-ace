@@ -24,3 +24,16 @@ Sources: `local/hud-mock/` (mock_hud.py, `out-ship2/*.png`, STEPS.md) and the ea
 | A10 | Menu, instructions and leaderboard get a full-window background: the background drawn at play-area size and scaled to cover the window. Dim for pause and game over: black alpha 110 (guess). | The window is wider than the 640 × 480 painting. |
 | A11 | Edits to the GDD files the Director named, plus `14-glossary.md` (Camera row) and `90-open-questions.md` (UI-01 and WC-07 removed; UI-04 and LD-08 narrowed). | Needed to close UI-01 and WC-07 consistently. |
 | A12 | Feature id `HUD-PANEL` for the contract Features lines and `docs/contracts/HUD-PANEL/impact.md`. No Linear issue. | The crew was skipped, so no DRA key exists. |
+| A13 | The glass sheen is drawn as strips 16 rows tall, each trimmed to the bands' width (`frame.sheen_rows`). | The one full 640 × 480 sheen blit cut the browser build from 59 to 32 fps. With strips it is back to 59. |
+| A14 | Pause and game over dim the window with a multiply fill, not a blended layer. Alpha 110 is still the value. | Twice as fast on desktop. The browser goes from 42 and 37 fps to 45 and 43 fps (play stays at 59). The rest of the cost is any full-window operation in the software browser. |
+| A15 | `level.tier_mid_mix` (0.5) added to `hud.json`; `frame.last_lamp` must lie outside the play area; the loader checks that the play area, panel and frame fit the window; negative scores show as 0. | Findings of the code review and the second-opinion QA agent. |
+| A16 | Share Tech Mono is shipped unmodified (its license reserves the name "Share"). Exo 2 Bold is a static instance cut from the variable font, as STEPS.md said. | Credits in `game/assets/CREDITS.md`. |
+
+## Measured in the browser (pygbag 0.9.3, headless Chromium, requestAnimationFrame rate)
+| State | Before (main) | Now |
+|---|---|---|
+| Menu | 59.8 fps | 60.2 fps |
+| Playing | 59.0 fps | 59.4 fps |
+| Paused | not measured | 45.2 fps |
+| Game over | not measured | 42.6 fps |
+JS heap 48 MB before, 44 to 65 MB now. Console: only the known pygbag lines (BrowserFS 404, MEDIA USER ACTION).

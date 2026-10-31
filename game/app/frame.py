@@ -307,12 +307,10 @@ def _draw(
     """Draw the screen the flow shows on the window.
 
     The menu, the instructions page and the leaderboard page fill the whole window: the backdrop,
-    then
-    the page alone, with no world, overlay, HUD or frame. Playing, paused and game over draw the
-    background and the run's world on `field`, the play area (_draw_run), then the panel and frame
-    on
-    the window. Paused and game over then dim the whole window and draw their box centered on it.
-    Source: systems/app/frame-loop.md, Rules, Draw; systems/game-flow.md, Presentation.
+    then the page alone, with no world, overlay, HUD or frame. Playing, paused and game over draw
+    the background and the run's world on `field`, the play area (_draw_run), then the panel and
+    frame on the window. Paused and game over then dim the whole window and draw their box centered
+    on it. Source: systems/app/frame-loop.md, Rules, Draw; systems/game-flow.md, Presentation.
     """
     if flow.screen in _RUN_SCREENS:
         draw_background(field, background, background_ticks)
@@ -341,16 +339,15 @@ def _draw_run(
     ship_look: ShipLook,
     ticks: int,
 ) -> None:
-    """Draw the starfield, the drifters, the points popups, the ship while shown or the burst in
-    the last life, the graze rings and the debug outlines, overlay and wave lines if visible, all on
+    """Draw the starfield, the drifters, the points popups, the ship while shown or the burst in the
+    last life, the graze rings and the debug outlines, overlay and wave lines if visible, all on
     `surface`, the play area.
 
     Drifters sit behind the ship, and the popups over the drifters and behind the ship. The ship
     shows its flames only while it flies: not paused, not waiting to respawn. `ticks` steps the
     flame flicker. The burst takes the ship's place. The graze rings sit over the ship and don't
-    follow its blink. The HUD is not drawn here: it lives outside the play area.
-    Source: systems/app/frame-loop.md, Rules, Draw and Drifters behind the ship, Graze rings over
-    the ship.
+    follow its blink. The HUD is not drawn here: it lives outside the play area. Source:
+    systems/app/frame-loop.md, Rules, Draw and Drifters behind the ship, Graze rings over the ship.
     """
     run: Run = flow.run
     draw_starfield(surface, run.scroll)

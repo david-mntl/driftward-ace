@@ -1,13 +1,13 @@
 """Load and check the HUD values file.
 
 Reads `tuning/hud.json` once, at startup (`load_hud_rules`), before the window opens, because the
-window's size is in it. Checks every rule of hud.schema.json by hand (pygbag has no schema
-library) and builds a HudRules. Every field is required and no default lives in code. A missing
-file raises FileNotFoundError; a bad one raises ValueError naming the file and the field.
-Not a startup module: it imports ui, so only app.frame imports it, inside the guard.
+window's size is in it. Checks every rule of hud.schema.json by hand (pygbag has no schema library)
+and builds a HudRules. Every field is required and no default lives in code. A missing file raises
+FileNotFoundError; a bad one raises ValueError naming the file and the field. Not a startup module:
+it imports ui, so only app.frame imports it, inside the guard.
 
-Source: docs/contracts/schemas/hud.schema.json; docs/contracts/systems/hud.md, Interface;
-10-ui.md, rule 12.
+Source: docs/contracts/schemas/hud.schema.json; docs/contracts/systems/hud.md, Interface; 10-ui.md,
+rule 12.
 """
 
 import collections.abc
@@ -23,6 +23,7 @@ from pathlib import Path
 from app.drifters.checks import check_fields, check_integer, is_number
 from app.tuning import TUNING_DIR
 from core.run import LIVES_START
+from core.world import SCREEN_H, SCREEN_W
 from ui.hud_rules import BREAK_LOOKS, PALETTE_KEYS, RGB, HudRules
 
 log = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ _SHARES: frozenset[str] = frozenset(
         "motion.lamp_low",
         "fonts.label_mix",
         "fonts.value_mix",
+        "level.tier_mid_mix",
     }
 )
 """Float fields that must lie in 0..1."""
@@ -218,6 +220,7 @@ def _check_rules(name: str, rules: HudRules) -> None:
     other.
     """
     _check_palette(name, rules.palette)
+    _check_geometry(name, rules)
     if rules.window.dim_alpha > 255:
         raise ValueError(f"{name}: window.dim_alpha must be an integer from 0 to 255")
     if len(rules.hearts.slots) != LIVES_START:
@@ -229,6 +232,38 @@ def _check_rules(name: str, rules: HudRules) -> None:
     if rules.motion.scan_from > rules.motion.scan_to:
         raise ValueError(f"{name}: motion.scan_from must be <= motion.scan_to")
     _check_break_keys(name, rules.motion.break_keys)
+
+
+def _check_geometry(name: str, rules: HudRules) -> None:
+    """Raise unless the play area, panel and frame fit the window and the bar segments have width.
+
+    A bad number would otherwise fail deep inside pygame with no field named.
+    """
+    window, panel = rules.window, rules.panel
+    if window.field_x + SCREEN_W > window.width or window.field_y + SCREEN_H > window.height:
+        raise ValueError(
+            f"{name}: window.field_x and window.field_y must leave room for the "
+            f"{SCREEN_W}x{SCREEN_H} play area inside window.width and window.height"
+        )
+    if panel.x + panel.width > window.width:
+        raise ValueError(f"{name}: panel.x + panel.width must be <= window.width")
+    frame_width: int = panel.x + rules.frame.pillar_width
+    if frame_width > window.width or frame_width < window.field_x + SCREEN_W:
+        raise ValueError(
+            f"{name}: panel.x + frame.pillar_width must reach past the play area "
+            "and fit window.width"
+        )
+    lamp_x, lamp_y = rules.frame.last_lamp
+    if (
+        window.field_x <= lamp_x < window.field_x + SCREEN_W
+        and window.field_y <= lamp_y < window.field_y + SCREEN_H
+    ):
+        raise ValueError(f"{name}: frame.last_lamp must lie outside the play area")
+    score = rules.score
+    if score.bar_w <= (score.bar_segments - 1) * score.bar_gap:
+        raise ValueError(
+            f"{name}: score.bar_gap is too wide for score.bar_w and score.bar_segments"
+        )
 
 
 def _check_palette(name: str, palette: object) -> None:

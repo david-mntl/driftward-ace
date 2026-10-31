@@ -8,7 +8,7 @@ import pygame
 
 from core.world import SCREEN_H, SCREEN_W
 from ui.background_view import BackgroundArt, BackgroundRules, build_background
-from ui.hud import HudArt
+from ui.hud import HEART_CELL_COUNT, HudArt
 from ui.hud_rules import HudRules
 
 log = logging.getLogger(__name__)
@@ -60,14 +60,6 @@ def _load(file: str, alpha: bool) -> pygame.Surface:
     return image.convert_alpha() if alpha else image.convert()
 
 
-HEART_CELLS: int = 5
-"""Cells in hud_hearts.png: lit, dim, last life, break white, break hue. Must match HEART_CELLS in
-tools/art/hud_panel.py. Source: docs/contracts/systems/hud.md, Interface (HudArt)."""
-
-SCAN_HEIGHT: int = 3
-"""Height of hud_scan.png, px. Must match the picture tools/art/hud_panel.py bakes."""
-
-
 def load_hud_art(rules: HudRules) -> HudArt:
     """Load the HUD's baked pictures and its two fonts, and check each against the rules.
 
@@ -86,10 +78,12 @@ def load_hud_art(rules: HudRules) -> HudArt:
         sheen=_load_sized("hud_sheen.png", True, (SCREEN_W, SCREEN_H)),
         panel=_load_sized("hud_panel.png", False, (panel.width, window.height)),
         ship=_load_sized("hud_ship.png", True, (box[2], box[3])),
-        hearts=_load_cells("hud_hearts.png", rules.hearts.cell_w, rules.hearts.cell_h, HEART_CELLS),
+        hearts=_load_cells(
+            "hud_hearts.png", rules.hearts.cell_w, rules.hearts.cell_h, HEART_CELL_COUNT
+        ),
         radar=_load_cells("hud_radar.png", wedge, wedge, motion.sweep_frames),
         ring=_load_cells("hud_ring.png", ring, ring, motion.ring_frames),
-        scan=_load_sized("hud_scan.png", True, (motion.scan_w, SCAN_HEIGHT)),
+        scan=_load_wide("hud_scan.png", motion.scan_w),
         lamp=_load_sized("hud_lamp.png", True, (lamp, lamp)),
         label_font=pygame.font.Font(ASSETS_DIR / rules.fonts.label_file, rules.fonts.label_size),
         fonts={
@@ -125,3 +119,14 @@ def _load_cells(file: str, width: int, height: int, count: int) -> tuple[pygame.
     return tuple(
         strip.subsurface(pygame.Rect(i * width, 0, width, height)).copy() for i in range(count)
     )
+
+
+def _load_wide(file: str, width: int) -> pygame.Surface:
+    """Read one picture and check it is exactly ``width`` px wide, whatever its height."""
+    image: pygame.Surface = _load(file, True)
+    if image.get_width() != width:
+        raise ValueError(
+            f"assets/{file}: width is {image.get_width()}, expected {width} (tuning/hud.json); "
+            "run tools/art/hud_panel.py"
+        )
+    return image

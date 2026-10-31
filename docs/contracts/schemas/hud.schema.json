@@ -459,7 +459,8 @@
         "bars_right",
         "bars_bottom",
         "tier_mid",
-        "tier_high"
+        "tier_high",
+        "tier_mid_mix"
       ],
       "properties": {
         "box": {
@@ -536,6 +537,12 @@
           "description": "From this level the number is the last-life color.",
           "type": "integer",
           "minimum": 1
+        },
+        "tier_mid_mix": {
+          "description": "The mid tier's color: share of the way from the level color to the last-life color, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     },
