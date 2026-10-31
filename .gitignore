@@ -19,5 +19,5 @@ build/
 # Claude Code local settings
 .claude/settings.local.json
 
-# Local-only files, never committed: mood references from other works
+# Local-only files, never committed: mood references from other works, parked art scripts
 local/

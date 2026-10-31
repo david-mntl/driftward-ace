@@ -17,7 +17,8 @@
   ],
 
   "containerEnv": {
-    "DISPLAY": "${localEnv:DISPLAY}"
+    "DISPLAY": "${localEnv:DISPLAY}",
+    "PIXELLAB_API_TOKEN": "${localEnv:PIXELLAB_API_TOKEN}"
   },
 
   "customizations": {
