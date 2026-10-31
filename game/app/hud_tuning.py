@@ -37,6 +37,7 @@ _AT_LEAST_ONE: frozenset[str] = frozenset(
         "window.height",
         "panel.width",
         "frame.pillar_width",
+        "frame.sheen_rows",
         "score.tile_count",
         "score.tile_w",
         "score.tile_h",

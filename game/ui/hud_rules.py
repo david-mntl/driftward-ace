@@ -71,6 +71,7 @@ class FrameRules:
 
     pillar_width: int
     sheen: bool
+    sheen_rows: int
     last_lamp: Point2
     lamp_radius: float
     spill: float

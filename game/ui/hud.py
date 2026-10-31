@@ -213,6 +213,9 @@ class HudView:
         self._graze_numbers: dict[int, pygame.Surface] = {}
         self._best_numbers: dict[int, pygame.Surface] = {}
         self._frame_strips: tuple[tuple[pygame.Surface, tuple[int, int]], ...] = self._strips()
+        self._sheen_pieces: tuple[tuple[pygame.Surface, tuple[int, int]], ...] = (
+            self._sheen_slices()
+        )
         self._dim_layer: pygame.Surface = self._make_dim()
         self._lives: int | None = None
         self._grazes: int = 0
@@ -238,8 +241,8 @@ class HudView:
         self._draw_graze(window, run.grazes, tick)
         for strip, position in self._frame_strips:
             window.blit(strip, position)
-        if rules.frame.sheen:
-            window.blit(self._art.sheen, (rules.window.field_x, rules.window.field_y))
+        for piece, position in self._sheen_pieces:
+            window.blit(piece, position)
         if run.lives == 1:
             self._draw_lamp(window, tick)
 
@@ -370,6 +373,31 @@ class HudView:
             pygame.Rect(right, win.field_y, frame.get_width() - right, SCREEN_H),
         )
         return tuple((frame.subsurface(rect), rect.topleft) for rect in rects)
+
+    def _sheen_slices(self) -> tuple[tuple[pygame.Surface, tuple[int, int]], ...]:
+        """Return the sheen cut into strips ``sheen_rows`` tall, each trimmed to where it has any
+        sheen, with its window position. Empty when the sheen is off. Blending only these pixels is
+        what keeps the browser build at full speed: the whole play area costs about half the frame.
+        """
+        rules = self._rules
+        if not rules.frame.sheen:
+            return ()
+        sheen: pygame.Surface = self._art.sheen
+        pieces: list[tuple[pygame.Surface, tuple[int, int]]] = []
+        for top in range(0, sheen.get_height(), rules.frame.sheen_rows):
+            height: int = min(rules.frame.sheen_rows, sheen.get_height() - top)
+            bounds: pygame.Rect = sheen.subsurface(
+                pygame.Rect(0, top, sheen.get_width(), height)
+            ).get_bounding_rect()
+            if bounds.width and bounds.height:
+                area: pygame.Rect = bounds.move(0, top)
+                pieces.append(
+                    (
+                        sheen.subsurface(area),
+                        (rules.window.field_x + area.x, rules.window.field_y + area.y),
+                    )
+                )
+        return tuple(pieces)
 
     def _make_dim(self) -> pygame.Surface:
         """Return the window-sized dim layer, black at ``dim_alpha``."""

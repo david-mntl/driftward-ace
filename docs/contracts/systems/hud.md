@@ -124,7 +124,7 @@ The app opens the window from the rules: `pygame.display.set_mode((rules.window.
 | Level | the number in the tier color, the bars: lit up to the level, ramp `level` to `last_life`; bars past `level` are `dim` | number cached by level; rect fills |
 | Radar | frame `(tick % sweep_ticks) * frames // sweep_ticks` of the wedge | one blit |
 | Graze count | cached by value, centered in the dial, shrunk to fit `count_limit` | rendered again only when the count changes |
-| Frame | the strips of `hud_frame.png` round the play area and at the pillar, then the sheen over the play area when `frame.sheen` is on | blits |
+| Frame | the strips of `hud_frame.png` round the play area and at the pillar, then the sheen over the play area when `frame.sheen` is on, as strips `sheen_rows` tall trimmed to where they have any sheen (about 60 000 px, not the play area's 307 200) | blits |
 | Motions | see Rules | frames made ahead of time |
 
 States: lives 3, 2 and 1 show 3, 2 and 1 lit hearts, the last one orange; lives 0 (game over) shows none lit; a level or graze count past the limits is clamped as the GDD says.
@@ -138,6 +138,7 @@ Pause and game over: the app calls `HudView.dim(window)` after the HUD, then dra
 - The HUD only reads game state. It never changes it. It keeps only view state: the last lives, the last grazes and the start tick of each running motion. Source: 10-ui.md, rule 5.
 - **Motions** (all from `tuning/hud.json`, `motion`): the radar wedge turns once per `sweep_ticks`; the scan line falls once per `scan_ticks`; on the last life the last heart swells to `beat_scale` and back over `beat_ticks` and the lamp pulses to `lamp_low` over `lamp_ticks`; when `lives` drops, the heart that went plays its break (`break_keys`) over `break_ticks`, then stays dim; when `grazes` rises, the count swells to `bump_scale` over `bump_ticks` and a ring grows over `ring_ticks`. A rise in lives, or a fall in grazes, is a new run: all motions reset, none plays. The motions run on the `tick` the app passes, which stops while paused. Source: 10-ui.md, `hud_motion`.
 - Colors, sizes, positions, counts and timings all come from the tuning file. No value is written in code. The pictures `tools/art/hud_panel.py` bakes read the same file; changing a color or a position needs the tool run again for the baked parts. Source: 10-ui.md, rule 12.
+- The sheen is never blended as one play-area-sized picture: measured in the browser build, that one blit took the game from 59 to 32 frames a second. Source: 15-tech-constraints.md, rule 5.
 - Per frame the HUD makes no new surface, except the count's and the best's text when they change and the count's swell frames while it swells. Source: 10-ui.md, rule 11; 15-tech-constraints.md, rule 5.
 - The score shows `min(score, 10**tile_count - 1)`. The tiles never show a number the score doesn't have. Source: 10-ui.md, `hud_score`.
 - Score bar: with `best` not None and above 0, the target is `best`; else the next multiple of `bar_step` above the score. Lit segments are `ceil(min(1, score / target) * segments)`, 0 at score 0. Source: 10-ui.md, `hud_score_bar`.

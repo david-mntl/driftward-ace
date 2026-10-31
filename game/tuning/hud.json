@@ -34,6 +34,7 @@
   "frame": {
     "pillar_width": 24,
     "sheen": true,
+    "sheen_rows": 16,
     "last_lamp": [
       690,
       478

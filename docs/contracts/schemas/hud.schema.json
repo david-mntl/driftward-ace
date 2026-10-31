@@ -209,6 +209,7 @@
       "required": [
         "pillar_width",
         "sheen",
+        "sheen_rows",
         "last_lamp",
         "lamp_radius",
         "spill"
@@ -220,8 +221,13 @@
           "minimum": 1
         },
         "sheen": {
-          "description": "Show the glass sheen over the play area. Off saves a translucent blit per frame.",
+          "description": "Show the glass sheen over the play area.",
           "type": "boolean"
+        },
+        "sheen_rows": {
+          "description": "The sheen is drawn in strips this many rows tall, each cut to the bands' own width, so the game blends only pixels that have sheen. Smaller strips blend fewer pixels but make more blits.",
+          "type": "integer",
+          "minimum": 1
         },
         "last_lamp": {
           "description": "Centre of the pillar lamp that turns orange on the last life, window px.",
