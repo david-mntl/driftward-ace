@@ -56,7 +56,10 @@ class HudRules:
     fonts: FontRules             # the two font files, the sizes, label letter spacing, text mixes
 ```
 ```python
-# game/ui/hud.py. Imports: pygame, core.run, ui.hud_rules. Never app. Never reads the run mode.
+# game/ui/hud.py. Imports: pygame, core.world, ui.hud_rules, ui.score_text. Never app, never core.run. Never reads the run mode.
+class HudRun(Protocol):          # read-only score, lives, grazes, level (ints). core.run.Run satisfies it
+    ...
+
 @dataclass(frozen=True)
 class HudArt:
     frame: pygame.Surface        # hud_frame.png: frame body and pillar, glass and panel transparent
@@ -75,7 +78,7 @@ class HudView:
     def __init__(self, rules: HudRules, art: HudArt) -> None: ...
         # Builds once: the panel composite (panel, wireframe, static labels), 20 digit images (10 lit,
         # 10 dim), the pre-scaled last-life hearts, the dim layer, the frame's strips.
-    def draw(self, window: pygame.Surface, run: Run, best: int | None, tick: int) -> None: ...
+    def draw(self, window: pygame.Surface, run: HudRun, best: int | None, tick: int) -> None: ...
         # Draws the panel, the frame and the sheen on `window`. `tick` is the view clock (ticks, int).
         # Never touches the play area except for the sheen. Keeps the last lives and grazes to start the motions.
     def dim(self, window: pygame.Surface) -> None: ...
@@ -106,7 +109,7 @@ def load_hud_art(rules: HudRules) -> HudArt: ...
 The app opens the window from the rules: `pygame.display.set_mode((rules.window.width, rules.window.height))`, keeps the play area as `window.subsurface(Rect(field_x, field_y, SCREEN_W, SCREEN_H))` and draws the world on it. `core.world.SCREEN_W` and `SCREEN_H` don't change.
 
 ## Presentation
-`HudView.draw` reads only: `run.score`, `run.lives`, `run.grazes`, `run.level`, and `best` (a parameter, from the saves). Positions are in panel space (origin at the panel's top-left, `content_y` below the window's top) and live in the tuning file.
+`HudView.draw` reads only: `run.score`, `run.lives`, `run.grazes`, `run.level` (the `HudRun` protocol), and `best` (a parameter, from the saves). Positions are in panel space (origin at the panel's top-left, `content_y` below the window's top) and live in the tuning file.
 
 | Part | What is drawn | Cached or drawn |
 |---|---|---|
