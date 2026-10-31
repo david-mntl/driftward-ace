@@ -1,469 +1,406 @@
-"""Leaderboard page tests: the title, the empty-list line, the rows and the footer.
+"""Leaderboard page tests: the title, the medal rows, the plain rows, the empty line and the footer.
 
-Contract: docs/contracts/systems/game-flow.md, Interface (ui/leaderboard.py) and Presentation,
-Leaderboard page and the shared items (Text, Lines and blank lines, Cache, Only draws). The texts
-and the font sizes are stand-ins from scope report DRA-125, Values needed (Leaderboard page,
-Footer); the GDD does not hold them until UI-03 and UI-04. From DRA-126 the page also shows one
-row per saved entry: the row texts and look are stand-ins from scope report DRA-126, Values needed
-(Leaderboard rows: 16 px, 24 px apart, the place `1.`, the nickname, the score grouped like SCORE,
-`LV 3`) and docs/reports/DRA-126-away-log.md, Decisions, 5 (four columns, 24 px apart, the place and
-the score right-aligned, the nickname and the level left-aligned).
+Contract: docs/contracts/systems/screens.md, Interface (ui/leaderboard.py) and Presentation,
+Leaderboard page; 10-ui.md, `leaderboard_look`. Every size and color is read from the real
+tuning/screens.json through the `screen_rules` fixture, so a changed value moves the test with it.
 
-Positions are read from the drawn pixels (`pygame.image.tobytes`), never from a font size. The page
-is drawn on a black surface, so the ink is the text alone. Every text is compared with the same
-text rendered here in the default font (`_reference`), and its place is worked out from the ink's
-own offset in that render. The fonts' `get_linesize()` give the contract's rows (a blank line is
-one body line), as in `test_game_over.py`. The footer's place is read from the instructions page,
-which the contract names as its twin.
+Positions are read from the drawn pixels, never from a font size: the page is drawn on a black
+surface, so a bright pixel is ink, and a rank color is found as the exact color of a corner bracket
+(brackets are solid). Where a row sits is worked out from the contract (the table is centered
+between the title band and the footer band as if it held ten rows).
 """
 
-from itertools import accumulate
-from typing import NamedTuple
+import dataclasses
 
 import pygame
 import pytest
 
-import ui.leaderboard as page_view
-import ui.screen_look as look_view
+from app.assets import load_screen_fonts
 from core.saves import ScoreEntry
-from ui.instructions import draw_instructions
-from ui.leaderboard import draw_leaderboard
-from ui.screen_look import screen_font
+from ui.leaderboard import TOP_COUNT, draw_leaderboard
+from ui.screen_look import ScreenLook
+from ui.screen_rules import ScreenRules
 
-SIZES: tuple[tuple[int, int], ...] = ((640, 480), (800, 600))
-"""Surfaces drawn on: the canvas (03-world-and-camera.md, screen_w, screen_h (guess)) and a larger
-one, so the centering is shown to follow the surface and not a constant."""
+SIZES: tuple[tuple[int, int], ...] = ((856, 518), (1000, 640))
+"""Surfaces drawn on: the window (10-ui.md, window_screens) and a larger one, so the centering is
+shown to follow the surface and not a constant."""
 
-TITLE_TEXT: str = "LEADERBOARD"
-TITLE_FONT_SIZE: int = 32
-EMPTY_TEXT: str = "No scores yet."
-BODY_FONT_SIZE: int = 16
-"""Source: scope report DRA-125, Values needed, Leaderboard page: title 32 px, the line 16 px."""
+RANKS: tuple[str, ...] = ("rank_1", "rank_2", "rank_3")
+INK_LEVEL: int = 100
+"""A pixel with a channel above this is ink. The glass fill and the faint rule stay below it."""
 
-FOOTER_TEXT: str = "Press Enter or Space to go back."
-"""Source: scope report DRA-125, Values needed, Footer (16 px)."""
+NAMES: tuple[str, ...] = (
+    "VEGA",
+    "MOONDOG",
+    "K-9",
+    "ORBIT",
+    "DAVID",
+    "NOVA",
+    "PIXEL",
+    "ZED",
+    "LUNA",
+    "STARDUST*",
+)
+SCORES: tuple[int, ...] = (
+    1204880,
+    986420,
+    812300,
+    640150,
+    598730,
+    455210,
+    391880,
+    280440,
+    176300,
+    98650,
+)
+RIGHT_EDGE_TOLERANCE_PX: int = 4
+"""Slack for a glyph's side bearing and the glow when a right edge is read from ink."""
 
-TEXT_COLOR: tuple[int, int, int] = (255, 255, 255)
-"""Source: scope report DRA-125, Values needed (white text)."""
+FAINT_LEVEL: int = 8
+"""Above this a pixel is more than the last medal row's faint glow reaching a plain row."""
 
-GRAY: int = 60
-"""A background below white, for the checks that show nothing fills the surface."""
-
-TOLERANCE_PX: int = 1
-"""Rects are placed by integer halves: a center, or a vertical middle, may be one px off."""
-
-Band = tuple[int, int, int, int]
-"""One line of ink: top row, bottom row, left column, right column, all inclusive."""
+CENTER_TOLERANCE_PX: int = 3
+"""Slack for centering read from ink (glyph bearings, the trailing letter-spacing)."""
 
 
-class _Ref(NamedTuple):
-    """A text rendered here: its ink rectangle and where that sits in the render."""
-
-    crop: tuple[bytes, ...]
-    image_width: int
-    image_height: int
-    ink_left: int
-    ink_top: int
+def _entries(count: int = 10, names: tuple[str, ...] = NAMES) -> list[ScoreEntry]:
+    """``count`` entries in place order, scores falling, levels 9 down to 2."""
+    return [
+        ScoreEntry(nickname=names[i], score=SCORES[i], level_reached=max(9 - i, 2))
+        for i in range(count)
+    ]
 
 
-def _surface(size: tuple[int, int], gray: int = 0) -> pygame.Surface:
+def _page(
+    look: ScreenLook, entries: list[ScoreEntry], size: tuple[int, int] = SIZES[0], gray: int = 0
+) -> pygame.Surface:
     surface = pygame.Surface(size)
     surface.fill((gray, gray, gray))
+    draw_leaderboard(surface, look, entries)
     return surface
 
 
-def _levels(surface: pygame.Surface) -> bytes:
-    """The red level of every pixel, row by row. Every picture here is gray, so it is the level."""
-    return pygame.image.tobytes(surface, "RGB")[::3]
+def _table_top(rules: ScreenRules, size: tuple[int, int]) -> int:
+    """Top of the first row: the ten-row table centered between the title band and the footer."""
+    page = rules.leaderboard
+    body_top = page.margin_top + page.head_h
+    foot_top = size[1] - page.margin_bottom - page.foot_h
+    tops = TOP_COUNT * page.top_h + (TOP_COUNT - 1) * page.top_gap
+    table = tops + page.rest_gap + (10 - TOP_COUNT) * page.row_h
+    return body_top + (foot_top - body_top - table) // 2
 
 
-def _bands(surface: pygame.Surface) -> list[Band]:
-    """Each run of rows holding ink, with its ink columns."""
-    width, height = surface.get_size()
-    levels = _levels(surface)
-    bands: list[Band] = []
-    top: int | None = None
-    for y in range(height + 1):
-        inked = y < height and any(levels[y * width : (y + 1) * width])
-        if inked and top is None:
-            top = y
-        elif not inked and top is not None:
-            columns = [x for x in range(width) if any(levels[r * width + x] for r in range(top, y))]
-            bands.append((top, y - 1, columns[0], columns[-1]))
-            top = None
-    return bands
-
-
-def _crop(levels: bytes, width: int, band: Band) -> tuple[bytes, ...]:
-    """The band's ink rectangle, one bytes row per pixel row."""
-    top, bottom, left, right = band
-    return tuple(levels[y * width + left : y * width + right + 1] for y in range(top, bottom + 1))
-
-
-def _reference(text: str, size: int) -> _Ref:
-    """``text`` in the default font at ``size``, white on black: its ink and the ink's offset."""
-    image = pygame.font.Font(None, size).render(text, True, TEXT_COLOR)
-    canvas = _surface(image.get_size())
-    canvas.blit(image, (0, 0))
-    band = _bands(canvas)[0]
-    crop = _crop(_levels(canvas), canvas.get_width(), band)
-    return _Ref(crop, image.get_width(), image.get_height(), band[2], band[0])
-
-
-def _page(size: tuple[int, int], gray: int = 0) -> pygame.Surface:
-    surface = _surface(size, gray)
-    draw_leaderboard(surface)
-    return surface
-
-
-def _assert_line(levels: bytes, width: int, band: Band, ref: _Ref, what: str) -> None:
-    """The band is exactly ``ref``'s ink and its render is centered across ``width``."""
-    assert (band[1] - band[0] + 1, band[3] - band[2] + 1) == (len(ref.crop), len(ref.crop[0])), (
-        f"{what}: the ink is not the text's size"
-    )
-    assert _crop(levels, width, band) == ref.crop, f"{what}: not the default font's render"
-    rect_left = band[2] - ref.ink_left
-    assert abs(2 * rect_left + ref.image_width - width) <= TOLERANCE_PX, (
-        f"{what}: not centered across {width}: rect left {rect_left}, "
-        f"render width {ref.image_width}"
+def _row_rect(rules: ScreenRules, size: tuple[int, int], place: int) -> pygame.Rect:
+    """The box of place ``place`` (1 to 10): a medal row's panel, or a plain row's band."""
+    page = rules.leaderboard
+    left = (size[0] - page.table_w) // 2
+    top = _table_top(rules, size)
+    if place <= TOP_COUNT:
+        return pygame.Rect(
+            left, top + (place - 1) * (page.top_h + page.top_gap), page.table_w, page.top_h
+        )
+    first_plain = top + TOP_COUNT * page.top_h + (TOP_COUNT - 1) * page.top_gap + page.rest_gap
+    return pygame.Rect(
+        left, first_plain + (place - TOP_COUNT - 1) * page.row_h, page.table_w, page.row_h
     )
 
 
-def test_the_leaderboard_shows_the_title_the_empty_line_and_the_footer_centered(
-    pygame_headless: None,
+def _ink(surface: pygame.Surface, area: pygame.Rect, level: int = INK_LEVEL) -> pygame.Rect | None:
+    """The rectangle of the bright pixels inside ``area``, in surface coordinates; None if none."""
+    part = surface.subsurface(area.clip(surface.get_rect()))
+    dark = pygame.mask.from_threshold(part, (0, 0, 0, 255), (level, level, level, 255))
+    dark.invert()
+    boxes = dark.get_bounding_rects()
+    if not boxes:
+        return None
+    box = boxes[0].unionall(boxes[1:])
+    return box.move(area.clip(surface.get_rect()).topleft)
+
+
+def _count(
+    surface: pygame.Surface, area: pygame.Rect, color: tuple[int, int, int], tolerance: int = 1
+) -> int:
+    """How many pixels inside ``area`` are ``color``, each channel within ``tolerance``."""
+    part = surface.subsurface(area.clip(surface.get_rect()))
+    level = (tolerance, tolerance, tolerance, 255)
+    return pygame.mask.from_threshold(part, (*color, 255), level).count()
+
+
+def _rows_differing(first: pygame.Surface, second: pygame.Surface) -> tuple[int, int] | None:
+    """The first and last pixel row where the two pictures differ; None if they are the same."""
+    width, height = first.get_size()
+    a = pygame.image.tobytes(first, "RGB")
+    b = pygame.image.tobytes(second, "RGB")
+    rows = [
+        y
+        for y in range(height)
+        if a[y * width * 3 : (y + 1) * width * 3] != b[y * width * 3 : (y + 1) * width * 3]
+    ]
+    return (rows[0], rows[-1]) if rows else None
+
+
+def test_title_is_in_the_head_band_and_centered(
+    look: ScreenLook, screen_rules: ScreenRules
 ) -> None:
-    title_ref = _reference(TITLE_TEXT, TITLE_FONT_SIZE)
-    empty_ref = _reference(EMPTY_TEXT, BODY_FONT_SIZE)
-    footer_ref = _reference(FOOTER_TEXT, BODY_FONT_SIZE)
-    title_line = pygame.font.Font(None, TITLE_FONT_SIZE).get_linesize()
-    body_line = pygame.font.Font(None, BODY_FONT_SIZE).get_linesize()
+    page = screen_rules.leaderboard
     for size in SIZES:
-        width, height = size
-        surface = _page(size)
-        bands = _bands(surface)
-        assert len(bands) == 3, f"{size=}: lines of ink: {bands}"
-        levels = _levels(surface)
-        title, empty, footer = bands
-        _assert_line(levels, width, title, title_ref, f"{size=} title")
-        _assert_line(levels, width, empty, empty_ref, f"{size=} empty line")
-        _assert_line(levels, width, footer, footer_ref, f"{size=} footer")
-        # The title, one blank body line, then the empty-list line.
-        title_top = title[0] - title_ref.ink_top
-        assert empty[0] - empty_ref.ink_top == title_top + title_line + body_line, (
-            f"{size=}: the empty line is not one blank line under the title"
-        )
-        # That block is centered between the surface's top and the footer's top.
-        footer_top = height - 2 * body_line
-        block_bottom = empty[0] - empty_ref.ink_top + body_line
-        assert abs(title_top + block_bottom - footer_top) <= TOLERANCE_PX, (
-            f"{size=}: the block {title_top}..{block_bottom} is not centered above {footer_top}"
-        )
+        surface = _page(look, _entries(), size)
+        band = pygame.Rect(40, 0, size[0] - 80, page.margin_top + page.head_h)
+        ink = _ink(surface, band, 150)
+        assert ink is not None, f"{size}: no title ink in the head band"
+        assert abs(ink.centerx - size[0] / 2) <= CENTER_TOLERANCE_PX, f"{size}: title off center"
+        assert ink.top >= page.margin_top - 4, f"{size}: title is above its margin"
 
 
-def test_the_footer_is_on_the_same_rows_as_the_instructions_page(pygame_headless: None) -> None:
-    for size in SIZES:
-        width, _ = size
-        leaderboard = _page(size)
-        instructions = _surface(size)
-        draw_instructions(instructions)
-        footer = _bands(leaderboard)[-1]
-        assert footer == _bands(instructions)[-1], f"{size=}: the footer is not in the same place"
-        assert _crop(_levels(leaderboard), width, footer) == _crop(
-            _levels(instructions), width, footer
-        ), f"{size=}: the footer's pixels differ from the instructions page's"
-
-
-def test_the_leaderboard_draws_the_same_pixels_twice_and_changes_nothing_but_the_surface(
-    pygame_headless: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_medal_rows_have_rank_colored_corner_brackets(
+    look: ScreenLook, screen_rules: ScreenRules
 ) -> None:
-    texts_before = (page_view.LEADERBOARD_TITLE_TEXT, page_view.LEADERBOARD_EMPTY_TEXT)
-    caplog.set_level(0)
+    out = screen_rules.glass.bracket_out
+    colors = [screen_rules.palette[key] for key in RANKS]
+    assert len(set(colors)) == 3, "the three rank colors must differ"
     for size in SIZES:
-        first = pygame.image.tobytes(_page(size), "RGB")
-        second = pygame.image.tobytes(_page(size), "RGB")
-        assert first == second, f"{size=}: two draws, two pictures"
-        # Nothing fills the background: every pixel with no ink stays the background's.
-        on_gray = pygame.image.tobytes(_page(size, gray=GRAY), "RGB")
-        assert all(
-            bright == GRAY for ink, bright in zip(first, on_gray, strict=True) if ink == 0
-        ), f"{size=}: the draw changed pixels with no ink"
-        assert _page(size).get_size() == size
-    assert caplog.records == [], "the view logged"
-    assert texts_before == (page_view.LEADERBOARD_TITLE_TEXT, page_view.LEADERBOARD_EMPTY_TEXT)
-    # Every fixed text is rendered once, on the first draw: after that, no render per frame.
-    renders: list[str] = []
-
-    class CountingFont:
-        def __init__(self, font: pygame.font.Font) -> None:
-            self._font = font
-
-        def render(self, text: str, antialias: bool, color: tuple[int, int, int]) -> pygame.Surface:
-            renders.append(text)
-            return self._font.render(text, antialias, color)
-
-        def __getattr__(self, name: str) -> object:
-            return getattr(self._font, name)
-
-    def counting(size: int) -> CountingFont:
-        return CountingFont(screen_font(size))
-
-    for module in (page_view, look_view):
-        monkeypatch.setattr(module, "screen_font", counting, raising=False)
-    for _ in range(3):
-        _page(SIZES[0])
-    assert renders == [], f"rendered again on later frames: {renders}"
+        surface = _page(look, _entries(), size)
+        for place, color in enumerate(colors, start=1):
+            rect = _row_rect(screen_rules, size, place)
+            corners = [
+                (rect.left - out, rect.top - out),
+                (rect.right + out - 1, rect.top - out),
+            ]
+            if place == TOP_COUNT:
+                # The next medal row's glow lies over the bottom corners above it, so only the
+                # last medal row's bottom corners are exactly the rank color.
+                corners += [
+                    (rect.left - out, rect.bottom + out - 1),
+                    (rect.right + out - 1, rect.bottom + out - 1),
+                ]
+            for corner in corners:
+                assert tuple(surface.get_at(corner))[:3] == color, (
+                    f"{size}: place {place} has no {color} bracket at {corner}"
+                )
 
 
-# DRA-126: the rows. Contract: game-flow.md, Interface (ui/leaderboard.py) and Presentation,
-# Leaderboard page (Filled, Row cells, Columns).
-
-ROW_SPACING: int = 24
-"""Px from one row's top to the next one's. Source: scope report DRA-126, Values needed
-(Leaderboard rows: 16 px, 24 px apart)."""
-
-COLUMN_GAP: int = 24
-"""Px between two columns. Source: docs/reports/DRA-126-away-log.md, Decisions, 5."""
-
-LEVEL_LABEL: str = "LV"
-"""The label before the level reached (`LV 3`). Source: scope report DRA-126, Values needed."""
+def test_plain_rows_have_no_brackets(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    out = screen_rules.glass.bracket_out
+    cyan = screen_rules.palette["frame_lights"]
+    surface = _page(look, _entries())
+    for place in range(TOP_COUNT + 1, 11):
+        rect = _row_rect(screen_rules, SIZES[0], place)
+        corner = (rect.left - out, rect.top - out)
+        assert tuple(surface.get_at(corner))[:3] != cyan, f"place {place} has a bracket"
 
 
-def _entry(nickname: str, score: int, level: int) -> ScoreEntry:
-    return ScoreEntry(nickname=nickname, score=score, level_reached=level)
+def test_medal_rows_are_taller_than_plain_rows_and_set_apart(
+    look: ScreenLook, screen_rules: ScreenRules
+) -> None:
+    page = screen_rules.leaderboard
+    assert page.top_h > page.row_h
+    assert page.rest_gap > 0
+    third = _row_rect(screen_rules, SIZES[0], 3)
+    fourth = _row_rect(screen_rules, SIZES[0], 4)
+    assert fourth.top - third.bottom == page.rest_gap
+    second = _row_rect(screen_rules, SIZES[0], 2)
+    assert second.top - _row_rect(screen_rules, SIZES[0], 1).bottom == page.top_gap
+    assert fourth.height == page.row_h
+    assert third.height == page.top_h
 
 
-FIVE: tuple[ScoreEntry, ...] = (
-    _entry("ACE", 1234567, 3),
-    _entry("ZZZZZZZZZZ", 90000, 8),
-    _entry(" A B", 999, 1),
-    _entry("M", 5, 4),
-    _entry("NEO.-_!?*", 0, 2),
-)
-"""Five entries in the order a list holds them, #1 first. Different widths in every column: a
-nickname of one letter and of ten, one with blanks (a leading and an inner one, drawn as spaces),
-scores from 0 to seven digits, levels 1 to 8."""
+def test_plain_rows_have_a_faint_line_under_them(
+    look: ScreenLook, screen_rules: ScreenRules
+) -> None:
+    surface = _page(look, _entries())
+    for place in range(TOP_COUNT + 1, 11):
+        rect = _row_rect(screen_rules, SIZES[0], place)
+        x = rect.left + 2
+        assert max(surface.get_at((x, rect.bottom))[:3]) > FAINT_LEVEL, f"place {place}: no line"
+        # The row above ends with its line on this row's first pixel row.
+        for y in range(rect.top + 1, rect.bottom):
+            assert max(surface.get_at((x, y))[:3]) <= FAINT_LEVEL, f"place {place}: ink at row {y}"
 
-TEN: tuple[ScoreEntry, ...] = tuple(
-    _entry(name, score, level)
-    for name, score, level in (
-        ("ONE", 100000000, 8),
-        ("TWO", 12345678, 7),
-        ("THREE", 1000000, 6),
-        ("FOUR", 123456, 5),
-        ("FIVE", 12345, 5),
-        ("SIX", 9999, 4),
-        ("SEVEN", 1000, 3),
-        ("EIGHT", 999, 2),
-        ("NINE", 10, 1),
-        ("TEN", 0, 1),
+
+def test_entry_i_is_place_i_plus_1(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    base = _page(look, _entries())
+    for index in range(10):
+        names = list(NAMES)
+        names[index] = "ZZZZ"
+        changed = _page(look, _entries(names=tuple(names)))
+        span = _rows_differing(base, changed)
+        rect = _row_rect(screen_rules, SIZES[0], index + 1)
+        assert span is not None, f"place {index + 1}: its name draws nothing"
+        message = (
+            f"place {index + 1}: its name changed rows {span}, outside {rect.top}..{rect.bottom}"
+        )
+        assert rect.top - 2 <= span[0], message
+        assert span[1] <= rect.bottom + 2, message
+
+
+def test_all_ten_rows_fit_between_the_title_and_the_footer(
+    look: ScreenLook, screen_rules: ScreenRules
+) -> None:
+    page = screen_rules.leaderboard
+    for size in SIZES:
+        surface = _page(look, _entries(), size)
+        first = _row_rect(screen_rules, size, 1)
+        last = _row_rect(screen_rules, size, 10)
+        assert first.top >= page.margin_top + page.head_h, f"{size}: the table touches the title"
+        assert last.bottom <= size[1] - page.margin_bottom - page.foot_h, f"{size}: touches footer"
+        assert _ink(surface, last, 150) is not None, f"{size}: the tenth row is empty"
+
+
+def test_fewer_entries_leave_the_rows_where_they_are(
+    look: ScreenLook, screen_rules: ScreenRules
+) -> None:
+    full = _page(look, _entries())
+    three = _page(look, _entries(3))
+    first = _row_rect(screen_rules, SIZES[0], 1)
+    third = _row_rect(screen_rules, SIZES[0], 3)
+    page = screen_rules.leaderboard
+    area = pygame.Rect(
+        0, first.top - 20, SIZES[0][0] - 60, third.bottom + page.rest_gap - first.top + 20
     )
-)
-"""A full top 10: the tenth place has two digits, so the place column is wider than for nine."""
-
-ONE: tuple[ScoreEntry, ...] = (_entry("SOLO", 42, 1),)
-
-
-def _cell_texts(place: int, entry: ScoreEntry) -> tuple[str, str, str, str]:
-    """The four cells of a row as the contract lists them: the place (`1.`), the nickname as
-    saved, the score grouped like SCORE with no label, the level (`LV 3`)."""
-    digits = f"{entry.score:,}".replace(",", " ")
-    return f"{place}.", entry.nickname, digits, f"{LEVEL_LABEL} {entry.level_reached}"
+    assert full.subsurface(area).get_buffer().raw == three.subsurface(area).get_buffer().raw
+    fourth = _row_rect(screen_rules, SIZES[0], 4)
+    assert _ink(three, pygame.Rect(100, fourth.top, 650, 200), 60) is None
 
 
-def _expected_page(
-    size: tuple[int, int], entries: tuple[ScoreEntry, ...], title_top: int, start: int
-) -> bytes:
-    """The page built here, cell by cell: the title and the footer centered, each row's four cells
-    in columns as wide as their widest cell, ``COLUMN_GAP`` apart, the table's left edge at
-    ``start``, the place and score right-aligned and the nickname and level left-aligned."""
-    width, height = size
-    body = pygame.font.Font(None, BODY_FONT_SIZE)
-    title = pygame.font.Font(None, TITLE_FONT_SIZE)
-    surface = _surface(size)
-
-    def centered(text: str, font: pygame.font.Font, top: int) -> None:
-        image = font.render(text, True, TEXT_COLOR)
-        surface.blit(image, image.get_rect(centerx=width // 2, top=top))
-
-    centered(TITLE_TEXT, title, title_top)
-    centered(FOOTER_TEXT, body, height - 2 * body.get_linesize())
-    rows = [_cell_texts(place, entry) for place, entry in enumerate(entries, start=1)]
-    widths = [max(body.size(row[column])[0] for row in rows) for column in range(4)]
-    lefts = [start, *(start + offset for offset in accumulate(w + COLUMN_GAP for w in widths[:3]))]
-    first_row = title_top + title.get_linesize() + body.get_linesize()
-    for index, row in enumerate(rows):
-        for column, text in enumerate(row):
-            image = body.render(text, True, TEXT_COLOR)
-            right_aligned = column in (0, 2)
-            left = lefts[column] + (widths[column] - image.get_width() if right_aligned else 0)
-            surface.blit(image, (left, first_row + index * ROW_SPACING))
-    return pygame.image.tobytes(surface, "RGB")
-
-
-def _drawn(size: tuple[int, int], entries: tuple[ScoreEntry, ...], gray: int = 0) -> pygame.Surface:
-    surface = _surface(size, gray)
-    draw_leaderboard(surface, entries)
-    return surface
-
-
-@pytest.mark.parametrize("entries", [ONE, FIVE, TEN], ids=["one", "five", "ten"])
-def test_the_leaderboard_with_entries_has_one_row_per_entry_in_four_aligned_columns(
-    pygame_headless: None, entries: tuple[ScoreEntry, ...]
-) -> None:
-    body = pygame.font.Font(None, BODY_FONT_SIZE)
-    title = pygame.font.Font(None, TITLE_FONT_SIZE)
-    title_ref = _reference(TITLE_TEXT, TITLE_FONT_SIZE)
-    for size in SIZES:
-        width, height = size
-        tag = f"{size=} {len(entries)} entries"
-        surface = _drawn(size, entries)
-        data = pygame.image.tobytes(surface, "RGB")
-        bands = _bands(surface)
-        # The title, one band per row (24 px apart, 16 px text: they never touch) and the footer.
-        assert len(bands) == len(entries) + 2, f"{tag}: lines of ink: {bands}"
-        title_band, footer = bands[0], bands[-1]
-        # The block, from the title's top to the last row's bottom, is centered above the footer.
-        title_top = title_band[0] - title_ref.ink_top
-        footer_top = height - 2 * body.get_linesize()
-        rows_height = body.get_linesize() + (len(entries) - 1) * ROW_SPACING
-        block = title.get_linesize() + body.get_linesize() + rows_height
-        assert abs(2 * title_top + block - footer_top) <= TOLERANCE_PX, (
-            f"{tag}: the block is not centered above the footer: top {title_top}"
+def test_scores_end_on_one_edge(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    page = screen_rules.leaderboard
+    surface = _page(look, _entries())
+    rect = _row_rect(screen_rules, SIZES[0], 1)
+    score_right = rect.right - page.pad_x - page.level_w - page.column_gap
+    for place in range(1, 11):
+        row = _row_rect(screen_rules, SIZES[0], place)
+        area = pygame.Rect(score_right - 200, row.top, 200 + page.column_gap // 2, row.height)
+        wide = score_right - (page.top_score_w if place <= TOP_COUNT else page.score_w)
+        ink = _ink(
+            surface, pygame.Rect(max(area.left, wide), row.top, area.right - wide, row.height), 150
         )
-        # Row i, entry i, place i + 1: the whole picture is the one built cell by cell here.
-        rows = [_cell_texts(place, entry) for place, entry in enumerate(entries, start=1)]
-        table = sum(max(body.size(row[c])[0] for row in rows) for c in range(4)) + 3 * COLUMN_GAP
-        starts = ((width - table) // 2, (width - table + 1) // 2)
-        candidates = [_expected_page(size, entries, title_top, start) for start in starts]
-        assert data in candidates, f"{tag}: not the table of four aligned columns, centered"
-        # The footer is the instructions page's footer, in the same place.
-        instructions = _surface(size)
-        draw_instructions(instructions)
-        assert footer == _bands(instructions)[-1], f"{tag}: the footer moved"
-        # The rows are ROW_SPACING apart: each row's ink top is row 0's plus i x 24 px (a cell's own
-        # glyphs may stand a row or two higher, so the band tops are read within 2 px).
-        row_tops = [band[0] for band in bands[1:-1]]
-        for index, top in enumerate(row_tops):
-            assert abs(top - (row_tops[0] + index * ROW_SPACING)) <= 2, (
-                f"{tag}: row {index} is not {ROW_SPACING} px under the one above: {row_tops}"
-            )
-
-
-def test_the_leaderboard_with_entries_puts_each_cell_in_its_column_by_its_alignment(
-    pygame_headless: None,
-) -> None:
-    # The place and the score end on their column's right edge, the nickname and the level start on
-    # its left edge, whatever the other rows hold. Read from a page whose rows differ in width.
-    body = pygame.font.Font(None, BODY_FONT_SIZE)
-    rows = [_cell_texts(place, entry) for place, entry in enumerate(TEN, start=1)]
-    size = SIZES[0]
-    surface = _drawn(size, TEN)
-    levels = _levels(surface)
-    width = size[0]
-    bands = _bands(surface)[1:-1]
-    # Per column, the row's ink inside the column's own horizontal range.
-    widths = [max(body.size(row[c])[0] for row in rows) for c in range(4)]
-    table = sum(widths) + 3 * COLUMN_GAP
-    start = (width - table) // 2
-    lefts = [start, *(start + offset for offset in accumulate(w + COLUMN_GAP for w in widths[:3]))]
-    for index, (band, row) in enumerate(zip(bands, rows, strict=True)):
-        for column, text in enumerate(row):
-            ref = _reference(text, BODY_FONT_SIZE)
-            right_aligned = column in (0, 2)
-            cell_left = lefts[column] + (
-                widths[column] - body.size(text)[0] if right_aligned else 0
-            )
-            ink_left = cell_left + ref.ink_left
-            top, bottom = band[0], band[1]
-            assert _crop_rows(levels, width, ink_left, top, bottom, ref), (
-                f"row {index} column {column} {text!r}: not at its place"
-            )
-
-
-def _crop_rows(levels: bytes, width: int, left: int, top: int, bottom: int, ref: _Ref) -> bool:
-    """True when ``ref``'s ink rectangle is in ``levels`` with its left column at ``left`` and its
-    rows ending inside ``top`` to ``bottom`` (the row's band)."""
-    height = len(ref.crop)
-    for y in range(top, bottom - height + 2):
-        got = tuple(
-            levels[(y + r) * width + left : (y + r) * width + left + len(ref.crop[0])]
-            for r in range(height)
+        assert ink is not None, f"place {place}: no score ink"
+        assert score_right - RIGHT_EDGE_TOLERANCE_PX <= ink.right <= score_right, (
+            f"place {place}: score ends at {ink.right}, not {score_right}"
         )
-        if got == ref.crop:
-            return True
-    return False
 
 
-def test_the_leaderboard_with_no_entries_is_the_dra_125_page(pygame_headless: None) -> None:
+def test_table_is_centered(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    rank = screen_rules.palette["rank_1"]
     for size in SIZES:
-        default = pygame.image.tobytes(_page(size), "RGB")
-        assert pygame.image.tobytes(_drawn(size, ()), "RGB") == default, f"{size=}: ()"
-        empty_list = _surface(size)
-        draw_leaderboard(empty_list, [])
-        assert pygame.image.tobytes(empty_list, "RGB") == default, f"{size=}: []"
-        bands = _bands(_page(size))
-        assert len(bands) == 3, f"{size=}: not the title, the empty line and the footer: {bands}"
-        levels = _levels(_page(size))
-        _assert_line(levels, size[0], bands[1], _reference(EMPTY_TEXT, BODY_FONT_SIZE), "empty")
+        surface = _page(look, _entries(), size)
+        row = _row_rect(screen_rules, size, 1)
+        area = row.inflate(60, 12)
+        pixels = pygame.mask.from_threshold(
+            surface.subsurface(area.clip(surface.get_rect())), (*rank, 255), (1, 1, 1, 255)
+        ).get_bounding_rects()
+        left = min(box.left for box in pixels) + area.left
+        right = max(box.right for box in pixels) + area.left
+        assert abs((left + right) / 2 - size[0] / 2) <= 1, f"{size}: the table is off center"
 
 
-def test_the_footer_of_the_filled_page_is_the_instructions_footer(pygame_headless: None) -> None:
-    for size in SIZES:
-        width, _ = size
-        instructions = _surface(size)
-        draw_instructions(instructions)
-        footer = _bands(instructions)[-1]
-        for entries in (ONE, FIVE, TEN):
-            page = _drawn(size, entries)
-            assert _bands(page)[-1] == footer, f"{size=} {len(entries)}: the footer moved"
-            assert _crop(_levels(page), width, footer) == _crop(
-                _levels(instructions), width, footer
-            ), f"{size=} {len(entries)}: the footer's pixels differ"
-
-
-def test_the_filled_leaderboard_draws_the_same_pixels_twice_and_changes_nothing_but_the_surface(
-    pygame_headless: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_each_medal_row_has_a_medal_in_its_rank_color(
+    look: ScreenLook, screen_rules: ScreenRules
 ) -> None:
-    caplog.set_level(0)
-    entries_before = tuple(
-        ScoreEntry(nickname=e.nickname, score=e.score, level_reached=e.level_reached) for e in TEN
+    page = screen_rules.leaderboard
+    surface = _page(look, _entries())
+    shapes = []
+    for place, key in enumerate(RANKS, start=1):
+        row = _row_rect(screen_rules, SIZES[0], place)
+        cell = pygame.Rect(row.left + page.pad_x, row.top, page.top_place_w, row.height)
+        assert _count(surface, cell, screen_rules.palette[key], 30) >= 20, (
+            f"place {place}: no medal"
+        )
+        ink = _ink(surface, cell, 150)
+        assert ink is not None, f"place {place}: no medal ink"
+        assert cell.contains(ink), f"place {place}: medal leaves its cell"
+        shapes.append(pygame.image.tobytes(surface.subsurface(cell), "RGB"))
+    assert len(set(shapes)) == 3, "the three medals must not look the same"
+
+
+def test_plain_rows_have_no_medal(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    page = screen_rules.leaderboard
+    surface = _page(look, _entries())
+    for place in range(TOP_COUNT + 1, 11):
+        row = _row_rect(screen_rules, SIZES[0], place)
+        number = pygame.Rect(row.left + page.pad_x, row.top, page.place_w, row.height)
+        ink = _ink(surface, number, 40)
+        assert ink is not None, f"place {place}: no number"
+        assert ink.width <= 2 * 12, f"place {place}: more than a number"
+        assert _count(surface, number, screen_rules.palette["rank_1"]) == 0
+
+
+def test_empty_list_shows_the_line_and_no_rows(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    page = screen_rules.leaderboard
+    for size in SIZES:
+        surface = _page(look, [], size)
+        body_top = page.margin_top + page.head_h
+        foot_top = size[1] - page.margin_bottom - page.foot_h
+        line = _ink(surface, pygame.Rect(100, body_top, size[0] - 200, foot_top - body_top), 60)
+        assert line is not None, f"{size}: the empty list says nothing"
+        assert line.top >= body_top + page.empty_top - 4, f"{size}: the line is above its place"
+        assert abs(line.centerx - size[0] / 2) <= CENTER_TOLERANCE_PX, f"{size}: line off center"
+        assert line.height < page.top_h, f"{size}: more than one line of text"
+        for key in RANKS:
+            whole = surface.get_rect()
+            assert _count(surface, whole, screen_rules.palette[key]) == 0, f"{size}: a medal row"
+
+
+def test_footer_shows_the_back_keys_centered(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    page = screen_rules.leaderboard
+    cyan = screen_rules.palette["frame_lights"]
+    for size in SIZES:
+        surface = _page(look, _entries(), size)
+        band = pygame.Rect(
+            100, size[1] - page.margin_bottom - page.foot_h, size[0] - 200, page.foot_h
+        )
+        ink = _ink(surface, band, 60)
+        assert ink is not None, f"{size}: no footer"
+        assert abs(ink.centerx - size[0] / 2) <= CENTER_TOLERANCE_PX, f"{size}: footer off center"
+        assert _count(surface, band, cyan, 40) > 0, f"{size}: the key caps are not cyan"
+
+
+def test_nothing_is_drawn_outside_the_table_but_the_rulers(
+    look: ScreenLook, screen_rules: ScreenRules
+) -> None:
+    rulers = screen_rules.rulers
+    for size in SIZES:
+        surface = _page(look, _entries(), size)
+        left = (size[0] - screen_rules.leaderboard.table_w) // 2
+        side = pygame.Rect(
+            rulers.inset_x + rulers.w + 1, 0, left - 8 - (rulers.inset_x + rulers.w + 1), size[1]
+        )
+        assert _ink(surface, side) is None, f"{size}: ink between the ruler and the table"
+        assert _ink(surface, pygame.Rect(0, 0, rulers.inset_x + rulers.w, size[1])) is not None, (
+            f"{size}: no ruler"
+        )
+
+
+def test_the_page_never_fills_the_background(look: ScreenLook) -> None:
+    surface = _page(look, _entries(), gray=60)
+    for point in ((3, 3), (50, 200), (SIZES[0][0] - 4, 300)):
+        assert surface.get_at(point)[:3] == (60, 60, 60), f"{point} was painted over"
+
+
+def test_redraw_is_the_same_picture(look: ScreenLook) -> None:
+    first = pygame.image.tobytes(_page(look, _entries()), "RGB")
+    assert pygame.image.tobytes(_page(look, _entries()), "RGB") == first
+
+
+def test_blur_flag_is_read_from_the_values(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    """With blur on, the glass blurs what is behind it; off (the shipped value), it leaves it."""
+    assert screen_rules.leaderboard.blur is False
+    blurred_rules = dataclasses.replace(
+        screen_rules, leaderboard=dataclasses.replace(screen_rules.leaderboard, blur=True)
     )
-    texts_before = (page_view.PLACE_FORMAT, page_view.LEVEL_LABEL, page_view.ROW_SPACING)
-    for size in SIZES:
-        for entries in (ONE, FIVE, TEN):
-            first = pygame.image.tobytes(_drawn(size, entries), "RGB")
-            second = pygame.image.tobytes(_drawn(size, entries), "RGB")
-            assert first == second, f"{size=} {len(entries)}: two draws, two pictures"
-            # Nothing fills the background: every pixel with no ink stays the background's.
-            on_gray = pygame.image.tobytes(_drawn(size, entries, gray=GRAY), "RGB")
-            assert all(
-                bright == GRAY for ink, bright in zip(first, on_gray, strict=True) if ink == 0
-            ), f"{size=} {len(entries)}: the draw changed pixels with no ink"
-            assert _drawn(size, entries).get_size() == size
-    assert caplog.records == [], "the view logged"
-    assert entries_before == TEN, "the draw changed the entries"
-    assert texts_before == (page_view.PLACE_FORMAT, page_view.LEVEL_LABEL, page_view.ROW_SPACING)
-    # Every cell text is rendered once and kept: the draws above warmed the caches, and after that
-    # no render per frame for a text already rendered.
-    renders: list[str] = []
+    blurred = ScreenLook(blurred_rules, load_screen_fonts(blurred_rules))
+    plain = pygame.Surface(SIZES[0])
+    plain.fill((90, 90, 90))
+    for x in range(0, SIZES[0][0], 6):
+        pygame.draw.line(plain, (200, 60, 60), (x, 0), (x, SIZES[0][1]))
+    first = plain.copy()
+    second = plain.copy()
+    draw_leaderboard(first, look, _entries())
+    draw_leaderboard(second, blurred, _entries())
+    assert pygame.image.tobytes(first, "RGB") != pygame.image.tobytes(second, "RGB")
 
-    class CountingFont:
-        def __init__(self, font: pygame.font.Font) -> None:
-            self._font = font
 
-        def render(self, text: str, antialias: bool, color: tuple[int, int, int]) -> pygame.Surface:
-            renders.append(text)
-            return self._font.render(text, antialias, color)
-
-        def __getattr__(self, name: str) -> object:
-            return getattr(self._font, name)
-
-    def counting(size: int) -> CountingFont:
-        return CountingFont(pygame.font.Font(None, size))
-
-    for module in (page_view, look_view):
-        monkeypatch.setattr(module, "screen_font", counting, raising=False)
-    for _ in range(3):
-        for entries in (ONE, FIVE, TEN):
-            _drawn(SIZES[0], entries)
-    assert renders == [], f"rendered again on later frames: {renders}"
+@pytest.mark.parametrize("size", [(640, 480), (1000, 700)])
+def test_other_surface_sizes_draw_without_error(look: ScreenLook, size: tuple[int, int]) -> None:
+    surface = _page(look, _entries(), size)
+    assert _ink(surface, surface.get_rect(), 150) is not None

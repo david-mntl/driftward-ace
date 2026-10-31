@@ -24,12 +24,13 @@ from collections.abc import Sequence
 
 import pygame
 
-from app.assets import load_background, load_hud_art
+from app.assets import load_background, load_hud_art, load_screen_fonts
 from app.background_tuning import load_background_rules
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.hud_tuning import load_hud_rules
 from app.mode import RunMode
 from app.saves import load_saves, write_saves
+from app.screens_tuning import load_screen_rules
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
 from app.ship_tuning import load_ship_look
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
@@ -70,6 +71,8 @@ from ui.leaderboard import draw_leaderboard
 from ui.menu import draw_menu
 from ui.pause_box import draw_pause_box
 from ui.popup_view import draw_points_popup
+from ui.screen_look import ScreenLook
+from ui.screen_rules import ScreenRules
 from ui.ship_view import ShipLook, draw_ship
 from ui.starfield import draw_starfield
 from ui.window_view import WindowBackdrop
@@ -120,6 +123,8 @@ async def frame_loop(mode: RunMode) -> None:
         pygame.Rect(hud_rules.window.field_x, hud_rules.window.field_y, SCREEN_W, SCREEN_H)
     )
     hud: HudView = HudView(hud_rules, load_hud_art(hud_rules))
+    screen_rules: ScreenRules = load_screen_rules()
+    look: ScreenLook = ScreenLook(screen_rules, load_screen_fonts(screen_rules))
     backdrop: WindowBackdrop = WindowBackdrop(window.get_size())
     background: BackgroundArt = load_background(load_background_rules())
     ship_look: ShipLook = load_ship_look()
@@ -172,6 +177,7 @@ async def frame_loop(mode: RunMode) -> None:
             field,
             backdrop,
             hud,
+            look,
             background,
             background_ticks,
             ship_look,
@@ -298,6 +304,7 @@ def _draw(
     field: pygame.Surface,
     backdrop: WindowBackdrop,
     hud: HudView,
+    look: ScreenLook,
     background: BackgroundArt,
     background_ticks: float,
     ship_look: ShipLook,
@@ -318,18 +325,18 @@ def _draw(
         hud.draw(window, flow.run, flow.best, int(background_ticks))
         if flow.screen is Screen.PAUSED:
             hud.dim(window)
-            draw_pause_box(window)
+            draw_pause_box(window, look)
         elif flow.screen is Screen.GAME_OVER:
             hud.dim(window)
-            _draw_game_over(window, flow)
+            _draw_game_over(window, look, flow)
         return
     backdrop.draw(window, background, background_ticks)
     if flow.screen is Screen.MENU:
-        draw_menu(window, flow.menu_selection)
+        draw_menu(window, look, flow.menu_selection)
     elif flow.screen is Screen.INSTRUCTIONS:
-        draw_instructions(window)
+        draw_instructions(window, look)
     elif flow.screen is Screen.LEADERBOARD:
-        draw_leaderboard(window, flow.leaderboard)
+        draw_leaderboard(window, look, flow.leaderboard)
 
 
 def _draw_run(
@@ -368,7 +375,7 @@ def _draw_run(
         draw_debug_wave_lines(surface, run)
 
 
-def _draw_game_over(surface: pygame.Surface, flow: GameFlow) -> None:
+def _draw_game_over(surface: pygame.Surface, look: ScreenLook, flow: GameFlow) -> None:
     """Draw the game-over box: the place message, the score, the letter picker when the run has
     one, then RETRY and MENU, active once the picker no longer takes keys.
 
@@ -376,8 +383,10 @@ def _draw_game_over(surface: pygame.Surface, flow: GameFlow) -> None:
     systems/app/frame-loop.md, Rules, Draw.
     """
     picker_shown: bool = flow.picker is not None
-    draw_game_over(surface, flow.game_over_message, picker_shown)
-    draw_final_score(surface, flow.run.score, picker_shown)
+    draw_game_over(surface, look, flow.game_over_message, picker_shown)
+    draw_final_score(surface, look, flow.run.score, picker_shown)
     if flow.picker is not None:
-        draw_name_picker(surface, flow.picker, flow.picking)
-    draw_game_over_choices(surface, flow.game_over_selection, picker_shown, active=not flow.picking)
+        draw_name_picker(surface, look, flow.picker, flow.picking)
+    draw_game_over_choices(
+        surface, look, flow.game_over_selection, picker_shown, active=not flow.picking
+    )

@@ -1,346 +1,298 @@
-"""Instructions page tests: the title, six sections with an outline icon, and the footer.
+"""Instructions page tests: the title, six glass cards with an icon, a topic and a caption, and the
+footer, in the Glass Cockpit look.
 
-Contract: docs/contracts/systems/game-flow.md, Interface (ui/instructions.py) and Presentation,
-Instructions page and the shared items (Text, Lines and blank lines, Cache, Only draws). The texts,
-the font sizes and the icon's size are stand-ins from scope report DRA-125, Values needed
-(Instructions page, Footer); the GDD does not hold them until UI-03 and UI-04. The icon's outline
-width comes from the contract (Presentation, Instructions page).
+Spec: 10-ui.md, `instructions_text_and_look`, `screens_look` and `window_screens`; the values are
+in tuning/screens.json (the `screen_rules` fixture). The look is the `look` fixture.
 
-Positions are read from the drawn pixels (`pygame.image.tobytes`), never from a font size. The page
-is drawn on a black surface, so the ink is the text and the icons alone. Every text is compared
-with the same text rendered here in the default font (`_reference`), and its place is worked out
-from the ink's own offset in that render. The fonts' `get_linesize()` give the contract's rows (a
-blank line is one body line), as in `test_game_over.py`. A heading row's icon is found by its top
-edge: the row's first ink row holds the icon alone, because the title is centered in the row.
+Positions and colors are read from the drawn pixels, never from a font metric. The page is drawn
+on a black surface, so any lit pixel is ink: text, an icon, the rulers or glow. The glass is read
+by drawing over a lighter grey, where a see-through fill differs from both the grey and the
+panel color.
 """
 
-from itertools import combinations, pairwise
-from typing import NamedTuple
+from dataclasses import replace
+from itertools import combinations
 
 import pygame
-import pytest
 
-import ui.instructions as page_view
-import ui.screen_look as look_view
-from ui.instructions import draw_instructions
-from ui.screen_look import screen_font
+from app.assets import load_screen_fonts
+from ui.instructions import (
+    CARD_COLOR_KEYS,
+    INSTRUCTION_SECTIONS,
+    _wrap,
+    card_rects,
+    draw_instructions,
+    icon_rect,
+)
+from ui.screen_look import ScreenLook
+from ui.screen_rules import ScreenRules
 
-SIZES: tuple[tuple[int, int], ...] = ((640, 480), (800, 600))
-"""Surfaces drawn on: the canvas (03-world-and-camera.md, screen_w, screen_h (guess)) and a larger
-one, so the centering is shown to follow the surface and not a constant."""
+WINDOW: tuple[int, int] = (856, 518)
+"""The window the page fills. Source: 10-ui.md, window_screens; hud.json, window."""
 
-TITLE_TEXT: str = "HOW TO PLAY"
-TITLE_FONT_SIZE: int = 32
-BODY_FONT_SIZE: int = 16
-"""Source: scope report DRA-125, Values needed, Instructions page: title 32 px, sections 16 px."""
+OTHER_SIZES: tuple[tuple[int, int], ...] = ((640, 480), (900, 600))
+"""Other surfaces the page still has to fit."""
 
 SECTIONS: tuple[tuple[str, str], ...] = (
-    ("FLY", "Arrows thrust. Let go and you keep drifting. Gravity never stops."),
-    ("PAUSE", "Enter or Space pauses. Press it again to go on."),
-    ("GRAZE", "Skim past a hazard without touching it to score points."),
-    ("WARNING", "A warning shows where a hazard will come in. Get clear."),
-    ("FALL", "Fall off the bottom and you lose a life."),
-    ("COINS", "Coins are points. The good ones sit near danger."),
+    ("FLY", "Hold to thrust. Let go and gravity takes you."),
+    ("PAUSE", "Press again to go on."),
+    ("GRAZE", "Skim a hazard without touching. Score."),
+    ("WARNING", "A hazard is coming. Get clear."),
+    ("FALL", "Fall off the bottom, lose a life."),
+    ("COINS", "Points. The best ones sit near danger."),
 )
-"""The six (title, line) pairs, in order. Source: scope report DRA-125, Values needed."""
+"""Source: 10-ui.md, instructions_text_and_look."""
 
-ICON_SIZE: int = 16
-"""Source: scope report DRA-125, Values needed: a 16 x 16 px white outline square."""
+GREY: int = 180
+"""The lighter backdrop the glass is read on."""
 
-ICON_LINE_WIDTH: int = 1
-"""Source: contract game-flow.md, Presentation, Instructions page: the plainest outline."""
+BLEND_TOLERANCE: int = 3
+"""SDL's alpha blend may be a few levels off the exact result."""
 
-FOOTER_TEXT: str = "Press Enter or Space to go back."
-"""Source: scope report DRA-125, Values needed, Footer (16 px)."""
-
-TEXT_COLOR: tuple[int, int, int] = (255, 255, 255)
-"""Source: scope report DRA-125, Values needed (white text)."""
-
-GRAY: int = 60
-"""A background below white, for the checks that show nothing fills the surface."""
-
-TOLERANCE_PX: int = 1
-"""Rects are placed by integer halves: a center, or a vertical middle, may be one px off."""
-
-Band = tuple[int, int, int, int]
-"""One run of ink: top row, bottom row, left column, right column, all inclusive."""
+LIT: int = 120
+"""A channel above this is a line or text. The glass fill and its scan lines stay well below."""
 
 
-class _Ref(NamedTuple):
-    """A text rendered here: its ink rectangle and where that sits in the render."""
-
-    crop: tuple[bytes, ...]
-    image_width: int
-    image_height: int
-    ink_left: int
-    ink_top: int
-
-
-class _Section(NamedTuple):
-    """One section as drawn: the icon's top-left, and the title's and the line's ink."""
-
-    icon_left: int
-    icon_top: int
-    title: Band
-    line: Band
-
-
-def _surface(size: tuple[int, int], gray: int = 0) -> pygame.Surface:
-    surface = pygame.Surface(size)
-    surface.fill((gray, gray, gray))
+def _page(look: ScreenLook, size: tuple[int, int] = WINDOW, grey: int = 0) -> pygame.Surface:
+    """Draw the page on a surface of ``size`` filled with ``grey`` and return it."""
+    surface: pygame.Surface = pygame.Surface(size)
+    surface.fill((grey, grey, grey))
+    draw_instructions(surface, look)
     return surface
 
 
-def _levels(surface: pygame.Surface) -> bytes:
-    """The red level of every pixel, row by row. Every picture here is gray, so it is the level."""
-    return pygame.image.tobytes(surface, "RGB")[::3]
-
-
-def _ink_bounds(levels: bytes, width: int, rows: range, columns: range) -> Band | None:
-    """The ink inside a window of rows and columns, or None."""
-    found = [(y, x) for y in rows for x in columns if levels[y * width + x]]
-    if not found:
+def _ink(surface: pygame.Surface, area: pygame.Rect) -> pygame.Rect | None:
+    """Return the bounding box of the lit pixels (not pure black) inside ``area``, in surface px."""
+    sub: pygame.Surface = surface.subsurface(area)
+    mask: pygame.Mask = pygame.mask.from_threshold(sub, (0, 0, 0), (1, 1, 1, 255))
+    mask.invert()
+    boxes: list[pygame.Rect] = mask.get_bounding_rects()
+    if not boxes:
         return None
-    ys = [y for y, _ in found]
-    xs = [x for _, x in found]
-    return min(ys), max(ys), min(xs), max(xs)
+    box: pygame.Rect = boxes[0].unionall(boxes[1:])
+    return box.move(area.topleft)
 
 
-def _bands(surface: pygame.Surface) -> list[Band]:
-    """Each run of rows holding ink, with its ink columns."""
-    width, height = surface.get_size()
-    levels = _levels(surface)
-    bands: list[Band] = []
-    top: int | None = None
-    for y in range(height + 1):
-        inked = y < height and any(levels[y * width : (y + 1) * width])
-        if inked and top is None:
-            top = y
-        elif not inked and top is not None:
-            columns = [x for x in range(width) if any(levels[r * width + x] for r in range(top, y))]
-            bands.append((top, y - 1, columns[0], columns[-1]))
-            top = None
-    return bands
+def _lit_ink(surface: pygame.Surface, area: pygame.Rect) -> pygame.Rect | None:
+    """Return the bounding box of the pixels with a channel above ``LIT`` inside ``area``.
+
+    Glow and the glass fill are dimmer than this, so only lines and text count.
+    """
+    sub: pygame.Surface = surface.subsurface(area)
+    mask: pygame.Mask = pygame.mask.from_threshold(sub, (0, 0, 0), (LIT, LIT, LIT, 255))
+    mask.invert()
+    boxes: list[pygame.Rect] = mask.get_bounding_rects()
+    if not boxes:
+        return None
+    return boxes[0].unionall(boxes[1:]).move(area.topleft)
 
 
-def _crop(levels: bytes, width: int, band: Band) -> tuple[bytes, ...]:
-    """The band's ink rectangle, one bytes row per pixel row."""
-    top, bottom, left, right = band
-    return tuple(levels[y * width + left : y * width + right + 1] for y in range(top, bottom + 1))
+def _bright(surface: pygame.Surface, area: pygame.Rect) -> int:
+    """Count the pixels inside ``area`` with a channel above ``LIT``."""
+    sub: pygame.Surface = surface.subsurface(area)
+    mask: pygame.Mask = pygame.mask.from_threshold(sub, (0, 0, 0), (LIT, LIT, LIT, 255))
+    return area.width * area.height - mask.count()
 
 
-def _reference(text: str, size: int) -> _Ref:
-    """``text`` in the default font at ``size``, white on black: its ink and the ink's offset."""
-    image = pygame.font.Font(None, size).render(text, True, TEXT_COLOR)
-    canvas = _surface(image.get_size())
-    canvas.blit(image, (0, 0))
-    band = _bands(canvas)[0]
-    crop = _crop(_levels(canvas), canvas.get_width(), band)
-    return _Ref(crop, image.get_width(), image.get_height(), band[2], band[0])
+def _closest(surface: pygame.Surface, area: pygame.Rect, color: tuple[int, int, int]) -> int:
+    """Return the smallest summed channel distance between ``color`` and any pixel in ``area``."""
+    best: int = 3 * 255
+    for x in range(area.left, area.right):
+        for y in range(area.top, area.bottom):
+            pixel = surface.get_at((x, y))
+            best = min(best, sum(abs(pixel[i] - color[i]) for i in range(3)))
+    return best
 
 
-def _body_line() -> int:
-    """One body line's height: the font's line size (contract: Lines and blank lines)."""
-    return pygame.font.Font(None, BODY_FONT_SIZE).get_linesize()
+def test_the_six_sections_hold_the_gdd_text() -> None:
+    assert INSTRUCTION_SECTIONS == SECTIONS
 
 
-def _row_height() -> int:
-    """A heading row's height: the taller of the icon and a body line."""
-    return max(ICON_SIZE, _body_line())
+def test_each_card_has_its_own_color_key(screen_rules: ScreenRules) -> None:
+    assert len(CARD_COLOR_KEYS) == len(SECTIONS)
+    assert all(key in screen_rules.palette for key in CARD_COLOR_KEYS)
 
 
-def _page(size: tuple[int, int], gray: int = 0) -> pygame.Surface:
-    surface = _surface(size, gray)
-    draw_instructions(surface)
-    return surface
-
-
-def _sections(surface: pygame.Surface) -> tuple[Band, list[_Section], Band]:
-    """The title's ink, each section, and the footer's ink, read from the pixels."""
-    width = surface.get_width()
-    levels = _levels(surface)
-    bands = _bands(surface)
-    assert len(bands) == len(SECTIONS) + 2, f"runs of ink: {bands}"
-    row_height = _row_height()
-    sections: list[_Section] = []
-    for band in bands[1:-1]:
-        top = band[0]
-        # The first ink row of a heading row is the icon's top edge alone.
-        edge = [x for x in range(width) if levels[top * width + x]]
-        icon_left = edge[0]
-        assert edge == list(range(icon_left, icon_left + ICON_SIZE)), f"icon top edge: {edge}"
-        title = _ink_bounds(
-            levels, width, range(top, top + row_height), range(icon_left + ICON_SIZE, width)
+def test_cards_are_six_in_reading_order(look: ScreenLook) -> None:
+    rects = card_rects(look, WINDOW)
+    assert len(rects) == len(SECTIONS)
+    columns = look.rules.instructions.columns
+    for index, rect in enumerate(rects):
+        assert (rect.left, rect.top) == (
+            rects[index % columns].left,
+            rects[index // columns * columns].top,
         )
-        line = _ink_bounds(levels, width, range(top + row_height, band[1] + 1), range(width))
-        assert title is not None, f"row at {top}: no title"
-        assert line is not None, f"row at {top}: no line"
-        sections.append(_Section(icon_left, top, title, line))
-    return bands[0], sections, bands[-1]
+    assert rects[0].left < rects[1].left
+    assert rects[0].top < rects[2].top
 
 
-def _rects_of(title: Band, sections: list[_Section], footer: Band) -> list[tuple[str, pygame.Rect]]:
-    """The ink rectangle of every element on the page, named."""
-
-    def rect(band: Band) -> pygame.Rect:
-        return pygame.Rect(band[2], band[0], band[3] - band[2] + 1, band[1] - band[0] + 1)
-
-    rects = [("page title", rect(title))]
-    for index, section in enumerate(sections):
-        icon = pygame.Rect(section.icon_left, section.icon_top, ICON_SIZE, ICON_SIZE)
-        rects.append((f"icon {index}", icon))
-        rects.append((f"heading {index}", rect(section.title)))
-        rects.append((f"line {index}", rect(section.line)))
-    rects.append(("footer", rect(footer)))
-    return rects
+def test_cards_fill_the_space_between_head_and_footer(look: ScreenLook) -> None:
+    rules = look.rules.instructions
+    rects = card_rects(look, WINDOW)
+    top = rules.margin_top + rules.head_h
+    bottom = WINDOW[1] - rules.margin_bottom - rules.foot_h
+    rows = len(SECTIONS) // rules.columns
+    assert min(r.top for r in rects) == top
+    assert 0 <= bottom - max(r.bottom for r in rects) < rows
+    assert min(r.left for r in rects) == rules.margin_x
+    assert 0 <= WINDOW[0] - rules.margin_x - max(r.right for r in rects) < rules.columns
 
 
-def test_the_page_has_the_title_then_six_sections_each_an_icon_a_title_and_a_line(
-    pygame_headless: None,
-) -> None:
-    title_ref = _reference(TITLE_TEXT, TITLE_FONT_SIZE)
-    footer_ref = _reference(FOOTER_TEXT, BODY_FONT_SIZE)
-    space = pygame.font.Font(None, BODY_FONT_SIZE).size(" ")[0]
-    row_height = _row_height()
-    assert page_view.INSTRUCTION_SECTIONS == SECTIONS
-    assert page_view.ICON_SIZE == ICON_SIZE
-    assert page_view.ICON_LINE_WIDTH == ICON_LINE_WIDTH
-    for size in SIZES:
-        width, height = size
-        surface = _page(size)
-        levels = _levels(surface)
-        title, sections, footer = _sections(surface)
-        # The page title and the footer: the texts, centered.
-        for band, ref, what in ((title, title_ref, "title"), (footer, footer_ref, "footer")):
-            assert _crop(levels, width, band) == ref.crop, f"{size=} {what}: not the render"
-            rect_left = band[2] - ref.ink_left
-            assert abs(2 * rect_left + ref.image_width - width) <= TOLERANCE_PX, (
-                f"{size=} {what}: not centered across {width}"
-            )
-        assert len(sections) == len(SECTIONS)
-        for index, ((name, line), section) in enumerate(zip(SECTIONS, sections, strict=True)):
-            what = f"{size=} section {index} {name}"
-            # The icon: a square outline of the icon's size, width 1, nothing inside it.
-            left, top = section.icon_left, section.icon_top
-            for y in range(ICON_SIZE):
-                for x in range(ICON_SIZE):
-                    on_edge = min(x, y, ICON_SIZE - 1 - x, ICON_SIZE - 1 - y) < ICON_LINE_WIDTH
-                    expected = 255 if on_edge else 0
-                    got = levels[(top + y) * width + left + x]
-                    assert got == expected, f"{what}: icon pixel ({x}, {y}) is {got}"
-            # Its title, one space right of the icon, in the body font.
-            heading_ref = _reference(name, BODY_FONT_SIZE)
-            assert _crop(levels, width, section.title) == heading_ref.crop, f"{what}: title"
-            assert section.title[2] == left + ICON_SIZE + space + heading_ref.ink_left, (
-                f"{what}: the title is not one space right of the icon"
-            )
-            # The icon and the title are centered together across the width.
-            together = ICON_SIZE + space + heading_ref.image_width
-            assert abs(2 * left + together - width) <= TOLERANCE_PX, f"{what}: heading off center"
-            # Each is centered vertically in the row.
-            title_top = section.title[0] - heading_ref.ink_top
-            assert abs(title_top - top - (row_height - heading_ref.image_height) // 2) <= (
-                TOLERANCE_PX
-            ), f"{what}: the title is not centered in its row"
-            # Its line, under the heading row, centered.
-            line_ref = _reference(line, BODY_FONT_SIZE)
-            assert _crop(levels, width, section.line) == line_ref.crop, f"{what}: line"
-            assert section.line[0] - line_ref.ink_top == top + row_height, (
-                f"{what}: the line is not directly under its heading row"
-            )
-            line_left = section.line[2] - line_ref.ink_left
-            assert abs(2 * line_left + line_ref.image_width - width) <= TOLERANCE_PX, (
-                f"{what}: the line is not centered"
-            )
-        # Every row is inside the surface and no two overlap.
-        surface_rect = pygame.Rect(0, 0, width, height)
-        rects = _rects_of(title, sections, footer)
-        for name, rect in rects:
-            assert surface_rect.contains(rect), f"{size=} {name} {rect} is not inside the surface"
-        for (first, one), (second, two) in combinations(rects, 2):
-            assert not one.colliderect(two), f"{size=} {first} {one} overlaps {second} {two}"
+def test_cards_are_one_gap_apart_and_never_overlap(look: ScreenLook) -> None:
+    rects = card_rects(look, WINDOW)
+    for a, b in combinations(rects, 2):
+        assert not a.colliderect(b)
+    gap = look.rules.instructions.gap
+    assert rects[1].left - rects[0].right == gap
+    assert rects[2].top - rects[0].bottom == gap
 
 
-def test_the_rows_are_one_under_the_other_with_blank_lines_and_the_block_is_centered(
-    pygame_headless: None,
-) -> None:
-    title_line = pygame.font.Font(None, TITLE_FONT_SIZE).get_linesize()
-    body_line = _body_line()
-    row_height = _row_height()
-    title_ref = _reference(TITLE_TEXT, TITLE_FONT_SIZE)
-    for size in SIZES:
-        height = size[1]
-        title, sections, footer = _sections(_page(size))
-        title_top = title[0] - title_ref.ink_top
-        tops = [section.icon_top for section in sections]
-        # The title, a blank line, then the first heading row.
-        assert tops[0] == title_top + title_line + body_line, f"{size=}: first row at {tops[0]}"
-        # Heading row, line row, then a blank line, for each section.
-        for upper, lower in pairwise(tops):
-            assert lower - upper == row_height + 2 * body_line, f"{size=}: rows at {tops}"
-        # The block, the title's top to the last line's bottom, is centered between the surface's
-        # top and the footer's top.
-        footer_top = height - 2 * body_line
-        block_bottom = tops[-1] + row_height + body_line
-        assert abs(title_top + block_bottom - footer_top) <= TOLERANCE_PX, (
-            f"{size=}: the block {title_top}..{block_bottom} is not centered above {footer_top}"
+def test_every_icon_box_sits_inside_its_card(look: ScreenLook) -> None:
+    rules = look.rules.instructions
+    for card in card_rects(look, WINDOW):
+        box = icon_rect(look, card)
+        assert card.contains(box)
+        assert box.size == (rules.icon_w, rules.icon_h)
+        assert box.left == card.left + rules.pad_x
+
+
+def test_each_card_draws_an_icon_in_its_box(look: ScreenLook) -> None:
+    page = _page(look)
+    for card in card_rects(look, WINDOW):
+        assert _bright(page, icon_rect(look, card)) > 50
+
+
+def test_the_six_icons_are_all_different(look: ScreenLook) -> None:
+    page = _page(look)
+    boxes = [icon_rect(look, card) for card in card_rects(look, WINDOW)]
+    pictures = [pygame.image.tobytes(page.subsurface(box), "RGB") for box in boxes]
+    for a, b in combinations(pictures, 2):
+        assert a != b
+
+
+def test_each_topic_is_lit_in_its_card_color(look: ScreenLook) -> None:
+    page = _page(look)
+    rules = look.rules.instructions
+    for card, key in zip(card_rects(look, WINDOW), CARD_COLOR_KEYS, strict=True):
+        left = icon_rect(look, card).right + rules.text_gap
+        area = pygame.Rect(
+            left, card.top + 6, card.right - rules.pad_x - left, card.height // 2 - 6
         )
-        assert footer[0] > block_bottom, f"{size=}: the footer is inside the block"
+        assert _closest(page, area, look.palette[key]) < 90
 
 
-def test_the_footer_is_near_the_bottom_with_one_blank_line_under_it(
-    pygame_headless: None,
-) -> None:
-    body_line = _body_line()
-    footer_ref = _reference(FOOTER_TEXT, BODY_FONT_SIZE)
-    for size in SIZES:
-        width, height = size
-        surface = _page(size)
-        _, _, footer = _sections(surface)
-        # The footer's line sits two body lines above the bottom: its own line, then one blank.
-        assert footer[0] - footer_ref.ink_top == height - 2 * body_line, f"{size=}: footer row"
-        levels = _levels(surface)
-        blank = levels[(height - body_line) * width :]
-        assert not any(blank), f"{size=}: ink in the last body line"
-        assert footer[1] < height - body_line, f"{size=}: the footer reaches the blank line"
+def test_captions_are_plating_and_stay_inside_the_card(look: ScreenLook) -> None:
+    page = _page(look)
+    rules = look.rules.instructions
+    plating = look.palette["plating"]
+    for card in card_rects(look, WINDOW):
+        left = icon_rect(look, card).right + rules.text_gap
+        text = pygame.Rect(left, card.top + 4, card.right - rules.pad_x - left, card.height - 8)
+        assert _closest(page, text, plating) < 130
+        bracket = look.rules.glass.bracket_len
+        outside = pygame.Rect(
+            card.right - rules.pad_x + 1,
+            card.top + bracket + 2,
+            rules.pad_x - 4,
+            card.height - 2 * bracket - 4,
+        )
+        assert _bright(page, outside) == 0
 
 
-def test_the_instructions_draw_the_same_pixels_twice_and_change_nothing_but_the_surface(
-    pygame_headless: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    sections_before = tuple(page_view.INSTRUCTION_SECTIONS)
-    caplog.set_level(0)
-    for size in SIZES:
-        first = pygame.image.tobytes(_page(size), "RGB")
-        second = pygame.image.tobytes(_page(size), "RGB")
-        assert first == second, f"{size=}: two draws, two pictures"
-        # Nothing fills the background: every pixel with no ink stays the background's.
-        on_gray = pygame.image.tobytes(_page(size, gray=GRAY), "RGB")
-        assert all(
-            bright == GRAY for ink, bright in zip(first, on_gray, strict=True) if ink == 0
-        ), f"{size=}: the draw changed pixels with no ink"
-        assert _page(size).get_size() == size
-    assert caplog.records == [], "the view logged"
-    assert tuple(page_view.INSTRUCTION_SECTIONS) == sections_before
-    # Every fixed text is rendered once, on the first draw: after that, no render per frame.
-    renders: list[str] = []
+def test_a_caption_wraps_to_fit_its_width(look: ScreenLook) -> None:
+    text = "Skim a hazard without touching. Score."
+    lines = _wrap(look, text, 120)
+    assert len(lines) > 1
+    assert " ".join(lines) == text
+    assert all(look.text_size(line, "card_text")[0] <= 120 for line in lines)
 
-    class CountingFont:
-        def __init__(self, font: pygame.font.Font) -> None:
-            self._font = font
 
-        def render(self, text: str, antialias: bool, color: tuple[int, int, int]) -> pygame.Surface:
-            renders.append(text)
-            return self._font.render(text, antialias, color)
+def test_a_word_wider_than_the_width_keeps_its_own_line(look: ScreenLook) -> None:
+    assert _wrap(look, "WARNING now", 5) == ["WARNING", "now"]
 
-        def __getattr__(self, name: str) -> object:
-            return getattr(self._font, name)
 
-    def counting(size: int) -> CountingFont:
-        return CountingFont(screen_font(size))
+def test_cards_are_see_through_glass(look: ScreenLook) -> None:
+    rules = look.rules
+    glass = rules.glass
+    dark = _page(look)
+    light = _page(look, grey=GREY)
+    alpha = glass.fill_alpha / 255
+    for card in card_rects(look, WINDOW):
+        row = card.height - 24
+        while row % glass.scan_pitch == glass.scan_pitch - 1:
+            row -= 1
+        point = (card.right - 30, card.top + row)
+        assert dark.get_at(point)[:3] != (0, 0, 0)
+        expected = [
+            round(rules.palette["panel_body"][i] * alpha + GREY * (1 - alpha)) for i in range(3)
+        ]
+        got = light.get_at(point)
+        assert all(abs(got[i] - expected[i]) <= BLEND_TOLERANCE for i in range(3))
 
-    for module in (page_view, look_view):
-        monkeypatch.setattr(module, "screen_font", counting, raising=False)
-    for _ in range(3):
-        _page(SIZES[0])
-    assert renders == [], f"rendered again on later frames: {renders}"
+
+def test_the_title_is_centered_at_the_top(look: ScreenLook) -> None:
+    rules = look.rules.instructions
+    head = pygame.Rect(60, 0, WINDOW[0] - 120, rules.margin_top + rules.head_h - 1)
+    ink = _lit_ink(_page(look), head)
+    assert ink is not None
+    assert abs(ink.centerx - WINDOW[0] // 2) <= 2
+    assert ink.bottom < rules.margin_top + rules.head_h
+
+
+def test_the_footer_keys_are_centered_in_the_footer_band(look: ScreenLook) -> None:
+    rules = look.rules.instructions
+    foot_top = WINDOW[1] - rules.margin_bottom - rules.foot_h
+    band = pygame.Rect(60, foot_top, WINDOW[0] - 120, rules.foot_h)
+    ink = _lit_ink(_page(look), band)
+    assert ink is not None
+    assert abs(ink.centerx - WINDOW[0] // 2) <= 2
+    assert abs(ink.centery - band.centery) <= 2
+
+
+def test_nothing_is_drawn_outside_the_margins_except_the_rulers(look: ScreenLook) -> None:
+    rules = look.rules
+    glass = rules.glass
+    reach = 2 * rules.glow.box_radius + glass.bracket_out + glass.bracket_w
+    ruler_end = rules.rulers.inset_x + rules.rulers.w
+    inner = pygame.Rect(ruler_end + 1, 0, WINDOW[0] - 2 * (ruler_end + 1), WINDOW[1])
+    ink = _ink(_page(look), inner)
+    assert ink is not None
+    limit = pygame.Rect(
+        rules.instructions.margin_x - reach,
+        rules.instructions.margin_top - reach,
+        WINDOW[0] - 2 * (rules.instructions.margin_x - reach),
+        WINDOW[1] - rules.instructions.margin_top - rules.instructions.margin_bottom + 2 * reach,
+    )
+    assert limit.contains(ink)
+
+
+def test_the_rulers_are_drawn_down_both_sides_when_on(look: ScreenLook) -> None:
+    rulers = look.rules.rulers
+    page = _page(look)
+    left = pygame.Rect(0, 0, rulers.inset_x + rulers.w, WINDOW[1])
+    right = pygame.Rect(
+        WINDOW[0] - rulers.inset_x - rulers.w, 0, rulers.inset_x + rulers.w, WINDOW[1]
+    )
+    assert _bright(page, left) > 0
+    assert _bright(page, right) > 0
+
+
+def test_the_rulers_are_gone_when_switched_off(screen_rules: ScreenRules) -> None:
+    quiet = replace(screen_rules, rulers=replace(screen_rules.rulers, enabled=False))
+    look = ScreenLook(quiet, load_screen_fonts(quiet))
+    column = pygame.Rect(0, 0, quiet.rulers.inset_x + quiet.rulers.w, WINDOW[1])
+    assert _ink(_page(look), column) is None
+
+
+def test_drawing_twice_gives_the_same_pixels(look: ScreenLook) -> None:
+    first = pygame.image.tobytes(_page(look), "RGB")
+    second = pygame.image.tobytes(_page(look), "RGB")
+    assert first == second
+
+
+def test_the_page_fits_other_surface_sizes(look: ScreenLook) -> None:
+    for size in OTHER_SIZES:
+        rects = card_rects(look, size)
+        area = pygame.Rect((0, 0), size)
+        assert all(area.contains(r) for r in rects)
+        assert _ink(_page(look, size), area) is not None

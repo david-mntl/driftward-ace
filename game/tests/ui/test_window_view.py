@@ -10,9 +10,10 @@ import pygame
 import pytest
 
 import app.frame as frame
-from app.assets import load_background, load_hud_art
+from app.assets import load_background, load_hud_art, load_screen_fonts
 from app.background_tuning import load_background_rules
 from app.hud_tuning import load_hud_rules
+from app.screens_tuning import load_screen_rules
 from app.ship_tuning import load_ship_look
 from app.tuning import load_graze_rules, load_last_life_rules
 from core.game_flow import GameFlow, Screen, start_flow
@@ -22,6 +23,7 @@ from ui.background_view import BackgroundArt
 from ui.debug_overlay import draw_debug_overlay
 from ui.hud import HudView
 from ui.hud_rules import HudRules
+from ui.screen_look import ScreenLook
 from ui.ship_view import ShipLook
 from ui.window_view import WindowBackdrop
 
@@ -40,6 +42,8 @@ class Parts:
             pygame.Rect(self.rules.window.field_x, self.rules.window.field_y, SCREEN_W, SCREEN_H)
         )
         self.hud: HudView = HudView(self.rules, load_hud_art(self.rules))
+        screen_rules = load_screen_rules()
+        self.screens: ScreenLook = ScreenLook(screen_rules, load_screen_fonts(screen_rules))
         self.backdrop: WindowBackdrop = WindowBackdrop(self.window.get_size())
         self.background: BackgroundArt = load_background(load_background_rules())
         self.look: ShipLook = load_ship_look()
@@ -57,6 +61,7 @@ class Parts:
             self.field,
             self.backdrop,
             self.hud,
+            self.screens,
             self.background,
             120.0,
             self.look,

@@ -20,6 +20,6 @@
 
 ## Fonts
 
-- fonts/Exo2-Bold.ttf: Exo 2 Bold, the HUD's numbers and the text of every screen. Copyright 2013 The Exo 2 Project Authors (https://github.com/googlefonts/Exo-2.0). A static Bold cut from the variable Exo 2 font, because pygame cannot pick a weight from a variable font. Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
-- fonts/ShareTechMono.ttf: Share Tech Mono Regular, the HUD's small labels. Copyright (c) 2012, Carrois Type Design, Ralph du Carrois, with Reserved Font Name 'Share'. Shipped unchanged. Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+- fonts/Exo2-Bold.ttf: Exo 2 Bold, the HUD's numbers. Copyright 2013 The Exo 2 Project Authors (https://github.com/googlefonts/Exo-2.0). A static Bold cut from the variable Exo 2 font, because pygame cannot pick a weight from a variable font. Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+- fonts/ShareTechMono.ttf: Share Tech Mono Regular, the HUD's small labels and the text of every screen. Copyright (c) 2012, Carrois Type Design, Ralph du Carrois, with Reserved Font Name 'Share'. Shipped unchanged. Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
 

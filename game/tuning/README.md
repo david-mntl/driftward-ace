@@ -193,3 +193,30 @@ The game checks every picture against these numbers at startup. A mismatch shows
 | `motion` | Every period in ticks (60 per second) and every scale. `break_keys` is the heart's break. |
 | `fonts` | The two font files, the sizes, the label spacing. |
 
+# screens.json
+
+The look of the menu, the pause box, the game-over screens, the instructions page and the leaderboard: colors, glow, glass, fonts and the size and gaps of each screen. You edit it by hand. The game reads it once at startup, in both run modes. Every field is required.
+
+The loader is `game/app/screens_tuning.py`. The schema is `docs/contracts/schemas/screens.schema.json`, with every field described. These values change how the screens look and nothing else. They never change play. Nothing here is baked into a picture file: the glass, the glow, the icons and the text are drawn once at startup, so a change shows after a reload.
+
+Field names carry their range. `*_alpha` is a whole number from 0 to 255. `*_strength` is a number from 0 to 1. `*_size`, `*_w`, `*_h` and `*_pitch` are whole numbers of 1 or more. Any other whole number is 0 or more.
+
+## Sections
+
+| Section | What it holds |
+|---|---|
+| `palette` | 13 colors as `#rrggbb`. Meanings are in `docs/design/gdd/12-art-and-audio.md`, Screen colors. Not the HUD palette. |
+| `glass` | The see-through panel every box and card shares: fill, border, corner brackets, scan lines, and `blur_down` (how much the picture behind is blurred; 1 is off). |
+| `glow` | The soft glow's radius (px) and strength (0 to 1) round boxes, behind text and behind icons. 0 strength turns a glow off. |
+| `fonts` | The font file and one entry per text role: size (px) and letter-spacing (em). Every role in the file must be there once. |
+| `rulers` | The tick marks down both sides of the full-window pages. `enabled` turns them off. |
+| `keycap` | The small key caps (ENTER, SPACE, arrows) and the gaps between them. |
+| `choice` | The selected choice's fade and brackets, and how dim a not-selected or not-yet-pickable choice is. |
+| `pause` | The pause box's size. `blur` turns the blur behind it off. |
+| `game_over` | The game-over box with and without the name picker: sizes, padding, the score cells, the slots, the cursor. |
+| `menu` | The menu's items, gaps and hint. |
+| `instructions` | The page's margins, the card grid and the icon box. |
+| `leaderboard` | The page's margins, the table and the row sizes. |
+
+`blur` is off by default on the pages that have a moving background (instructions, leaderboard): the blur is the one part drawn live every frame, and it costs frame rate in the browser.
+
