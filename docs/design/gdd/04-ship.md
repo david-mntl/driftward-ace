@@ -11,7 +11,10 @@ The ship has no weapon and no brake. Arrow keys add thrust, gravity always pulls
 | ship_w | 32 | px | — | guess | starting placeholder |
 | ship_h | 32 | px | — | guess | starting placeholder |
 | hitbox | an inverted T of two boxes: a bar 12 px wide, `ship_h` tall, centered; and a foot `ship_w` wide, 12 px tall, along the bottom | px | — | guess | Director (inverted T); sizes are a starting placeholder |
-| look | TBD | sprite, colors, animation | — | TBD | SH-06 |
+| look | the chosen sprite: a silver-grey and pale hull with long glassy cobalt and cyan blade wings, gold accents and a light blue cockpit gem, pointing up. Drawn 38 px wide in a 48 × 64 frame centered on the ship, so blade tips and the rear nozzles reach past the hitbox. No glow halo | sprite | — | guess | Director (chosen from the staged takes); size from the Director's test proposal |
+| lean | look only. 3 frames: left, centre, right. The lean shows from 1.0 px/tick of sideways speed (about 3 ticks of holding an arrow), either way. A lean is the centre pose squashed and shaded, not rotated (12-art-and-audio.md, rule 13). The hitbox never changes | frames; px/tick | — | guess | Director |
+| air_streaks | look only. Thin, faint pale-blue streaks trail behind the ship from under its wing tips when it moves sideways: short from 1.0 px/tick, long from 4.0. They always stay dimmer than a hazard. 2 flicker frames each. None while paused or waiting to respawn | frames; px/tick | — | guess | Director |
+| flame | a blue jet for each held arrow, none when no arrow is held. Up: the rear flame, bigger. Left, right: a small puff at the opposite wing tip. Down: two small puffs beside the nose. Opposite arrows cancel, as thrust does. 2 flicker frames each, 4 ticks apiece. No flame while paused or waiting to respawn | frames; ticks | — | guess | Director |
 | look_reference | Sharp and swept, built from long blade-like wings: alien and elegant, not a plain rocket. Deep cobalt blue neon lines around the hull, silver-grey and pale plating between them, a blue engine flame. No fuchsia: the ship is untouched. Points up; blade tips may reach past the hitbox | — | — | guess | Director |
 | placeholder_look | white (255, 255, 255), filled, the same inverted T as `hitbox` | RGB | — | guess | Director: what you see matches what can be hit |
 | gravity | 0.16 | px/tick² | TBD | guess | Director tuning guess |
@@ -46,14 +49,14 @@ Derived from the guesses above. Recompute when a value changes:
 6. **Fall cap bound.** A fall from the top line (y 168) to the floor (y 480) is 312 px and must take at least `min_fall_ticks`. So `fall_cap` must be ≤ 312 / 54 ≈ 5.77 px/tick.
 7. **No vertical drag and no upward speed cap**, unless SH-05 says otherwise.
 8. **Hitbox.** The ship never rotates, so its boxes stay upright. The hitbox is never bigger than what the player sees ([07-drifters.md](07-drifters.md), rule 8).
-9. **Looks.** The ship's look lives in this file, like every drifter's look lives in its spec. Until `look` is set, draw `placeholder_look`. Thrust flame, blink and burst-and-rebuild must all stay readable at `ship_w` × `ship_h`. Blink and burst: [05-lives-and-damage.md](05-lives-and-damage.md). Global style and palette: [12-art-and-audio.md](12-art-and-audio.md).
+9. **Looks.** The ship's look lives in this file, like every drifter's look lives in its spec. `placeholder_look` stays the reference for what can be hit. Thrust flame, blink and burst-and-rebuild must all stay readable at `ship_w` × `ship_h`. Blink and burst: [05-lives-and-damage.md](05-lives-and-damage.md). Global style and palette: [12-art-and-audio.md](12-art-and-audio.md).
 
 ## Edge cases
 - Left and right held together: they cancel, and drag still slows the ship.
 - Up and down held together: they cancel, and gravity still pulls.
 
 ## Open
-- SH-02, SH-04, SH-05, SH-06.
+- SH-02, SH-04, SH-05, SH-06 (only whether the neon lines glow).
 
 ## How to extend
 A new physics value: add a row with unit, range and status, and place it in the tick order. If it's live-tunable, the tuning file needs a matching key, which is a schema change.

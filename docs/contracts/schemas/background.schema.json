@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/background.schema.json",
+  "title": "Background values",
+  "description": "The file game/tuning/background.json: how the background moves and glows, read in both run modes. The file must exist; every field is optional, and a field left out keeps its default from game/app/background_tuning.py (DEFAULTS). {} is a valid file. All defaults are guesses (12-art-and-audio.md, background_numbers); tune them after a frame-rate check in the browser build. Loaded and checked by game/app/background_tuning.py at startup into ui.background_view.BackgroundRules. Look only: no field changes play. Owner of the schema: architect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {
+    "sway_loop_ticks": {
+      "description": "Ticks the far painting's sway takes for one full loop. The painting is a loop of baked frames; the game fades from one to the next over this time.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "planet_count": {
+      "description": "Broken planets on screen at once. 0 shows none.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "planet_speed": {
+      "description": "Px a planet moves straight down per tick.",
+      "type": "number",
+      "minimum": 0
+    },
+    "planet_scale": {
+      "description": "Planet size against the shipped sprite (about 100 px). 1 is as shipped.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "river_light_count": {
+      "description": "River light specks at most, the cap. 0 shows none.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "river_light_loop_ticks": {
+      "description": "Ticks a river speck takes from its start to the black hole. Also the length of the river's loop.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "river_light_strength": {
+      "description": "Brightness of river light and the swirl, 0 (off) to 1 (full).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "swirl_count": {
+      "description": "Specks circling the black hole. 0 shows none.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "swirl_loop_ticks": {
+      "description": "Ticks the swirl takes for one full turn.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "glow_height": {
+      "description": "Height of the fuchsia glow along the bottom edge, px. 0 turns it off.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "glow_strength": {
+      "description": "Brightness of the bottom glow at the very bottom edge, 0 (off) to 1 (full).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}

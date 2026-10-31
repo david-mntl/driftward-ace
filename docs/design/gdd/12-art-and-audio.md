@@ -33,7 +33,7 @@ The player never reads this. It gives the art a feeling to aim at.
 | glow | hazards, warnings and coins only. The HUD stays flat. The ship: SH-06 | — | — | guess | Director |
 | motion | look only. 2 or 3 states per object (for example idle, charge, fire), each a short loop of frames drawn ahead of time | — | — | guess | Director |
 | background | three layers, described below | — | — | guess | Director |
-| background_numbers | TBD | layer speeds, river light count, swirl loop length, bottom glow strength | — | TBD | AA-02 |
+| background_numbers | painting sway loop 900; planets on screen 3; planet speed 0.15; planet size ×1; river light specks 30 at most; river loop 900; river and swirl strength 0.6; swirl specks 8; swirl loop 480; bottom glow 40 tall, strength 0.25. The near layer has no numbers yet: it is not built | ticks; planets; px/tick; ×; specks; ticks; 0..1; specks; ticks; px; 0..1 | see tuning file | guess | AA-02, Director: use guesses, tune later |
 | audio_format | see [15-tech-constraints.md](15-tech-constraints.md#values) | — | — | locked | — |
 | sound_list | TBD | — | — | TBD | AA-03 |
 | particle_cap | TBD | particles | — | TBD | AA-04 |
@@ -48,7 +48,7 @@ The player never reads this. It gives the art a feeling to aim at.
 | Deep cobalt blue with pale plating | you, untouched | the ship and its cockpit: cobalt neon lines, a blue flame, silver-grey and pale plating |
 
 ### Background
-- **Far layer.** One large still painting. Rivers of stars, gas and debris curve toward a dim, distant black hole at the bottom left, mostly off screen.
+- **Far layer.** One large painting. Rivers of stars, gas and debris curve toward a dim, distant black hole at the bottom left, mostly off screen. The rays sway very slowly, and a soft patch of light turns along the hole's rim. It is a loop of frames made ahead of time, faded from one to the next, and it keeps the painting's brightness. The sway is slow and small, so it never pulls the eye off the objects.
 - **River light.** Small glowing specks and streaks travel along the curves into the black hole, so the rivers look like they flow. Their number is capped. A small swirl loops around the black hole.
 - **Middle layer.** Dark outlines of broken planets, scrolling straight down, slowly.
 - **Near layer.** A few dust streaks, scrolling straight down, faster.
@@ -65,7 +65,7 @@ The player never reads this. It gives the art a feeling to aim at.
 8. **Rim light.** Every object the anomaly touched gets a thin fuchsia rim on its bottom side, the side facing the black hole. The ship has none: it is untouched. Source: Director.
 9. **Looks never change play.** Animation, rotation frames and random looks are visual only. Hitboxes never rotate, move or resize with the look. Source: Director; [07-drifters.md](07-drifters.md) rule 8.
 10. **A fixed pool of looks.** A drifter with several looks picks one from a fixed pool each time it appears. Art is never made new per run. Source: Director.
-11. **Painted once.** Background layers are images made ahead of time and loaded by the game, never drawn shape by shape each frame. Source: Director.
+11. **Painted once.** Background layers are images made ahead of time and loaded by the game, never drawn shape by shape each frame. A layer that moves is a loop of such images. Source: Director.
 12. **Words, not pictures.** The style is defined in words in this file. Images from other works are never part of this design and never ship. Only art made for the game, or converted from a source that is free to use and credited, ships. Source: Director.
 13. **Motion must show at game size.** A turn smaller than about 20° does not read on a sprite this small. A turning object uses a full turn in steps of 45° or less, so the loop has no back-and-forth. One exception: a part that swings on a fixed body, like the satellite's panels, goes back and forth. The light and the rim stay fixed while the shape turns. Frames sit in one strip, all the same size. Source: Director.
 
@@ -73,7 +73,7 @@ The player never reads this. It gives the art a feeling to aim at.
 - Art for a drifter whose spec is still draft: wait, or use a placeholder shape the Director approves.
 
 ## Open
-- AA-02 (background numbers), AA-03, AA-04.
+- AA-02 (background numbers: still to tune after a frame-rate check in the browser build, and the near layer's), AA-03, AA-04.
 
 ## How to extend
 A new visual or sound rule that applies to every drifter goes here. Anything specific to one drifter goes in that drifter's spec. A new color meaning is a new row in the color language, with the Director's approval.
