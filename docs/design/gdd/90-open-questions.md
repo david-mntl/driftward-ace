@@ -51,8 +51,6 @@ None open.
 ## UI
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
-| UI-03 | Instructions page: exact text, the icon for each section, and layout. Content and font are set in 10-ui.md. | 10-ui.md | Instructions | open |
-| UI-04 | Look of the text on the menu, leaderboard, pause box and game-over screen, letter picker included: layout and colors. Content and font are set in 10-ui.md; where each sits in the window is set too. | 10-ui.md | Screens look | open |
 
 ## Save data
 None open.

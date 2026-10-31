@@ -30,7 +30,7 @@ The player never reads this. It gives the art a feeling to aim at.
 | placeholder_bg | (0, 0, 0) | RGB | — | guess | starting placeholder |
 | art_style | smooth: drawn at 4× the game size with gradients and glossy rims, then shrunk to game size. Not pixel art. Shown at 1× | — | — | guess | Director |
 | palette | the color language below. Exact RGB values come with the drawn art | — | — | guess | Director |
-| glow | hazards, warnings and coins only. The HUD stays flat. The ship: SH-06 | — | — | guess | Director |
+| glow | hazards, warnings and coins in play. The screens (menu, pause box, game over, instructions, leaderboard) have their own soft glow ([10-ui.md](10-ui.md#values), `ui_glow`). The HUD stays flat. The ship: SH-06 | — | — | guess | Director |
 | hud_look | the side panel and cockpit frame: see [10-ui.md](10-ui.md#values) (`hud_*`, `cockpit_frame`) and the HUD colors below. Drawn at 4× and shrunk like every sprite, shown at 1×. Text is drawn at 1× | — | — | guess | Director |
 | motion | look only. 2 or 3 states per object (for example idle, charge, fire), each a short loop of frames drawn ahead of time | — | — | guess | Director |
 | background | three layers, described below | — | — | guess | Director |
@@ -70,6 +70,25 @@ The HUD has its own colors, set by the Director. Under the anomaly's magnetism e
 | line | #232c55 | thin rules | the footer line |
 | tile_bg | #04061a | the tile's dark glass | behind each digit |
 | footer_dot | #33408a | the footer's empty dot | both ends of the footer line |
+
+### Screen colors
+The screens (menu, pause box, game over, instructions, leaderboard) have their own palette, Mono Violet, in the screens tuning file. It is not the HUD palette. The lines and lights are cyan, the text is pale violet-white, and gold marks the level, first place and coins. They are starting values.
+
+| Key | Color | Means | Used on |
+|---|---|---|---|
+| ship_lines | #9d6bff | the main line | the pause sign, the glow's second tone, the ENTER key in the pause icon |
+| ship_lines_light | #c9b5ff | the second line | small lines in the icons |
+| frame_lights | #8be9ff | lights | borders, corner brackets, scan lines, key caps, the selected choice's fade, the picker cursor |
+| panel_body | #0c0b24 | the glass | every box and card fill |
+| score | #d8c8ff | the score | the score digits |
+| level | #ffd166 | gold | the level reached (`LV`), coins |
+| hearts | #e6a8ff | a life | the heart in the FALL icon |
+| graze | #e6a8ff | the graze | the GRAZE icon |
+| last_life | #ff9e5e | warning | the WARNING icon, the ship's flame in the FLY icon |
+| plating | #f4f1ff | titles and text | titles, names, captions |
+| rank_1 | #ffd166 | first place | the leaderboard's top row |
+| rank_2 | #cfd2ff | second place | the leaderboard's second row |
+| rank_3 | #f0a07a | third place | the leaderboard's third row |
 
 ### Background
 - **Far layer.** One large painting. Rivers of stars, gas and debris curve toward a dim, distant black hole at the bottom left, mostly off screen. The rays sway very slowly, and a soft patch of light turns along the hole's rim. It is a loop of frames made ahead of time, faded from one to the next, and it keeps the painting's brightness. The sway is slow and small, so it never pulls the eye off the objects.
