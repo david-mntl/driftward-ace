@@ -2,10 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "driftward-ace/satellite-tuning.schema.json",
   "title": "Satellite tuning file",
-  "description": "The file game/tuning/drifters/satellite.json. The same fields as drifter-tuning.schema.json, and each variant also sets angle_degrees and has exactly two boxes: the body first, then the panel bar. Values from drifters/02-satellite.md (guess): variants flat (default, angle 0) and angled (angle 20), each 36 wide and 12 tall, body box 12 x 12 and panel bar box 36 x 6, both centered; speed_ratio 0.375; entry_warning_ticks 60 (07-drifters.md, shared). Key mapping to the GDD: angle_degrees is the variant's angle below level in 02-satellite.md, variants. Loaded and checked by game/app/tuning.py at startup (docs/contracts/systems/app.md, Rules, Tuning loader), which builds core.drifters.satellite.SatelliteVariantExtra from angle_degrees. The loader also enforces the two rules drifter-tuning.schema.json names: default_variant is one of the variant names, and every box lies inside its variant's width x height footprint. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, Satellite.",
+  "description": "The file game/tuning/drifters/satellite.json. The same fields as drifter-tuning.schema.json, and each variant also sets angle_degrees, the panel swing (swing_degrees, swing_frames, swing_ticks_per_frame), the field speed (field_ticks_per_frame) and swing_hitbox. hitbox holds the still body; swing_hitbox the panel boxes that turn with the swing, so the hitbox matches the drawn frame. Values (guess; the Director's playtest sprite, 2026-10-29, GDD backfill pending): variants flat (default, angle 0) and angled (angle 20), each 40 wide and 28 tall (every drawn pixel of the sprite), body circle r 7, two panel boxes; speed_ratio 0.375; entry_warning_ticks 60 (07-drifters.md, shared). Loaded and checked by game/app/drifters/satellite_tuning.py at startup, which builds core.drifters.satellite.SatelliteVariantExtra. The loader also enforces the two rules drifter-tuning.schema.json names (default_variant is one of the variant names, every shape lies inside its variant's footprint) and that every panel box stays inside the footprint at every swing step. Owner of the schema: architect. Contract: docs/contracts/systems/drifters.md, Rules, Satellite.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["default_variant", "variants", "speed_ratio", "entry_warning_ticks"],
+  "required": [
+    "default_variant",
+    "variants",
+    "speed_ratio",
+    "entry_warning_ticks"
+  ],
   "properties": {
     "default_variant": {
       "description": "The variant a placement gets when it names none (07-drifters.md, rule 10). Must be a key of variants.",
@@ -15,36 +20,91 @@
       "description": "Named variants (07-drifters.md, rule 10). A new angle or size is a new entry here and needs no code (02-satellite.md, How to extend).",
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "$ref": "drifter-tuning.schema.json#/$defs/variant_name" },
-      "additionalProperties": { "$ref": "#/$defs/variant" }
+      "propertyNames": {
+        "$ref": "drifter-tuning.schema.json#/$defs/variant_name"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/variant"
+      }
     },
-    "speed_ratio": { "$ref": "drifter-tuning.schema.json#/properties/speed_ratio" },
-    "entry_warning_ticks": { "$ref": "drifter-tuning.schema.json#/properties/entry_warning_ticks" }
+    "speed_ratio": {
+      "$ref": "drifter-tuning.schema.json#/properties/speed_ratio"
+    },
+    "entry_warning_ticks": {
+      "$ref": "drifter-tuning.schema.json#/properties/entry_warning_ticks"
+    }
   },
   "$defs": {
     "variant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["width", "height", "angle_degrees", "hitbox"],
+      "required": [
+        "width",
+        "height",
+        "angle_degrees",
+        "swing_degrees",
+        "swing_frames",
+        "swing_ticks_per_frame",
+        "field_ticks_per_frame",
+        "hitbox",
+        "swing_hitbox"
+      ],
       "properties": {
-        "width": { "$ref": "drifter-tuning.schema.json#/$defs/variant/properties/width" },
-        "height": { "$ref": "drifter-tuning.schema.json#/$defs/variant/properties/height" },
+        "width": {
+          "$ref": "drifter-tuning.schema.json#/$defs/variant/properties/width"
+        },
+        "height": {
+          "$ref": "drifter-tuning.schema.json#/$defs/variant/properties/height"
+        },
         "angle_degrees": {
           "description": "Path angle below level, degrees. 0 flies level; 20 sinks 20 degrees as it crosses. Never scaled by level (02-satellite.md, rule 6).",
           "type": "number",
           "minimum": 0,
           "exclusiveMaximum": 90
         },
+        "swing_degrees": {
+          "description": "Largest panel turn either way, degrees. The panels and swing_hitbox turn by swing_degrees * sin(2 pi * step / swing_frames). Changes play: the panel hitbox turns with it. The sprite must be redrawn by tools/art/satellite_swing.py after a change. Starting value 25 (guess, Director in chat, 2026-10-29).",
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 90
+        },
+        "swing_frames": {
+          "description": "Steps in one full swing, there and back. Must equal the frame count of game/assets/sprites/satellite.png; redraw the sprite after a change. Starting value 24 (guess, 2026-10-29).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "swing_ticks_per_frame": {
+          "description": "Ticks each swing step lasts. One full swing is swing_frames x this. Changes play (the panel hitbox follows the swing). Starting value 5, a 2 s swing (guess, Director in chat, 2026-10-29: slower than the first 0.67 s).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "field_ticks_per_frame": {
+          "description": "Ticks each frame of the turning magnetism field shows (game/assets/sprites/satellite_field.png). Look only; never changes play. Starting value 3, one turn in 2.4 s with 48 frames (guess, 2026-10-29).",
+          "type": "integer",
+          "minimum": 1
+        },
         "hitbox": {
-          "description": "Exactly two boxes, offsets from the satellite's center: the body first, then the panel bar. The view draws them in that order of meaning: body white on top of the blue bar (02-satellite.md, hitbox, placeholder_look). Never bigger than the look.",
+          "description": "The parts that stay still (the body): one or more circles or boxes, offsets from the satellite's center, at level. Mirrored for invert. Never bigger than the look.",
           "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
-          "prefixItems": [
-            { "$ref": "drifter-tuning.schema.json#/$defs/box" },
-            { "$ref": "drifter-tuning.schema.json#/$defs/box" }
-          ],
-          "items": false
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "drifter-tuning.schema.json#/$defs/circle"
+              },
+              {
+                "$ref": "drifter-tuning.schema.json#/$defs/box"
+              }
+            ]
+          }
+        },
+        "swing_hitbox": {
+          "description": "The panels: one or more boxes, offsets from the center, as drawn at level. Each turns with the swing about the center (into a four-corner polygon) and is mirrored for invert. The loader checks every box stays inside width x height at every swing step. Never bigger than the look.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "drifter-tuning.schema.json#/$defs/box"
+          }
         }
       }
     }

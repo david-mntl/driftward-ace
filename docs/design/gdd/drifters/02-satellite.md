@@ -23,7 +23,7 @@ A satellite that crosses the screen from a side wall in a straight line. The fla
 | telegraph | none. It never strikes; it only flies | — | — | locked | Director |
 | specialty | none | — | — | locked | Director |
 | graze | yes | — | — | locked | 06-scoring.md |
-| look_reference | White body with blue solar panels on both sides | — | — | guess | Director |
+| look_reference | White body with blue solar panels on both sides. It looks wrecked but still flies: torn panel edges, a scorched, cracked body. Thin fuchsia magnetism rays glow on it and move with the panel swing | — | — | guess | Director |
 | placeholder_look | the two hitbox boxes, filled: body white (240, 240, 240), panel bar blue (60, 110, 220), body drawn on top | RGB | — | guess | Director |
 | start | just outside the left wall, at its placed y ([../07-drifters.md](../07-drifters.md) rule 14). With `invert`: just outside the right wall | px | — | guess | Director |
 
@@ -37,7 +37,7 @@ At Level 1 the flat one crosses the screen in about 270 ticks (4.5 s). The angle
 5. **Leaves:** once fully off screen past the far wall or below the floor ([../07-drifters.md](../07-drifters.md) rule 12). It flies through the walls ([../07-drifters.md](../07-drifters.md) rule 15).
 6. **Scales:** `speed` × the level's hazard speed, set when it appears ([../08-difficulty.md](../08-difficulty.md)). The angle never scales.
 7. **Placing:** its y, its variant and `invert`.
-8. **Looks and sounds:** placeholder boxes until the look is drawn. The satellite never rotates, so its boxes stay upright. Sound: none yet.
+8. **Looks and sounds:** placeholder boxes until the look is drawn. The satellite never rotates, so its boxes stay upright. Its panels swing about 25° to each side, back and forth, while the body stays still. The swing is drawn only. The hitbox panel bar stays flat. Sound: none yet.
 9. **wave_check notes:** none beyond the shared rules.
 
 ## Edge cases

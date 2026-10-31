@@ -21,6 +21,7 @@ from core.collision import (
     Circle,
     Hitbox,
     Line,
+    Polygon,
     Shape,
     grow_hitbox,
     hitboxes_overlap,
@@ -215,7 +216,22 @@ def _distance(x: float, y: float, shape: Shape) -> float:
         dx: float = max(abs(x - shape.cx) - shape.w / 2, 0.0)
         dy: float = max(abs(y - shape.cy) - shape.h / 2, 0.0)
         return math.hypot(dx, dy)
+    if isinstance(shape, Polygon):
+        return _polygon_distance(x, y, shape)
     return _segment_distance(x, y, shape) - shape.thickness / 2
+
+
+def _polygon_distance(x: float, y: float, polygon: Polygon) -> float:
+    """Distance from a point to a convex polygon's edge, px. 0 inside it."""
+    points = polygon.points
+    edges = [
+        Line(*points[i], *points[(i + 1) % len(points)], 1.0)
+        for i in range(len(points))
+    ]
+    sides = [(e.bx - e.ax) * (y - e.ay) - (e.by - e.ay) * (x - e.ax) for e in edges]
+    if all(s >= 0 for s in sides) or all(s <= 0 for s in sides):
+        return 0.0
+    return min(_segment_distance(x, y, e) for e in edges)
 
 
 def _segment_distance(x: float, y: float, line: Line) -> float:
@@ -249,6 +265,15 @@ def _hitbox_bounds(hitbox: Hitbox) -> _Bounds:
                     shape.cy - half_h,
                     shape.cx + half_w,
                     shape.cy + half_h,
+                )
+            )
+        elif isinstance(shape, Polygon):
+            parts.append(
+                (
+                    min(px for px, _ in shape.points),
+                    min(py for _, py in shape.points),
+                    max(px for px, _ in shape.points),
+                    max(py for _, py in shape.points),
                 )
             )
         else:
