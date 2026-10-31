@@ -24,6 +24,7 @@ A rock that falls straight down from the top. It has no logic: it just falls. It
 | looks | a list of named skins, filled when the art is drawn. Every skin keeps the variant's size and hitbox. Until then: one placeholder look | — | — | guess | Director |
 | look_pick | random, each time a meteorite appears. Looks only; the game plays the same | — | — | guess | Director |
 | look_reference | A plain rock, floating and falling. No tail and no glow: the fireball is the comet. Tumbles slowly as it falls: one full turn, always the same way | — | — | guess | Director |
+| art_canvas | the design image is one still frame of the medium rock, 28 × 28, the rock filling the hitbox circle. The 8 turn frames are drawn from it later. Small and big are the same art shrunk or grown to 20 and 40 | px | — | guess | main session, away decision 2026-10-31 |
 | look_frames | 8 drawn frames, the same rock turned 45° each, so the 8 frames make one full turn. Played in order 1 to 8, then again from 1. Frame size = the variant width, square. All looks use the same count | frames | — | guess | Director |
 | look_ticks_per_frame | 5 (one full turn = 40 ticks, about 1.5 turns a second). Each rock starts at a random frame | ticks | — | guess | Director |
 | placeholder_look | a filled circle as wide as the variant, grey (140, 140, 140) | RGB | — | guess | Director |

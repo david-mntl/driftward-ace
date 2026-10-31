@@ -21,6 +21,7 @@ Big chunks of floating ground that drift down with the world. They don't hurt. T
 | specialty | none | — | — | locked | Director |
 | graze | no. It blocks like a wall, and walls never pay ([../06-scoring.md](../06-scoring.md) rule 5) | — | — | locked | Director |
 | look_reference | Green floating ground with a darker edge | — | — | guess | Director |
+| art_canvas | the design image is the rectangle, 320 × 120, the ground filling the box exactly with no transparent edge. The other shapes are cut from the same ground later | px | — | guess | main session, away decision 2026-10-31 |
 | placeholder_look | the filled shape in green (70, 160, 80), with a 2 px edge in darker green (35, 90, 45) drawn inside the shape | RGB | — | guess | Director |
 
 **Shapes.** Every size is the box around the shape, centered on the island's position. The arms of the L and the T are `arm` thick. `invert` flips the shape upside down.

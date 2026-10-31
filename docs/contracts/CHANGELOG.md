@@ -206,3 +206,11 @@
 - `systems/run.md`: 12 to 13, frozen.
 - `systems/saves.md`: 0 to 1, frozen.
 - Saves: top 10 scores in browser storage, a three-letter name picker at game over, place messages, BEST on the HUD and a filled leaderboard. New saves contract.
+
+## DRA-147, 2026-10-31
+- `systems/screens.md`: 0 to 1, draft (not frozen: the feature ran in one session without task files, so close-out has not run).
+- `systems/game-flow.md`: look and Interface notes marked superseded by `systems/screens.md`. Flow rules unchanged. Draft, version 2.
+- `systems/app/frame-loop.md` (in `systems/app.md`): the Draw rule's screen calls take the `look` argument. Draft, version 18.
+- `systems/run.md`: one pointer to `systems/screens.md`. Frozen, version 13.
+- Screens look: Glass Cockpit in Mono Violet with soft glow for the menu, pause box, game-over screens, instructions page and leaderboard. New screens tuning file and schema (`tuning/screens.json`, `schemas/screens.schema.json`). Closes UI-03 and UI-04.
+

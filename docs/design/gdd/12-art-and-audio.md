@@ -28,7 +28,7 @@ The player never reads this. It gives the art a feeling to aim at.
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
 | placeholder_bg | (0, 0, 0) | RGB | — | guess | starting placeholder |
-| art_style | smooth: drawn at 4× the game size with gradients and glossy rims, then shrunk to game size. Not pixel art. Shown at 1× | — | — | guess | Director |
+| art_style | smooth: drawn large first, 8× the game size for sprites up to 64 px on their longest side and 4× for bigger ones, with gradients and glossy rims, then shrunk to game size. The large master is kept so details can be redrawn. Not pixel art. Shown at 1× | — | — | guess | Director (8× for small sprites: Director 2026-10-31, "generate the pictures a bit bigger so we can shrink them") |
 | palette | the color language below. Exact RGB values come with the drawn art | — | — | guess | Director |
 | glow | hazards, warnings and coins in play. The screens (menu, pause box, game over, instructions, leaderboard) have their own soft glow ([10-ui.md](10-ui.md#values), `ui_glow`). The HUD stays flat. The ship: SH-06 | — | — | guess | Director |
 | hud_look | the side panel and cockpit frame: see [10-ui.md](10-ui.md#values) (`hud_*`, `cockpit_frame`) and the HUD colors below. Drawn at 4× and shrunk like every sprite, shown at 1×. Text is drawn at 1× | — | — | guess | Director |
@@ -76,8 +76,8 @@ The screens (menu, pause box, game over, instructions, leaderboard) have their o
 
 | Key | Color | Means | Used on |
 |---|---|---|---|
-| ship_lines | #9d6bff | the main line | the pause sign, the glow's second tone, the ENTER key in the pause icon |
-| ship_lines_light | #c9b5ff | the second line | small lines in the icons |
+| ship_lines | #9d6bff | the main line | the FALL card's topic and icon |
+| ship_lines_light | #c9b5ff | the second line | the PAUSE card's topic and icon, the rock's lines in the GRAZE icon |
 | frame_lights | #8be9ff | lights | borders, corner brackets, scan lines, key caps, the selected choice's fade, the picker cursor |
 | panel_body | #0c0b24 | the glass | every box and card fill |
 | score | #d8c8ff | the score | the score digits |

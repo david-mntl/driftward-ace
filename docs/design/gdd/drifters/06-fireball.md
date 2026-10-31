@@ -25,6 +25,7 @@ A comet that dives across the screen on a straight, steep diagonal. By default i
 | specialty | none | — | — | locked | Director |
 | graze | yes | — | — | locked | 06-scoring.md |
 | look_reference | Orange-yellow comet with a fading trail | — | — | guess | Director |
+| art_canvas | 64 × 64 for the big fireball, flying down and to the right at `angle`. The head's center sits at (44, 44); the trail runs back toward the top-left corner along the path and may reach past the tail hitbox. `invert` is the same image mirrored. The small one is the same art shrunk to 42 × 42 | px | — | guess | main session, away decision 2026-10-31 |
 | placeholder_look | two filled circles the size of its hitbox: head orange (255, 140, 0), tail dark yellow (200, 160, 0) | RGB | — | guess | Director |
 | start | just outside the screen ([../07-drifters.md](../07-drifters.md) rule 14). Default: at the top-left corner, head's center on the left wall, head's bottom edge on the top edge. With `invert`: the same at the right wall. A placement may set another x along the top, or a side entry at a set y | px | — | guess | Director |
 

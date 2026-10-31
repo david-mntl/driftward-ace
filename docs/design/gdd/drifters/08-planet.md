@@ -26,6 +26,7 @@ A planet drifts down with the world, wrapped in a gravity field you can see. Ins
 | looks | a list of named skins, filled when the art is drawn. Every skin has the same size and hitbox. Until then: one placeholder look | — | — | guess | Director |
 | look_pick | random, each time a planet appears. Looks only; the game plays the same | — | — | locked | Director |
 | look_reference | Purple sphere with faint rings showing the pull radius | — | — | guess | Director |
+| art_canvas | 64 × 64, the planet filling the hitbox circle exactly. The field rings are not part of the image: the game draws them | px | — | guess | main session, away decision 2026-10-31 |
 | placeholder_look | planet: filled circle in purple (140, 70, 200). Field: a 1 px ring at `pull_radius` and two faint 1 px rings that drift inward from it and fade, in (180, 120, 255) | RGB | — | guess | Director |
 | field_ring_trip | 120: each inner ring slides at a steady speed from `pull_radius` to the planet's surface in this many ticks, then starts again at `pull_radius` | ticks | — | guess | Director |
 | field_ring_gap | 60: the second inner ring runs this many ticks behind the first | ticks | — | guess | Director |

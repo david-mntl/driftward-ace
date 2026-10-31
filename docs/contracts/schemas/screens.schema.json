@@ -1,0 +1,895 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/screens.schema.json",
+  "title": "Screens values",
+  "description": "The file game/tuning/screens.json: the look of the menu, the pause box, the game-over screens, the instructions page and the leaderboard: colors, glow, glass, fonts and the size and gaps of each screen, read in both run modes. Every field is required: no default lives in code. Nothing is baked into a picture file: the glass, the glow, the icons and the text are drawn once at startup. Range by field name: a name ending _alpha is a whole number 0 to 255, _strength a number 0 to 1, and _size, _w, _h and _pitch (and a field named w, h or size) a whole number of 1 or more; any other whole number is 0 or more, and any other number is 0 or more. All values are guesses from the screens brainstorm (10-ui.md, screens_look). Loaded and checked by game/app/screens_tuning.py at startup into ui.screen_rules.ScreenRules. Look only: no field changes play. Owner of the schema: architect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "palette",
+    "glass",
+    "glow",
+    "fonts",
+    "rulers",
+    "keycap",
+    "choice",
+    "pause",
+    "game_over",
+    "menu",
+    "instructions",
+    "leaderboard"
+  ],
+  "properties": {
+    "palette": {
+      "description": "The screens' colors as #rrggbb, 13 of them (Mono Violet). Not the HUD palette. Meanings: 12-art-and-audio.md, Screen colors.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ship_lines",
+        "ship_lines_light",
+        "frame_lights",
+        "panel_body",
+        "score",
+        "level",
+        "hearts",
+        "graze",
+        "last_life",
+        "plating",
+        "rank_1",
+        "rank_2",
+        "rank_3"
+      ],
+      "properties": {
+        "ship_lines": {
+          "description": "The main line: the FALL card's color (its topic and icon lines).",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "ship_lines_light": {
+          "description": "The second line: the PAUSE card's color and the rock's lines in the GRAZE icon.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "frame_lights": {
+          "description": "Lights: borders, corner brackets, scan lines, key caps, the selected choice's fade and brackets, the picker cursor, the ruler ticks.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "panel_body": {
+          "description": "The glass: every box and card fill.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "score": {
+          "description": "The score digits.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "level": {
+          "description": "Gold: the level reached (LV) and the coins.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "hearts": {
+          "description": "The heart in the FALL icon.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "graze": {
+          "description": "The GRAZE card's color.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "last_life": {
+          "description": "Warning: the WARNING card's color and the ship's flame in the FLY icon.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "plating": {
+          "description": "Titles, names and captions.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "rank_1": {
+          "description": "First place: the leaderboard's top row.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "rank_2": {
+          "description": "Second place: the leaderboard's second row.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "rank_3": {
+          "description": "Third place: the leaderboard's third row.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      }
+    },
+    "glass": {
+      "description": "The see-through panel every box and card shares.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fill_alpha",
+        "border_alpha",
+        "border_w",
+        "bracket_len",
+        "bracket_w",
+        "bracket_out",
+        "scan_pitch",
+        "scan_alpha",
+        "blur_down"
+      ],
+      "properties": {
+        "fill_alpha": {
+          "description": "How opaque the dark panel_body fill is, 0 to 255. About 56% is 143.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "border_alpha": {
+          "description": "How opaque the thin border is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "border_w": {
+          "description": "Border width in px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bracket_len": {
+          "description": "Length of each arm of a corner bracket, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "bracket_w": {
+          "description": "Thickness of a corner bracket, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bracket_out": {
+          "description": "How many px outside the box's edge the brackets sit, 0 or more.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "scan_pitch": {
+          "description": "Rows between two scan lines, 1 or more.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "scan_alpha": {
+          "description": "How opaque a scan line is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "blur_down": {
+          "description": "How many times smaller the picture behind a box is made before it is scaled back up: the blur. 1 is no blur.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "glow": {
+      "description": "The soft glow, drawn once and kept. A strength of 0 turns that glow off.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "box_radius",
+        "box_strength",
+        "text_radius",
+        "text_strength",
+        "icon_radius",
+        "icon_strength"
+      ],
+      "properties": {
+        "box_radius": {
+          "description": "Glow round a panel's border and brackets, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "box_strength": {
+          "description": "That glow's strength, 0 to 1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "text_radius": {
+          "description": "Glow behind lit text, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_strength": {
+          "description": "That glow's strength, 0 to 1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "icon_radius": {
+          "description": "Glow behind an icon's lines, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "icon_strength": {
+          "description": "That glow's strength, 0 to 1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "fonts": {
+      "description": "The screens' font file and one entry per text role.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text_file",
+        "roles"
+      ],
+      "properties": {
+        "text_file": {
+          "description": "Path of the font file under game/assets/. Share Tech Mono.",
+          "type": "string"
+        },
+        "roles": {
+          "description": "One entry for every role in the enum, each named once and no other: the loader refuses a missing, repeated or unknown role.",
+          "type": "array",
+          "minItems": 17,
+          "maxItems": 17,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "size",
+              "spacing"
+            ],
+            "properties": {
+              "name": {
+                "description": "The role's name. One of: title, message, menu_title, menu_item, button, label, digit, picker, key, hint, row, top_name, top_score, level, card_title, card_text, empty.",
+                "type": "string",
+                "enum": [
+                  "title",
+                  "message",
+                  "menu_title",
+                  "menu_item",
+                  "button",
+                  "label",
+                  "digit",
+                  "picker",
+                  "key",
+                  "hint",
+                  "row",
+                  "top_name",
+                  "top_score",
+                  "level",
+                  "card_title",
+                  "card_text",
+                  "empty"
+                ]
+              },
+              "size": {
+                "description": "Font size in px, 1 or more.",
+                "type": "integer",
+                "minimum": 1
+              },
+              "spacing": {
+                "description": "Letter-spacing in em: 0.3 is 30% of the font's height between characters. 0 or more.",
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "rulers": {
+      "description": "The tick marks down both sides of a full-window page.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "inset_x",
+        "inset_y",
+        "w",
+        "minor_pitch",
+        "major_pitch",
+        "minor_alpha",
+        "major_alpha"
+      ],
+      "properties": {
+        "enabled": {
+          "description": "Whether the rulers show.",
+          "type": "boolean"
+        },
+        "inset_x": {
+          "description": "Distance of the ticks from the window's side edge, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "inset_y": {
+          "description": "Distance of the first and last tick from the top and bottom edge, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "w": {
+          "description": "Length of the longest tick, px. Short ticks are 5/8 of it.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "minor_pitch": {
+          "description": "Rows between two ticks, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "major_pitch": {
+          "description": "Rows between two long ticks, px. A multiple of minor_pitch: the loader refuses any other.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "minor_alpha": {
+          "description": "How opaque a short tick is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "major_alpha": {
+          "description": "How opaque a long tick is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      }
+    },
+    "keycap": {
+      "description": "The small key caps (ENTER, SPACE, the arrows) and the gaps round them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_w",
+        "h",
+        "pad_x",
+        "radius",
+        "fill_alpha",
+        "border_alpha",
+        "gap",
+        "hint_gap",
+        "group_gap"
+      ],
+      "properties": {
+        "min_w": {
+          "description": "Narrowest a key cap gets, px. An arrow key is this wide.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "description": "Key cap height, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "pad_x": {
+          "description": "Space each side of the label inside a text key cap, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "radius": {
+          "description": "Corner radius, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "fill_alpha": {
+          "description": "How opaque the faint fill is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "border_alpha": {
+          "description": "How opaque the border is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "gap": {
+          "description": "Space between two key caps in a row, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "hint_gap": {
+          "description": "Space between the last key cap and the word after it, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "group_gap": {
+          "description": "Space between two hints in the name picker's hint row, px.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "choice": {
+      "description": "A choice: RETRY, MENU or a menu item.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fade_alpha",
+        "bracket_inset",
+        "dim_alpha",
+        "off_alpha"
+      ],
+      "properties": {
+        "fade_alpha": {
+          "description": "How opaque the cyan fade behind the selected choice is at its middle, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "bracket_inset": {
+          "description": "Distance of the [ and ] from the choice's left and right edge, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "dim_alpha": {
+          "description": "How bright a choice is when it is not selected, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "off_alpha": {
+          "description": "How bright a choice is when it can't be picked yet (the picker still takes the keys), 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      }
+    },
+    "pause": {
+      "description": "The pause box.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "w",
+        "h",
+        "gap",
+        "blur"
+      ],
+      "properties": {
+        "w": {
+          "description": "Box width, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "description": "Box height, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "gap": {
+          "description": "Space between the word PAUSE and the key caps under it, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "blur": {
+          "description": "Whether the picture behind the box is blurred, drawn live every frame.",
+          "type": "boolean"
+        }
+      }
+    },
+    "game_over": {
+      "description": "The game-over box with and without the name picker. The lines are spread evenly between the top and bottom padding.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "w",
+        "h",
+        "picker_w",
+        "picker_h",
+        "pad_top",
+        "pad_bottom",
+        "picker_pad_top",
+        "score_digits",
+        "score_gap",
+        "score_cell_w",
+        "score_group_gap",
+        "choice_w",
+        "choice_h",
+        "choice_gap",
+        "slot_w",
+        "slot_h",
+        "slot_gap",
+        "slot_pad_y",
+        "slot_line_w",
+        "slot_line_alpha",
+        "cursor_alpha",
+        "arrow_size",
+        "arrow_gap",
+        "blur"
+      ],
+      "properties": {
+        "w": {
+          "description": "Box width without the picker, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "description": "Box height without the picker, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "picker_w": {
+          "description": "Box width with the picker, px. At least w.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "picker_h": {
+          "description": "Box height with the picker, px. At least h.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "pad_top": {
+          "description": "Space above the first line without the picker, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "pad_bottom": {
+          "description": "Space below RETRY and MENU, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "picker_pad_top": {
+          "description": "Space above the first line with the picker, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "score_digits": {
+          "description": "Fewest digits the score shows. A shorter score gets dim leading zeros; a longer one shows in full.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "score_gap": {
+          "description": "Space between the label SCORE and the digits, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "score_cell_w": {
+          "description": "Width of one digit cell, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "score_group_gap": {
+          "description": "Space between two groups of three digits, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "choice_w": {
+          "description": "Width of RETRY's and MENU's rect, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "choice_h": {
+          "description": "Height of each, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "choice_gap": {
+          "description": "Space between RETRY and MENU, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "slot_w": {
+          "description": "Width of one picker slot, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "slot_h": {
+          "description": "Height of one picker slot, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "slot_gap": {
+          "description": "Space between two slots, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "slot_pad_y": {
+          "description": "Room above and below the slot row for the cursor's arrows, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "slot_line_w": {
+          "description": "Thickness of the line under each slot, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "slot_line_alpha": {
+          "description": "How opaque that line is on a slot that isn't the cursor's, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "cursor_alpha": {
+          "description": "How opaque the cyan fill on the cursor's slot is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "arrow_size": {
+          "description": "Half the width of the cursor's arrows, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "arrow_gap": {
+          "description": "Space between the cursor's slot and each arrow, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "blur": {
+          "description": "Whether the picture behind the box is blurred, drawn live every frame.",
+          "type": "boolean"
+        }
+      }
+    },
+    "menu": {
+      "description": "The menu: title, three items, hint. All centered in the window.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_w",
+        "item_h",
+        "item_gap",
+        "title_gap",
+        "hint_bottom"
+      ],
+      "properties": {
+        "item_w": {
+          "description": "Width of each item's rect, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "item_h": {
+          "description": "Height of each item's rect, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "item_gap": {
+          "description": "Space between two items, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "title_gap": {
+          "description": "Space between the title and the first item, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "hint_bottom": {
+          "description": "Distance of the hint line's bottom from the window's bottom edge, px.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "instructions": {
+      "description": "The instructions page: a card grid between the title and the footer.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "margin_x",
+        "margin_top",
+        "margin_bottom",
+        "head_h",
+        "foot_h",
+        "gap",
+        "columns",
+        "icon_w",
+        "icon_h",
+        "pad_x",
+        "pad_y",
+        "text_gap",
+        "caption_gap",
+        "blur"
+      ],
+      "properties": {
+        "margin_x": {
+          "description": "Space between the window's side edges and the grid, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "margin_top": {
+          "description": "Space above the title, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "margin_bottom": {
+          "description": "Space below the footer, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "head_h": {
+          "description": "Height of the band that holds the title, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "foot_h": {
+          "description": "Height of the band that holds the footer, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "gap": {
+          "description": "Space between cards, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "description": "Cards per row, 1 or more. Six cards fill the rows.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "icon_w": {
+          "description": "Width of a card's icon box, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "icon_h": {
+          "description": "Height of a card's icon box, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "pad_x": {
+          "description": "Space between a card's edge and its content, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "pad_y": {
+          "description": "Least space above and below the icon in its card, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_gap": {
+          "description": "Space between the icon box and the text, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "caption_gap": {
+          "description": "Space between a card's topic and its caption, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "blur": {
+          "description": "Whether the picture behind the cards is blurred, drawn live every frame. Off keeps the frame rate on the moving background.",
+          "type": "boolean"
+        }
+      }
+    },
+    "leaderboard": {
+      "description": "The leaderboard page: the title, the table of the top 10, the footer.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "margin_top",
+        "margin_bottom",
+        "head_h",
+        "foot_h",
+        "table_w",
+        "top_h",
+        "top_gap",
+        "row_h",
+        "rest_gap",
+        "pad_x",
+        "place_w",
+        "top_place_w",
+        "column_gap",
+        "score_w",
+        "top_score_w",
+        "level_w",
+        "medal_size",
+        "rule_alpha",
+        "empty_top",
+        "blur"
+      ],
+      "properties": {
+        "margin_top": {
+          "description": "Space above the title, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "margin_bottom": {
+          "description": "Space below the footer, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "head_h": {
+          "description": "Height of the band that holds the title, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "foot_h": {
+          "description": "Height of the band that holds the footer, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "table_w": {
+          "description": "Width of the table, centered, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "top_h": {
+          "description": "Height of one medal row (places 1 to 3), px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "top_gap": {
+          "description": "Space between two medal rows, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "row_h": {
+          "description": "Height of one plain row (places 4 to 10), px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "rest_gap": {
+          "description": "Space between the medal rows and the plain rows, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "pad_x": {
+          "description": "Space between a row's edge and its content, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "place_w": {
+          "description": "Width of the place cell in a plain row, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "top_place_w": {
+          "description": "Width of the place cell (the medal) in a medal row, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "column_gap": {
+          "description": "Space between columns, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "score_w": {
+          "description": "Width of the score column in a plain row, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "top_score_w": {
+          "description": "Width of the score column in a medal row, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "level_w": {
+          "description": "Width of the level column (LV n), px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "medal_size": {
+          "description": "Side of the crown and medal pictures, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "rule_alpha": {
+          "description": "How opaque the thin line under each plain row is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "empty_top": {
+          "description": "Space between the head band and the empty-list line, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "blur": {
+          "description": "Whether the picture behind the medal rows is blurred, drawn live every frame. Off keeps the frame rate on the moving background.",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

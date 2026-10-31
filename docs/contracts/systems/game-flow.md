@@ -1,7 +1,7 @@
 # Game flow: menu, instructions, leaderboard, pause, game over and name entry
 Version: 2
 Status: draft
-Features: DRA-125, DRA-126, HUD-PANEL
+Features: DRA-125, DRA-126, HUD-PANEL, DRA-147
 Created by: architect
 
 ## Purpose
@@ -93,6 +93,8 @@ run.held        as before     the arrows held now        same           held = t
 wait            frozen        frozen                     frozen         still waiting     still waiting          ends: thrust
 ```
 
+Superseded for the look by systems/screens.md (DRA-147). The flow rules here stand. (The sketch's text, color and icons are the stand-ins.)
+
 Screens (stand-ins, centered across the surface they draw on, white default-font text on the background). From HUD-PANEL that surface is the whole 856 × 518 window for every screen: the menu, instructions and leaderboard fill it with the background and no panel or frame (`WindowBackdrop`); PAUSED and GAME_OVER are centered on the window, over the play area and the panel, and the window is dimmed first (`HudView.dim`, `systems/hud.md`). Layouts read the surface's size, so no layout number changes:
 ```
 MENU                          INSTRUCTIONS                          LEADERBOARD
@@ -182,6 +184,8 @@ def add_flow_drifters(
 ```
 `Run`, `step_run`, `add_drifters`, `next_run` and `hold_arrows` are in `docs/contracts/systems/run.md`. `Thrust` is in `docs/contracts/systems/ship.md`.
 
+Superseded for the look by systems/screens.md (DRA-147). The flow rules here stand. This applies to the view blocks below, up to `core/game_flow.py`'s DRA-126 changes.
+
 ```python
 # game/ui/screen_look.py (new). The stand-in look the screens share. Imports: pygame. Never core, never app.
 SCREEN_TEXT_COLOR: Final[tuple[int, int, int]]   # scope report DRA-125, Values needed (stand-ins: white text)
@@ -270,6 +274,8 @@ def stop_saves(flow: GameFlow) -> GameFlow: ...
 ```
 `Saves`, `ScoreEntry`, `GameOverMessage` and `NamePicker` are in `docs/contracts/systems/saves.md`. `Run.level_reached` is in `docs/contracts/systems/run.md`.
 
+Superseded for the look by systems/screens.md (DRA-147). The flow rules here stand. This applies to the view blocks below: their signatures now take the look (`systems/screens.md`, Interface).
+
 ```python
 # game/ui/game_over.py, changed. Imports also core.saves (GameOverMessage, NamePicker, NICKNAME_CHARACTERS,
 # BLANK). Each function keeps its DRA-125 call valid: the new parameters default to the DRA-125 screen.
@@ -328,6 +334,8 @@ The app picks what to draw from `flow.screen` (`systems/app/frame-loop.md`, Draw
 | `flow.picker`, `flow.picking` (DRA-126) | the letter picker: its slots' characters and, while `picking`, the cursor's outline; RETRY and MENU grey while `picking`. Source: 11-save-data.md, nickname_input; scope report DRA-126, Values needed |
 | `flow.leaderboard` (DRA-126) | the leaderboard page's rows: `draw_leaderboard(surface, flow.leaderboard)`. Entry `i` is place `i + 1`. Source: 10-ui.md, leaderboard_page; 02-game-flow.md, rule 4 |
 | `flow.best` (DRA-126) | BEST on the HUD: `docs/contracts/systems/hud.md` |
+
+Superseded for the look by systems/screens.md (DRA-147). The flow rules here stand.
 
 Every view here is a stand-in: the look values are the scope reports' (DRA-125 and DRA-126, Values needed), approved by the Director and not in the GDD, until UI-03 and UI-04 (10-ui.md, instructions_text_and_look, screens_look, TBD). Each one is its own constant, so those features replace them one by one. Shared by all:
 - **Text.** The default font (`screen_font(size)`), antialiased, in `SCREEN_TEXT_COLOR`, every line centered across the surface's width (`centerx = width // 2`, from `surface.get_size()`). A title at `SCREEN_TITLE_FONT_SIZE`, body lines at `SCREEN_BODY_FONT_SIZE`, menu items at `MENU_ITEM_FONT_SIZE`.
@@ -470,6 +478,7 @@ Values. Every key and screen value comes from the GDD or the scope report; none 
 - **The menu always opens on Play.** Rule 2 sets the selection the menu opens with, and the menu opens again after each page. Reading it on every entry needs no memory of where the player was.
 - **A focus loss is a tick input.** It reaches core on the tick after the browser reports it, like a key, so the pause happens on the fixed tick (15-tech-constraints.md, rule 2) and tests can feed it.
 - **The views take plain values, not the flow.** The menu takes its selection, the game-over screen its score and its choice, the pages nothing. The views stay small, testable alone, and free of the flow's rules. `draw_game_over` and `draw_final_score` keep their DRA-61 signatures, so the app's current calls stay valid until integration and QA stays clean between tasks.
+- Superseded for the look by systems/screens.md (DRA-147). The flow rules here stand. The next three bullets give the DRA-125 reasons for the stand-in look.
 - **Shared look in `ui/screen_look.py`.** Five screens use the same color, sizes, marker and box. One home for each stand-in means UI-04 changes one constant, not five copies. Values that only one screen uses stay in its own module.
 - **Layout from font metrics.** The scope report gives sizes and "centered"; the rows are placed by the fonts' own line heights and a space's width, so no spacing number is invented and the layout follows the font if UI-03 or UI-04 changes it.
 - **One outline square for every icon.** The scope report asks for a stand-in icon per section and gives one: a white outline square. A 1-px outline is the plainest outline pygame draws; UI-03 sets the real icons.
