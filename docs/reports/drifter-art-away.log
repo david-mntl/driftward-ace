@@ -3,6 +3,79 @@ Started 2026-10-31 by the main session (Opus 5.5), while the Director is away.
 Every sub-agent runs on claude-sonnet-5-5 (Agent model: sonnet).
 
 ============================================================
+RESULT (read this first)
+============================================================
+25 passing designs across 7 drifters. 36 design runs, 94 rounds, 94 critic
+reports. Nothing committed. No game code touched. Nothing moved into
+game/assets/: every file waits in staging for you.
+
+  drifter          passed  failed  passing designs (round that passed)
+  meteorite        5/5     1       d2 r3, d3 r3, d4 r2, d5 r2, d6 r2
+  fireball         5/5     0       d1 r2, d2 r3, d3 r3, d4 r3, d5 r1
+  ufo              5/5     0       d1 r1, d2 r3, d3 r3, d4 r2, d5 r3
+  planet           5/5     1       d1 r2, d3 r3, d4 r2, d5 r2, d6 r2
+  coin             2/5     3       d1 r3, d2 r3          (stopped: 3 fails)
+  electric ball    2/5     3       d2 r2, d4 r3          (stopped: 3 fails)
+  floating island  1/5     3       d3 r3                 (stopped: 3 fails)
+
+Where to look:
+  - One picture of all 25: staging/assets/drifter-designs-overview.png
+  - The 11 that missed, for reference: staging/assets/drifter-designs-near-misses.png
+  - Each design: staging/assets/sprites/<drifter>-d<k>-r<n>.png (game size),
+    -board.png (preview), -master.png (8x or 4x), .piskel (layers, editable)
+  - Each score with reasons: docs/reports/ui-art/<drifter>-d<k>-r<n>.md
+  - Each script (rebuilds the latest round): tools/art/<drifter>-d<k>.py
+  - Credits: staging/assets/CREDITS.md (94 lines, all "own work, script drawn")
+
+Open items for you:
+  1. Decision-log number clash. Another session working on this branch
+     (the screens work, commits as "david") committed my uncommitted GDD
+     edits in f1ab10e at 14:55, then added its own row "128" (screens glow
+     off) below my 128 and 129. The log now has two rows numbered 128.
+     Proposal: renumber the screens row to 130. I did not edit it, since that
+     session may still be active. Nothing else in the repo cites "128".
+  2. Coin, electric ball and floating island are short of 5. More runs need
+     your call (the 3-fail stop is yours). Each still has 2 unused
+     directions in the brief list (D7).
+  3. ufo-d2 was shrunk to 90% to fit a glow (D11). If you pick it, redraw at
+     100% so the drawing fills the hitbox.
+  4. Two scoring gaps worth knowing before you judge by score alone:
+     body size for electric ball (D15) and coin colours judged by eye (D16).
+  5. GDD 12 `glow` vs meteorite "no glow" (D9): one clarifying line later.
+  6. To approve a design, name the file; the art agent moves it and its
+     credits line into game/assets/ (its normal approval step).
+
+My own read as art director (looked at the overview sheet; opinion, not score):
+  - Fireball is the strongest family: all five read as one world. d4 (dying
+    star) and d2 (burning rock) are my picks.
+  - Planet: d1 (banded) and d4 (inside out, orange fissures) are the most
+    readable at 1x. d3's swirl sits close to the coin's galaxy look.
+  - Meteorite: d2 (iron), d4 (pumice) and d6 (chondrite) give a good
+    random pool together. d3 (frost) reads a little like a snowcap.
+  - UFO: d1 and d4 are clean; d2 (wrecked) is busy at 1x and is the one
+    shrunk to 90% (open item 3).
+  - Electric ball: d2 reads as electricity; d4's swirl leans toward the
+    coin's galaxy, which risks the "solid fuchsia = coin" read (rule 6).
+  - Coin d1 vs d2: close; d2's rare frame stands out more.
+
+Files changed or added (all uncommitted, except the GDD lines the other
+session committed in f1ab10e, see open item 1):
+  - docs/design/gdd/drifters/{01,04,05,06,07,08,10}-*.md: art_canvas rows
+  - docs/design/gdd/12-art-and-audio.md: art_style (8x / 4x, master kept)
+  - docs/design/gdd/91-decision-log.md: rows 128, 129
+  - .claude/agents/art-audio-engineer.md: masters, .piskel, one script per
+    asset, append-only credits (D4)
+  - tools/art/piskel_file.py, tools/art/overview_sheet.py,
+    tools/art/<drifter>-d<k>.py (36 design scripts)
+  - staging/assets/sprites/*-d*-r*.{png,-board.png,-master.png,.piskel}
+  - staging/assets/drifter-designs-overview.png, drifter-designs-near-misses.png
+  - staging/assets/CREDITS.md (94 appended lines)
+  - docs/reports/ui-art/*-d*-r*.md (94 critic reports)
+  - local/piskel/ (gitignored build, never committed; server stopped)
+Sub-agents: about 190 runs on claude-sonnet-5-5 (94 art rounds, 94 critic
+rounds, the .piskel helper, the overview sheets; 9 resumed after the limit).
+
+============================================================
 WHAT THE DIRECTOR ASKED (before leaving)
 ============================================================
 - Act as art director. Make the main design for every drifter that has no art yet.
@@ -100,9 +173,91 @@ D11 Watch item: the ufo-d2 round 2 refine shrank the saucer to 90% to make
     bigger than the drawing means hits from an empty edge (Pillar 2).
     The critic scores Size; if this design is picked, redraw at 100%.
 
-(more decisions are added below as they come up)
+D12 Late briefs carry lessons. For runs started after a drifter already had
+    a pass or two fails (floating-island-d4, coin-d5), the round 1 brief
+    points the art agent at the passing reports and lists what the critic
+    kept asking for. Same direction list, same rules; only a shortcut so
+    fewer rounds are spent re-learning the same notes.
 
+D13 Usage limit. Around 18:00 UTC the Sonnet sub-agents hit the account's
+    5-hour limit (reset 18:40). Nine art agents stopped mid-task. At 19:40
+    the Director said "CONTINUE"; the nine were resumed with SendMessage
+    (same agent, same context), not restarted. Three had already written
+    their files and only finished the checks; six drew from scratch.
+    No round was skipped or counted twice.
+
+D14 One critic prompt for planet-d2 round 2 named the wrong previous report
+    (planet-d1-r1.md instead of planet-d2-r1.md). The critic noticed and
+    used the right one. The score is unaffected.
+
+D15 Electric ball stopped at 3 fails (d1, d3, d5) with 2 passes (d2, d4).
+    That is the rule the Director set, so no more runs.
+    Process gap found on the way: the skill's measure step passes only the
+    image size (24 x 24). The 16 px ball inside it is never measured for the
+    critic, so the critic capped Size at 7 on d5 for three rounds. The art
+    agent did measure it (16 x 16 at alpha >= 50%). Suggestion for later:
+    let the measure step pass the body size for sprites whose `art_canvas`
+    is bigger than the body (electric ball, coin). Not changed now.
+
+D16 Coin stopped at 3 fails (d3, d4, d5) with 2 passes (d1, d2).
+    Note on d5: the critic scored Colors 7 three rounds running for a
+    "magenta, not crimson" lit face, judged by eye on the board. The art
+    agent's pixel samples of that face were (204,32,95) and (193,33,103),
+    which is the spec's crimson (200,30,90). The critic can't measure
+    pixels by design, so small-sprite colour calls can be off. coin-d5-r3 is
+    worth a look anyway; it may be closer than its score says.
+
+(more decisions are added below as they come up)
 ============================================================
 STATUS PER DRIFTER
 ============================================================
-(filled in as runs finish)
+
+METEORITE  passes 5/5  fails 1/3
+  d1 [FAIL]  r1 7.0/6/9  |  r2 7.6/7/9  |  r3 7.8/7/9
+  d2 [PASS]  r1 7.2/6/9  |  r2 7.4/7/9  |  r3 8.0/7/9
+  d3 [PASS]  r1 7.2/6/9  |  r2 7.8/7/9  |  r3 8.0/7/9
+  d4 [PASS]  r1 7.6/7/9  |  r2 8.0/7/9
+  d5 [PASS]  r1 7.8/7/9  |  r2 8.2/8/9
+  d6 [PASS]  r1 7.8/7/9  |  r2 8.2/8/9
+
+COIN  passes 2/5  fails 3/3
+  d1 [PASS]  r1 7.4/7/8  |  r2 7.8/7/8  |  r3 8.0/8/8
+  d2 [PASS]  r1 7.6/7/9  |  r2 7.8/7/9  |  r3 8.0/7/9
+  d3 [FAIL]  r1 7.4/6/8  |  r2 7.6/7/8  |  r3 7.8/7/8
+  d4 [FAIL]  r1 7.0/6/9  |  r2 7.6/7/9  |  r3 7.8/7/9
+  d5 [FAIL]  r1 7.6/7/8  |  r2 7.6/7/8  |  r3 7.8/7/8
+
+FLOATING-ISLAND  passes 1/5  fails 3/3
+  d1 [FAIL]  r1 7.2/6/9  |  r2 7.4/6/9  |  r3 7.8/7/9
+  d2 [FAIL]  r1 7.4/7/9  |  r2 7.6/7/9  |  r3 7.8/7/8
+  d3 [PASS]  r1 7.2/6/9  |  r2 7.6/7/9  |  r3 8.0/7/9
+  d4 [FAIL]  r1 7.0/6/9  |  r2 7.2/6/9  |  r3 7.4/7/9
+
+FIREBALL  passes 5/5  fails 0/3
+  d1 [PASS]  r1 7.2/6/8  |  r2 8.0/7/9
+  d2 [PASS]  r1 7.8/7/9  |  r2 7.8/7/9  |  r3 8.0/7/9
+  d3 [PASS]  r1 7.8/7/8  |  r2 7.8/7/7  |  r3 8.0/8/8
+  d4 [PASS]  r1 6.8/6/7  |  r2 7.8/7/8  |  r3 8.2/8/9
+  d5 [PASS]  r1 8.0/7/9
+
+UFO  passes 5/5  fails 0/3
+  d1 [PASS]  r1 8.0/7/9
+  d2 [PASS]  r1 7.4/6/9  |  r2 7.8/7/9  |  r3 8.2/8/9
+  d3 [PASS]  r1 7.4/6/9  |  r2 7.6/7/9  |  r3 8.0/7/9
+  d4 [PASS]  r1 7.8/7/9  |  r2 8.0/7/9
+  d5 [PASS]  r1 7.2/7/8  |  r2 7.4/6/8  |  r3 8.0/7/9
+
+PLANET  passes 5/5  fails 1/3
+  d1 [PASS]  r1 7.8/7/9  |  r2 8.0/7/9
+  d2 [FAIL]  r1 6.8/6/8  |  r2 7.6/7/9  |  r3 7.8/7/9
+  d3 [PASS]  r1 7.2/6/9  |  r2 7.8/7/9  |  r3 8.0/7/9
+  d4 [PASS]  r1 7.6/7/9  |  r2 8.0/7/9
+  d5 [PASS]  r1 7.4/7/9  |  r2 8.0/7/9
+  d6 [PASS]  r1 7.8/7/9  |  r2 8.2/8/9
+
+ELECTRIC-BALL  passes 2/5  fails 3/3
+  d1 [FAIL]  r1 7.0/6/8  |  r2 7.6/7/8  |  r3 7.8/7/8
+  d2 [PASS]  r1 7.6/7/9  |  r2 8.0/7/9
+  d3 [FAIL]  r1 7.4/6/9  |  r2 7.6/7/9  |  r3 7.8/7/9
+  d4 [PASS]  r1 7.0/6/9  |  r2 7.8/7/9  |  r3 8.0/7/9
+  d5 [FAIL]  r1 6.0/5/7  |  r2 6.6/6/7  |  r3 6.8/6/7
