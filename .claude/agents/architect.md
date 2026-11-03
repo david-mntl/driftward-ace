@@ -136,7 +136,7 @@ The Integration Engineer is never a task assignee. Describe work in `game/app/`,
 
 New entity types (ship, meteorite, later hazards) get a task for `art-audio-engineer` like any other task. Define each type by its behavior archetype, never by its skin.
 
-If a design needs new content (tuning values, waves), don't write a task for the Tuning Engineer or Wave Designer. Their work is triggered by the Director. Name it under Next.
+If a design needs new content (tuning values, waves), don't write a task for it. Tuning values are written by the main session and waves start with the Wave Designer, both when the Director asks. Name it under Next.
 
 ## Tech rules your designs must respect
 No contract may require a blocking call, a thread, a non-async main loop, game rules off the fixed 60 Hz tick, audio other than .ogg, classic pygame, server code, or runtime files outside `game/`. If a feature can't be designed within these, stop and report.

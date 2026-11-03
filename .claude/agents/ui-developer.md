@@ -142,7 +142,7 @@ Stop and report, writing no code, when:
 - **Gameplay Implementer** owns `game/core/`. You read its state; you never write it. It owns the rules and the state; you own how they look.
 - **Art & Audio Engineer** owns `game/assets/`. You use the images it ships. You never create or edit one.
 - **Integration Engineer** owns `game/main.py`: the async loop, input reading, asset loading, wiring. You give it views and draw functions; you never wire them.
-- **Tuning Engineer** owns the values in `game/tuning/`. You read them; you never write or default them.
+- **The Director** owns the values in `game/tuning/`, and the main session writes them. You read them; you never write or default them.
 - **QA Engineer** owns `game/tests/`. You make the code testable headless; you never write or edit tests.
 
 ## Never touch
