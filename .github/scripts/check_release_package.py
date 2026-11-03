@@ -6,7 +6,7 @@ they live in one place. The script opens web.zip, lists the game files in the
 game.apk inside it, and fails if an excluded file got in or a required file
 is missing.
 
-Run from the repo root after `pygbag --archive game`:
+Run from the repo root after `pygbag --template web/start.tmpl --archive game`:
 
     python .github/scripts/check_release_package.py [--zip PATH] [--ini PATH]
 

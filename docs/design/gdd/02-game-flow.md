@@ -3,12 +3,12 @@ Status: draft
 Depends on: [05-lives-and-damage.md](05-lives-and-damage.md), [10-ui.md](10-ui.md), [11-save-data.md](11-save-data.md)
 
 ## Summary
-The game moves through a few fixed states. pygbag's own click-to-start screen comes first and unlocks audio. Then the main menu shows: Play, Instructions, Leaderboard. A run plays until the last life is lost. The ship bursts, the world runs on for two seconds, then the game-over screen shows. If the score made the top 10, the player enters a name there first. RETRY starts a new run; MENU goes back to the menu.
+The game moves through a few fixed states. The start page comes first: the game's name over the menu's painting, a loading bar, then a prompt. One click or key press unlocks audio and opens the menu. Then the main menu shows: Play, Instructions, Leaderboard. A run plays until the last life is lost. The ship bursts, the world runs on for two seconds, then the game-over screen shows. If the score made the top 10, the player enters a name there first. RETRY starts a new run; MENU goes back to the menu.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PygbagStart
-    PygbagStart --> Menu: click
+    [*] --> StartPage
+    StartPage --> Menu: click or key
     Menu --> Instructions: Instructions
     Instructions --> Menu: confirm key
     Menu --> Leaderboard: Leaderboard
@@ -40,7 +40,7 @@ stateDiagram-v2
 | retry_key | a confirm key on RETRY | — | — | locked | Director |
 
 ## Rules
-1. **PygbagStart.** pygbag's built-in click-to-start screen. Never build a custom one. Source: [15-tech-constraints.md](15-tech-constraints.md).
+1. **StartPage.** Shows on page load, before the game runs. It loads the game, then waits for one click or any key press. That input is the gesture the browser needs to allow sound ([15-tech-constraints.md](15-tech-constraints.md) rule 3). Content is in [10-ui.md](10-ui.md), `start_page`. The press only opens the game: it never picks a menu item, and a key held through it counts as held on the menu (rule 12).
 2. **Menu.** Shows after the click, and again when MENU is picked on GameOver. It opens with `menu_start_selection` selected. Up and down move the selection, a confirm key picks it. Play starts a run (rule 5). Nothing else returns to the menu; a run in progress never does. Source: [01-vision.md](01-vision.md), Locked decisions.
 3. **Instructions.** Opens only from the menu, never on its own. Content is in [10-ui.md](10-ui.md). A confirm key goes back to the menu.
 4. **Leaderboard.** Opens from the menu. Shows the top 10 ([11-save-data.md](11-save-data.md)). It opens even when the list is empty or saves don't work. A confirm key goes back to the menu.

@@ -29,7 +29,7 @@ The game is Python built for the browser. These limits are hard: breaking one br
 ## Rules
 1. **Async main loop.** The main loop is `async` and yields every frame with `await asyncio.sleep(0)`. No blocking calls, no threads. A blocking loop freezes the browser page.
 2. **Fixed tick.** Every game rule runs on the fixed 60 Hz tick, never on frame time. The browser frame rate can dip; the rules must not change when it does. One frame runs at most `max_ticks_per_frame` ticks. After a hidden tab or a stall, the game carries on from where it was and never runs the missed time in one burst.
-3. **Audio.** .ogg only, because MP3 and WAV break the pygbag build. pygbag's own click-to-start screen unlocks browser audio. Never build a custom one.
+3. **Audio.** .ogg only, because MP3 and WAV break the pygbag build. The browser allows sound only after the player clicks or presses a key on the page, so the start page ([10-ui.md](10-ui.md), `start_page`) waits for one before the game begins. Sound never starts before it. The page is the game's own: it replaces pygbag's default click-to-start screen (decision 130).
 4. **No server.** No server code, no paid services, no online features.
 5. **Browser performance.** Python in WebAssembly is slow. Glow is pre-rendered and particles are capped ([12-art-and-audio.md](12-art-and-audio.md)).
 6. **Done means it runs in a real browser.** A desktop run doesn't count.
