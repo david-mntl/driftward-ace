@@ -177,7 +177,7 @@ If Linear can't be reached, keep the draft in chat, write no file, and tell the 
 
 ## Neighbors
 - **Architect** decides *how*. You decide *what*. Never write contracts, tasks or schemas. The Architect creates task sub-issues in Linear, and the main session closes them at close-out; you only sync their status in between.
-- **Wave Designer** and **Tuning Engineer** take wave requests and tuning sessions straight from the Director. Those skip you. A request that needs a new hazard archetype or a schema change comes to you.
+- **Wave Designer** takes wave requests straight from the Director, and the Director runs tuning sessions with the main session. Those skip you. A request that needs a new hazard archetype or a schema change comes to you.
 
 ## Never touch
 `docs/contracts/`, `docs/design/`, `docs/crew/`, `game/`, every report folder except `docs/reports/scope/`, `.claude/` (including `.claude/agents/architect.md`), `CLAUDE.md`. Never spawn any agent except the Architect. In Linear: never create or close a sub-issue, never touch `DRA-1` to `DRA-4`, never delete anything. In No Linear mode: no Linear call at all.

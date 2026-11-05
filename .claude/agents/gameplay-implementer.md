@@ -132,7 +132,7 @@ Stop and report, writing no code, when:
 
 ## Neighbors
 - **Architect** owns contracts and task files. You never edit either. If the contract doesn't fit, stop and report.
-- **Tuning Engineer** owns the values in `game/tuning/`. You read them; you never write or default them.
+- **The Director** owns the values in `game/tuning/`, and the main session writes them. You read them; you never write or default them.
 - **UI Developer** shows state on screen from `game/ui/`. You own the rules and the state; it owns how they look.
 - **Integration Engineer** owns `game/main.py`: the async loop, input reading, asset loading, wiring. You give it step functions; you never wire them.
 - **QA Engineer** owns `game/tests/`. You make the code testable headless; you never write or edit tests.

@@ -15,28 +15,17 @@ import promote
 import pygame
 from bench import Bench
 from core.drifters.base import DrifterType
+from core.drifters.spawner import Placement
 from core.levels import LEVEL_COUNT
 from core.scroll import scroll_speed
 from core.wave_files import SEAM_CLEAR_PX, _build_wave
 from doc import NAME, Doc, Leaf, get_leaf, leaves
+from place import CLICK_FIELDS, Spot, Unreachable, place_in_wave, placement_item
 
 ROOT: Path = doc_module.TOOL_DIR.parents[1]
 FOCUS_ORDER: tuple[str, ...] = ("game", "wave", "palette", "values")
 TYPES: tuple[str, ...] = tuple(drifter_type.value for drifter_type in DrifterType)
 PALETTE_ROWS: int = 7
-CLICK_FIELDS: dict[str, tuple[str, ...]] = {
-    "meteorite": ("x",),
-    "satellite": ("y",),
-    "chain_lightning": ("x",),
-    "fireball": ("x",),
-    "coin": ("x", "y"),
-    "floating_island": ("x",),
-    "planet": ("x",),
-    "ufo": ("y",),
-}
-"""Which coordinates of a mouse click a drifter takes. A meteorite falls from its x, a satellite
-crosses at its y, a coin sits at both. A fireball enters along the top, at its x. An island and a
-planet scroll in from the top at their x. A UFO crosses from a side at its y."""
 NEW_WAVE_LENGTH: int = 1320
 """Length of a new wave, px. The same as the game's first waves (20 s at Level 1)."""
 """Rows the palette lists show at once."""
@@ -65,6 +54,15 @@ HAZARD_FIELDS: tuple[str, ...] = ("graze_margin",)
 HAZARD_STEP: float = 1.0
 """px per nudge of the graze margin (Shift: x10)."""
 REMOVE: object = object()
+OPEN_FOLDERS: tuple[Path, ...] = (
+    doc_module.SANDBOX_DIR / "drafts",
+    doc_module.SANDBOX_DIR,
+    doc_module.WAVES_DIR,
+    doc_module.WAVES_DIR / "other",
+)
+"""Where the Open list looks for wave files, in this order. Not their subfolders."""
+PLAYLIST_NAME: str = "playlist"
+"""The game's playlist file, in the waves folder. Not a wave."""
 
 
 @dataclass
@@ -87,11 +85,38 @@ class Prompt:
     text: str
     submit: Callable[[str], None]
 
+    def __post_init__(self) -> None:
+        self.start: str = self.text
+        """The text it opened with. A paste replaces it until something else is typed."""
+
 
 @dataclass
 class PromoteView:
     items: list[promote.Item]
     cursor: int = 0
+
+
+@dataclass
+class OpenView:
+    """The Open list: every wave file the editor can open, narrowed by what is typed."""
+
+    files: list[Path]
+    text: str = ""
+    cursor: int = 0
+    top: int = 0
+    rows: int = 10
+    """Rows the list shows at once, set by the drawing."""
+
+    def shown(self) -> list[Path]:
+        """The files whose path, from the repo root, holds the typed text (any case)."""
+        words: str = self.text.lower()
+        return [path for path in self.files if words in _relative(path).lower()]
+
+    def move(self, step: int) -> None:
+        """Move the cursor by `step` rows, kept in the list and in view."""
+        count: int = len(self.shown())
+        self.cursor = min(max(self.cursor + step, 0), max(count - 1, 0))
+        self.top = min(max(self.top, self.cursor - self.rows + 1), self.cursor)
 
 
 class Editor:
@@ -102,9 +127,13 @@ class Editor:
         self.cursor: int = 0
         self.prompt: Prompt | None = None
         self.promote: PromoteView | None = None
+        self.picker: OpenView | None = None
         self.message: str = ""
         self.invert: bool = False
         """The palette's switch: new drifters are placed inverted (mirrored)."""
+        self.at_spot: bool = False
+        """Place by position: a click puts the drifter on that spot at the playhead's moment,
+        instead of starting there."""
         self.armed: tuple[str, str | None] | None = None
         """A (type, variant) waiting for a click in the game view to be placed."""
         self.panels: dict[str, pygame.Rect] = {}
@@ -237,6 +266,9 @@ class Editor:
         if self.promote is not None:
             self._promote_key(event)
             return True
+        if self.picker is not None:
+            self._picker_key(event)
+            return True
         ctrl: bool = bool(event.mod & pygame.KMOD_CTRL)
         shift: bool = bool(event.mod & pygame.KMOD_SHIFT)
         if ctrl:
@@ -253,6 +285,9 @@ class Editor:
             return True
         if event.key == pygame.K_t:
             self.trail = not self.trail
+            return True
+        if event.key == pygame.K_p:
+            self.toggle_at_spot()
             return True
         if event.key == pygame.K_TAB:
             self._next_focus(-1 if shift else 1)
@@ -272,6 +307,9 @@ class Editor:
         """A click in the game view. Armed: place the drifter there. Otherwise select the
         placement of the nearest drifter and focus its values, or focus the game."""
         if self.prompt is not None or self.promote is not None:
+            return
+        if self.armed is not None and self.at_spot:
+            self._add_at_spot(self.armed[0], self.armed[1], local)
             return
         if self.armed is not None:
             self._add(self.armed[1], drifter=self.armed[0], at=local)
@@ -352,6 +390,15 @@ class Editor:
             "new drifters are placed inverted" if self.invert else "invert off"
         )
 
+    def toggle_at_spot(self) -> None:
+        """Flip place by position. It applies to the next click with an armed drifter."""
+        self.at_spot = not self.at_spot
+        self.message = (
+            "at spot: a click puts the drifter there at this moment"
+            if self.at_spot
+            else "at spot off: a click starts the drifter there"
+        )
+
     def _arm(self, variant: str | None) -> None:
         """Wait for a click in the game view to place the palette's drifter."""
         if self.doc.wave is None:
@@ -362,7 +409,12 @@ class Editor:
         self.message = ""
 
     def wheel_at(self, pos: tuple[int, int], dy: int) -> None:
-        """Scroll the palette list under the mouse."""
+        """Scroll the palette list under the mouse, or the Open list."""
+        if self.picker is not None:
+            view: OpenView = self.picker
+            bottom: int = max(len(view.shown()) - view.rows, 0)
+            view.top = min(max(view.top - dy, 0), bottom)
+            return
         for kind, area in self.regions.items():
             if area.collidepoint(pos):
                 count: int = len(TYPES) if kind == "type" else len(self.variants())
@@ -450,16 +502,7 @@ class Editor:
             self.message = f"cannot add {drifter}: {error}"
             return
 
-        def change(doc: Doc) -> None:
-            assert doc.wave is not None
-            doc.wave.setdefault("placements", []).append(item)
-            doc.sort()
-            self._held = item
-
-        if self.bench.edit(change):
-            self.selected = next(
-                i for i, q in enumerate(self.placements()) if q is self._held
-            )
+        if self._append(item):
             name: str = f"{drifter} {variant}" if variant else drifter
             if inverted:
                 name += " (inverted)"
@@ -476,6 +519,81 @@ class Editor:
             self.message = (
                 f"added {name} at {at_px:g} px. Left/Right nudge, Enter types"
             )
+
+    def _append(self, item: dict[str, Any]) -> bool:
+        """Add `item` to the wave and select it. False: the game refused it."""
+
+        def change(doc: Doc) -> None:
+            assert doc.wave is not None
+            doc.wave.setdefault("placements", []).append(item)
+            doc.sort()
+            self._held = item
+
+        if not self.bench.edit(change):
+            return False
+        self.selected = next(
+            i for i, q in enumerate(self.placements()) if q is self._held
+        )
+        return True
+
+    def _add_at_spot(
+        self, drifter: str, variant: str | None, at: tuple[float, float]
+    ) -> None:
+        """Add a drifter so that it is on `at` at the playhead's moment (place.py).
+
+        The trigger and the coordinate it takes are worked out from its path. A spot it can't
+        pass at this moment is refused with the nearest one it can. With the invert switch on,
+        a drifter that has no mirror is placed as it is.
+        """
+        wave: dict[str, Any] | None = self.doc.wave
+        if wave is None:
+            self.message = "no wave to add to: open one with Ctrl+O first"
+            return
+        moment: int = self.bench.run.scroll.scrolled_ticks
+        if moment * scroll_speed(self.bench.level) > float(wave.get("length_px", 0)):
+            self.message = "cannot place at spot: the playhead is past the wave's end"
+            return
+        placements: list[Any] = list(wave.get("placements", []))
+        spot: Spot | None = None
+        error: Exception | None = None
+        for inverted in (True, False) if self.invert else (False,):
+            what: Placement = Placement(
+                drifter_type=DrifterType(drifter), variant=variant, invert=inverted
+            )
+            try:
+                spot = place_in_wave(
+                    what,
+                    at,
+                    moment,
+                    self.bench.level,
+                    self.bench.tuning,
+                    self.bench.run.ship,
+                    self.doc.wave_id,
+                    placements,
+                )
+            except Unreachable as err:
+                self.message = f"cannot reach {at[0]:.0f}, {at[1]:.0f} now: {err}"
+                return
+            except ValueError as err:
+                error = err
+                continue
+            break
+        if spot is None:
+            self.message = f"cannot add {drifter}: {error}"
+            return
+        item: dict[str, Any] = placement_item(what, spot)
+        if not self._append(item):
+            return
+        name: str = f"{drifter} {variant}" if variant else drifter
+        if what.invert:
+            name += " (inverted)"
+        elif self.invert:
+            name += " (no invert for this drifter)"
+        where: str = ", ".join(f"{k} {v:g}" for k, v in spot.fields.items())
+        self.message = (
+            f"placed {name} at {spot.at_px} px, {where}: on the spot now, "
+            f"{spot.off_px:.1f} px off. Esc stops placing"
+        )
 
     def _reachable(self) -> dict[str, bool]:
         """Which panels can take the focus now."""
@@ -888,20 +1006,34 @@ class Editor:
         self.prompt = Prompt(label, "new_wave", submit)
 
     def _open(self) -> None:
-        def submit(text: str) -> None:
-            try:
-                opened: Doc = Doc.open(_resolve(text))
-            except (OSError, ValueError) as err:
-                self.message = f"cannot open: {err}"
-                return
-            if self.bench.load_doc(opened):
-                self.armed = None
-                self.selected = 0 if self.placements() else None
-                self.cursor = self._home()
-                self.message = f"opened {_relative(_resolve(text))}"
+        """Show the Open list, the cursor on the file open now."""
+        files: list[Path] = wave_files()
+        view: OpenView = OpenView(files)
+        here: Path | None = self.doc.source_file
+        if here is not None and here.resolve() in [f.resolve() for f in files]:
+            view.move([f.resolve() for f in files].index(here.resolve()))
+        self.picker = view
 
-        label: str = "Open (unsaved changes are dropped)" if self.doc.dirty else "Open"
-        self.prompt = Prompt(label, _relative(doc_module.SANDBOX_DIR) + "/", submit)
+    def _open_path(self, path: Path) -> None:
+        try:
+            opened: Doc = Doc.open(path)
+        except (OSError, ValueError) as err:
+            self.message = f"cannot open: {err}"
+            return
+        if self.bench.load_doc(opened):
+            self.armed = None
+            self.selected = 0 if self.placements() else None
+            self.cursor = self._home()
+            self.message = f"opened {_relative(path)}"
+
+    def pick_at(self, pos: tuple[int, int]) -> None:
+        """A click while the Open list shows: open the file of the row under it."""
+        for area, kind, index in self.hits:
+            if kind == "file" and area.collidepoint(pos) and self.picker is not None:
+                path: Path = self.picker.shown()[index]
+                self.picker = None
+                self._open_path(path)
+                return
 
     def _open_promote(self) -> None:
         try:
@@ -924,10 +1056,49 @@ class Editor:
             self.prompt = None
             self.message = ""
             prompt.submit(prompt.text.strip())
-        elif event.key == pygame.K_BACKSPACE:
-            prompt.text = prompt.text[:-1]
-        elif event.unicode and event.unicode.isprintable():
-            prompt.text += event.unicode
+        elif event.mod & pygame.KMOD_CTRL and event.key == pygame.K_c:
+            copy_text(prompt.text)
+        elif event.mod & pygame.KMOD_CTRL and event.key == pygame.K_v:
+            pasted: str = paste_text()
+            prompt.text = (
+                pasted if prompt.text == prompt.start else prompt.text + pasted
+            )
+        else:
+            prompt.text = _edit_text(prompt.text, event)
+
+    def _picker_key(self, event: pygame.event.Event) -> None:
+        """Type to narrow the list, Ctrl+V pastes a name or path, Enter opens."""
+        view: OpenView = self.picker  # type: ignore[assignment]
+        ctrl: bool = bool(event.mod & pygame.KMOD_CTRL)
+        shown: list[Path] = view.shown()
+        if event.key == pygame.K_ESCAPE:
+            self.picker = None
+        elif event.key == pygame.K_RETURN:
+            typed: Path = _resolve(view.text)
+            path: Path | None = (
+                typed
+                if view.text and typed.is_file()
+                else shown[view.cursor]
+                if shown
+                else None
+            )
+            if path is None:
+                self.message = f"no wave matches '{view.text}'"
+                return
+            self.picker = None
+            self._open_path(path)
+        elif event.key in (pygame.K_UP, pygame.K_DOWN):
+            view.move(1 if event.key == pygame.K_DOWN else -1)
+        elif event.key in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+            view.move(view.rows if event.key == pygame.K_PAGEDOWN else -view.rows)
+        elif ctrl and event.key == pygame.K_c and shown:
+            copy_text(_relative(shown[view.cursor]))
+            self.message = f"copied {_relative(shown[view.cursor])}"
+        else:
+            before: str = view.text
+            view.text = _edit_text(view.text, event)
+            if view.text != before:
+                view.cursor = view.top = 0
 
     def _promote_key(self, event: pygame.event.Event) -> None:
         view: PromoteView = self.promote  # type: ignore[assignment]
@@ -992,6 +1163,46 @@ def _parse(text: str, like: Any, field: str) -> Any:
             return int(text)
         except ValueError:
             raise ValueError("not a whole number") from None
+    return text
+
+
+def wave_files() -> list[Path]:
+    """Every wave file the editor can open: drafts, sandbox files, then the game's waves."""
+    files: list[Path] = []
+    for folder in OPEN_FOLDERS:
+        files += sorted(
+            path for path in folder.glob("*.json") if path.stem != PLAYLIST_NAME
+        )
+    return files
+
+
+def paste_text() -> str:
+    """The clipboard's first line, without quotes or a file:// prefix. Empty if none."""
+    try:
+        text: str = pygame.scrap.get_text()
+    except pygame.error:
+        return ""
+    lines: list[str] = text.strip().splitlines()
+    first: str = lines[0].strip().strip("'\"") if lines else ""
+    return first.removeprefix("file://")
+
+
+def copy_text(text: str) -> None:
+    """Put `text` on the clipboard. Nothing happens where there is none."""
+    try:
+        pygame.scrap.put_text(text)
+    except pygame.error:
+        pass
+
+
+def _edit_text(text: str, event: pygame.event.Event) -> str:
+    """A line of typed text after one key: Backspace, Ctrl+V pastes, a printable adds."""
+    if event.key == pygame.K_BACKSPACE:
+        return text[:-1]
+    if event.mod & pygame.KMOD_CTRL:
+        return text + paste_text() if event.key == pygame.K_v else text
+    if event.unicode and event.unicode.isprintable():
+        return text + str(event.unicode)
     return text
 
 

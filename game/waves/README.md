@@ -157,7 +157,7 @@ At load, the game refuses:
 - a playlist that is not exactly 8 levels, or that names a wave that doesn't exist
 - a level with random picks and no pool wave for it
 
-It does not check these. They are the Wave Critic's job and the `wave_check` tool's:
+It does not check these. They are the `wave_check` tool's job:
 
 - gaps, telegraph time, coin distance, and whether a bot can survive the wave
 - Wave 0 holding only meteorites as hazards
