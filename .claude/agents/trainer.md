@@ -67,7 +67,7 @@ If any input or output is vague, or an output has no reader, don't finish the fi
 
 ## Content rules
 - Every agent that fills in a contract gets this line: "Follow the Architect's schema in `docs/contracts/` exactly. If the schema doesn't fit, stop and report the mismatch. Never adapt the format."
-- Each critic's file says whether its findings block or advise. Scope Guardian, QA Engineer, and Wave Critic block. Implementation Reviewer advises.
+- Each critic's file says whether its findings block or advise. Scope Guardian and QA Engineer block. Implementation Reviewer advises.
 - Keep each file concise: only what the agent needs to do its job. The two copied blocks don't count. If the job section keeps growing, it's probably two jobs; tell the Director.
 - Write in direct, plain sentences. No filler.
 

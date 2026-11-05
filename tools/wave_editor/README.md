@@ -67,7 +67,22 @@ Ctrl+N asks for a name (lower case letters, digits, `_`) and starts an empty fix
 
 **Invert switch:** the pill at the top right of the DRIFTERS panel (or the I key). When it is on, every drifter you place from the palette gets `invert: true`, so you pick the mirrored version from the start. The status line says `INVERTED` while placing. It can be flipped while a drifter is armed, and applies to the next one placed. A drifter with no mirror (the meteorite and the coin) is placed as it is, and the message says so. Inverted: a satellite and a fireball come from the right and fly left; a chain lightning is mirrored.
 
-A click gives a drifter the coordinates it uses: a meteorite, a chain lightning, a fireball, a floating island and a planet take the click's `x` (they come in from the top), a satellite and a UFO take `y` (they cross at that height), a coin takes both. A satellite or a UFO enters from the left unless the invert switch is on.
+A click gives a drifter the coordinates it uses: a meteorite, a chain lightning, a fireball, a floating island, a planet and an electric ball take the click's `x` (they come in from the top), a satellite and a UFO take `y` (they cross at that height), a coin takes both. A satellite or a UFO enters from the left unless the invert switch is on.
+
+**At spot (P):** P switches it on and off. While it is on, a click places the armed drifter so that it is **on the click at the playhead's moment**, instead of starting there. Pause where the drifter should be somewhere, arm it, click the spot. The tool plays the drifter alone with the game's physics at the level you picked and works out its `at_px` and the coordinate it takes (the same ones as above). The status line says `AT SPOT`, and the message gives the trigger and how far off it lands: a drifter moves in steps, so it can be up to half a step off, usually 1 to 2 px.
+
+- **Refused** when the drifter's path never passes that spot at that moment: it can't get there in time without triggering inside the first 120 px, or its path doesn't go there. The message gives the nearest spot it can reach and the miss in px. A floating island waits for the 120 px too, since `wave_check` counts it for the seam.
+- **UFO:** its weave changes with where it starts, so the tool tries every height in its band. That takes a few seconds. It uses the default seed the UFO gets at its place in the list. Adding a drifter before another UFO changes that UFO's default seed, as it always has.
+- The ship's position counts only for the chain lightning's warning. The tool uses the ship where it is now.
+- Same thing from the command line, for drafting waves without the window:
+
+```
+python tools/wave_editor/place.py meteorite 200 300 4.5                 # on 200,300 at 4.5 s, Level 8
+python tools/wave_editor/place.py fireball 300 300 5 --invert --level 4
+python tools/wave_editor/place.py ufo 300 300 6 --wave tools/wave_editor/sandbox/drafts/x.json
+```
+
+It prints the trigger and the miss, then the placement as JSON. `--wave` uses that file's tuning layers, its length and the UFO's default seed there. Without it a UFO needs `--seed`. Other options: `--variant`, `--ship L|C|R` (default C). Exit code: 0 placed, 1 refused, 2 bad input.
 
 **With the keyboard:**
 
@@ -119,8 +134,12 @@ Nudge or type a value and it becomes **W**. D on a W value drops it back to F or
 | Ctrl+S | save the sandbox file (`tools/wave_editor/sandbox/<name>.json`) |
 | Ctrl+Shift+S | save as (type a path, it never writes under `game/`) |
 | Ctrl+N | new empty wave |
-| Ctrl+O | open a sandbox file or a game wave |
+| Ctrl+O | open a wave from a list (see below) |
 | Ctrl+P | promote |
+
+**Open** shows every wave file over the game view: drafts (`sandbox/drafts/`), sandbox files, then the game's waves (`game/waves/` and `game/waves/other/`). The file open now is marked and has the cursor. Type to narrow the list (any part of the path, any case), Up/Down or PageUp/PageDown to pick, Enter or a click to open, Esc to cancel. Ctrl+V pastes a name or a path, and a pasted path to any wave file opens with Enter even if it is not in the list (for example VS Code's Copy Path). Ctrl+C copies the picked file's path.
+
+**Typing in a prompt** (a value, a name, save as): Ctrl+V pastes the clipboard's first line. If you haven't typed anything yet, the paste replaces the starting text. Ctrl+C copies the line.
 
 **Promote** lists what it would write: the wave file in `game/waves/`, one `game/tuning/drifters/<type>.json` per changed type, with the value diffs and which other waves use that type, and `game/tuning/hazards.json` if the graze margin changed. Space ticks an item, Enter writes only the ticked ones. A tuning file is patched in place, so only the changed numbers differ. After writing a type, its W and F layers are dropped, because production now has them. The same goes for the graze margin after `hazards.json`. `playlist.json` is never touched. Nothing is committed. `wave_check` is not built yet.
 

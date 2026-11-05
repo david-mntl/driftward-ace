@@ -77,7 +77,7 @@ KEYS: tuple[tuple[str, str], ...] = (
     ("EDIT", ""),
     ("Tab", "next panel"),
     ("Click", "panel, row, drifter, or place"),
-    ("I", "palette invert on / off"),
+    ("I / P", "invert / at spot on / off"),
     ("Up Down", "pick a row"),
     ("Left Right", "nudge (Shift x10) / palette side"),
     ("Enter", "type a value / add"),
@@ -146,6 +146,7 @@ def main() -> None:
                 and editor.focus == "game"
                 and editor.prompt is None
                 and editor.promote is None
+                and editor.picker is None
             )
             thrust: Thrust = _held_thrust() if steering else Thrust()
             ticks: int = 0
@@ -186,10 +187,15 @@ def draw_all(
     _draw_bar(screen, font, editor)
     if editor.promote is not None:
         _draw_promote(screen, font, editor)
+    if editor.picker is not None:
+        _draw_open(screen, font, editor)
 
 
 def route_click(pos: tuple[int, int], editor: Editor) -> bool:
     """Send a left click to where it belongs. True if it grabbed the timeline bar (a scrub)."""
+    if editor.picker is not None:
+        editor.pick_at(pos)
+        return False
     if BAR.collidepoint(pos):
         return True
     if GAME_RECT.collidepoint(pos):
@@ -291,7 +297,12 @@ def _draw_pointer(
     """Over the game view: the x and y under the mouse, game pixels. While a drifter is armed
     for placing, a crosshair too."""
     mouse: tuple[int, int] = pygame.mouse.get_pos()
-    if not GAME_RECT.collidepoint(mouse) or editor.prompt is not None or editor.promote:
+    if (
+        not GAME_RECT.collidepoint(mouse)
+        or editor.prompt is not None
+        or editor.promote
+        or editor.picker
+    ):
         return
     clip = screen.get_clip()
     screen.set_clip(GAME_RECT)
@@ -571,8 +582,13 @@ def _draw_bar(screen: pygame.Surface, font: pygame.font.Font, editor: Editor) ->
     if editor.armed is not None:
         kind, variant = editor.armed
         hint: str = (
-            f"PLACING {kind} {variant or ''}{' INVERTED' if editor.invert else ''}: "
-            "click in the game view, Esc stops"
+            f"PLACING {kind} {variant or ''}{' INVERTED' if editor.invert else ''}"
+            f"{' AT SPOT' if editor.at_spot else ''}: "
+            + (
+                "click where it should be now, Esc stops"
+                if editor.at_spot
+                else "click in the game view, Esc stops"
+            )
         )
         _lines(screen, font, BAR.x, BAR.bottom + 44, [(hint, TRAIL)])
     if editor.prompt is not None:
@@ -619,6 +635,69 @@ def _draw_promote(
         ("Nothing is committed.", DIM),
     ]
     _lines(screen, font, box.x + 12, box.bottom - line * 4, notes)
+
+
+def _draw_open(screen: pygame.Surface, font: pygame.font.Font, editor: Editor) -> None:
+    """The Open list over the game view: what is typed, then the files that match it."""
+    view = editor.picker
+    assert view is not None
+    box: pygame.Rect = GAME_RECT.inflate(-30, -30)
+    pygame.draw.rect(screen, (16, 18, 26), box)
+    pygame.draw.rect(screen, ACCENT, box, 1)
+    line: int = font.get_linesize()
+    title: str = "OPEN a wave" + (
+        "   (unsaved changes are dropped)" if editor.doc.dirty else ""
+    )
+    screen.blit(font.render(title, True, ACCENT), (box.x + 12, box.y + 10))
+    find: pygame.Rect = pygame.Rect(box.x + 10, box.y + 14 + line, box.w - 20, line + 8)
+    pygame.draw.rect(screen, HIGHLIGHT, find)
+    screen.blit(
+        font.render(f"Find  {view.text}_", True, TEXT), (find.x + 6, find.y + 4)
+    )
+    shown: list[Path] = view.shown()
+    top_y: int = find.bottom + 8
+    view.rows = max((box.bottom - line * 3 - top_y) // (line + 2), 1)
+    here: Path | None = editor.doc.source_file
+    for number in range(view.top, min(view.top + view.rows, len(shown))):
+        path: Path = shown[number]
+        y: int = top_y + (number - view.top) * (line + 2)
+        row: pygame.Rect = pygame.Rect(box.x + 6, y - 2, box.w - 12, line + 2)
+        if number == view.cursor:
+            pygame.draw.rect(screen, HIGHLIGHT, row)
+        editor.hits.append((row, "file", number))
+        name: str = path.name
+        if here is not None and path.resolve() == here.resolve():
+            name += "   (open now)"
+        screen.blit(font.render(name, True, TEXT), (box.x + 14, y))
+        folder: str = _relative_dir(path)
+        screen.blit(
+            font.render(folder, True, DIM),
+            (box.right - 14 - font.size(folder)[0], y),
+        )
+    if not shown:
+        screen.blit(
+            font.render("no wave matches. A full path opens with Enter.", True, DIM),
+            (box.x + 14, top_y),
+        )
+    notes: list = [
+        (f"{len(shown)} of {len(view.files)} files", DIM),
+        (
+            (
+                "Type to find   Ctrl+V paste a name or path   Up Down pick   "
+                "Enter or click open   Esc cancel"
+            ),
+            TEXT,
+        ),
+    ]
+    _lines(screen, font, box.x + 12, box.bottom - line * 2 - 6, notes)
+
+
+def _relative_dir(path: Path) -> str:
+    """The file's folder from the repo root, for the Open list's right column."""
+    try:
+        return str(path.parent.resolve().relative_to(GAME_DIR.parent))
+    except ValueError:
+        return str(path.parent)
 
 
 if __name__ == "__main__":
