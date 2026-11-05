@@ -32,7 +32,7 @@ A comet that dives across the screen on a straight, steep diagonal. By default i
 At Level 1 the 35° path splits into about 2.5 px/tick down and 1.8 px/tick sideways. From the top-left corner it crosses the floor near x 336, about 3.2 s later. Derived from the guesses above; not tuning keys.
 
 ## Rules
-1. **Appears:** at its start spot, then flies into view. Its entry warning shows first, where it will appear: at its x against the top edge for a top entry, at its y against the side edge for a side entry ([../07-drifters.md](../07-drifters.md) rule 9). The warning copy is tilted along its path, with the tail pointing back, so it also shows which way it will fly.
+1. **Appears:** at its start spot, then flies into view. Its entry warning shows first, where it will appear: at its x against the top edge for a top entry, at its y against the side edge for a side entry ([../07-drifters.md](../07-drifters.md) rule 9).
 2. **Telegraph:** none. The entry warning is its only warning.
 3. **Moves:** in a straight line at `speed` along its path, at `angle` from straight down, every tick. Down and to the right; down and to the left with `invert`. A side entry from the left wall flies right; with `invert` it enters from the right wall and flies left. No targeting, no turning. The scroll doesn't add to it ([../03-world-and-camera.md](../03-world-and-camera.md) rule 9).
 4. **Hits:** touching the head or the tail is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)).

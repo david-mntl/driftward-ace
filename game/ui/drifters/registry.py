@@ -12,7 +12,7 @@ from collections.abc import Callable
 import pygame
 
 from core.drifters.base import Drifter, DrifterType, Phase
-from ui.drifters.entry_warning import draw_entry_warning, drop_entry_warning
+from ui.drifters.entry_warning import draw_entry_warning
 
 log = logging.getLogger(__name__)
 
@@ -64,9 +64,8 @@ def render_drifter(surface: pygame.Surface, drifter: Drifter) -> None:
     """
     view: DrifterView = _view_for(drifter.drifter_type)
     if drifter.phase is Phase.WARNING:
-        draw_entry_warning(surface, drifter, view)
+        draw_entry_warning(surface, drifter)
     elif drifter.phase is Phase.ACTIVE:
-        drop_entry_warning(drifter)
         view(surface, drifter, (drifter.x, drifter.y), 1.0, drifter.brightness())
 
 
