@@ -80,7 +80,7 @@ GRAZE_RING_WIDTH: int = 1
 GRAZE_MARGIN: float = 14.0
 """px. Source: 06-scoring.md, graze_margin (locked)."""
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
@@ -851,7 +851,7 @@ def test_a_graze_and_a_hit_by_another_hazard_on_one_tick_the_graze_pays_then_the
     messages = [r.getMessage() for r in caplog.records]
     graze_at = messages.index("drifter graze id=1 type=meteorite")
     touch_at = messages.index("drifter touch id=2 type=meteorite effect=hit")
-    life_at = messages.index("life lost lives=2")
+    life_at = messages.index(f"life lost lives={LIVES_START - 1}")
     assert graze_at < touch_at < life_at
     # On the last life the hit starts the last life, and the final score has the graze in it.
     caplog.clear()
@@ -891,7 +891,9 @@ def test_a_graze_on_a_fall_tick_pays_then_the_fall_counts(caplog: pytest.LogCapt
     assert popup.x == HOME_X
     assert popup.start_y > SCREEN_H
     messages = [r.getMessage() for r in caplog.records]
-    assert messages.index("drifter graze id=1 type=meteorite") < messages.index("life lost lives=2")
+    assert messages.index("drifter graze id=1 type=meteorite") < messages.index(
+        f"life lost lives={LIVES_START - 1}"
+    )
 
 
 LONG_RULES: GrazeRules = replace(CUSTOM_RULES, popup_ticks=500, ring_ticks=500)
@@ -1080,7 +1082,7 @@ def test_a_paid_graze_logs_one_line_after_the_collect_lines_and_before_the_hit_l
         "drifter touch id=3 type=coin effect=collect",
         "drifter graze id=1 type=meteorite",
         "drifter touch id=2 type=meteorite effect=hit",
-        "life lost lives=2",
+        f"life lost lives={LIVES_START - 1}",
         run_lines[4],
     ]
     assert run_lines[4].startswith("drifter gone id=3 type=coin")

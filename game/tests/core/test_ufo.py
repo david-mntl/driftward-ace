@@ -111,7 +111,7 @@ REHIT_COOLDOWN: int = 180
 REHIT_DIM: float = 0.75
 """Source: 05-lives-and-damage.md, rehit_cooldown, rehit_dim (guess)."""
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
@@ -1370,7 +1370,7 @@ def test_a_ufo_logs_spawn_active_each_hit_and_gone_and_nothing_from_core_drifter
         "drifter spawn id=1 type=ufo variant=standard x=-20.00 y=300.00 speed=1.97 level=1",
         "drifter active id=1 type=ufo x=-20.00 y=300.00",
         "drifter touch id=1 type=ufo effect=hit",
-        "life lost lives=2",
+        f"life lost lives={LIVES_START - 1}",
         "invulnerable end",
         f"drifter gone id=1 type=ufo x={last.x:.2f} y={last.y:.2f}",
     ]

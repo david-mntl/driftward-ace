@@ -75,7 +75,7 @@ GRAVITY: float = 0.16
 FALL_CAP: float = 5.5
 """px/tick², px/tick. Source: 04-ship.md, Values, gravity, fall_cap (guess)."""
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
@@ -563,7 +563,7 @@ def test_a_ship_falls_onto_an_island_stands_and_rides_down_and_falls_when_it_lea
     assert fell.waiting
     assert fell.invuln_ticks_left == INVULN_TICKS
     assert fell.ship == spawn()
-    assert "life lost lives=2" in run_lines(caplog)
+    assert f"life lost lives={LIVES_START - 1}" in run_lines(caplog)
     assert not any(line.startswith("respawn clear") for line in run_lines(caplog))
     assert not any(line.startswith("drifter touch") for line in run_lines(caplog))
 
@@ -658,7 +658,7 @@ def test_a_ship_in_the_respawn_wait_is_carried_down_by_an_island_and_falls_off_t
         assert fell.lives == LIVES_START - 1
         assert fell.waiting
         assert fell.invuln_ticks_left == INVULN_TICKS
-        assert "life lost lives=2" in lines
+        assert f"life lost lives={LIVES_START - 1}" in lines
 
 
 def test_a_ship_in_the_respawn_wait_with_no_island_on_it_stays_exactly_as_it_was() -> None:
@@ -733,7 +733,7 @@ def test_a_fall_respawns_the_ship_clear_of_an_island_over_the_respawn_point(
         assert fell.lives == LIVES_START - 1
         assert fell.waiting
         assert fell.invuln_ticks_left == INVULN_TICKS
-        assert lines.index("life lost lives=2") < from_index
+        assert lines.index(f"life lost lives={LIVES_START - 1}") < from_index
 
 
 def test_a_fall_respawns_clear_of_the_island_where_it_stands_after_the_scroll_moved_it() -> None:

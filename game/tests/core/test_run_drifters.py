@@ -28,7 +28,7 @@ from core.run import Run, add_drifters, next_run, start_run, step_run
 from core.scroll import Scroll, start_scroll
 from core.ship import Ship, Thrust, ship_hitbox, spawn
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 """Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
 
 INVULN_TICKS: int = 60
@@ -854,7 +854,7 @@ def test_drifter_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -
     ]
     assert hit_lines[2] == "drifter touch id=1 type=meteorite effect=hit"
     assert hit_lines[3] == "drifter touch id=2 type=meteorite effect=hit"
-    assert hit_lines[4] == "life lost lives=2"
+    assert hit_lines[4] == f"life lost lives={LIVES_START - 1}"
     caplog.clear()
     for _ in range(150):
         run = hold_ship(step_run(run, NO_KEY))

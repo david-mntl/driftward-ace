@@ -14,7 +14,7 @@ from core.run import Run, next_run, start_run, step_run
 from core.scroll import Scroll, start_scroll
 from core.ship import Ship, Thrust, spawn, step
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 """Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
 
 INVULN_TICKS: int = 60
@@ -344,8 +344,9 @@ def test_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -> None:
     assert _count(_lines(caplog), "respawn wait end") == 0
     caplog.clear()
 
-    # First fall. Then 600 ticks of waiting log only the end of the invulnerability.
-    run = step_run(_falling_run(), NO_KEY)
+    # First of three falls from 3 lives left. Then 600 ticks of waiting log only the end of the
+    # invulnerability.
+    run = step_run(_falling_run(lives=3), NO_KEY)
     lines = _lines(caplog)
     assert _count(lines, "life lost") == 1
     assert _count(lines, "respawn from") == 1

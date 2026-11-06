@@ -106,7 +106,7 @@ REHIT_COOLDOWN: int = 180
 REHIT_DIM: float = 0.75
 """Source: 05-lives-and-damage.md, rehit_cooldown, rehit_dim (guess)."""
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 

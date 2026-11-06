@@ -43,7 +43,7 @@ from core.waves import (
     start_waves,
 )
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
@@ -746,7 +746,7 @@ def test_a_new_run_logs_new_run_then_the_waves_start_and_a_tick_logs_the_waves_l
     seen: list[tuple[str, str]] = messages(caplog, RUN_LOGGER, WAVES_LOGGER)
     assert [name for name, _ in seen] == [RUN_LOGGER] * 3 + [WAVES_LOGGER] * 3
     lines: list[str] = [line for _, line in seen]
-    assert lines[0] == "life lost lives=2"
+    assert lines[0] == f"life lost lives={LIVES_START - 1}"
     assert lines[1].startswith("respawn from ")
     assert lines[2].startswith("drifter gone id=1 type=meteorite")
     assert lines[3:] == [
