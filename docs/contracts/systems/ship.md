@@ -97,7 +97,8 @@ The respawn spot (DRA-86), `spawn_clear(ground)`, from (320, 240): the ship's 32
 island (box 120 x 120)     top..bottom    ship there?    above: y, top edge     below: y     spot
 centered (320, 330)        270..390       no             -                      -            (320, 240)
 centered (320, 300)        240..360       yes            224, 208 (ok)          376          (320, 224) above
-centered (320, 250)        190..310       yes            174, 158 (past 168)    326          (320, 326) below
+centered (320, 250)        190..310       yes            174, 158 (ok)          326          (320, 174) above
+centered (320, 170)        110..230       yes            94, 78 (past 84)       246          (320, 246) below
 centered (320, 160)        100..220       no             -                      -            (320, 240)
 ```
 

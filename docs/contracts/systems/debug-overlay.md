@@ -75,7 +75,7 @@ def draw_debug_hitboxes(surface: pygame.Surface, run: Run) -> None: ...   # DRA-
 | `ship.y` | text line 2, `y <value>`, e.g. `y 240.00` |
 | `ship.vx` | text line 3, `vx <value>`, e.g. `vx 0.00` |
 | `ship.vy` | text line 4, `vy <value>`, e.g. `vy 0.00` |
-| `TOP_LINE_Y` | a 1 px horizontal line, the full surface width, on row `TOP_LINE_Y` (168). Source: 10-ui.md, debug_overlay_layout; 03-world-and-camera.md, rule 2 |
+| `TOP_LINE_Y` | a 1 px horizontal line, the full surface width, on row `TOP_LINE_Y` (84). Source: 10-ui.md, debug_overlay_layout; 03-world-and-camera.md, rule 2 |
 | `SCREEN_H` (the floor) | a 1 px horizontal line, the full surface width, on row `SCREEN_H - 1` (479). Source: 10-ui.md, debug_overlay_layout; 03-world-and-camera.md, rule 5 |
 
 - Text layout: line 1's top-left at (`OVERLAY_MARGIN`, `OVERLAY_MARGIN`), (4, 4). Each next line's top is one `font.get_linesize()` lower. Source: 10-ui.md, debug_overlay_layout (guess).

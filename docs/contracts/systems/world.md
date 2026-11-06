@@ -14,7 +14,7 @@ All rules use screen px. World coordinates with y up (03-world-and-camera.md, ru
  x=0                              x=640  (SCREEN_W)
   +--------------------------------+  y=0
   |                                |
-  |- - - - - - TOP LINE - - - - - -|  y=168  (TOP_LINE_Y, ceiling)
+  |- - - - - - TOP LINE - - - - - -|  y=84   (TOP_LINE_Y, ceiling)
   |                                |
   |               ship             |
   |                                |
@@ -35,14 +35,14 @@ flowchart LR
 # game/core/world.py  (constants only. One import: `from typing import Final`. No logger)
 SCREEN_W: Final[int] = 640            # 03-world-and-camera.md, screen_w
 SCREEN_H: Final[int] = 480            # 03-world-and-camera.md, screen_h
-TOP_LINE_RATIO: Final[float] = 0.35   # 03-world-and-camera.md, top_line_ratio
-TOP_LINE_Y: Final[int]                # = round(SCREEN_H * TOP_LINE_RATIO) -> 168
+TOP_LINE_RATIO: Final[float] = 0.175  # 03-world-and-camera.md, top_line_ratio
+TOP_LINE_Y: Final[int]                # = round(SCREEN_H * TOP_LINE_RATIO) -> 84
 ```
 Screen coordinates, pygame style: x to the right, y down, in pixels. The left wall is x 0, the right wall is x `SCREEN_W`, the floor is y `SCREEN_H`.
 
 ## Rules
 - The play area is 640×480. Source: 03-world-and-camera.md, screen_w, screen_h (guess).
-- The top line sits at `screen_h × top_line_ratio` = 168. It is computed from the ratio, never written as a bare 168. It is a ceiling for the ship (`systems/ship.md`, step 7). Source: 03-world-and-camera.md, rule 2 and How to extend.
+- The top line sits at `screen_h × top_line_ratio` = 84. It is computed from the ratio, never written as a bare 84. It is a ceiling for the ship (`systems/ship.md`, step 7). Source: 03-world-and-camera.md, rule 2 and How to extend.
 - The screen never moves. No camera offset exists, and none is added. Source: 03-world-and-camera.md, rule 3; 01-vision.md, locked decision 2.
 - The side walls are at x 0 and x `SCREEN_W`. Source: 03-world-and-camera.md, rule 6.
 - The floor is the bottom edge of the screen, y `SCREEN_H`. Source: 03-world-and-camera.md, rule 5.
@@ -51,7 +51,7 @@ Screen coordinates, pygame style: x to the right, y down, in pixels. The left wa
 - Every constant is `Final`. Source: scope report DRA-19, item 5.
 
 ## Rationale
-- **`TOP_LINE_Y` uses `round(...)`.** `480 * 0.35` in floating point is not exactly 168. Rounding gives the int 168 that the GDD names, and keeps the ratio as the source.
+- **`TOP_LINE_Y` uses `round(...)`.** `480 * 0.175` in floating point may not be exactly 84. Rounding gives the int 84 that the GDD names, and keeps the ratio as the source.
 - **Screen size moves from `app/settings.py` to `core/world.py`.** Core needs the walls and the floor, and core may not import `app`. One home avoids two copies of a guess value drifting apart. The DRA-5 contract left this choice to DRA-6. The change to the app is listed under Impact in `docs/contracts/systems/app.md`.
 - **One import for `Final` (DRA-19).** The scope marks every core constant `Final`, and `Final` lives in `typing`. The module was import-free so the guard's error step could import it with nothing that can fail. `typing` is stdlib and can't realistically fail to import, so that still holds. Same `Final[type]` form as `systems/ship.md`, Rationale.
 - **No camera fields, ever.** DRA-6 left room for a camera. The GDD changed on 2026-10-12: the screen is fixed and the world scrolls past it (91-decision-log.md, row 22). The scroll has state and a step, so it lives in its own module, `core/scroll.py`, and this file stays constants only.

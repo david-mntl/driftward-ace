@@ -83,8 +83,8 @@ SPAWN_X: float = 320.0
 SPAWN_Y: float = 240.0
 """Source: 05-lives-and-damage.md, fall_respawn (locked)."""
 
-TOP_LINE_Y: float = 168.0
-"""round(480 * 0.35). Source: 03-world-and-camera.md, rule 2."""
+TOP_LINE_Y: float = 84.0
+"""round(480 * 0.175). Source: 03-world-and-camera.md, rule 2."""
 
 RUN_LOGGER = "core.run"
 SHIP_LOGGER = "core.ship"
@@ -676,14 +676,28 @@ def test_a_ship_in_the_respawn_wait_with_no_island_on_it_stays_exactly_as_it_was
     assert run.ship != spawn()
 
 
+TALL: str = "tall rectangle"
+"""A test-only rectangle 320 x 300, not a variant. No variant is tall enough to hold the respawn
+point with its up spot past the top line (84) and up no farther than down: that takes an island
+taller than 248 px. A tall one is the island of a variant with its height and box changed."""
+
+
+def tall_island(center_y: float) -> FloatingIsland:
+    """The rectangle at x 320, made 300 tall (box and height), centered on `center_y`."""
+    base = island("rectangle", 320.0, center_y)
+    return replace(base, height=300.0, hitbox=(Box(0.0, 0.0, 320.0, 300.0),))
+
+
 RESPAWN_CASES: tuple[tuple[str, str, float, float, float | None], ...] = (
     # name, variant, island center y, ship y after the fall, or None when the spawn is clear.
-    # Spawn box: x 304 to 336, y 224 to 256 at the respawn point (320, 240).
+    # Spawn box: x 304 to 336, y 224 to 256 at the respawn point (320, 240). Up is 256 minus the
+    # island's top edge and down is its bottom edge minus 224; the up spot's top edge is the
+    # island's top edge minus 32, and the top line is at 84.
     ("above: top edge 220, up 36, down 116", "rectangle", 280.0, 204.0, 204.0),
-    ("above on the top line: top edge 200, up 56", "rectangle", 260.0, 184.0, 184.0),
-    ("above passes the top line: top edge 199, up 57", "rectangle", 259.0, 335.0, 335.0),
-    ("above passes the top line, nearer: top edge 190", "rectangle", 250.0, 326.0, 326.0),
-    ("tie but above passes the top line: top edge 180", "rectangle", 240.0, 316.0, 316.0),
+    ("above on the top line: top edge 116, up 140, down 192", TALL, 266.0, 100.0, 100.0),
+    ("above passes the top line: top edge 115, up 141, down 191", TALL, 265.0, 431.0, 431.0),
+    ("above passes the top line, nearer: top edge 100, up 156", TALL, 250.0, 416.0, 416.0),
+    ("tie but above passes the top line: top edge 90, up 166", TALL, 240.0, 406.0, 406.0),
     ("below is nearer: top edge 120", "rectangle", 180.0, 256.0, 256.0),
     ("tie, both free: the L's bar 220 to 260", "l_shape", 200.0, 204.0, 204.0),
     ("touching from below: top edge 256", "rectangle", 316.0, SPAWN_Y, None),
@@ -709,7 +723,7 @@ def test_a_fall_respawns_the_ship_clear_of_an_island_over_the_respawn_point(
     falling = Ship(x=320.0, y=495.0, vx=0.0, vy=5.5)
     run = run_of(
         falling,
-        island(variant, 320.0, center_y),
+        tall_island(center_y) if variant == TALL else island(variant, 320.0, center_y),
         scroll=STILL,
         invuln_ticks_left=INVULN_TICKS if protected else 0,
     )

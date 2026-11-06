@@ -53,8 +53,8 @@ HALF: float = 16.0
 SCREEN_W: float = 640.0
 """px. Source: 03-world-and-camera.md, Values, screen_w (guess)."""
 
-TOP_LINE_Y: float = 168.0
-"""Screen y of the top line: round(480 * 0.35). Source: 03-world-and-camera.md, rule 2."""
+TOP_LINE_Y: float = 84.0
+"""Screen y of the top line: round(480 * 0.175). Source: 03-world-and-camera.md, rule 2."""
 
 PULL_RADIUS: float = 150.0
 """px from the planet's center. Source: drifters/08-planet.md, pull_radius (guess)."""

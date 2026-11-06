@@ -27,7 +27,7 @@ Walls, top line, floor and every wave coordinate count from the play area's own 
 |---|---|---|---|---|---|
 | screen_w | 640. The play area's width | px | — | guess | Director |
 | screen_h | 480. The play area's height | px | — | guess | Director |
-| top_line_ratio | 0.35 | of screen_h, from top | — | locked | Director |
+| top_line_ratio | 0.175 | of screen_h, from top | — | locked | Director |
 | px_per_meter | 10 | px/m | — | locked | Director |
 | scroll_base | 1.1 | px/tick | TBD (SH-02) | guess | Director tuning guess |
 | scroll_start_delay | 30 | ticks (0.5 s) after play starts | — | guess | Director |
@@ -41,7 +41,7 @@ Walls, top line, floor and every wave coordinate count from the play area's own 
 
 ## Rules
 1. **Coordinates.** World: x to the right, y **up**. Screen: pygame, y **down**. Wave placements count from the wave's start ([09-waves.md](09-waves.md) rule 2). Source: Director. The exact conversion is a technical detail, not a design rule.
-2. **Top line.** Screen y = `screen_h × top_line_ratio` = 168. It is a ceiling. The ship's top edge is the point that counts. When the ship pushes past it, the top edge is clamped to the line and `vy` becomes 0, the same way the side walls stop `vx`.
+2. **Top line.** Screen y = `screen_h × top_line_ratio` = 84. It is a ceiling. The ship's top edge is the point that counts. When the ship pushes past it, the top edge is clamped to the line and `vy` becomes 0, the same way the side walls stop `vx`.
 3. **The screen never moves.** It doesn't follow the ship, up or down. Source: [01-vision.md](01-vision.md), Locked decisions.
 4. **Scroll.** Every tick, the world scrolls down by `scroll_base × scroll multiplier` for the current level ([08-difficulty.md](08-difficulty.md)). The ship never changes the scroll. It starts `scroll_start_delay` ticks after play starts and never stops until game over, including right after a fall.
 5. **Floor.** The floor is the bottom edge of the screen. Falling off it costs a life ([05-lives-and-damage.md](05-lives-and-damage.md)). The ship counts as off once it is fully below the floor: its top edge is past the bottom of the screen.

@@ -41,7 +41,7 @@ SCREEN_W: int = 640
 SCREEN_H: int = 480
 """px. Source: 03-world-and-camera.md, Values, screen_h (guess)."""
 
-TOP_LINE_RATIO: float = 0.35
+TOP_LINE_RATIO: float = 0.175
 """Of screen_h, from the top. Source: 03-world-and-camera.md, Values, top_line_ratio (locked)."""
 
 TOP_LINE_Y: int = round(SCREEN_H * TOP_LINE_RATIO)

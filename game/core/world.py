@@ -15,14 +15,14 @@ SCREEN_W: Final[int] = 640
 SCREEN_H: Final[int] = 480
 """Screen height, px. Source: 03-world-and-camera.md, screen_h (guess)."""
 
-TOP_LINE_RATIO: Final[float] = 0.35
+TOP_LINE_RATIO: Final[float] = 0.175
 """Top line position as a share of SCREEN_H, from the top.
 
-Source: 03-world-and-camera.md, top_line_ratio (locked).
+Source: 03-world-and-camera.md, top_line_ratio (locked; 0.35 until the 2026-11-06 hotfix).
 """
 
 TOP_LINE_Y: Final[int] = round(SCREEN_H * TOP_LINE_RATIO)
-"""Top line screen y, px: 168. Computed from the ratio, never a bare number.
+"""Top line screen y, px: 84. Computed from the ratio, never a bare number.
 
 Source: 03-world-and-camera.md, rule 2.
 """
