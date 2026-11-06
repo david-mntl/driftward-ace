@@ -16,8 +16,12 @@ from typing import Protocol
 
 import pygame
 
+from core.level_up import LevelUpBanner, shown_level
+from core.levels import FIRST_LEVEL, LEVEL_COUNT
 from core.world import SCREEN_H, SCREEN_W
 from ui.hud_rules import RGB, HudRules, MotionRules
+from ui.level_up_motion import fade_share, pop_scale
+from ui.level_up_rules import LevelUpLook, PopLook
 from ui.score_text import group_digits
 
 log = logging.getLogger(__name__)
@@ -38,8 +42,14 @@ HEART_CELL_COUNT: int = 5
 TEXT_CACHE_SIZE: int = 8
 """Most text images kept for a changing value (BEST, graze count) before the oldest are dropped."""
 
+INK_TILE: int = 16
+"""Side of the cells a thin outline's picture is cut into, px. Each cell is trimmed to its ink."""
+
 type Anchor = str
 """Where a text image sits on its point: left, center or right (vertical center always)."""
+
+type Tiles = tuple[tuple[pygame.Surface, tuple[int, int]], ...]
+"""Small images with the window position of their top-left corner."""
 
 
 class HudRun(Protocol):
@@ -81,6 +91,34 @@ class HudArt:
     label_font: pygame.font.Font
     fonts: Mapping[str, pygame.font.Font]
     """Exo 2 Bold at the sizes of hud.json: `value`, `tile`, `graze` and `level`."""
+
+
+@dataclass(frozen=True)
+class LevelSlot:
+    """Where and how the HUD draws one level's number. Source: level-up/view.md, Interface."""
+
+    center: tuple[int, int]
+    """Window px: the center of the number image at its normal size."""
+    size: tuple[int, int]
+    """That image's width and height, px."""
+    color: RGB
+    """The number's tier color at that level."""
+
+
+@dataclass(frozen=True, slots=True)
+class _Pop:
+    """What a level pop looks like on one frame, worked out from the banner's age."""
+
+    level: int
+    """The new level."""
+    frame: int
+    """Index of the number's pre-made frame."""
+    flash: RGB
+    """The white the number and the new climb bar fade from."""
+    bar_share: float
+    """0 (flash color) to 1 (lit color): where the new climb bar's fade is."""
+    box_alpha: int
+    """Opacity of the box outline's flash, 0..255."""
 
 
 def clamp_score(score: int, digits: int) -> int:
@@ -180,10 +218,16 @@ class HudView:
     set.
     """
 
-    def __init__(self, rules: HudRules, art: HudArt) -> None:
+    def __init__(
+        self, rules: HudRules, art: HudArt, level_up_look: LevelUpLook | None = None
+    ) -> None:
+        """Build every picture once. With ``level_up_look`` also build the level pop's frames for
+        every level a banner can show; with None no pop is ever drawn.
+        """
         palette: Mapping[str, RGB] = rules.palette
         self._rules: HudRules = rules
         self._art: HudArt = art
+        self._look: LevelUpLook | None = level_up_look
         self._origin: tuple[int, int] = (rules.panel.x, rules.panel.content_y)
         self._label_color: RGB = _mix(
             palette["panel_body"], palette["plating"], rules.fonts.label_mix
@@ -216,13 +260,27 @@ class HudView:
         self._breaks: dict[int, int] = {}
         self._bump_start: int | None = None
         self._ring_start: int | None = None
+        self._pop_frames: dict[int, tuple[pygame.Surface, ...]] = {}
+        self._box_flash: Tiles = ()
+        if level_up_look is not None:
+            self._build_pop(level_up_look)
 
-    def draw(self, window: pygame.Surface, run: HudRun, best: int | None, tick: int) -> None:
+    def draw(
+        self,
+        window: pygame.Surface,
+        run: HudRun,
+        best: int | None,
+        tick: int,
+        level_up: LevelUpBanner | None = None,
+    ) -> None:
         """Draw the panel, the frame and the sheen on ``window``. ``tick`` is the view clock, in
         ticks.
 
         Never draws on the play area except the sheen. Starts the heart's break and the graze
-        motions when ``run.lives`` falls or ``run.grazes`` rises since the last call.
+        motions when ``run.lives`` falls or ``run.grazes`` rises since the last call. The level
+        readout shows ``shown_level(level_up, run.level)`` and plays the pop after the banner's
+        arrival tick; with ``level_up`` None, or no look given at construction, it shows
+        ``run.level`` as the HUD always did. The pop runs on the banner's age, not on ``tick``.
         """
         self._update(run, tick)
         rules: HudRules = self._rules
@@ -230,12 +288,24 @@ class HudView:
         self._draw_score(window, run.score, best)
         self._draw_hearts(window, run.lives, tick)
         self._draw_scan(window, tick)
-        self._draw_level(window, run.level)
+        banner: LevelUpBanner | None = level_up if self._look is not None else None
+        self._draw_level(window, shown_level(banner, run.level), self._active_pop(banner))
         self._draw_graze(window, run.grazes, tick)
         for strip, position in self._frame_strips:
             window.blit(strip, position)
         for piece, position in self._sheen_pieces:
             window.blit(piece, position)
+
+    def level_slot(self, level: int) -> LevelSlot:
+        """Return where the HUD draws ``level``'s number: its center in window px, its image's
+        size and its tier color. Draws and changes nothing.
+        """
+        number: pygame.Surface = self._level_number(level)
+        return LevelSlot(
+            center=self._number_rect(number).center,
+            size=number.get_size(),
+            color=self._tier_color(level),
+        )
 
     def dim(self, window: pygame.Surface) -> None:
         """Darken the whole window: black at ``window.dim_alpha``. Draw the box after it.
@@ -262,7 +332,89 @@ class HudView:
         self._lives = lives
         self._grazes = run.grazes
 
+    def _active_pop(self, banner: LevelUpBanner | None) -> _Pop | None:
+        """Return the pop to draw, or None before the arrival tick, after the pop and with no
+        banner. Reads the banner's age: it is the only clock the pop has.
+        """
+        if self._look is None or banner is None:
+            return None
+        pop: PopLook = self._look.pop
+        elapsed: int = banner.age_ticks - banner.arrival_ticks
+        if not 0 <= elapsed < pop.ticks:
+            return None
+        last: int = max(1, pop.steps - 1)
+        return _Pop(
+            level=banner.level,
+            frame=min(pop.steps - 1, round(elapsed * last / pop.ticks)),
+            flash=self._look.colors["flash"],
+            bar_share=fade_share(elapsed, 0, pop.bar_flash_ticks),
+            box_alpha=round(255 * (1.0 - fade_share(elapsed, 0, pop.box_flash_ticks))),
+        )
+
     # ----- building (once) -----
+
+    def _build_pop(self, look: LevelUpLook) -> None:
+        """Make the pop's pictures: the number's frames for each level a banner can show and the
+        box outline's flash. Also renders the level numbers, so no draw renders text.
+        """
+        for level in range(FIRST_LEVEL, LEVEL_COUNT + 1):
+            self._level_number(level)
+        for level in range(FIRST_LEVEL + 1, LEVEL_COUNT + 1):
+            self._pop_frames[level] = self._number_frames(level, look)
+        self._box_flash = self._box_outline(look)
+
+    def _number_frames(self, level: int, look: LevelUpLook) -> tuple[pygame.Surface, ...]:
+        """Return ``pop.steps`` images of ``level``'s number across the pop, first to last.
+
+        Frame ``k`` is the pop at tick ``round(k * pop.ticks / (steps - 1))``: the size from
+        ``pop_scale`` and a color mixed from ``colors.flash`` to the tier color over
+        ``pop.flash_ticks``. The first frame is the arrival size, the last the normal image.
+        """
+        pop: PopLook = look.pop
+        tier: RGB = self._tier_color(level)
+        font: pygame.font.Font = self._art.fonts["level"]
+        frames: list[pygame.Surface] = []
+        for step in range(pop.steps):
+            elapsed: int = round(step * pop.ticks / max(1, pop.steps - 1))
+            color: RGB = _mix(look.colors["flash"], tier, fade_share(elapsed, 0, pop.flash_ticks))
+            image: pygame.Surface = font.render(str(level), True, color)
+            scale: float = pop_scale(elapsed, pop)
+            if scale != 1.0:
+                size: tuple[int, int] = (
+                    max(1, round(image.get_width() * scale)),
+                    max(1, round(image.get_height() * scale)),
+                )
+                image = pygame.transform.smoothscale(image, size)
+            frames.append(image)
+        return tuple(frames)
+
+    def _box_outline(self, look: LevelUpLook) -> Tiles:
+        """Return the level box's outline in ``colors.box_flash`` as small images in window px.
+
+        The outline follows the baked box: cut top-right and bottom-left corners
+        (``pop.box_corner_cut``), ``pop.box_flash_width`` thick, drawn over the baked edge.
+        """
+        pop: PopLook = look.pop
+        left, top, width, height = self._rules.level.box
+        cut: int = pop.box_corner_cut
+        pad: int = pop.box_flash_width
+        image: pygame.Surface = pygame.Surface((width + 2 * pad, height + 2 * pad), pygame.SRCALPHA)
+        corners: list[tuple[int, int]] = [
+            (pad, pad),
+            (pad + width - cut, pad),
+            (pad + width - 1, pad + cut - 1),
+            (pad + width - 1, pad + height - 1),
+            (pad + cut - 1, pad + height - 1),
+            (pad, pad + height - cut),
+        ]
+        pygame.draw.polygon(image, (*look.colors["box_flash"], 255), corners, pop.box_flash_width)
+        origin: tuple[int, int] = (
+            self._origin[0] + left - pad,
+            self._origin[1] + top - pad,
+        )
+        return tuple(
+            (tile, (origin[0] + at[0], origin[1] + at[1])) for tile, at in _ink_tiles(image)
+        )
 
     def _label(self, text: str) -> pygame.Surface:
         """Return ``text`` in the label font, letter-spaced, as one image in the label color."""
@@ -483,39 +635,76 @@ class HudView:
             self._art.scan, (ox + motion.scan_x, oy + row - self._art.scan.get_height() // 2)
         )
 
-    def _draw_level(self, window: pygame.Surface, level: int) -> None:
-        """Draw the level number in its tier color and the climb bars: lit up to ``level``."""
+    def _draw_level(self, window: pygame.Surface, level: int, pop: _Pop | None) -> None:
+        """Draw the level box's flash, the number (its pop frame while ``pop`` runs) in its tier
+        color, and the climb bars: lit up to ``level``.
+        """
+        if pop is None:
+            number: pygame.Surface = self._level_number(level)
+            window.blit(number, self._number_rect(number))
+        else:
+            self._draw_box_flash(window, pop)
+            frame: pygame.Surface = self._pop_frames[pop.level][pop.frame]
+            window.blit(frame, frame.get_rect(center=self.level_slot(pop.level).center))
         spec = self._rules.level
-        palette: Mapping[str, RGB] = self._rules.palette
         ox, oy = self._origin
-        number: pygame.Surface = self._level_number(level)
-        window.blit(number, self._anchored(number, ox + spec.number_x, oy + spec.number_y, "left"))
         span: int = (spec.bars - 1) * spec.bar_pitch + spec.bar_w
         lit: int = min(level, spec.bars)
         for index in range(spec.bars):
             height: int = spec.bar_base_h + index * spec.bar_step_h
-            color: RGB = (
-                _mix(palette["level"], palette["last_life"], index / max(1, spec.bars - 1))
-                if index < lit
-                else palette["dim"]
-            )
             left: int = ox + spec.bars_right - span + index * spec.bar_pitch
             window.fill(
-                color, pygame.Rect(left, oy + spec.bars_bottom - height, spec.bar_w, height)
+                self._bar_color(index, lit, pop),
+                pygame.Rect(left, oy + spec.bars_bottom - height, spec.bar_w, height),
             )
+
+    def _bar_color(self, index: int, lit: int, pop: _Pop | None) -> RGB:
+        """Return climb bar ``index``'s color: ``dim`` past ``lit``, else its ramp color, mixed
+        from the flash white while it is the new level's bar and the pop's flash runs.
+        """
+        spec = self._rules.level
+        palette: Mapping[str, RGB] = self._rules.palette
+        if index >= lit:
+            return palette["dim"]
+        color: RGB = _mix(palette["level"], palette["last_life"], index / max(1, spec.bars - 1))
+        if pop is None or index != min(pop.level, spec.bars) - 1:
+            return color
+        return _mix(pop.flash, color, pop.bar_share)
+
+    def _draw_box_flash(self, window: pygame.Surface, pop: _Pop) -> None:
+        """Draw the box outline's flash at the pop's opacity, over the baked outline."""
+        if pop.box_alpha == 0:
+            return
+        for tile, position in self._box_flash:
+            tile.set_alpha(pop.box_alpha)
+            window.blit(tile, position)
+
+    def _number_rect(self, number: pygame.Surface) -> pygame.Rect:
+        """Return where the level number image is blitted: left edge at ``number_x``, vertically
+        centered on ``number_y``.
+        """
+        spec = self._rules.level
+        return self._anchored(
+            number, self._origin[0] + spec.number_x, self._origin[1] + spec.number_y, "left"
+        )
+
+    def _tier_color(self, level: int) -> RGB:
+        """Return the level number's tier color: ``level``, a mix toward ``last_life``, or
+        ``last_life``.
+        """
+        spec = self._rules.level
+        palette: Mapping[str, RGB] = self._rules.palette
+        key: str = tier_color_key(level, spec.tier_mid, spec.tier_high)
+        if key == "mid":
+            return _mix(palette["level"], palette["last_life"], spec.tier_mid_mix)
+        return palette[key]
 
     def _level_number(self, level: int) -> pygame.Surface:
         """Return the level number's image in its tier color. Kept per level."""
         if level not in self._level_numbers:
-            spec = self._rules.level
-            palette: Mapping[str, RGB] = self._rules.palette
-            key: str = tier_color_key(level, spec.tier_mid, spec.tier_high)
-            color: RGB = (
-                _mix(palette["level"], palette["last_life"], spec.tier_mid_mix)
-                if key == "mid"
-                else palette[key]
+            self._level_numbers[level] = self._art.fonts["level"].render(
+                str(level), True, self._tier_color(level)
             )
-            self._level_numbers[level] = self._art.fonts["level"].render(str(level), True, color)
         return self._level_numbers[level]
 
     def _draw_graze(self, window: pygame.Surface, grazes: int, tick: int) -> None:
@@ -562,3 +751,20 @@ class HudView:
                 image = pygame.transform.smoothscale(image, (limit, height))
             self._graze_numbers[grazes] = image
         return self._graze_numbers[grazes]
+
+
+def _ink_tiles(image: pygame.Surface) -> Tiles:
+    """Cut ``image`` into ``INK_TILE`` cells, each trimmed to its ink, as copies with their offset.
+
+    A thin shape then costs a few small blits, never one blit of its whole bounding box. Cells with
+    no ink are dropped.
+    """
+    tiles: list[tuple[pygame.Surface, tuple[int, int]]] = []
+    for top in range(0, image.get_height(), INK_TILE):
+        for left in range(0, image.get_width(), INK_TILE):
+            cell: pygame.Rect = pygame.Rect(left, top, INK_TILE, INK_TILE).clip(image.get_rect())
+            ink: pygame.Rect = image.subsurface(cell).get_bounding_rect()
+            if ink.width and ink.height:
+                area: pygame.Rect = ink.move(cell.topleft)
+                tiles.append((image.subsurface(area).copy(), area.topleft))
+    return tuple(tiles)
