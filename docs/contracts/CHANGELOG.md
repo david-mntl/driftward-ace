@@ -220,3 +220,16 @@
 - Changed: `game/ui/drifters/entry_warning.py` (one cached sign image; `draw_entry_warning(surface, obj)` loses its `view` argument; `drop_entry_warning` removed); `game/ui/drifters/registry.py` (calls); `systems/drifters/shared/views.md` (Diagram, Interface, Presentation, Entry warning).
 - Tests: `game/tests/ui/test_entry_warning.py` rewritten for the sign: its size, nothing past the radius, its color, the mark, and the same image at the warning center.
 - Not changed, now unused by the UI: core `warning_copy()` and `warning_tilt_degrees()` on every drifter, the chain lightning's `entry_warning_icon` tuning field, and the contract text that describes them (`shared/base.md`, `shared/base-interface.md`, the drifter `core.md`, `view.md` and `rationale.md` files, integration checks DRA-47 and DRA-56). Removing them is a structural change for the Architect.
+
+## Invulnerability 1 s, 2026-11-06
+- Numbers-only hotfix. The Director ordered it, and the main session applied it outside the pipeline. `invuln_ticks` 30 to 60 (0.5 s to 1 s). GDD: `05-lives-and-damage.md` Values and Summary, `90-open-questions.md` LD-08, `91-decision-log.md` row 134.
+- Changed: `INVULN_TICKS` in `game/core/run.py`; `systems/run.md` constant line and the blink table (now T to T+60). No interface change, so the version stays 13.
+- Tests: the `INVULN_TICKS` copies in 13 core test files are 60. Four scenarios were timed around 30 ticks and now follow `INVULN_TICKS`: the blink pattern and the log test (`test_run.py`), the slow rock's speed 0.5 to 0.25 so it still overlaps the ship past the longer window (`test_run_drifters.py`), the last-life rock's cooldown (`test_run_last_life.py`) and the UFO's end-of-invulnerability tick (`test_ufo.py`).
+- Not changed: past task files and integration checks keep their 30-tick timings as history. The browser build was not re-run.
+
+## Five lives, 2026-11-06
+- The Director's call in the main session, no pipeline. `lives_start` 3 to 5, a locked decision. GDD: `05-lives-and-damage.md` Values and Summary, `01-vision.md` locked decision 5, `02-game-flow.md` rule 5, `10-ui.md` `hud_lives` and the layout sketch, `91-decision-log.md` row 135.
+- HUD: two more heart sockets on the wireframe, top (103, 150) on the nose over the cockpit window and bottom (103, 211) above the main exhaust. Fill order center, right, left, top, bottom. `tuning/hud.json` `hearts.slots` holds 5; `schemas/hud.schema.json` slots 3 to 5 items; `hud_ship.png` re-baked with `tools/art/hud_panel.py` (the other HUD pictures came out byte-identical). The view needed no code change: slot `i` is lit while `i < lives`.
+- Changed: `LIVES_START` in `game/core/run.py`; `systems/run.md` constant line; `systems/hud.md` sketch, Interface comment, Presentation rows and States (draft, version stays 7); docstrings in `game/ui/hud_rules.py` and `tools/art/hud_panel.py`.
+- Tests: the `LIVES_START` copies in the core tests are 5, with new copies in `test_game_flow.py`, `test_graze_feedback.py` and `ui/test_hud.py`. Log lines that named the life count after the first loss now use `LIVES_START - 1`. The log test in `test_run.py` starts its falls at 3 lives. The HUD heart tests cover 5, 4, 3 and 2 lives and all 5 slots.
+- Not changed: past task files, reports and integration checks keep their 3-life numbers as history. The browser build was not re-run.

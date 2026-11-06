@@ -74,8 +74,8 @@ RULES: LastLifeRules = LastLifeRules(
 )
 """The values above as the run takes them."""
 
-LIVES_START: int = 3
-INVULN_TICKS: int = 30
+LIVES_START: int = 5
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
 BLINK_SWAP_TICKS: int = 6
@@ -821,17 +821,18 @@ def test_the_burst_starts_on_the_origin_flies_evenly_and_fades_evenly(
 
 
 def test_ship_visible_is_false_from_the_death_tick_on_and_as_before_until_then() -> None:
-    cooldown_rock: Meteorite = replace(rock(HOME_X, HOME_Y), rehit_cooldown_ticks=40)
+    cooldown: int = INVULN_TICKS + 10
+    cooldown_rock: Meteorite = replace(rock(HOME_X, HOME_Y), rehit_cooldown_ticks=cooldown)
     run: Run = run_of(cooldown_rock, lives=2)
     seen: list[tuple[int, bool, int]] = []
-    for tick in range(1, 50):
+    for tick in range(1, cooldown + 10):
         run = step_run(replace(run, ship=HOME_SHIP), NO_KEY)
         seen.append((tick, run.ship_visible, run.invuln_ticks_left))
         if run.burst is not None:
             break
 
-    assert run.last_life, "the second hit, on tick 42, is the last life"
-    assert seen[-1][0] == 42
+    assert run.last_life, "the second hit, on tick cooldown + 2, is the last life"
+    assert seen[-1][0] == cooldown + 2
     assert seen[0][2] == INVULN_TICKS
     for tick, visible, left in seen[:-1]:
         assert visible == expected_visible(left), f"tick {tick}, invuln_ticks_left {left}"

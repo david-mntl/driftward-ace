@@ -51,12 +51,13 @@ from core.world import SCREEN_H
 
 log = logging.getLogger(__name__)
 
-LIVES_START: Final[int] = 3
-"""Lives at the start of a run. Source: 05-lives-and-damage.md, lives_start (locked)."""
+LIVES_START: Final[int] = 5
+"""Lives at the start of a run. Source: 05-lives-and-damage.md, lives_start (locked; 3 until
+the 2026-11-06 hotfix)."""
 
-INVULN_TICKS: Final[int] = 30
-"""Ticks of invulnerability after a respawn. Source: 05-lives-and-damage.md, invuln_ticks
-(locked)."""
+INVULN_TICKS: Final[int] = 60
+"""Ticks of invulnerability after a respawn or a hit (1 s). Source: 05-lives-and-damage.md,
+invuln_ticks (locked; 30 until the 2026-11-06 hotfix)."""
 
 BLINK_SWAP_TICKS: Final[int] = 6
 """Ticks between one visible/hidden swap of the blink. Source: scope report DRA-23, blink:

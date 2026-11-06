@@ -27,13 +27,16 @@ from ui.hud_rules import RGB, HudRules
 SENTINEL: RGB = (255, 0, 255)
 """Fills the window before a draw, so any pixel the HUD didn't write shows."""
 
+LIVES_START: int = 5
+"""One heart per life. Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
+
 
 @dataclasses.dataclass(frozen=True)
 class FakeRun:
     """The four numbers the HUD reads."""
 
     score: int = 0
-    lives: int = 3
+    lives: int = LIVES_START
     grazes: int = 0
     level: int = 1
 
@@ -256,12 +259,12 @@ def test_best_shows_with_commas_and_is_hidden_without_a_best_score(
 # ----- hearts -----
 
 
-@pytest.mark.parametrize("lives", [3, 2])
+@pytest.mark.parametrize("lives", [5, 4, 3, 2])
 def test_hearts_are_lit_for_each_life_left_and_dim_for_each_lost(
     view: HudView, window: pygame.Surface, rules: HudRules, lives: int
 ) -> None:
     _draw(view, window, FakeRun(lives=lives))
-    for slot in range(3):
+    for slot in range(LIVES_START):
         pixel = _heart_pixel(window, rules, slot)
         if slot < lives:
             assert _near(pixel, rules.palette["hearts"]), (slot, pixel)
@@ -269,21 +272,21 @@ def test_hearts_are_lit_for_each_life_left_and_dim_for_each_lost(
             assert not _near(pixel, rules.palette["hearts"], 60), (slot, pixel)
 
 
-def test_the_last_life_is_one_orange_heart_and_two_dim_ones(
+def test_the_last_life_is_one_orange_heart_and_the_rest_dim(
     view: HudView, window: pygame.Surface, rules: HudRules
 ) -> None:
     _draw(view, window, FakeRun(lives=1))
     assert _near(_heart_pixel(window, rules, 0), rules.palette["last_life"])
-    for slot in (1, 2):
+    for slot in range(1, LIVES_START):
         assert not _near(_heart_pixel(window, rules, slot), rules.palette["hearts"], 60)
         assert not _near(_heart_pixel(window, rules, slot), rules.palette["last_life"], 60)
 
 
-def test_no_life_left_shows_three_dim_hearts(
+def test_no_life_left_shows_every_heart_dim(
     view: HudView, window: pygame.Surface, rules: HudRules
 ) -> None:
     _draw(view, window, FakeRun(lives=0))
-    for slot in range(3):
+    for slot in range(LIVES_START):
         pixel = _heart_pixel(window, rules, slot)
         assert not _near(pixel, rules.palette["hearts"], 60)
         assert not _near(pixel, rules.palette["last_life"], 60)

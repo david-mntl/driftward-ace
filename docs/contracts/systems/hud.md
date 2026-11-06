@@ -20,7 +20,7 @@ The text HUD of DRA-13 to DRA-126 (SCORE, BEST and GRAZE lines at the top left, 
  |   | play area 640 × 480 at (16, 10)    |   |      |  score bar     |
  |   | glass: nothing drawn over it       |   |      |  BEST          |
  |   | (the sheen is the one translucent  |   |      |  hull wireframe|
- |   |  layer, see Rules)                 |   |      |  + 3 hearts    |
+ |   |  layer, see Rules)                 |   |      |  + 5 hearts    |
  |   +------------------------------------+   |      |  LEVEL | GRAZE |
  | frame                                      |      |  footer line   |
  +--------------------------------------------+------+----------------+
@@ -49,7 +49,7 @@ class HudRules:
     panel: PanelRules            # x, width, content_y, scale (read by the art tool only)
     frame: FrameRules            # pillar and sheen: sheen on or off, the corner lights' radius
     score: ScoreRules            # tiles, score bar, labels, best, caps
-    hearts: HeartRules           # the three slot centres in panel space, the image cell size
+    hearts: HeartRules           # one slot centre per life in panel space, the image cell size
     level: LevelRules            # label, number anchor, bars, tier steps
     graze: DialRules             # centre, radius, number size, label anchor, count limit
     motion: MotionRules          # every period in ticks and every scale, the break keys
@@ -113,12 +113,12 @@ The app opens the window from the rules: `pygame.display.set_mode((rules.window.
 | Part | What is drawn | Cached or drawn |
 |---|---|---|
 | Panel background | gradient, score box, level box, tile backs, dial rings and cross, footer | once, `hud_panel.png` |
-| Wireframe | the ship's hull outline with three empty sockets | once, `hud_ship.png` |
+| Wireframe | the ship's hull outline with one empty socket per life (5) | once, `hud_ship.png` |
 | Labels SCORE, LEVEL, GRAZE | Share Tech Mono, letter-spaced, at the label mix of panel body and plating | once, on the panel composite |
 | Score tiles | 7 digit images, one per tile, leading zeros in the dim image. Tile top bar: score color, dim for leading zeros | 10 lit and 10 dim digit images made once; per frame 7 blits and 7 rect fills |
 | Score bar | 14 segments, lit ones on a ramp from `ship_lines` to `score`, the rest `dim` | rect fills per frame |
 | BEST | label and the grouped number (comma), right-aligned, only when `best` is not None | the number is rendered again only when `best` changes |
-| Hearts | slots center, right, left: slot `i` lit while `i < lives`. Lit: the lit image; lost: dim; last life (`lives == 1`) the lit slot uses the last image | blits |
+| Hearts | slots center, right, left, top, bottom: slot `i` lit while `i < lives`. Lit: the lit image; lost: dim; last life (`lives == 1`) the lit slot uses the last image | blits |
 | Scan line | `scan` at a y that falls from `y0` to `y1` once per `scan_ticks` | one blit |
 | Level | the number in the tier color, the bars: lit up to the level, ramp `level` to `last_life`; bars past `level` are `dim` | number cached by level; rect fills |
 | Radar | frame `(tick % sweep_ticks) * frames // sweep_ticks` of the wedge | one blit |
@@ -126,7 +126,7 @@ The app opens the window from the rules: `pygame.display.set_mode((rules.window.
 | Frame | the strips of `hud_frame.png` round the play area and at the pillar, then the sheen over the play area when `frame.sheen` is on, as strips `sheen_rows` tall trimmed to where they have any sheen (about 60 000 px, not the play area's 307 200) | blits |
 | Motions | see Rules | frames made ahead of time |
 
-States: lives 3, 2 and 1 show 3, 2 and 1 lit hearts, the last one orange; lives 0 (game over) shows none lit; a level or graze count past the limits is clamped as the GDD says.
+States: lives 5 to 1 show 5 to 1 lit hearts, the last one orange; lives 0 (game over) shows none lit; a level or graze count past the limits is clamped as the GDD says.
 
 Pause and game over: the app calls `HudView.dim(window)` after the HUD, then draws the pause box or the game-over screen on the whole window, centered on it (`systems/game-flow.md`, Presentation).
 

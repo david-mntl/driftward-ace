@@ -338,11 +338,11 @@ class Baker:
         return (self.pillar + (x - self.pillar) * self.k, y * self.k)
 
     def socket_centers(self) -> list[Point]:
-        """Where the three heart sockets sit on the wireframe, panel space, from hud.json."""
+        """Where the heart sockets sit on the wireframe, one per life, panel space, from hud.json."""
         return [(float(x), float(y)) for x, y in self.r["hearts"]["slots"]]
 
     def ship_picture(self) -> pygame.Surface:
-        """The wireframe: a hull outline traced from the real ship, with three empty sockets."""
+        """The wireframe: a hull outline traced from the real ship, with one empty socket per life."""
         c, hr = self.c, self.r["hearts"]
         bx, by, bw, bh = hr["ship_box"]
         big = hires(bw, bh)

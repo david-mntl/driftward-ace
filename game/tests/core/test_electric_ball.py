@@ -104,8 +104,8 @@ REHIT_COOLDOWN: int = 180
 REHIT_DIM: float = 0.75
 """Source: 05-lives-and-damage.md, rehit_cooldown, rehit_dim (guess)."""
 
-LIVES_START: int = 3
-INVULN_TICKS: int = 30
+LIVES_START: int = 5
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
 RUN_LOGGER = "core.run"
@@ -928,7 +928,7 @@ def test_the_run_logs_spawn_active_touch_and_gone_and_the_ball_logs_nothing(
         "drifter touch id=1 type=electric_ball effect=hit",
         "drifter gone id=1 type=electric_ball x=320.00 y=488.00",
     ]
-    assert "life lost lives=2" in run_lines
+    assert f"life lost lives={LIVES_START - 1}" in run_lines
     # The ball's own module and the base log nothing.
     assert [r.name for r in caplog.records if r.name.startswith("core.drifters")] == []
 

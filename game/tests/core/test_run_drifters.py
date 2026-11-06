@@ -28,10 +28,10 @@ from core.run import Run, add_drifters, next_run, start_run, step_run
 from core.scroll import Scroll, start_scroll
 from core.ship import Ship, Thrust, ship_hitbox, spawn
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 """Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
 
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Ticks. Source: 05-lives-and-damage.md, Values, invuln_ticks (locked)."""
 
 THRUST_SIDE: float = 0.42
@@ -358,7 +358,7 @@ def test_an_invulnerable_ship_takes_no_hit_until_it_ends() -> None:
 
 
 def test_a_hit_starts_the_cooldown_and_the_drifter_keeps_moving() -> None:
-    speed: float = 0.5
+    speed: float = 0.25
     start: Meteorite = rock(speed=speed)
     assert start.may_hit_ship()
     assert start.rehit_ticks_left == 0
@@ -854,7 +854,7 @@ def test_drifter_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -
     ]
     assert hit_lines[2] == "drifter touch id=1 type=meteorite effect=hit"
     assert hit_lines[3] == "drifter touch id=2 type=meteorite effect=hit"
-    assert hit_lines[4] == "life lost lives=2"
+    assert hit_lines[4] == f"life lost lives={LIVES_START - 1}"
     caplog.clear()
     for _ in range(150):
         run = hold_ship(step_run(run, NO_KEY))

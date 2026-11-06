@@ -111,8 +111,8 @@ REHIT_COOLDOWN: int = 180
 REHIT_DIM: float = 0.75
 """Source: 05-lives-and-damage.md, rehit_cooldown, rehit_dim (guess)."""
 
-LIVES_START: int = 3
-INVULN_TICKS: int = 30
+LIVES_START: int = 5
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
 RUN_LOGGER = "core.run"
@@ -1312,7 +1312,7 @@ def test_touching_the_disc_or_the_dome_is_one_hit_and_the_cooldown_holds() -> No
     assert ufos_of(run)[0].rehit_ticks_left == REHIT_COOLDOWN
     # A hit while the UFO flies and weaves: the ship is put on its disc every tick, so it touches
     # all the time. One hit on tick 1, the cooldown counting 180 down, no second hit on ticks 2 to
-    # 181 (the invulnerable blink ends on its own after 30), a second on tick 182.
+    # 181 (the invulnerable blink ends on its own after INVULN_TICKS), a second on tick 182.
     flying = replace(active(300.0, 300.0))
     run = run_of(resting(300.0, 290.0), flying)
     twin = flying
@@ -1336,7 +1336,7 @@ def test_touching_the_disc_or_the_dome_is_one_hit_and_the_cooldown_holds() -> No
             assert run.lives == LIVES_START - 1, tick
             assert after.rehit_ticks_left == REHIT_COOLDOWN - (tick - 1), tick
             assert after.brightness() == (REHIT_DIM if after.rehit_ticks_left > 0 else 1.0)
-            if tick == 31:
+            if tick == INVULN_TICKS + 1:
                 assert run.invuln_ticks_left == 0
             assert hitboxes_overlap(ship_hitbox(run.ship), after.current_hitbox()), tick
         else:
@@ -1370,7 +1370,7 @@ def test_a_ufo_logs_spawn_active_each_hit_and_gone_and_nothing_from_core_drifter
         "drifter spawn id=1 type=ufo variant=standard x=-20.00 y=300.00 speed=1.97 level=1",
         "drifter active id=1 type=ufo x=-20.00 y=300.00",
         "drifter touch id=1 type=ufo effect=hit",
-        "life lost lives=2",
+        f"life lost lives={LIVES_START - 1}",
         "invulnerable end",
         f"drifter gone id=1 type=ufo x={last.x:.2f} y={last.y:.2f}",
     ]

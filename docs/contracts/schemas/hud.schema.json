@@ -394,10 +394,10 @@
       ],
       "properties": {
         "slots": {
-          "description": "Heart centres in fill order: first life, second, third.",
+          "description": "Heart centres in fill order, one per life: center, right, left, top, bottom.",
           "type": "array",
-          "minItems": 3,
-          "maxItems": 3,
+          "minItems": 5,
+          "maxItems": 5,
           "items": {
             "description": "x, y",
             "type": "array",

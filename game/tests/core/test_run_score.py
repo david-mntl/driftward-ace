@@ -32,7 +32,7 @@ SCROLL_START_DELAY: int = 30
 """Ticks before the world moves. Source: 03-world-and-camera.md, Values, scroll_start_delay
 (guess)."""
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 """Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
 
 SHIP_H: int = 32

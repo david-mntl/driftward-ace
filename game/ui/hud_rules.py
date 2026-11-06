@@ -108,9 +108,9 @@ class ScoreRules:
 
 @dataclass(frozen=True)
 class HeartRules:
-    """The three heart centers in fill order (panel space px), a heart image's size, the wireframe's
+    """The heart centers in fill order, one per life (panel space px), a heart image's size, the
 
-    box.
+    wireframe's box.
     """
 
     slots: tuple[Point2, ...]

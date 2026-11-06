@@ -14,10 +14,10 @@ from core.run import Run, next_run, start_run, step_run
 from core.scroll import Scroll, start_scroll
 from core.ship import Ship, Thrust, spawn, step
 
-LIVES_START: int = 3
+LIVES_START: int = 5
 """Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
 
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Ticks. Source: 05-lives-and-damage.md, Values, invuln_ticks (locked)."""
 
 BLINK_SWAP_TICKS: int = 6
@@ -217,15 +217,11 @@ def test_blink_swaps_every_six_ticks_then_stays_visible() -> None:
         states = _states_after_respawn(press_at, INVULN_TICKS + 12)
         visible = [run.ship_visible for run in states]
 
+        # Starts visible, swaps every BLINK_SWAP_TICKS while invulnerable, then stays visible.
         block = BLINK_SWAP_TICKS
-        expected = (
-            [True] * block
-            + [False] * block
-            + [True] * block
-            + [False] * block
-            + [True] * block
-            + [True] * (len(states) - 5 * block)
-        )
+        expected = [(tick // block) % 2 == 0 for tick in range(INVULN_TICKS)]
+        expected += [True] * (len(states) - INVULN_TICKS)
+        assert expected[block : 2 * block] == [False] * block
         assert visible == expected
 
 
@@ -348,8 +344,9 @@ def test_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -> None:
     assert _count(_lines(caplog), "respawn wait end") == 0
     caplog.clear()
 
-    # First fall. Then 600 ticks of waiting log only the end of the invulnerability.
-    run = step_run(_falling_run(), NO_KEY)
+    # First of three falls from 3 lives left. Then 600 ticks of waiting log only the end of the
+    # invulnerability.
+    run = step_run(_falling_run(lives=3), NO_KEY)
     lines = _lines(caplog)
     assert _count(lines, "life lost") == 1
     assert _count(lines, "respawn from") == 1
@@ -372,7 +369,7 @@ def test_events_log_once_on_core_run(caplog: pytest.LogCaptureFixture) -> None:
     assert _count(lines, "life lost") == 1
     assert _count(lines, "respawn from") == 1
     caplog.clear()
-    run = _advance(run, NO_KEY, 40)
+    run = _advance(run, NO_KEY, INVULN_TICKS + 10)
     assert _lines(caplog) == ["invulnerable end"]
     caplog.clear()
     run = step_run(run, right)

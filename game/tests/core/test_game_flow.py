@@ -56,6 +56,9 @@ from core.waves import (
     start_waves,
 )
 
+LIVES_START: int = 5
+"""Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
+
 SCREEN_H: int = 480
 """px. Source: 03-world-and-camera.md, Values, screen_h (guess)."""
 
@@ -470,7 +473,7 @@ def test_play_starts_the_apps_run_untouched_and_after_a_game_over_it_starts_next
     assert play.screen is Screen.PLAYING
     assert play.run == next_run(over.run)
     assert not play.run.game_over
-    assert play.run.lives == 3
+    assert play.run.lives == LIVES_START
     assert not play.run_stepped
     assert step_flow(play, IDLE).run == step_run(next_run(over.run), NO_KEY)
 
@@ -649,7 +652,7 @@ def test_retry_gives_next_run_and_playing_at_once_and_menu_gives_the_menu_with_p
     assert retry.screen is Screen.PLAYING
     assert retry.run == next_run(over.run)
     assert not retry.run_stepped
-    assert retry.run.lives == 3
+    assert retry.run.lives == LIVES_START
     assert not retry.run.game_over
     # The next tick is the run's first.
     assert step_flow(retry, TickInput(thrust=UP)).run == step_run(retry.run, UP)

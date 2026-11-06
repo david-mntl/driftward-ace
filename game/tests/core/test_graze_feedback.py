@@ -72,6 +72,9 @@ from core.scroll import Scroll
 from core.ship import Ship, Thrust
 from core.ship import step as ship_step
 
+LIVES_START: int = 5
+"""Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
+
 GRAZE_MARGIN: float = 14.0
 """px. Source: 06-scoring.md, graze_margin (locked)."""
 
@@ -91,7 +94,7 @@ GRAZE_RING_END: float = 32.0
 GRAZE_RING_WIDTH: int = 1
 """Source: 06-scoring.md, graze_ring (guess)."""
 
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, invuln_ticks (locked)."""
 
 HOME_X: float = 320.0
@@ -830,7 +833,7 @@ def test_rings_and_graze_popups_keep_aging_during_the_respawn_wait_and_on_protec
         popups.append(graze_popups(run))
         # Nothing here pays a second time and no life is lost.
         assert run.grazes == 1
-        assert run.lives == 3
+        assert run.lives == LIVES_START
     # The popup aged and left on the same ticks as with a free ship.
     check_popup_over_time(popups, rules, ship_after.x, ship_after.y)
 

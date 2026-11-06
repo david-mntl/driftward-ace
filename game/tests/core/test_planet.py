@@ -85,8 +85,8 @@ SCREEN_H: float = 480.0
 REHIT_COOLDOWN: int = 180
 """Ticks. Source: 05-lives-and-damage.md, rehit_cooldown (guess)."""
 
-LIVES_START: int = 3
-INVULN_TICKS: int = 30
+LIVES_START: int = 5
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
 RUN_LOGGER = "core.run"
@@ -749,7 +749,7 @@ def test_a_planet_logs_spawn_active_each_hit_and_gone_and_nothing_for_its_pull(
         "drifter spawn id=1 type=planet variant=standard x=320.00 y=-151.00 speed=0.00 level=1",
         "drifter active id=1 type=planet x=320.00 y=-151.00",
         "drifter touch id=1 type=planet effect=hit",
-        "life lost lives=2",
+        f"life lost lives={LIVES_START - 1}",
         "invulnerable end",
         "drifter gone id=1 type=planet x=320.00 y=631.10",
     ]

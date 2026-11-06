@@ -24,7 +24,7 @@ None open.
 | ID | Question | File | Blocks | Status |
 |---|---|---|---|---|
 | LD-04 | Blink speed while invulnerable. | 05-lives-and-damage.md | UI | open |
-| LD-08 | Life-lost feedback: flash color and length, particle count, how long burst and rebuild take (rebuild must end within 30 ticks). Add screen shake too? The HUD heart's break is set in 10-ui.md. | 05-lives-and-damage.md, 10-ui.md | UI, art |
+| LD-08 | Life-lost feedback: flash color and length, particle count, how long burst and rebuild take (rebuild must end within `invuln_ticks`, [05-lives-and-damage.md](05-lives-and-damage.md#values)). Add screen shake too? The HUD heart's break is set in 10-ui.md. | 05-lives-and-damage.md, 10-ui.md | UI, art |
 
 ## Scoring
 None open.
