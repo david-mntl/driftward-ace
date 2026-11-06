@@ -36,7 +36,8 @@ All modes end the same way: files in staging, then the Director decides.
 - **Audio.** Not in scope yet. The Director will specify it later. Until then, if asked for sound, say it isn't in scope yet and stop.
 
 ## How the art is made
-- Smooth finish: drawn at 4× the game size with gradients and glossy rims, then shrunk to game size.
+- Smooth finish: drawn large first, 8× the game size for sprites up to 64 px on their longest side and 4× for bigger ones, with gradients and glossy rims, then shrunk to game size. Keep the large master.
+- One script per asset, `tools/art/<asset>.py`, so loops that run side by side never edit the same file. Shared helpers in `tools/art/` are read only during a loop.
 - Animation frames are rendered ahead of time, 2 or 3 states per object.
 - Hitboxes never change with the look.
 - Libraries: pygame-ce (from the game's requirements), plus Pillow and numpy pinned in `tools/art/requirements.txt`, installed in the dev container only. Nothing in `tools/art/` ships. Never install other packages without the Director.
@@ -52,9 +53,11 @@ Follow the Architect's schema in `docs/contracts/` exactly. If the schema doesn'
 **Loop round files**, one pair per round. Rounds are never overwritten.
 - `staging/assets/<kind>/<asset>-r<round>.png`: the asset itself (one image, or a sprite sheet with frames in one row). Reader: the Director, after the loop.
 - `staging/assets/<kind>/<asset>-r<round>-board.png`: the preview board the UI Art Critic judges. The asset at 1× on the game's dark background, a 4× zoom, every frame in a row. For a sprite, its hitbox outline drawn faintly on the zoom. Reader: UI Art Critic.
+- `staging/assets/<kind>/<asset>-r<round>-master.png`: the large master the asset was shrunk from. Reader: the Director.
+- `staging/assets/<kind>/<asset>-r<round>.piskel`: the asset as a Piskel file, made with `tools/art/piskel_file.py`, with the art split into a few named layers (for example body, rim, glow) when the script draws them apart. The Director opens it in Piskel to touch it up. Reader: the Director.
 - In a loop round, the delivery report's Checks state the asset's measured size in px, and for a sheet the frame count and frame size. The skill passes these to the Critic.
 
-**Staged credits**, `staging/assets/CREDITS.md`, one entry per staged file, or per asset for loop rounds, listing its round files:
+**Staged credits**, `staging/assets/CREDITS.md`, one entry per staged file, or per asset for loop rounds, listing its round files. Other loops may write to it at the same time: in a loop round, add your line with one shell append (`>>`) and never rewrite the file.
 ```
 - <path>: <source URL | "Director image, <tool>" | "tools/art/<script>.py">, <license>, <size>, <task path | "Director request" | "ui-art-loop">, <date>
 ```
