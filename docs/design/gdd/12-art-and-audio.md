@@ -39,6 +39,21 @@ The player never reads this. It gives the art a feeling to aim at.
 | sound_list | TBD | — | — | TBD | AA-03 |
 | particle_cap | TBD | particles | — | TBD | AA-04 |
 
+### Frame-rate check
+Measured 2026-11-06 in a browser build (Chromium, desktop), wave 4 at Level 2: up to 37 satellites and coins on the field at once. A frame has 16.7 ms at 60 fps. "Ticks per second" is game speed: below 60, the whole game runs in slow motion.
+
+| Measure | Before the fix | After the fix | Empty field |
+|---|---|---|---|
+| Frames per second at the busiest moment | 5 | 32 to 40 | 60 |
+| Ticks per second (game speed) | 25 | 60 | 60 |
+| Game rules, one tick | 36 ms | 8 ms | under 1 ms |
+| Drawing, one frame | 16 ms | 15 ms | 11 to 13 ms |
+| of which background | not split | 4 ms (painting 2) | 5 to 6 ms |
+| of which drifters, ship and effects | not split | 6 ms | 1 ms |
+| of which HUD | not split | 3 ms | 4 ms |
+
+The fix made the collision and graze checks skip far-apart shapes. Every result is the same as before. The background and the HUD together cost about 8 to 10 ms of every frame, even with nothing on the field.
+
 ### Color language
 | Color | Means | Used on |
 |---|---|---|
@@ -117,7 +132,7 @@ The screens (menu, pause box, game over, instructions, leaderboard) have their o
 - Art for a drifter whose spec is still draft: wait, or use a placeholder shape the Director approves.
 
 ## Open
-- AA-02 (background numbers: still to tune after a frame-rate check in the browser build, and the near layer's), AA-03, AA-04.
+- AA-02 (background numbers: still to tune, and the near layer's. The frame-rate check is done, see Frame-rate check), AA-03, AA-04.
 
 ## How to extend
 A new visual or sound rule that applies to every drifter goes here. Anything specific to one drifter goes in that drifter's spec. A new color meaning is a new row in the color language, with the Director's approval.
