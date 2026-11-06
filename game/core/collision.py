@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 _Point = tuple[float, float]
 _BoxCorners = tuple[_Point, _Point, _Point, _Point]
 _Span = tuple[float, float]
+_Bounds = tuple[float, float, float, float]
 
 Direction = tuple[float, float]
 """A unit vector, screen px, y down: (0.0, -1.0) is up."""
@@ -29,6 +30,10 @@ SURFACE_TOLERANCE: Final[float] = 1e-9
 """px. An overlap this deep or less counts as touching for `deeply_overlaps` and
 `exit_distance`. Not a game value: it only absorbs floating point error after a push.
 Source: drifters.md, Rationale, SURFACE_TOLERANCE."""
+
+BOUNDS_SLACK: Final[float] = 1e-6
+"""px. `hitboxes_overlap` skips the exact test only for bounds more than this far apart, so
+floating point error in a bound can never hide a real overlap. Not a game value."""
 
 _AXIS_DIRECTIONS: Final[tuple[Direction, ...]] = ((0.0, -1.0), (0.0, 1.0), (-1.0, 0.0), (1.0, 0.0))
 """Up, down, left, right: the first directions `push_directions` returns."""
@@ -118,10 +123,38 @@ def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool:
     Shapes that only touch at an edge or a point don't overlap. An empty hitbox overlaps
     nothing. Raises TypeError for a shape that is not a Circle, a Box, a Line or a Polygon,
     even when the other hitbox is empty. Source: drifters.md, Rules, Collision.
+
+    Speed only, same answer: a pair whose upright bounds are more than BOUNDS_SLACK px apart
+    can't share area, so the exact shape test runs only for pairs whose bounds meet, and not at
+    all when the two hitboxes' bounds are apart.
     """
-    _require_known_shapes(a)
-    _require_known_shapes(b)
-    return any(_shapes_overlap(sa, sb) for sa in a for sb in b)
+    bounds_a: list[_Bounds] = [_bounds(shape) for shape in a]
+    bounds_b: list[_Bounds] = [_bounds(shape) for shape in b]
+    if not bounds_a or not bounds_b or _apart(_joined(bounds_a), _joined(bounds_b)):
+        return False
+    return any(
+        not _apart(box_a, box_b) and _shapes_overlap(sa, sb)
+        for sa, box_a in zip(a, bounds_a, strict=True)
+        for sb, box_b in zip(b, bounds_b, strict=True)
+    )
+
+
+def hitboxes_near(a: Hitbox, b: Hitbox, margin: float) -> bool:
+    """Return False when `a` grown by `margin` px (0 or more) can't overlap `b`. Both placed.
+
+    A cheap bounds test, for skipping work: the upright bounds of `a`, widened by `margin` on
+    every side, are more than BOUNDS_SLACK px from the bounds of `b`. `grow_hitbox` never reaches
+    past those bounds, so False means `hitboxes_overlap(grow_hitbox(a, margin), b)` is False too.
+    True only means the exact test is needed. An empty hitbox is near nothing. Raises TypeError
+    for a shape that is not a Circle, a Box, a Line or a Polygon.
+    """
+    bounds_a: list[_Bounds] = [_bounds(shape) for shape in a]
+    bounds_b: list[_Bounds] = [_bounds(shape) for shape in b]
+    if not bounds_a or not bounds_b:
+        return False
+    left, top, right, bottom = _joined(bounds_a)
+    grown: _Bounds = (left - margin, top - margin, right + margin, bottom + margin)
+    return not _apart(grown, _joined(bounds_b))
 
 
 def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox:
@@ -208,11 +241,51 @@ def _unknown_shape(shape: object) -> TypeError:
     return TypeError(f"unknown shape kind '{type(shape).__name__}'")
 
 
-def _require_known_shapes(hitbox: Hitbox) -> None:
-    """Raise TypeError when any shape of `hitbox` is not a Circle, a Box, a Line or a Polygon."""
-    for shape in hitbox:
-        if not isinstance(shape, Circle | Box | Line | Polygon):
-            raise _unknown_shape(shape)
+def _bounds(shape: Shape) -> _Bounds:
+    """Return the upright box round a placed shape: (left, top, right, bottom), px.
+
+    A line reaches half its thickness past its ends on every side. Raises TypeError for a shape
+    that is not a Circle, a Box, a Line or a Polygon.
+    """
+    if isinstance(shape, Circle):
+        return (shape.cx - shape.r, shape.cy - shape.r, shape.cx + shape.r, shape.cy + shape.r)
+    if isinstance(shape, Box):
+        half_w: float = shape.w / 2
+        half_h: float = shape.h / 2
+        return (shape.cx - half_w, shape.cy - half_h, shape.cx + half_w, shape.cy + half_h)
+    if isinstance(shape, Line):
+        half: float = shape.thickness / 2
+        return (
+            min(shape.ax, shape.bx) - half,
+            min(shape.ay, shape.by) - half,
+            max(shape.ax, shape.bx) + half,
+            max(shape.ay, shape.by) + half,
+        )
+    if isinstance(shape, Polygon):
+        xs: list[float] = [point[0] for point in shape.points]
+        ys: list[float] = [point[1] for point in shape.points]
+        return (min(xs), min(ys), max(xs), max(ys))
+    raise _unknown_shape(shape)
+
+
+def _joined(bounds: list[_Bounds]) -> _Bounds:
+    """Return the upright box round every box in `bounds`, which is not empty."""
+    return (
+        min(box[0] for box in bounds),
+        min(box[1] for box in bounds),
+        max(box[2] for box in bounds),
+        max(box[3] for box in bounds),
+    )
+
+
+def _apart(a: _Bounds, b: _Bounds) -> bool:
+    """True when the two upright boxes are more than BOUNDS_SLACK px apart on x or on y."""
+    return (
+        a[2] + BOUNDS_SLACK < b[0]
+        or b[2] + BOUNDS_SLACK < a[0]
+        or a[3] + BOUNDS_SLACK < b[1]
+        or b[3] + BOUNDS_SLACK < a[1]
+    )
 
 
 def _require_boxes_and_polygons(function_name: str, hitbox: Hitbox) -> None:
