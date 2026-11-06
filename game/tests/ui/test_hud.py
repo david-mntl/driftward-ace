@@ -1,826 +1,546 @@
-"""HUD layout tests. Contract: docs/contracts/systems/hud.md, Rules and Presentation.
+"""HUD panel tests. Contract: docs/contracts/systems/hud.md, Presentation and Rules.
 
-From DRA-117 line 2 holds the GRAZE line (`GRAZE 0` for a fresh run), so the tests that said
-line 2 was empty and compared the whole surface with the SCORE line alone now expect the GRAZE
-line beside it.
-
-Positions are read from the drawn pixels, never from a font size or a line height. The HUD
-and the debug overlay must never overlap (Director, scope report DRA-13, Decision log). The
-hearts show the lives left (scope report DRA-23, Values needed).
+The panel is read from drawn pixels: a tile's top bar and digit, a heart's center, a climb bar's
+column. Every position and color comes from tuning/hud.json, never from a number in a test.
 """
 
 import dataclasses
-from collections.abc import Callable
 
 import pygame
 import pytest
 
-import ui.hud as hud_module
-from core.graze import GrazeRules
-from core.run import Run, start_run
-from core.scroll import Scroll
-from core.ship import spawn
-from ui.debug_overlay import draw_debug_overlay, overlay_text_bottom
+from app.assets import load_hud_art
+from app.hud_tuning import load_hud_rules
+from core.world import SCREEN_H, SCREEN_W
 from ui.hud import (
-    HEART_COLOR,
-    HEART_GAP,
-    HEART_MARGIN,
-    HEART_SIZE,
-    HUD_BEST_X,
-    HUD_COLOR,
-    HUD_FONT_SIZE,
-    HUD_LINE_SPACING,
-    HUD_MARGIN,
-    HUD_OVERLAY_GAP,
-    HUD_TOP,
-    draw_hud,
+    HudArt,
+    HudView,
+    beat_scale_at,
+    break_state_at,
+    bump_scale_at,
+    clamp_score,
+    lit_segments,
+    tier_color_key,
 )
-from ui.score_text import best_text, graze_text, score_text
+from ui.hud_rules import RGB, HudRules
 
-SURFACE_SIZE: tuple[int, int] = (640, 480)
-"""Test surface. Source: 03-world-and-camera.md, screen_w, screen_h (guess)."""
+SENTINEL: RGB = (255, 0, 255)
+"""Fills the window before a draw, so any pixel the HUD didn't write shows."""
 
-SCREEN_H: int = 480
-"""Source: 03-world-and-camera.md, screen_h (guess)."""
 
-TOP_LINE_RATIO: float = 0.35
-"""Source: 03-world-and-camera.md, top_line_ratio (locked)."""
+@dataclasses.dataclass(frozen=True)
+class FakeRun:
+    """The four numbers the HUD reads."""
 
-TOP_LINE_ROW: int = int(SCREEN_H * TOP_LINE_RATIO)
-"""Row 168 of the overlay's top line. Source: 03-world-and-camera.md, rule 2."""
+    score: int = 0
+    lives: int = 3
+    grazes: int = 0
+    level: int = 1
 
-FLOOR_ROW: int = SCREEN_H - 1
-"""Row 479 of the overlay's floor line. Source: 03-world-and-camera.md, rule 3."""
 
-BLACK: tuple[int, int, int] = (0, 0, 0)
-"""Test surface fill. Source: 12-art-and-audio.md, placeholder_bg (guess)."""
+@pytest.fixture(scope="module")
+def rules() -> HudRules:
+    """The shipped HUD rules."""
+    return load_hud_rules()
 
-OVERLAY_GREEN: tuple[int, int, int] = (0, 255, 0)
-"""Source: 10-ui.md, debug_overlay_color (guess)."""
 
-WHITE: tuple[int, int, int] = (255, 255, 255)
-"""Readout color. Source: scope report DRA-13, temporary stand-in."""
+@pytest.fixture(scope="module")
+def window(pygame_headless: None, rules: HudRules) -> pygame.Surface:
+    """A window surface the size the rules say, with a display set for convert()."""
+    return pygame.display.set_mode((rules.window.width, rules.window.height))
 
-# Scope report DRA-13, HUD layout (approved by the Director, not in the GDD).
-assert HUD_COLOR == WHITE
-assert (HUD_MARGIN, HUD_LINE_SPACING, HUD_TOP, HUD_OVERLAY_GAP) == (4, 20, 4, 4)
-assert HUD_FONT_SIZE == 16
 
-# Scope report DRA-126, Values needed (BEST: on HUD line 1 at a fixed x of 200 px).
-assert HUD_BEST_X == 200
+@pytest.fixture(scope="module")
+def art(window: pygame.Surface, rules: HudRules) -> HudArt:
+    """The shipped pictures and fonts."""
+    return load_hud_art(rules)
 
-# Scope report DRA-23, Values needed (hearts, approved by the Director, not in the GDD).
-assert HEART_COLOR == WHITE
-assert (HEART_SIZE, HEART_GAP, HEART_MARGIN) == (24, 8, 8)
 
-SCROLL = Scroll(ticks=130, scrolled_ticks=100)
-"""100 scrolled ticks, 11 m: a multi-digit readout with width."""
+@pytest.fixture
+def view(rules: HudRules, art: HudArt) -> HudView:
+    """A fresh view: no motion has started."""
+    return HudView(rules, art)
 
-SLOT_LEFTS: tuple[int, ...] = (608, 576, 544)
-"""Box left column of slots 0, 1 and 2, slot 0 the rightmost. Source: systems/hud.md,
-Presentation (640 - 8 - 24 - i * 32), scope report DRA-23, Values needed."""
 
-HEART_TOP: int = 8
-"""Box top row of every heart. Source: scope report DRA-23, Values needed (8 px from the top)."""
-
-HEART_AREA_LEFT: int = 536
-"""Left column of the hearts area: the leftmost box minus the margin. Source: systems/hud.md,
-Presentation."""
-
-HEART_AREA_ROWS: int = 40
-"""Rows 0 to 39 of the hearts area. Source: task DRA-23-05, test 2."""
-
-Pixels = list[list[tuple[int, int, int]]]
-
-
-def _pixels(surface: pygame.Surface) -> Pixels:
-    width, height = surface.get_size()
-    data = pygame.image.tobytes(surface, "RGB")
-    flat = list(zip(data[0::3], data[1::3], data[2::3], strict=True))
-    return [flat[y * width : (y + 1) * width] for y in range(height)]
-
-
-def _blank() -> pygame.Surface:
-    surface = pygame.Surface(SURFACE_SIZE)
-    surface.fill(BLACK)
-    return surface
-
-
-def _run(lives: int) -> Run:
-    return Run(ship=spawn(), scroll=SCROLL, lives=lives)
-
-
-def _hud(below_overlay: bool, lives: int = 0) -> Pixels:
-    """The HUD on a black surface. The readout tests use 0 lives: only the readout is white."""
-    surface = _blank()
-    draw_hud(surface, _run(lives), below_overlay)
-    return _pixels(surface)
-
-
-def _overlay() -> Pixels:
-    surface = _blank()
-    draw_debug_overlay(surface, spawn())
-    return _pixels(surface)
-
-
-def _ink(rows: Pixels, ignore_rows: tuple[int, ...] = ()) -> list[tuple[int, int]]:
-    """(x, y) of every non-black pixel outside ignore_rows."""
-    return [
-        (x, y)
-        for y, row in enumerate(rows)
-        if y not in ignore_rows
-        for x, p in enumerate(row)
-        if p != BLACK
-    ]
-
-
-def _white(rows: Pixels) -> list[tuple[int, int]]:
-    return [(x, y) for y, row in enumerate(rows) for x, p in enumerate(row) if p == WHITE]
-
-
-def test_hud_normal_layout_starts_inside_the_margin_and_top(pygame_headless: None) -> None:
-    rows = _hud(below_overlay=False)
-    ink = _ink(rows)
-    assert _white(rows), "no white readout pixel drawn"
-    top = min(y for _, y in ink)
-    left = min(x for x, _ in ink)
-    assert top >= HUD_TOP, f"ink above the HUD top: row {top}"
-    assert left >= HUD_MARGIN, f"ink left of the margin: column {left}"
-
-
-def test_hud_never_overlaps_the_debug_overlay(pygame_headless: None) -> None:
-    overlay = _ink(_overlay(), ignore_rows=(TOP_LINE_ROW, FLOOR_ROW))
-    hud = _white(_hud(below_overlay=True))
-    assert overlay, "no overlay text drawn"
-    assert hud, "no white readout pixel drawn"
-    lowest_overlay = max(y for _, y in overlay)
-    highest_hud = min(y for _, y in hud)
-    assert highest_hud > lowest_overlay, f"HUD row {highest_hud} not below overlay {lowest_overlay}"
-
-
-def test_hud_keeps_the_gap_below_the_overlay(pygame_headless: None) -> None:
-    overlay = _ink(_overlay(), ignore_rows=(TOP_LINE_ROW, FLOOR_ROW))
-    hud = _white(_hud(below_overlay=True))
-    bottom = overlay_text_bottom()
-    assert bottom > max(y for _, y in overlay), "overlay_text_bottom is not below the overlay text"
-    first = min(y for _, y in hud)
-    assert first >= bottom + HUD_OVERLAY_GAP, f"HUD ink at row {first}, overlay bottom {bottom}"
-
-
-def test_hud_does_not_jump_when_the_overlay_is_hidden(pygame_headless: None) -> None:
-    overlay_only = _overlay()
-    covered = _blank()
-    draw_debug_overlay(covered, spawn())
-    draw_hud(covered, _run(0), True)
-    covered_rows = _pixels(covered)
-    hidden_rows = _hud(below_overlay=True)
-    overlay_pixels = set(_ink(overlay_only))
-    for y, row in enumerate(hidden_rows):
-        for x, pixel in enumerate(row):
-            if (x, y) not in overlay_pixels:
-                assert covered_rows[y][x] == pixel, f"HUD pixel differs at {(x, y)}"
-    assert _white(hidden_rows), "no white readout pixel drawn"
-
-
-def test_hud_stays_above_the_top_line(pygame_headless: None) -> None:
-    for below_overlay in (False, True):
-        hud = _white(_hud(below_overlay))
-        assert hud, f"no white readout pixel drawn, below_overlay={below_overlay}"
-        lowest = max(y for _, y in hud)
-        assert lowest < TOP_LINE_ROW, f"HUD row {lowest} reaches the top line, {below_overlay=}"
-
-
-def _box_white(rows: Pixels, left: int) -> list[tuple[int, int]]:
-    """White (x, y) inside the heart box whose top-left is (left, HEART_TOP)."""
-    return [
-        (x, y)
-        for y in range(HEART_TOP, HEART_TOP + HEART_SIZE)
-        for x in range(left, left + HEART_SIZE)
-        if rows[y][x] == WHITE
-    ]
-
-
-def _box_pixels(rows: Pixels, left: int) -> Pixels:
-    return [rows[y][left : left + HEART_SIZE] for y in range(HEART_TOP, HEART_TOP + HEART_SIZE)]
-
-
-def test_hud_draws_one_heart_per_life(pygame_headless: None) -> None:
-    for lives in (3, 2, 1, 0):
-        rows = _hud(below_overlay=False, lives=lives)
-        filled = {SLOT_LEFTS[slot] for slot in range(lives)}
-        for left in SLOT_LEFTS:
-            has_white = bool(_box_white(rows, left))
-            assert has_white == (left in filled), f"{lives=}: box at {left}, white={has_white}"
-        inside = {
-            (x, y)
-            for left in filled
-            for x in range(left, left + HEART_SIZE)
-            for y in range(HEART_TOP, HEART_TOP + HEART_SIZE)
-        }
-        stray = [
-            (x, y)
-            for (x, y) in _white(rows)
-            if x >= HEART_AREA_LEFT and y < HEART_AREA_ROWS and (x, y) not in inside
-        ]
-        assert not stray, f"{lives=}: white pixels outside the filled boxes, first {stray[:3]}"
-
-
-def test_hud_lost_life_removes_the_leftmost_heart_only(pygame_headless: None) -> None:
-    three = _hud(below_overlay=False, lives=3)
-    two = _hud(below_overlay=False, lives=2)
-    for left in SLOT_LEFTS[:2]:
-        assert _box_white(three, left), f"no heart at {left} with 3 lives"
-        assert _box_pixels(two, left) == _box_pixels(three, left), f"heart at {left} changed"
-    assert not _box_white(two, SLOT_LEFTS[2]), "leftmost heart still drawn with 2 lives"
-
-
-def test_hud_hearts_ignore_the_overlay(pygame_headless: None) -> None:
-    def hearts(below_overlay: bool) -> Pixels:
-        return [row[HEART_AREA_LEFT:] for row in _hud(below_overlay, lives=3)]
-
-    normal = hearts(below_overlay=False)
-    debug = hearts(below_overlay=True)
-    assert any(WHITE in row for row in normal), "no heart drawn"
-    assert normal == debug, "hearts moved with below_overlay"
-    heart_pixels = {
-        (x, y)
-        for y, row in enumerate(_hud(below_overlay=True, lives=3))
-        for x, p in enumerate(row)
-        if x >= HEART_AREA_LEFT and p == WHITE
-    }
-    overlay_text = {
-        (x, y)
-        for y, row in enumerate(_overlay())
-        for x, p in enumerate(row)
-        if p == OVERLAY_GREEN and y not in (TOP_LINE_ROW, FLOOR_ROW)
-    }
-    assert overlay_text, "no overlay text drawn"
-    assert not heart_pixels & overlay_text, "a heart pixel shares a place with overlay text"
-
-
-# SCORE line tests, from DRA-61. Contract: systems/hud.md, Presentation (SCORE line) and Rules.
-# Scope report DRA-61, Limits: SCORE on line 1 at the left margin, in the DRA-13 HUD look (default
-# font, 16 px, white, antialiased); the meters readout is gone and line 2 stays empty.
-
-SCORES: tuple[int, ...] = (0, 5, 999, 1234, 1234567, 10**11)
-"""Scores drawn: 0, one digit, a full group, two groups, three groups, twelve digits. Source:
-systems/hud.md, Presentation, score_text (the scope report's examples)."""
-
-ZERO_SCROLL = Scroll(ticks=0, scrolled_ticks=0)
-"""No meters flown, so the run's score is its coin points alone. Source: systems/run.md, score."""
-
-
-def _score_run(score: int, lives: int = 0) -> Run:
-    return Run(ship=spawn(), scroll=ZERO_SCROLL, lives=lives, coin_points=score)
-
-
-def _score_hud(score: int, below_overlay: bool, lives: int = 0) -> Pixels:
-    surface = _blank()
-    draw_hud(surface, _score_run(score, lives), below_overlay)
-    return _pixels(surface)
-
-
-def _hud_top(below_overlay: bool) -> int:
-    return overlay_text_bottom() + HUD_OVERLAY_GAP if below_overlay else HUD_TOP
-
-
-def _reference_text(score: int) -> pygame.Surface:
-    """The SCORE text as the contract sets its look: default font, 16 px, antialiased, white."""
-    return pygame.font.Font(None, HUD_FONT_SIZE).render(score_text(score), True, HUD_COLOR)
-
-
-def _reference_graze(grazes: int) -> pygame.Surface:
-    """The GRAZE text as the contract sets its look: the SCORE line's, from `graze_text`."""
-    return pygame.font.Font(None, HUD_FONT_SIZE).render(graze_text(grazes), True, HUD_COLOR)
-
-
-def _expected_score_line(score: int, below_overlay: bool) -> Pixels:
-    """A black surface with the SCORE text blitted at (HUD_MARGIN, hud_top)."""
-    surface = _blank()
-    surface.blit(_reference_text(score), (HUD_MARGIN, _hud_top(below_overlay)))
-    return _pixels(surface)
-
-
-def _expected_graze_line(grazes: int, below_overlay: bool) -> Pixels:
-    """A black surface with the GRAZE text blitted at (HUD_MARGIN, hud_top + HUD_LINE_SPACING)."""
-    surface = _blank()
-    top = _hud_top(below_overlay) + HUD_LINE_SPACING
-    surface.blit(_reference_graze(grazes), (HUD_MARGIN, top))
-    return _pixels(surface)
-
-
-def _expected_hud(run: Run, below_overlay: bool) -> Pixels:
-    """SCORE on line 1 and GRAZE on line 2, as the contract sets them, for the run's own fields."""
-    surface = _blank()
-    top = _hud_top(below_overlay)
-    surface.blit(_reference_text(run.score), (HUD_MARGIN, top))
-    surface.blit(_reference_graze(run.grazes), (HUD_MARGIN, top + HUD_LINE_SPACING))
-    return _pixels(surface)
-
-
-def _rows(rows: Pixels, first: int, last: int) -> Pixels:
-    """Rows `first` to `last - 1` of a drawn surface."""
-    return rows[first:last]
-
-
-def _line_one_ink(rows: Pixels, below_overlay: bool) -> list[tuple[int, int]]:
-    """Ink above line 2's top: the SCORE line's rows."""
-    return [(x, y) for (x, y) in _ink(rows) if y < _hud_top(below_overlay) + HUD_LINE_SPACING]
-
-
-def test_hud_score_is_on_line_one_at_the_left_margin(pygame_headless: None) -> None:
-    for below_overlay in (False, True):
-        line_two_top = _hud_top(below_overlay) + HUD_LINE_SPACING
-        for score in SCORES:
-            drawn = _score_hud(score, below_overlay)
-            # Line 1 is the SCORE text alone, where it always was.
-            assert _rows(drawn, 0, line_two_top) == _rows(
-                _expected_score_line(score, below_overlay), 0, line_two_top
-            ), f"{score=}, {below_overlay=}: line 1 is not the SCORE text at ({HUD_MARGIN}, ...)"
-            # The whole surface is the SCORE line with the GRAZE line beside it on line 2.
-            assert drawn == _expected_hud(_score_run(score), below_overlay), (
-                f"{score=}, {below_overlay=}: not SCORE on line 1 and GRAZE 0 on line 2"
-            )
-        ink = _line_one_ink(_score_hud(1234, below_overlay), below_overlay)
-        top = _hud_top(below_overlay)
-        assert min(x for x, _ in ink) >= HUD_MARGIN, f"{below_overlay=}: ink left of the margin"
-        assert top <= min(y for _, y in ink), f"{below_overlay=}: ink above line 1"
-
-
-def test_hud_score_pixels_follow_the_score(pygame_headless: None) -> None:
-    for below_overlay in (False, True):
-        seen: dict[int, Pixels] = {}
-        for score in (0, 5, 1234, 0, 1234, 5):
-            drawn = _score_hud(score, below_overlay)
-            if score in seen:
-                assert drawn == seen[score], f"{score=}, {below_overlay=}: same score, new pixels"
-            seen[score] = drawn
-        assert len({tuple(map(tuple, rows)) for rows in seen.values()}) == len(seen), (
-            f"{below_overlay=}: two scores drew the same pixels"
-        )
-        widths = [
-            max(x for x, _ in _line_one_ink(_score_hud(score, below_overlay), below_overlay))
-            for score in SCORES
-        ]
-        assert widths == sorted(widths), f"{below_overlay=}: the text did not grow right: {widths}"
-        assert widths[-1] > widths[0], f"{below_overlay=}: more digits did not widen the text"
-
-
-def test_hud_line_two_holds_the_graze_line_only_and_the_meters_are_gone(
-    pygame_headless: None,
+def _draw(
+    view: HudView, window: pygame.Surface, run: FakeRun, best: int | None = None, tick: int = 0
 ) -> None:
-    assert SCROLL.meters > 0, "the test run must have flown some meters"
-    for below_overlay in (False, True):
-        rows = _hud(below_overlay=below_overlay, lives=0)
-        line_two_top = _hud_top(below_overlay) + HUD_LINE_SPACING
-        line_three_top = line_two_top + HUD_LINE_SPACING
-        # Line 2 is `GRAZE 0` and nothing else: no meters readout.
-        expected = _expected_graze_line(0, below_overlay)
-        assert _rows(rows, line_two_top, line_three_top) == _rows(
-            expected, line_two_top, line_three_top
-        ), f"{below_overlay=}: line 2 is not GRAZE 0 alone"
-        assert _ink(_rows(expected, line_two_top, line_three_top)), "no GRAZE line in the reference"
-        stray = [(x, y) for (x, y) in _ink(rows) if y >= line_three_top]
-        assert not stray, f"{below_overlay=}: ink below line 2, first {stray[:3]}"
-        assert _line_one_ink(rows, below_overlay), f"{below_overlay=}: no SCORE drawn"
+    window.fill(SENTINEL)
+    view.draw(window, run, best, tick)
 
 
-def test_hud_score_top_is_the_overlay_bottom_plus_the_gap(pygame_headless: None) -> None:
-    blit_top = overlay_text_bottom() + HUD_OVERLAY_GAP
-    ink_offset = _reference_text(1234).get_bounding_rect().top
-    for score in (0, 1234):
-        ink = _ink(_score_hud(score, below_overlay=True))
-        first = min(y for _, y in ink)
-        assert first == blit_top + _reference_text(score).get_bounding_rect().top, (
-            f"{score=}: first ink row {first}, expected blit top {blit_top} plus {ink_offset}"
-        )
-        assert _score_hud(score, True) == _expected_hud(_score_run(score), True)
-    normal_first = min(y for _, y in _ink(_score_hud(1234, below_overlay=False)))
-    assert normal_first == HUD_TOP + ink_offset, "normal mode: SCORE not at HUD_TOP"
+def _panel(rules: HudRules, x: int, y: int) -> tuple[int, int]:
+    """Window position of panel-space point (x, y)."""
+    return rules.panel.x + x, rules.panel.content_y + y
 
 
-def test_hud_earlier_rules_hold_with_score(pygame_headless: None) -> None:
-    overlay = _ink(_overlay(), ignore_rows=(TOP_LINE_ROW, FLOOR_ROW))
-    overlay_pixels = set(_ink(_overlay()))
-    bottom = overlay_text_bottom()
-    plain_hearts = [row[HEART_AREA_LEFT:] for row in _score_hud(0, False, lives=3)]
-    for score in SCORES:
-        for below_overlay in (False, True):
-            tag = f"{score=}, {below_overlay=}"
-            rows = _score_hud(score, below_overlay, lives=3)
-            text = [(x, y) for (x, y) in _ink(rows) if x < HEART_AREA_LEFT]
-            assert text, f"{tag}: no SCORE drawn"
-            assert max(y for _, y in _ink(rows)) < TOP_LINE_ROW, f"{tag}: HUD reaches the top line"
-            assert max(x for x, _ in text) < HEART_AREA_LEFT - 1, f"{tag}: SCORE reaches the hearts"
-            assert [row[HEART_AREA_LEFT:] for row in rows] == plain_hearts, f"{tag}: hearts moved"
-            if below_overlay:
-                assert min(y for _, y in text) > max(y for _, y in overlay), f"{tag}: overlap"
-                assert min(y for _, y in text) >= bottom + HUD_OVERLAY_GAP, f"{tag}: gap lost"
-                covered = _blank()
-                draw_debug_overlay(covered, spawn())
-                draw_hud(covered, _score_run(score, 3), True)
-                for y, row in enumerate(_pixels(covered)):
-                    for x, pixel in enumerate(row):
-                        if (x, y) not in overlay_pixels:
-                            assert pixel == rows[y][x], f"{tag}: HUD pixel differs at {(x, y)}"
+def _near(
+    color: tuple[int, int, int, int] | pygame.Color, target: RGB, tolerance: int = 30
+) -> bool:
+    return all(abs(color[i] - target[i]) <= tolerance for i in range(3))
 
 
-# GRAZE line tests, from DRA-117. Contract: systems/hud.md, Presentation (GRAZE line) and Rules.
-# Scope report DRA-117, Limits: GRAZE on line 2 at the left margin, in SCORE's stand-in look
-# (default font, 16 px, white, antialiased), digits grouped like SCORE, no digit limit.
+def _tile_bright_pixels(window: pygame.Surface, rules: HudRules, index: int) -> int:
+    """Pixels in tile `index` below its top bar that are bright, like a lit digit's."""
+    spec = rules.score
+    x, y = _panel(rules, spec.tile_x + index * spec.tile_pitch, spec.tile_y + spec.tile_top)
+    count = 0
+    for px in range(x, x + spec.tile_w):
+        for py in range(y, y + spec.tile_h - spec.tile_top):
+            if sum(window.get_at((px, py))[:3]) > 600:
+                count += 1
+    return count
 
-GRAZES: tuple[int, ...] = (0, 5, 999, 1234, 1234567, 10**11)
-"""Counts drawn: 0, one digit, a full group, two groups, three groups, twelve digits. Source:
-systems/hud.md, Presentation, graze_text (`GRAZE 0`, `GRAZE 5`, `GRAZE 1 234`)."""
 
-NO_GRAZE_POINTS = GrazeRules(points=0)
-"""Grazes that pay nothing, so the score stays put while the count changes. Source: systems/run.md,
-Interface, `GrazeRules.points` (>= 0) and `Run.score`."""
+def _tile_top(window: pygame.Surface, rules: HudRules, index: int) -> pygame.Color:
+    spec = rules.score
+    x, y = _panel(rules, spec.tile_x + index * spec.tile_pitch + 1, spec.tile_y)
+    return window.get_at((x, y))
 
 
-def _graze_run(
-    grazes: int,
-    lives: int = 0,
-    coin_points: int = 1234,
-    rules: GrazeRules | None = None,
-) -> Run:
-    return Run(
-        ship=spawn(),
-        scroll=ZERO_SCROLL,
-        lives=lives,
-        coin_points=coin_points,
-        grazes=grazes,
-        graze_rules=rules if rules is not None else GrazeRules(),
+def _heart_pixel(window: pygame.Surface, rules: HudRules, slot: int) -> pygame.Color:
+    x, y = _panel(rules, *rules.hearts.slots[slot])
+    return window.get_at((x, y))
+
+
+# ----- pure helpers -----
+
+
+def test_clamp_score_stops_at_the_last_number_the_tiles_can_show() -> None:
+    assert clamp_score(48210, 7) == 48210
+    assert clamp_score(9_999_999, 7) == 9_999_999
+    assert clamp_score(12_000_000, 7) == 9_999_999
+    assert clamp_score(0, 7) == 0
+    assert clamp_score(-5, 7) == 0
+
+
+@pytest.mark.parametrize(
+    ("score", "best", "expected"),
+    [
+        (0, 112_430, 0),
+        (0, None, 0),
+        (1, 100, 1),
+        (50, 100, 7),
+        (100, 100, 14),
+        (250, 100, 14),
+        (5_000, None, 7),
+        (9_999, None, 14),
+        (10_000, None, 7),
+        (20_000, None, 10),
+        (9_999, 0, 14),
+    ],
+)
+def test_the_score_bar_fills_toward_the_best_or_the_next_ten_thousand(
+    score: int, best: int | None, expected: int
+) -> None:
+    assert lit_segments(score, best, 14, 10_000) == expected
+
+
+@pytest.mark.parametrize(
+    ("level", "expected"),
+    [(1, "level"), (3, "level"), (4, "mid"), (6, "mid"), (7, "last_life"), (8, "last_life")],
+)
+def test_the_level_number_warms_up_at_the_tier_levels(level: int, expected: str) -> None:
+    assert tier_color_key(level, 4, 7) == expected
+
+
+def test_the_last_heart_beats_up_to_the_scale_and_back_every_beat(rules: HudRules) -> None:
+    motion = rules.motion
+    assert beat_scale_at(0, motion) == 1.0
+    peak = round(motion.beat_ticks * motion.beat_peak_at)
+    assert beat_scale_at(peak, motion) == pytest.approx(motion.beat_scale, abs=0.02)
+    assert beat_scale_at(motion.beat_ticks - 1, motion) == 1.0
+    assert beat_scale_at(motion.beat_ticks, motion) == 1.0
+
+
+def test_the_graze_count_swells_once_then_rests(rules: HudRules) -> None:
+    motion = rules.motion
+    assert bump_scale_at(0, motion) == 1.0
+    peak = round(motion.bump_ticks * motion.bump_peak_at)
+    assert bump_scale_at(peak, motion) == pytest.approx(motion.bump_scale, abs=0.03)
+    assert bump_scale_at(motion.bump_ticks, motion) == 1.0
+    assert bump_scale_at(-1, motion) == 1.0
+
+
+def test_a_heart_break_runs_through_its_keys_then_ends(rules: HudRules) -> None:
+    motion = rules.motion
+    start = break_state_at(0, motion)
+    assert start is not None
+    assert start == (motion.break_keys[0][1], motion.break_keys[0][2])
+    flicker = break_state_at(round(motion.break_ticks * 0.12), motion)
+    assert flicker is not None
+    assert flicker[0] < 0.3
+    assert break_state_at(motion.break_ticks, motion) is None
+    assert break_state_at(-1, motion) is None
+
+
+# ----- score tiles and bar -----
+
+
+def test_seven_tiles_show_a_seven_digit_score_with_no_dim_zero(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    _draw(view, window, FakeRun(score=1_204_880))
+    for index in range(rules.score.tile_count):
+        assert _tile_bright_pixels(window, rules, index) > 20
+        assert _near(_tile_top(window, rules, index), rules.palette["score"], 0)
+
+
+def test_leading_zeros_are_dim_and_the_digits_are_lit(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    _draw(view, window, FakeRun(score=48_210))
+    for index in (0, 1):
+        assert _tile_bright_pixels(window, rules, index) == 0
+        assert _tile_top(window, rules, index) == pygame.Color(*rules.palette["dim"])
+    for index in range(2, 7):
+        assert _tile_bright_pixels(window, rules, index) > 20
+        assert _tile_top(window, rules, index) == pygame.Color(*rules.palette["score"])
+
+
+def test_a_score_of_zero_keeps_the_last_tile_lit(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    _draw(view, window, FakeRun(score=0))
+    last = rules.score.tile_count - 1
+    assert _tile_bright_pixels(window, rules, last) > 20
+    assert _tile_bright_pixels(window, rules, 0) == 0
+
+
+def test_a_score_past_the_tiles_shows_the_last_number_they_can(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    spec = rules.score
+    _draw(view, window, FakeRun(score=9_999_999))
+    x, y = _panel(rules, spec.tile_x, spec.tile_y)
+    area = pygame.Rect(x, y, spec.tile_pitch * spec.tile_count, spec.tile_h)
+    expected = window.subsurface(area).copy()
+    _draw(view, window, FakeRun(score=12_345_678))
+    assert pygame.image.tobytes(window.subsurface(area), "RGB") == pygame.image.tobytes(
+        expected, "RGB"
     )
 
 
-def _graze_hud(run: Run, below_overlay: bool) -> Pixels:
-    surface = _blank()
-    draw_hud(surface, run, below_overlay)
-    return _pixels(surface)
-
-
-def test_hud_graze_is_on_line_two_at_the_left_margin(pygame_headless: None) -> None:
-    for below_overlay in (False, True):
-        line_two_top = _hud_top(below_overlay) + HUD_LINE_SPACING
-        for grazes in GRAZES:
-            run = _graze_run(grazes)
-            drawn = _graze_hud(run, below_overlay)
-            tag = f"{grazes=}, {below_overlay=}"
-            # The whole surface: SCORE on line 1 and GRAZE on line 2, in SCORE's look.
-            assert drawn == _expected_hud(run, below_overlay), f"{tag}: not the two lines"
-            # Line 2 alone is the GRAZE text at (HUD_MARGIN, hud_top + HUD_LINE_SPACING).
-            assert _rows(drawn, line_two_top, SURFACE_SIZE[1]) == _rows(
-                _expected_graze_line(grazes, below_overlay), line_two_top, SURFACE_SIZE[1]
-            ), f"{tag}: line 2 is not graze_text at ({HUD_MARGIN}, {line_two_top})"
-            ink = [(x, y) for (x, y) in _ink(drawn) if y >= line_two_top]
-            assert ink, f"{tag}: no GRAZE drawn"
-            assert min(x for x, _ in ink) >= HUD_MARGIN, f"{tag}: ink left of the margin"
-            assert max(y for _, y in ink) < line_two_top + HUD_LINE_SPACING, f"{tag}: below line 2"
-
-
-def test_hud_shows_graze_zero_for_a_fresh_run_and_after_game_over(pygame_headless: None) -> None:
-    fresh = start_run()
-    assert fresh.grazes == 0
-    for run in (fresh, _graze_run(0, lives=3, coin_points=0), _graze_run(0, lives=0)):
-        for below_overlay in (False, True):
-            drawn = _graze_hud(run, below_overlay)
-            line_two_top = _hud_top(below_overlay) + HUD_LINE_SPACING
-            # Left of the hearts' area, where line 2 is.
-            band = range(line_two_top, line_two_top + HUD_LINE_SPACING)
-            expected = _expected_graze_line(0, below_overlay)
-            assert [drawn[y][:HEART_AREA_LEFT] for y in band] == [
-                expected[y][:HEART_AREA_LEFT] for y in band
-            ], f"{below_overlay=}: not GRAZE 0 on a fresh run"
-    # While the Game Over box shows the HUD still shows the count: the run is frozen, not hidden.
-    over = Run(ship=spawn(), scroll=ZERO_SCROLL, lives=0, game_over=True, grazes=7)
-    for below_overlay in (False, True):
-        assert _graze_hud(over, below_overlay) == _expected_hud(over, below_overlay)
-
-
-def test_hud_score_line_stays_put_beside_the_graze_line(pygame_headless: None) -> None:
-    for below_overlay in (False, True):
-        line_two_top = _hud_top(below_overlay) + HUD_LINE_SPACING
-        # Same score (graze points 0), counts change: line 1 is the same pixels.
-        line_one = [
-            _rows(_graze_hud(_graze_run(g, rules=NO_GRAZE_POINTS), below_overlay), 0, line_two_top)
-            for g in GRAZES
-        ]
-        assert all(rows == line_one[0] for rows in line_one), f"{below_overlay=}: SCORE moved"
-        assert _rows(line_one[0], 0, line_two_top) == _rows(
-            _expected_score_line(1234, below_overlay), 0, line_two_top
-        ), f"{below_overlay=}: SCORE is not where it was"
-        # Same count, scores change: line 2 and below are the same pixels.
-        line_two = [
-            _rows(_graze_hud(_graze_run(5, coin_points=c), below_overlay), line_two_top, 480)
-            for c in SCORES
-        ]
-        assert all(rows == line_two[0] for rows in line_two), f"{below_overlay=}: GRAZE moved"
-
-
-def test_hud_graze_pixels_follow_the_count(pygame_headless: None) -> None:
-    for below_overlay in (False, True):
-        line_two_top = _hud_top(below_overlay) + HUD_LINE_SPACING
-        seen: dict[int, Pixels] = {}
-        for grazes in (0, 5, 1234, 0, 1234, 5):
-            drawn = _rows(
-                _graze_hud(_graze_run(grazes, rules=NO_GRAZE_POINTS), below_overlay),
-                line_two_top,
-                480,
-            )
-            if grazes in seen:
-                assert drawn == seen[grazes], f"{grazes=}, {below_overlay=}: same count, new pixels"
-            seen[grazes] = drawn
-        assert len({tuple(map(tuple, rows)) for rows in seen.values()}) == len(seen), (
-            f"{below_overlay=}: two counts drew the same pixels"
-        )
-        widths = [
-            max(
-                x
-                for x, y in _ink(_graze_hud(_graze_run(g, rules=NO_GRAZE_POINTS), below_overlay))
-                if y >= line_two_top
-            )
-            for g in GRAZES
-        ]
-        assert widths == sorted(widths), f"{below_overlay=}: the text did not grow right: {widths}"
-        assert widths[-1] > widths[0], f"{below_overlay=}: more digits did not widen the text"
-
-
-def test_hud_graze_never_overlaps_the_overlay_hearts_or_top_line(pygame_headless: None) -> None:
-    overlay = _ink(_overlay(), ignore_rows=(TOP_LINE_ROW, FLOOR_ROW))
-    overlay_pixels = set(_ink(_overlay()))
-    bottom = overlay_text_bottom()
-    plain_hearts = [row[HEART_AREA_LEFT:] for row in _graze_hud(_graze_run(0, lives=3), False)]
-    for grazes in GRAZES:
-        for below_overlay in (False, True):
-            tag = f"{grazes=}, {below_overlay=}"
-            line_two_top = _hud_top(below_overlay) + HUD_LINE_SPACING
-            rows = _graze_hud(_graze_run(grazes, lives=3), below_overlay)
-            text = [(x, y) for (x, y) in _ink(rows) if x < HEART_AREA_LEFT and y >= line_two_top]
-            assert text, f"{tag}: no GRAZE drawn"
-            assert max(y for _, y in text) < TOP_LINE_ROW, f"{tag}: GRAZE reaches the top line"
-            assert max(x for x, _ in text) < HEART_AREA_LEFT - 1, f"{tag}: GRAZE reaches hearts"
-            assert [row[HEART_AREA_LEFT:] for row in rows] == plain_hearts, f"{tag}: hearts moved"
-            if below_overlay:
-                assert min(y for _, y in text) > max(y for _, y in overlay), f"{tag}: overlap"
-                assert min(y for _, y in text) >= bottom + HUD_OVERLAY_GAP + HUD_LINE_SPACING, tag
-                covered = _blank()
-                draw_debug_overlay(covered, spawn())
-                draw_hud(covered, _graze_run(grazes, lives=3), True)
-                for y, row in enumerate(_pixels(covered)):
-                    for x, pixel in enumerate(row):
-                        if (x, y) not in overlay_pixels:
-                            assert pixel == rows[y][x], f"{tag}: HUD pixel differs at {(x, y)}"
-
-
-def test_hud_graze_text_is_rendered_again_only_when_the_count_changes(
-    pygame_headless: None, monkeypatch: pytest.MonkeyPatch
+def test_the_score_bar_lights_the_segments_the_score_earns(
+    view: HudView, window: pygame.Surface, rules: HudRules
 ) -> None:
-    """Each text is built by `graze_text` / `score_text` only when its own number is new.
-
-    The calls are counted through the names `ui.hud` imports from `ui.score_text`; the cache is
-    one slot per text (hud.md, GRAZE line and SCORE line). A count that no earlier test drew
-    (41) is drawn once before counting, so the one-slot cache holds it whatever ran before.
-    """
-    calls: dict[str, int] = {"graze": 0, "score": 0}
-
-    def counting(name: str, real: Callable[[int], str]) -> Callable[[int], str]:
-        def wrapper(number: int) -> str:
-            calls[name] += 1
-            return real(number)
-
-        return wrapper
-
-    surface = _blank()
-    draw_hud(surface, _graze_run(41, rules=NO_GRAZE_POINTS), False)
-    monkeypatch.setattr(hud_module, "graze_text", counting("graze", graze_text))
-    monkeypatch.setattr(hud_module, "score_text", counting("score", score_text))
-
-    def frame(grazes: int, coin_points: int) -> None:
-        draw_hud(surface, _graze_run(grazes, coin_points=coin_points, rules=NO_GRAZE_POINTS), False)
-
-    for _ in range(5):
-        frame(41, 1234)
-    assert calls == {"graze": 0, "score": 0}, f"same numbers re-rendered: {calls}"
-    frame(42, 1234)
-    assert calls == {"graze": 1, "score": 0}, f"a new count did not render once: {calls}"
-    for _ in range(5):
-        frame(42, 1234)
-    assert calls == {"graze": 1, "score": 0}, f"the same count re-rendered: {calls}"
-    frame(42, 1235)
-    assert calls == {"graze": 1, "score": 1}, f"a new score re-rendered the GRAZE text: {calls}"
-    frame(41, 1235)
-    assert calls == {"graze": 2, "score": 1}, f"a changed count did not render again: {calls}"
+    spec = rules.score
+    _draw(view, window, FakeRun(score=5_000))
+    lit = lit_segments(5_000, None, spec.bar_segments, spec.bar_step)
+    seg_w = (spec.bar_w - (spec.bar_segments - 1) * spec.bar_gap) / spec.bar_segments
+    colors = []
+    for index in range(spec.bar_segments):
+        x, y = _panel(rules, spec.bar_x + round(index * (seg_w + spec.bar_gap)) + 1, spec.bar_y + 1)
+        colors.append(window.get_at((x, y)))
+    dim = pygame.Color(*rules.palette["dim"])
+    assert all(color != dim for color in colors[:lit])
+    assert all(color == dim for color in colors[lit:])
 
 
-# BEST line tests, from DRA-126. Contract: systems/hud.md, Presentation (BEST line) and Rules.
-# Scope report DRA-126, Values needed: `BEST 1 234` in SCORE's look (default font, 16 px, white,
-# antialiased, digits grouped) on HUD line 1 at a fixed x of 200 px. Drawn only when `best` is not
-# None.
-
-BESTS: tuple[int, ...] = (0, 5, 999, 1234, 1234567, 10**11)
-"""Bests drawn: 0, one digit, a full group, two groups, three groups, twelve digits. Source:
-systems/hud.md, Presentation, best_text (`BEST 0`, `BEST 999`, `BEST 1 234`)."""
-
-BEST_SCORES: tuple[int, ...] = (0, 1234, 10**11)
-"""Scores drawn beside BEST: the shortest, a middle one and the longest SCORE text. The longest
-(12 digits) still ends left of `HUD_BEST_X`, so no run here overlaps the two."""
-
-
-def _bytes(surface: pygame.Surface) -> bytes:
-    return pygame.image.tobytes(surface, "RGB")
+def test_best_shows_with_commas_and_is_hidden_without_a_best_score(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    spec = rules.score
+    area = pygame.Rect(
+        *_panel(rules, spec.best_label_x, spec.best_y - 8), spec.best_right - spec.best_label_x, 16
+    )
+    _draw(view, window, FakeRun(), best=None)
+    hidden = pygame.image.tobytes(window.subsurface(area), "RGB")
+    _draw(view, window, FakeRun(), best=112_430)
+    shown = pygame.image.tobytes(window.subsurface(area), "RGB")
+    assert hidden != shown
+    _draw(view, window, FakeRun(), best=None)
+    assert pygame.image.tobytes(window.subsurface(area), "RGB") == hidden
 
 
-def _best_surface(run: Run, below_overlay: bool, best: int | None) -> pygame.Surface:
-    """The HUD on a black surface with the best passed as the contract says (None: left out)."""
-    surface = _blank()
-    if best is None:
-        draw_hud(surface, run, below_overlay)
-    else:
-        draw_hud(surface, run, below_overlay, best=best)
-    return surface
+# ----- hearts -----
 
 
-def _reference_best(best: int) -> pygame.Surface:
-    """The BEST text as the contract sets its look: SCORE's, from `best_text`."""
-    return pygame.font.Font(None, HUD_FONT_SIZE).render(best_text(best), True, HUD_COLOR)
+@pytest.mark.parametrize("lives", [3, 2])
+def test_hearts_are_lit_for_each_life_left_and_dim_for_each_lost(
+    view: HudView, window: pygame.Surface, rules: HudRules, lives: int
+) -> None:
+    _draw(view, window, FakeRun(lives=lives))
+    for slot in range(3):
+        pixel = _heart_pixel(window, rules, slot)
+        if slot < lives:
+            assert _near(pixel, rules.palette["hearts"]), (slot, pixel)
+        else:
+            assert not _near(pixel, rules.palette["hearts"], 60), (slot, pixel)
 
 
-def _expected_with_best(run: Run, below_overlay: bool, best: int | None) -> bytes:
-    """SCORE at the margin, BEST at (HUD_BEST_X, hud_top) when there is one, and GRAZE on line 2."""
-    surface = _blank()
-    top = _hud_top(below_overlay)
-    surface.blit(_reference_text(run.score), (HUD_MARGIN, top))
-    if best is not None:
-        surface.blit(_reference_best(best), (HUD_BEST_X, top))
-    surface.blit(_reference_graze(run.grazes), (HUD_MARGIN, top + HUD_LINE_SPACING))
-    return _bytes(surface)
+def test_the_last_life_is_one_orange_heart_and_two_dim_ones(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    _draw(view, window, FakeRun(lives=1))
+    assert _near(_heart_pixel(window, rules, 0), rules.palette["last_life"])
+    for slot in (1, 2):
+        assert not _near(_heart_pixel(window, rules, slot), rules.palette["hearts"], 60)
+        assert not _near(_heart_pixel(window, rules, slot), rules.palette["last_life"], 60)
 
 
-def _changed_pixels(first: bytes, second: bytes) -> list[int]:
-    """The pixel indexes where two black-and-white pictures differ (the red level is enough)."""
-    return [i for i, (a, b) in enumerate(zip(first[::3], second[::3], strict=True)) if a != b]
+def test_no_life_left_shows_three_dim_hearts(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    _draw(view, window, FakeRun(lives=0))
+    for slot in range(3):
+        pixel = _heart_pixel(window, rules, slot)
+        assert not _near(pixel, rules.palette["hearts"], 60)
+        assert not _near(pixel, rules.palette["last_life"], 60)
 
 
-def test_hud_best_is_on_line_one_at_its_fixed_x_in_both_modes(pygame_headless: None) -> None:
-    width = SURFACE_SIZE[0]
-    for below_overlay in (False, True):
-        top = _hud_top(below_overlay)
-        for score in BEST_SCORES:
-            run = _score_run(score)
-            without = _bytes(_best_surface(run, below_overlay, None))
-            for best in BESTS:
-                tag = f"{score=}, {best=}, {below_overlay=}"
-                drawn = _bytes(_best_surface(run, below_overlay, best))
-                # The whole surface: SCORE and BEST on line 1 at their x, GRAZE on line 2.
-                assert drawn == _expected_with_best(run, below_overlay, best), f"{tag}: not BEST"
-                # BEST's own pixels are what the call adds: all at or right of HUD_BEST_X, and on
-                # the rows SCORE's text box covers (the same top, the same font).
-                added = _changed_pixels(without, drawn)
-                assert added, f"{tag}: nothing drawn for BEST"
-                columns = [i % width for i in added]
-                rows = [i // width for i in added]
-                assert min(columns) >= HUD_BEST_X, f"{tag}: BEST ink left of {HUD_BEST_X}"
-                score_rows = range(top, top + _reference_text(score).get_height())
-                assert all(row in score_rows for row in rows), f"{tag}: BEST off SCORE's rows"
-                best_box = _reference_best(best).get_bounding_rect()
-                assert min(rows) == top + best_box.top, f"{tag}: BEST's top is not hud_top"
-                assert min(columns) == HUD_BEST_X + best_box.left, f"{tag}: BEST's left moved"
+def test_the_pillar_holds_no_lamp_on_any_life_count(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    for lives in (3, 2, 1, 0):
+        _draw(view, window, FakeRun(lives=lives), tick=0)
+        for x in range(rules.panel.x, rules.panel.x + rules.frame.pillar_width):
+            for y in range(rules.window.height - 80, rules.window.height):
+                assert not _near(window.get_at((x, y)), rules.palette["last_life"], 60), lives
 
 
-def test_hud_best_stays_at_its_x_however_long_the_score_grows(pygame_headless: None) -> None:
-    width = SURFACE_SIZE[0]
-    for below_overlay in (False, True):
-        for best in (0, 1234):
-            added: list[list[int]] = []
-            for score in SCORES:
-                run = _score_run(score)
-                added.append(
-                    _changed_pixels(
-                        _bytes(_best_surface(run, below_overlay, None)),
-                        _bytes(_best_surface(run, below_overlay, best)),
-                    )
+# ----- level -----
+
+
+@pytest.mark.parametrize("level", range(1, 9))
+def test_climb_bars_are_lit_up_to_the_level_and_dim_above_it(
+    view: HudView, window: pygame.Surface, rules: HudRules, level: int
+) -> None:
+    spec = rules.level
+    _draw(view, window, FakeRun(level=level))
+    span = (spec.bars - 1) * spec.bar_pitch + spec.bar_w
+    dim = pygame.Color(*rules.palette["dim"])
+    for index in range(spec.bars):
+        x, y = _panel(
+            rules, spec.bars_right - span + index * spec.bar_pitch + 1, spec.bars_bottom - 2
+        )
+        if index < level:
+            assert window.get_at((x, y)) != dim, (level, index)
+        else:
+            assert window.get_at((x, y)) == dim, (level, index)
+
+
+def test_the_climb_has_one_bar_per_level(rules: HudRules) -> None:
+    assert rules.level.bars == 8
+
+
+def test_bars_get_taller_one_by_one(view: HudView, window: pygame.Surface, rules: HudRules) -> None:
+    spec = rules.level
+    _draw(view, window, FakeRun(level=spec.bars))
+    span = (spec.bars - 1) * spec.bar_pitch + spec.bar_w
+    heights = []
+    for index in range(spec.bars):
+        x, _ = _panel(rules, spec.bars_right - span + index * spec.bar_pitch + 1, 0)
+        top = 0
+        for row in range(spec.bars_bottom - 1, 0, -1):
+            if window.get_at((x, rules.panel.content_y + row)) == pygame.Color(*SENTINEL):
+                break
+            if window.get_at((x, rules.panel.content_y + row)) != pygame.Color(
+                *rules.palette["dim"]
+            ) and (
+                _near(window.get_at((x, rules.panel.content_y + row)), rules.palette["level"], 120)
+                or _near(
+                    window.get_at((x, rules.panel.content_y + row)), rules.palette["last_life"], 60
                 )
-            tag = f"{best=}, {below_overlay=}"
-            assert all(pixels == added[0] for pixels in added), f"{tag}: BEST moved with SCORE"
-            assert min(i % width for i in added[0]) >= HUD_BEST_X, f"{tag}: BEST left of its x"
+            ):
+                top = spec.bars_bottom - row
+        heights.append(top)
+    assert heights == sorted(heights)
+    assert heights[-1] > heights[0]
 
 
-def test_hud_draws_no_best_when_best_is_none_and_the_old_call_draws_what_it_drew(
-    pygame_headless: None,
+# ----- graze -----
+
+
+def test_the_graze_count_shows_in_the_dial_and_changes_with_the_count(
+    view: HudView, window: pygame.Surface, rules: HudRules
 ) -> None:
-    width = SURFACE_SIZE[0]
-    for below_overlay in (False, True):
-        top = _hud_top(below_overlay)
-        for lives in (0, 3):
-            for score in BEST_SCORES:
-                run = _score_run(score, lives)
-                tag = f"{score=}, {lives=}, {below_overlay=}"
-                old_call = _blank()
-                draw_hud(old_call, run, below_overlay)
-                explicit_none = _blank()
-                draw_hud(explicit_none, run, below_overlay, best=None)
-                positional_none = _blank()
-                draw_hud(positional_none, run, below_overlay, None)
-                assert _bytes(old_call) == _bytes(explicit_none) == _bytes(positional_none), tag
-                # What it drew before: SCORE and GRAZE and the hearts, and no ink in BEST's place
-                # on line 1 (hearts are right of it, at HEART_AREA_LEFT and beyond).
-                drawn = _bytes(old_call)
-                text_rows = range(top, top + HUD_LINE_SPACING)
-                for y in text_rows:
-                    row = drawn[(y * width + HUD_BEST_X) * 3 : (y * width + HEART_AREA_LEFT) * 3]
-                    assert not any(row), f"{tag}: ink in BEST's place on row {y} with no best"
-                left_text = [row[:HEART_AREA_LEFT] for row in _pixels(old_call)]
-                expected = _pixels(_surface_of(_expected_with_best(run, below_overlay, None)))
-                assert left_text == [row[:HEART_AREA_LEFT] for row in expected], tag
+    cx, cy = _panel(rules, *rules.graze.center)
+    area = pygame.Rect(cx - 20, cy - 12, 40, 24)
+    _draw(view, window, FakeRun(grazes=5))
+    five = pygame.image.tobytes(window.subsurface(area), "RGB")
+    view2 = HudView(rules, load_hud_art(rules))
+    _draw(view2, window, FakeRun(grazes=12))
+    assert pygame.image.tobytes(window.subsurface(area), "RGB") != five
 
 
-def _surface_of(data: bytes) -> pygame.Surface:
-    return pygame.image.frombytes(data, SURFACE_SIZE, "RGB")
-
-
-def test_hud_best_leaves_the_hearts_and_the_other_lines_where_they_were(
-    pygame_headless: None,
+def test_a_huge_graze_count_still_fits_the_dial(
+    view: HudView, window: pygame.Surface, rules: HudRules
 ) -> None:
-    for below_overlay in (False, True):
-        run = _graze_run(7, lives=3, coin_points=1234)
-        plain = _pixels(_best_surface(run, below_overlay, None))
-        top = _hud_top(below_overlay)
-        for best in BESTS:
-            with_best = _pixels(_best_surface(run, below_overlay, best))
-            tag = f"{best=}, {below_overlay=}"
-            assert [row[HEART_AREA_LEFT:] for row in with_best] == [
-                row[HEART_AREA_LEFT:] for row in plain
-            ], f"{tag}: the hearts moved"
-            below_line_one = top + HUD_LINE_SPACING
-            assert with_best[below_line_one:] == plain[below_line_one:], f"{tag}: line 2 moved"
-            # SCORE's own columns, left of BEST, are the same pixels.
-            assert [row[:HUD_BEST_X] for row in with_best] == [row[:HUD_BEST_X] for row in plain], (
-                f"{tag}: SCORE changed"
-            )
+    _draw(view, window, FakeRun(grazes=123_456_789))
+    cx, cy = _panel(rules, *rules.graze.center)
+    limit = rules.graze.count_limit
+    outside = pygame.Rect(cx - limit // 2 - 6, cy - 14, 4, 28)
+    for px in range(outside.left, outside.right):
+        for py in range(outside.top, outside.bottom):
+            assert not _near(window.get_at((px, py)), rules.palette["graze"], 20)
 
 
-def test_hud_best_text_is_rendered_again_only_when_the_best_changes(
-    pygame_headless: None, monkeypatch: pytest.MonkeyPatch
+def test_the_radar_wedge_turns(view: HudView, window: pygame.Surface, rules: HudRules) -> None:
+    cx, cy = _panel(rules, *rules.graze.center)
+    radius = rules.graze.wedge_radius
+    area = pygame.Rect(cx - radius, cy - radius, 2 * radius, 2 * radius)
+    _draw(view, window, FakeRun())
+    first = pygame.image.tobytes(window.subsurface(area), "RGB")
+    _draw(view, window, FakeRun(), tick=rules.motion.sweep_ticks // 4)
+    assert pygame.image.tobytes(window.subsurface(area), "RGB") != first
+    _draw(view, window, FakeRun(), tick=rules.motion.sweep_ticks)
+    assert pygame.image.tobytes(window.subsurface(area), "RGB") == first
+
+
+def test_the_scan_line_moves_through_the_wireframe(
+    view: HudView, window: pygame.Surface, rules: HudRules
 ) -> None:
-    """The BEST text is built by `best_text` only when its own number is new.
+    m = rules.motion
+    x, y_top = _panel(rules, m.scan_x + m.scan_w // 2, m.scan_from)
+    _draw(view, window, FakeRun())
+    start = window.get_at((x, y_top))
+    _draw(view, window, FakeRun(), tick=m.scan_ticks // 2)
+    assert window.get_at((x, y_top)) != start
 
-    The calls are counted through the name `ui.hud` imports from `ui.score_text`; the cache is
-    one slot per text (hud.md, BEST line). A best that no earlier test drew (4141) is drawn once
-    before counting, so the one-slot cache holds it whatever ran before.
-    """
-    calls: dict[str, int] = {"best": 0, "graze": 0, "score": 0}
 
-    def counting(name: str, real: Callable[[int], str]) -> Callable[[int], str]:
-        def wrapper(number: int) -> str:
-            calls[name] += 1
-            return real(number)
+# ----- motion that reacts to the run -----
 
-        return wrapper
 
-    surface = _blank()
-    run = _graze_run(41, rules=NO_GRAZE_POINTS)
-    draw_hud(surface, run, False, best=4141)
-    monkeypatch.setattr(hud_module, "best_text", counting("best", best_text))
-    monkeypatch.setattr(hud_module, "graze_text", counting("graze", graze_text))
-    monkeypatch.setattr(hud_module, "score_text", counting("score", score_text))
+def _area_around(rules: HudRules, point: tuple[int, int], half: int) -> pygame.Rect:
+    x, y = _panel(rules, *point)
+    return pygame.Rect(x - half, y - half, 2 * half, 2 * half)
 
-    def frame(best: int | None, coin_points: int = 1234) -> None:
-        draw_hud(
-            surface, _graze_run(41, coin_points=coin_points, rules=NO_GRAZE_POINTS), False, best
+
+def test_losing_a_life_breaks_that_heart_then_leaves_it_dim(
+    rules: HudRules, art: HudArt, window: pygame.Surface
+) -> None:
+    broken = HudView(rules, art)
+    _draw(broken, window, FakeRun(lives=3), tick=10)
+    area = _area_around(rules, rules.hearts.slots[2], 14)
+    _draw(broken, window, FakeRun(lives=2), tick=11)
+    during = pygame.image.tobytes(window.subsurface(area), "RGB")
+    steady = HudView(rules, art)
+    _draw(steady, window, FakeRun(lives=2), tick=11)
+    resting = pygame.image.tobytes(window.subsurface(area), "RGB")
+    assert during != resting
+    _draw(broken, window, FakeRun(lives=2), tick=11 + rules.motion.break_ticks)
+    after = pygame.image.tobytes(window.subsurface(area), "RGB")
+    _draw(steady, window, FakeRun(lives=2), tick=11 + rules.motion.break_ticks)
+    assert after == pygame.image.tobytes(window.subsurface(area), "RGB")
+
+
+def test_a_graze_swells_the_count_and_grows_a_ring_that_then_ends(
+    rules: HudRules, art: HudArt, window: pygame.Surface
+) -> None:
+    cx, cy = _panel(rules, *rules.graze.center)
+    radius = rules.graze.wedge_radius
+    area = pygame.Rect(cx - radius, cy - radius, 2 * radius, 2 * radius)
+    view = HudView(rules, art)
+    _draw(view, window, FakeRun(grazes=4), tick=0)
+    _draw(view, window, FakeRun(grazes=5), tick=1)
+    during = pygame.image.tobytes(window.subsurface(area), "RGB")
+    quiet = HudView(rules, art)
+    _draw(quiet, window, FakeRun(grazes=5), tick=1)
+    assert during != pygame.image.tobytes(window.subsurface(area), "RGB")
+    late = 1 + max(rules.motion.ring_ticks, rules.motion.bump_ticks)
+    _draw(view, window, FakeRun(grazes=5), tick=late)
+    after = pygame.image.tobytes(window.subsurface(area), "RGB")
+    _draw(quiet, window, FakeRun(grazes=5), tick=late)
+    assert after == pygame.image.tobytes(window.subsurface(area), "RGB")
+
+
+def test_a_new_run_starts_no_motion(rules: HudRules, art: HudArt, window: pygame.Surface) -> None:
+    area = _area_around(rules, rules.hearts.slots[2], 14)
+    view = HudView(rules, art)
+    _draw(view, window, FakeRun(lives=0, grazes=9), tick=50)
+    _draw(view, window, FakeRun(lives=3, grazes=0), tick=51)
+    fresh = pygame.image.tobytes(window.subsurface(area), "RGB")
+    quiet = HudView(rules, art)
+    _draw(quiet, window, FakeRun(lives=3, grazes=0), tick=51)
+    assert fresh == pygame.image.tobytes(window.subsurface(area), "RGB")
+
+
+# ----- the frame and the play area -----
+
+
+def _no_sheen(rules: HudRules) -> HudRules:
+    return dataclasses.replace(rules, frame=dataclasses.replace(rules.frame, sheen=False))
+
+
+def test_the_hud_never_draws_on_the_play_area_without_the_sheen(
+    rules: HudRules, art: HudArt, window: pygame.Surface
+) -> None:
+    view = HudView(_no_sheen(rules), art)
+    _draw(view, window, FakeRun(score=48_210, lives=1, grazes=5, level=5), best=112_430, tick=40)
+    field = pygame.Rect(rules.window.field_x, rules.window.field_y, SCREEN_W, SCREEN_H)
+    for px in (field.left, field.right - 1, field.centerx):
+        for py in (field.top, field.bottom - 1, field.centery):
+            assert window.get_at((px, py))[:3] == SENTINEL
+    assert pygame.image.tobytes(window.subsurface(field), "RGB") == (
+        pygame.image.tobytes(pygame.Surface(field.size), "RGB").replace(
+            b"\x00\x00\x00", b"\xff\x00\xff"
         )
-
-    for _ in range(5):
-        frame(4141)
-    assert calls == {"best": 0, "graze": 0, "score": 0}, f"the same best re-rendered: {calls}"
-    frame(4142)
-    assert calls["best"] == 1, f"a new best did not render once: {calls}"
-    for _ in range(5):
-        frame(4142)
-    assert calls["best"] == 1, f"the same best re-rendered: {calls}"
-    frame(4142, coin_points=1235)
-    assert calls["best"] == 1, f"a new score rendered the BEST text again: {calls}"
-    frame(None)
-    frame(None, coin_points=1236)
-    assert calls["best"] == 1, f"no best rendered a BEST text: {calls}"
-    frame(4141)
-    assert calls["best"] == 2, f"a changed best did not render again: {calls}"
-    # SCORE and GRAZE render only for their own new numbers (the score went 1234, 1235, 1234,
-    # 1236, 1234 across the frames above: four new ones), never for BEST's.
-    assert calls["score"] == 4, f"SCORE rendered for something but a new score: {calls}"
-    assert calls["graze"] == 0, f"GRAZE rendered for something but a new count: {calls}"
+    )
 
 
-def test_hud_with_best_draws_the_same_pixels_twice_and_changes_nothing_but_the_surface(
-    pygame_headless: None, caplog: pytest.LogCaptureFixture
+def test_the_sheen_is_the_only_thing_over_the_play_area_and_it_is_faint(
+    view: HudView, window: pygame.Surface, rules: HudRules
 ) -> None:
-    caplog.set_level(0)
-    run = _graze_run(7, lives=3, coin_points=1234)
-    before = dataclasses.replace(run)
-    for below_overlay in (False, True):
-        first = _best_surface(run, below_overlay, 5678)
-        second = _best_surface(run, below_overlay, 5678)
-        assert _bytes(first) == _bytes(second), f"{below_overlay=}: two draws, two pictures"
-        assert first.get_size() == SURFACE_SIZE
-    assert run == before, "the draw changed the run"
-    assert caplog.records == [], "the HUD logged"
+    _draw(view, window, FakeRun())
+    field = pygame.Rect(rules.window.field_x, rules.window.field_y, SCREEN_W, SCREEN_H)
+    for px in range(field.left, field.right, 7):
+        for py in range(field.top, field.bottom, 7):
+            pixel = window.get_at((px, py))
+            assert pixel[1] <= 120, (px, py, pixel)
+
+
+def test_the_frame_covers_the_ring_round_the_glass_and_the_panel_covers_its_side(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    _draw(view, window, FakeRun())
+    probes = [
+        (2, 2),
+        (rules.window.field_x - 2, rules.window.height // 2),
+        (rules.window.width // 3, rules.window.height - 3),
+        (rules.window.field_x + SCREEN_W + 4, rules.window.height // 2),
+        (rules.panel.x + 5, 300),
+        (rules.window.width - 3, rules.window.height - 3),
+        (rules.window.width - 3, 3),
+    ]
+    for probe in probes:
+        assert window.get_at(probe)[:3] != SENTINEL, probe
+
+
+def test_dim_darkens_the_whole_window_by_the_alpha_in_the_rules(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    window.fill((200, 200, 200))
+    view.dim(window)
+    expected = round(200 * (255 - rules.window.dim_alpha) / 255)
+    for probe in ((0, 0), (rules.window.width - 1, rules.window.height - 1), (400, 250)):
+        assert abs(window.get_at(probe)[0] - expected) <= 1
+
+
+def test_every_pixel_of_the_window_is_drawn_by_the_play_area_plus_the_hud(
+    view: HudView, window: pygame.Surface, rules: HudRules
+) -> None:
+    window.fill(SENTINEL)
+    field = window.subsurface(
+        pygame.Rect(rules.window.field_x, rules.window.field_y, SCREEN_W, SCREEN_H)
+    )
+    field.fill((0, 0, 0))
+    view.draw(window, FakeRun(score=1, lives=3, level=2), 5, 0)
+    raw = pygame.image.tobytes(window, "RGB")
+    assert SENTINEL_BYTES not in [raw[i : i + 3] for i in range(0, len(raw), 3 * 997)]
+
+
+SENTINEL_BYTES: bytes = bytes(SENTINEL)
+
+
+def test_drawing_never_changes_the_loaded_pictures(
+    rules: HudRules, art: HudArt, window: pygame.Surface
+) -> None:
+    before = [pygame.image.tobytes(heart, "RGBA") for heart in art.hearts]
+    alphas = [heart.get_alpha() for heart in art.hearts]
+    view = HudView(rules, art)
+    _draw(view, window, FakeRun(lives=3), tick=0)
+    _draw(view, window, FakeRun(lives=1), tick=1)
+    _draw(view, window, FakeRun(lives=0), tick=2)
+    assert [pygame.image.tobytes(heart, "RGBA") for heart in art.hearts] == before
+    assert [heart.get_alpha() for heart in art.hearts] == alphas

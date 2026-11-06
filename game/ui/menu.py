@@ -1,89 +1,74 @@
-"""Menu screen: the title and the three items, the selected one marked.
+"""Menu screen: the title, the three items with the selected one lit and bracketed, the hint.
 
-Source: docs/contracts/systems/game-flow.md, Interface (ui/menu.py) and Presentation, Menu. The
-view takes the selection as a plain value and only draws. It never fills the background, never
-flips the display, never logs per frame, never catches an error and never reads the run mode, a
-key or the focus. A stand-in until UI-03 and UI-04.
+Source: docs/contracts/systems/screens.md, Interface (ui/menu.py); 10-ui.md, `menu_screen`,
+`menu_look` and `menu_hint`. The view takes the look and the selection as a plain value and only
+draws. It never fills the background, never flips the display, never logs per frame, never catches
+an error and never reads the run mode, a key or the focus.
 """
 
 import logging
 from collections.abc import Mapping
-from functools import cache
 from types import MappingProxyType
 from typing import Final
 
 import pygame
 
 from core.game_flow import MenuItem
-from ui.screen_look import (
-    SCREEN_TEXT_COLOR,
-    SCREEN_TITLE_FONT_SIZE,
-    SELECTION_MARKER,
-    screen_font,
-)
+from ui.screen_look import ScreenLook
 
 log = logging.getLogger(__name__)
 
 MENU_TITLE_TEXT: Final[str] = "DRIFTWARD ACE"
-"""Menu title. Scope report DRA-125, Values needed, Menu (stand-in until UI-03)."""
+"""Menu title."""
 
-MENU_ITEM_FONT_SIZE: Final[int] = 24
-"""Menu items' font size, default font, px. Scope report DRA-125, Values needed, Menu."""
-
-MENU_ITEM_SPACING: Final[int] = 40
-"""From one item's top to the next one's, px. Scope report DRA-125, Values needed, Menu."""
+MENU_HINT_TEXT: Final[str] = "Up & Down to choose. Enter to start."
+"""The line under the items. 10-ui.md, menu_hint."""
 
 MENU_ITEM_TEXTS: Final[Mapping[MenuItem, str]] = MappingProxyType(
     {
-        MenuItem.PLAY: "Play",
-        MenuItem.INSTRUCTIONS: "Instructions",
-        MenuItem.LEADERBOARD: "Leaderboard",
+        MenuItem.PLAY: "PLAY",
+        MenuItem.INSTRUCTIONS: "INSTRUCTIONS",
+        MenuItem.LEADERBOARD: "LEADERBOARD",
     }
 )
-"""Each item's label. Scope report DRA-125, Values needed, Menu; 02-game-flow.md, menu_items."""
+"""Each item's label, in capitals like RETRY and MENU. 02-game-flow.md, menu_items."""
 
 
-def draw_menu(surface: pygame.Surface, selection: MenuItem) -> None:
-    """Blit the title and the three items onto ``surface``, the marker on ``selection``. Units: px.
+def draw_menu(surface: pygame.Surface, look: ScreenLook, selection: MenuItem) -> None:
+    """Draw the title, the three items, the hint and the rulers onto ``surface``. Units: px.
 
-    Every line is centered across the width. The title is followed by one blank title line, then
-    the items in ``MenuItem`` order, their tops ``MENU_ITEM_SPACING`` apart. The block, from the
-    title's top to the last item's bottom (its top plus the item font's ``get_height()``), is
-    centered vertically. Needs ``pygame.font`` initialized.
+    The title, ``title_gap``, then the items (``item_w`` by ``item_h``, ``item_gap`` apart, in
+    ``MenuItem`` order) are one block, centered on both axes. ``selection`` is lit and bracketed,
+    the others dim. The hint is centered, ``hint_bottom`` px above the bottom edge. Needs
+    ``pygame.font`` initialized.
     """
+    rules = look.rules.menu
     width, height = surface.get_size()
-    title_line: int = screen_font(SCREEN_TITLE_FONT_SIZE).get_linesize()
-    block_top: int = (height - _block_height(title_line)) // 2
-    _blit_centered(surface, MENU_TITLE_TEXT, SCREEN_TITLE_FONT_SIZE, width, block_top)
-    items_top: int = block_top + 2 * title_line
+    palette = look.palette
+    look.blit_rulers(surface)
+    title_h: int = look.text_size(MENU_TITLE_TEXT, "menu_title")[1]
+    count: int = len(MenuItem)
+    block: int = title_h + rules.title_gap + count * rules.item_h + (count - 1) * rules.item_gap
+    top: int = (height - block) // 2
+    look.blit_text(
+        surface,
+        MENU_TITLE_TEXT,
+        "menu_title",
+        palette["plating"],
+        {"midtop": (width // 2, top)},
+    )
+    items_top: int = top + title_h + rules.title_gap
     for index, item in enumerate(MenuItem):
-        top: int = items_top + index * MENU_ITEM_SPACING
-        _blit_centered(surface, MENU_ITEM_TEXTS[item], MENU_ITEM_FONT_SIZE, width, top)
-        if item is selection:
-            _blit_marker(surface, MENU_ITEM_TEXTS[item], width, top)
-
-
-def _block_height(title_line: int) -> int:
-    """Return the block's height, px: title line, blank line, items to the last one's bottom."""
-    last_gap: int = (len(MenuItem) - 1) * MENU_ITEM_SPACING
-    return 2 * title_line + last_gap + screen_font(MENU_ITEM_FONT_SIZE).get_height()
-
-
-def _blit_centered(surface: pygame.Surface, text: str, size: int, width: int, top: int) -> None:
-    """Blit ``text`` at font ``size`` with its center on ``width // 2`` and its top at ``top``."""
-    image: pygame.Surface = _render(text, size)
-    surface.blit(image, image.get_rect(centerx=width // 2, top=top))
-
-
-def _blit_marker(surface: pygame.Surface, label: str, width: int, top: int) -> None:
-    """Blit the marker at ``top``, its right edge one space left of ``label``'s left edge."""
-    label_left: int = _render(label, MENU_ITEM_FONT_SIZE).get_rect(centerx=width // 2).left
-    space: int = screen_font(MENU_ITEM_FONT_SIZE).size(" ")[0]
-    marker: pygame.Surface = _render(SELECTION_MARKER, MENU_ITEM_FONT_SIZE)
-    surface.blit(marker, marker.get_rect(right=label_left - space, top=top))
-
-
-@cache
-def _render(text: str, size: int) -> pygame.Surface:
-    """Return ``text`` rendered once at font ``size``, antialiased, in the screen text color."""
-    return screen_font(size).render(text, True, SCREEN_TEXT_COLOR)
+        rect: pygame.Rect = pygame.Rect(0, 0, rules.item_w, rules.item_h)
+        rect.midtop = (width // 2, items_top + index * (rules.item_h + rules.item_gap))
+        state: str = "selected" if item is selection else "dim"
+        look.blit_choice(surface, MENU_ITEM_TEXTS[item], rect, "menu_item", state)
+    look.blit_text(
+        surface,
+        MENU_HINT_TEXT,
+        "hint",
+        palette["plating"],
+        {"midbottom": (width // 2, height - rules.hint_bottom)},
+        glow=False,
+        alpha=look.rules.menu.hint_alpha,
+    )

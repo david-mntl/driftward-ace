@@ -66,6 +66,6 @@ if (echo >"/dev/tcp/127.0.0.1/${PORT}") 2>/dev/null; then
 fi
 
 log "Serving Driftward Ace at ${URL}"
-python -m pygbag --port "${PORT}" game &
+python -m pygbag --template web/start.tmpl --port "${PORT}" game &
 SERVER_PID=$!
 wait "${SERVER_PID}"

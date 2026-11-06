@@ -24,11 +24,13 @@ from collections.abc import Sequence
 
 import pygame
 
-from app.assets import load_background
+from app.assets import load_background, load_hud_art, load_screen_fonts
 from app.background_tuning import load_background_rules
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
+from app.hud_tuning import load_hud_rules
 from app.mode import RunMode
 from app.saves import load_saves, write_saves
+from app.screens_tuning import load_screen_rules
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
 from app.ship_tuning import load_ship_look
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
@@ -62,14 +64,18 @@ from ui.game_over import (
     draw_name_picker,
 )
 from ui.graze_view import draw_graze_ring
-from ui.hud import draw_hud
+from ui.hud import HudView
+from ui.hud_rules import HudRules
 from ui.instructions import draw_instructions
 from ui.leaderboard import draw_leaderboard
 from ui.menu import draw_menu
 from ui.pause_box import draw_pause_box
 from ui.popup_view import draw_points_popup
+from ui.screen_look import ScreenLook
+from ui.screen_rules import ScreenRules
 from ui.ship_view import ShipLook, draw_ship
 from ui.starfield import draw_starfield
+from ui.window_view import WindowBackdrop
 
 log = logging.getLogger(__name__)
 
@@ -103,13 +109,23 @@ BACKGROUND_MAX_STEP: float = 0.1
 doesn't make it jump. Look only, no design meaning."""
 
 _RUN_SCREENS: frozenset[Screen] = frozenset({Screen.PLAYING, Screen.PAUSED, Screen.GAME_OVER})
-"""Screens that show the run's world and the HUD."""
+"""Screens that show the run's world in the play area and the HUD round it."""
 
 
 async def frame_loop(mode: RunMode) -> None:
     """Open the window and run frames until pygame.QUIT (desktop only)."""
     pygame.init()
-    surface: pygame.Surface = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+    hud_rules: HudRules = load_hud_rules()
+    window: pygame.Surface = pygame.display.set_mode(
+        (hud_rules.window.width, hud_rules.window.height)
+    )
+    field: pygame.Surface = window.subsurface(
+        pygame.Rect(hud_rules.window.field_x, hud_rules.window.field_y, SCREEN_W, SCREEN_H)
+    )
+    hud: HudView = HudView(hud_rules, load_hud_art(hud_rules))
+    screen_rules: ScreenRules = load_screen_rules()
+    look: ScreenLook = ScreenLook(screen_rules, load_screen_fonts(screen_rules))
+    backdrop: WindowBackdrop = WindowBackdrop(window.get_size())
     background: BackgroundArt = load_background(load_background_rules())
     ship_look: ShipLook = load_ship_look()
     debug: bool = mode is RunMode.DEBUG
@@ -156,7 +172,18 @@ async def frame_loop(mode: RunMode) -> None:
         was_capped = _apply_cap(accumulator, was_capped)
         if was_capped:
             accumulator = 0.0
-        _draw(surface, background, background_ticks, ship_look, flow, overlay_visible, debug)
+        _draw(
+            window,
+            field,
+            backdrop,
+            hud,
+            look,
+            background,
+            background_ticks,
+            ship_look,
+            flow,
+            overlay_visible,
+        )
         pygame.display.flip()
         await asyncio.sleep(0)
     log.info("quit")
@@ -273,51 +300,61 @@ def _apply_cap(accumulator: float, was_capped: bool) -> bool:
 
 
 def _draw(
-    surface: pygame.Surface,
+    window: pygame.Surface,
+    field: pygame.Surface,
+    backdrop: WindowBackdrop,
+    hud: HudView,
+    look: ScreenLook,
     background: BackgroundArt,
     background_ticks: float,
     ship_look: ShipLook,
     flow: GameFlow,
     overlay_visible: bool,
-    debug: bool,
 ) -> None:
-    """Draw the background at `background_ticks`, then draw the screen the flow shows.
+    """Draw the screen the flow shows on the window.
 
-    The menu, the instructions page and the leaderboard page show alone: no world, no overlay, no
-    HUD. Playing, paused and game over show the run's world (_draw_run).
-    Source: systems/app/frame-loop.md, Rules, Draw; systems/game-flow.md, Presentation.
+    The menu, the instructions page and the leaderboard page fill the whole window: the backdrop,
+    then the page alone, with no world, overlay, HUD or frame. Playing, paused and game over draw
+    the background and the run's world on `field`, the play area (_draw_run), then the panel and
+    frame on the window. Paused and game over then dim the whole window and draw their box centered
+    on it. Source: systems/app/frame-loop.md, Rules, Draw; systems/game-flow.md, Presentation.
     """
-    draw_background(surface, background, background_ticks)
+    if flow.screen in _RUN_SCREENS:
+        draw_background(field, background, background_ticks)
+        _draw_run(field, flow, overlay_visible, ship_look, int(background_ticks))
+        hud.draw(window, flow.run, flow.best, int(background_ticks))
+        if flow.screen is Screen.PAUSED:
+            hud.dim(window)
+            draw_pause_box(window, look)
+        elif flow.screen is Screen.GAME_OVER:
+            hud.dim(window)
+            _draw_game_over(window, look, flow)
+        return
+    backdrop.draw(window, background, background_ticks)
     if flow.screen is Screen.MENU:
-        draw_menu(surface, flow.menu_selection)
+        draw_menu(window, look, flow.menu_selection)
     elif flow.screen is Screen.INSTRUCTIONS:
-        draw_instructions(surface)
+        draw_instructions(window, look)
     elif flow.screen is Screen.LEADERBOARD:
-        draw_leaderboard(surface, flow.leaderboard)
-    elif flow.screen in _RUN_SCREENS:
-        _draw_run(surface, flow, overlay_visible, debug, ship_look, int(background_ticks))
+        draw_leaderboard(window, look, flow.leaderboard)
 
 
 def _draw_run(
     surface: pygame.Surface,
     flow: GameFlow,
     overlay_visible: bool,
-    debug: bool,
     ship_look: ShipLook,
     ticks: int,
 ) -> None:
-    """Draw the starfield, the drifters, the points popups, the ship while shown or the burst in
-    the last life, the graze rings, the debug outlines, overlay and wave lines if visible, the
-    PAUSE box when paused or the game-over screen at game over (_draw_game_over), and the HUD
-    last, with BEST.
+    """Draw the starfield, the drifters, the points popups, the ship while shown or the burst in the
+    last life, the graze rings and the debug outlines, overlay and wave lines if visible, all on
+    `surface`, the play area.
 
     Drifters sit behind the ship, and the popups over the drifters and behind the ship. The ship
     shows its flames only while it flies: not paused, not waiting to respawn. `ticks` steps the
-    flame flicker. The burst takes the ship's place. The HUD sits below the overlay's place for
-    the whole run in debug mode, even while F3 hides the overlay. The graze rings sit over the
-    ship and don't follow its blink.
-    Source: systems/app/frame-loop.md, Rules, Draw, Drifters behind the ship, Graze rings over
-    the ship and below_overlay.
+    flame flicker. The burst takes the ship's place. The graze rings sit over the ship and don't
+    follow its blink. The HUD is not drawn here: it lives outside the play area. Source:
+    systems/app/frame-loop.md, Rules, Draw and Drifters behind the ship, Graze rings over the ship.
     """
     run: Run = flow.run
     draw_starfield(surface, run.scroll)
@@ -336,14 +373,9 @@ def _draw_run(
         draw_debug_hitboxes(surface, run)
         draw_debug_overlay(surface, run.ship)
         draw_debug_wave_lines(surface, run)
-    if flow.screen is Screen.PAUSED:
-        draw_pause_box(surface)
-    elif flow.screen is Screen.GAME_OVER:
-        _draw_game_over(surface, flow)
-    draw_hud(surface, run, below_overlay=debug, best=flow.best)
 
 
-def _draw_game_over(surface: pygame.Surface, flow: GameFlow) -> None:
+def _draw_game_over(surface: pygame.Surface, look: ScreenLook, flow: GameFlow) -> None:
     """Draw the game-over box: the place message, the score, the letter picker when the run has
     one, then RETRY and MENU, active once the picker no longer takes keys.
 
@@ -351,8 +383,10 @@ def _draw_game_over(surface: pygame.Surface, flow: GameFlow) -> None:
     systems/app/frame-loop.md, Rules, Draw.
     """
     picker_shown: bool = flow.picker is not None
-    draw_game_over(surface, flow.game_over_message, picker_shown)
-    draw_final_score(surface, flow.run.score, picker_shown)
+    draw_game_over(surface, look, flow.game_over_message, picker_shown)
+    draw_final_score(surface, look, flow.run.score, picker_shown)
     if flow.picker is not None:
-        draw_name_picker(surface, flow.picker, flow.picking)
-    draw_game_over_choices(surface, flow.game_over_selection, picker_shown, active=not flow.picking)
+        draw_name_picker(surface, look, flow.picker, flow.picking)
+    draw_game_over_choices(
+        surface, look, flow.game_over_selection, picker_shown, active=not flow.picking
+    )

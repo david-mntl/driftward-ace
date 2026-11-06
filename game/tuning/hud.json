@@ -1,0 +1,194 @@
+{
+  "palette": {
+    "ship_lines": "#ff00ae",
+    "ship_lines_light": "#bd7cfe",
+    "plating": "#f7f7f7",
+    "hearts": "#f79afe",
+    "last_life": "#ff8a3d",
+    "score": "#b48cff",
+    "level": "#ffc800",
+    "graze": "#f89ffe",
+    "panel_body": "#0a1029",
+    "frame_metal": "#080f24",
+    "frame_highlight": "#080e23",
+    "frame_lights": "#3dfffc",
+    "fuchsia_spill": "#000000",
+    "dim": "#29346a",
+    "line": "#232c55",
+    "tile_bg": "#04061a",
+    "footer_dot": "#33408a"
+  },
+  "window": {
+    "width": 856,
+    "height": 518,
+    "field_x": 16,
+    "field_y": 10,
+    "dim_alpha": 110
+  },
+  "panel": {
+    "x": 672,
+    "width": 184,
+    "content_y": 67,
+    "scale": 0.8
+  },
+  "frame": {
+    "pillar_width": 24,
+    "sheen": false,
+    "sheen_rows": 16,
+    "light_radius": 3.0,
+    "spill": 0.5
+  },
+  "score": {
+    "box": [
+      32,
+      10,
+      142,
+      85
+    ],
+    "label_x": 42,
+    "label_y": 22,
+    "tile_count": 7,
+    "tile_x": 45,
+    "tile_y": 33,
+    "tile_w": 15,
+    "tile_h": 25,
+    "tile_pitch": 17,
+    "tile_top": 2,
+    "bar_x": 42,
+    "bar_y": 65,
+    "bar_w": 123,
+    "bar_h": 5,
+    "bar_segments": 14,
+    "bar_gap": 2,
+    "bar_step": 10000,
+    "best_label_x": 42,
+    "best_y": 82,
+    "best_right": 165,
+    "best_separator": ","
+  },
+  "hearts": {
+    "slots": [
+      [
+        103,
+        182
+      ],
+      [
+        142,
+        185
+      ],
+      [
+        64,
+        185
+      ]
+    ],
+    "cell_w": 24,
+    "cell_h": 22,
+    "ship_box": [
+      34,
+      109,
+      139,
+      152
+    ]
+  },
+  "level": {
+    "box": [
+      32,
+      262,
+      66,
+      75
+    ],
+    "label_x": 38,
+    "label_y": 274,
+    "number_x": 38,
+    "number_y": 316,
+    "bars": 8,
+    "bar_w": 2,
+    "bar_pitch": 3,
+    "bar_base_h": 4,
+    "bar_step_h": 3,
+    "bars_right": 90,
+    "bars_bottom": 330,
+    "tier_mid": 4,
+    "tier_high": 7,
+    "tier_mid_mix": 0.5
+  },
+  "graze": {
+    "center": [
+      139,
+      298
+    ],
+    "radius": 32,
+    "inner_radius": 21,
+    "wedge_radius": 31,
+    "count_limit": 48,
+    "label_x": 139,
+    "label_y": 342
+  },
+  "motion": {
+    "sweep_ticks": 300,
+    "sweep_frames": 36,
+    "scan_ticks": 270,
+    "scan_x": 45,
+    "scan_w": 117,
+    "scan_from": 105,
+    "scan_to": 242,
+    "beat_ticks": 54,
+    "beat_scale": 1.2,
+    "beat_peak_at": 0.3,
+    "beat_end_at": 0.6,
+    "beat_steps": 8,
+    "break_ticks": 54,
+    "break_keys": [
+      [
+        0,
+        1,
+        "white"
+      ],
+      [
+        0.12,
+        0.15,
+        "white"
+      ],
+      [
+        0.24,
+        1,
+        "hue"
+      ],
+      [
+        0.38,
+        0.1,
+        "hue"
+      ],
+      [
+        0.52,
+        0.8,
+        "hue"
+      ],
+      [
+        1,
+        0.16,
+        "plain"
+      ]
+    ],
+    "bump_ticks": 18,
+    "bump_scale": 1.2,
+    "bump_peak_at": 0.4,
+    "ring_ticks": 30,
+    "ring_frames": 10,
+    "ring_from": 0.6,
+    "ring_to": 2.6,
+    "ring_radius": 12
+  },
+  "fonts": {
+    "ui_file": "fonts/Exo2-Bold.ttf",
+    "label_file": "fonts/ShareTechMono.ttf",
+    "label_size": 8,
+    "value_size": 10,
+    "tile_size": 16,
+    "graze_size": 22,
+    "level_size": 29,
+    "label_spacing": 2,
+    "label_mix": 0.5,
+    "value_mix": 0.78
+  }
+}

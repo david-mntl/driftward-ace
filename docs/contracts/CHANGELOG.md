@@ -206,3 +206,17 @@
 - `systems/run.md`: 12 to 13, frozen.
 - `systems/saves.md`: 0 to 1, frozen.
 - Saves: top 10 scores in browser storage, a three-letter name picker at game over, place messages, BEST on the HUD and a filled leaderboard. New saves contract.
+
+## DRA-147, 2026-10-31
+- `systems/screens.md`: 0 to 1, draft (not frozen: the feature ran in one session without task files, so close-out has not run).
+- `systems/game-flow.md`: look and Interface notes marked superseded by `systems/screens.md`. Flow rules unchanged. Draft, version 2.
+- `systems/app/frame-loop.md` (in `systems/app.md`): the Draw rule's screen calls take the `look` argument. Draft, version 18.
+- `systems/run.md`: one pointer to `systems/screens.md`. Frozen, version 13.
+- Screens look: Glass Cockpit in Mono Violet with soft glow for the menu, pause box, game-over screens, instructions page and leaderboard. New screens tuning file and schema (`tuning/screens.json`, `schemas/screens.schema.json`). Closes UI-03 and UI-04.
+
+
+## Entry warning sign, 2026-11-02
+- Every entry warning is one plain warning sign: an orange (#ff9e5e) point-up triangle with a see-through fill and an exclamation mark, 24 px across, the same for every drifter. The drifter copy, the glow and the spikes are gone. Director's call in the main session, no pipeline. GDD: `07-drifters.md` (`entry_warning_look`, `entry_warning_color`, `entry_warning_size`; `entry_warning_glow` and `entry_warning_spikes` removed), `drifters/02-satellite.md` and `drifters/06-fireball.md` (rule 1, no tilted copy), `drifters/03-chain-lightning.md` (`entry_warning_icon` no longer shown), `91-decision-log.md` row 130.
+- Changed: `game/ui/drifters/entry_warning.py` (one cached sign image; `draw_entry_warning(surface, obj)` loses its `view` argument; `drop_entry_warning` removed); `game/ui/drifters/registry.py` (calls); `systems/drifters/shared/views.md` (Diagram, Interface, Presentation, Entry warning).
+- Tests: `game/tests/ui/test_entry_warning.py` rewritten for the sign: its size, nothing past the radius, its color, the mark, and the same image at the warning center.
+- Not changed, now unused by the UI: core `warning_copy()` and `warning_tilt_degrees()` on every drifter, the chain lightning's `entry_warning_icon` tuning field, and the contract text that describes them (`shared/base.md`, `shared/base-interface.md`, the drifter `core.md`, `view.md` and `rationale.md` files, integration checks DRA-47 and DRA-56). Removing them is a structural change for the Architect.

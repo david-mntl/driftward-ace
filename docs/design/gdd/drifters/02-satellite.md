@@ -30,7 +30,7 @@ A satellite that crosses the screen from a side wall in a straight line. The fla
 At Level 1 the flat one crosses the screen in about 270 ticks (4.5 s). The angled one moves about 2.35 px/tick across and 0.86 px/tick down, so it sinks about 230 px over the full width. Derived from the guesses above; not tuning keys.
 
 ## Rules
-1. **Appears:** at its start spot, then flies into view. Its entry warning shows first, at its y against the wall it enters from ([../07-drifters.md](../07-drifters.md) rule 9). For the angled variant the warning copy is tilted along its path, so it also shows which way it will fly.
+1. **Appears:** at its start spot, then flies into view. Its entry warning shows first, at its y against the wall it enters from ([../07-drifters.md](../07-drifters.md) rule 9).
 2. **Telegraph:** none. The entry warning is its only warning.
 3. **Moves:** in a straight line at `speed` along its path, every tick, away from the wall it entered from. Flat: level. Angled: 20° below level. No targeting, no turning. The scroll doesn't add to it ([../03-world-and-camera.md](../03-world-and-camera.md) rule 9).
 4. **Hits:** touching the body or the panels is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)).

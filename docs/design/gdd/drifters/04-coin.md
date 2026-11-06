@@ -21,6 +21,7 @@ A fragment of the galaxy: a tiny swirling galaxy held in a transparent crystal, 
 | popup | its points ("+50", "+100") show where it was collected, drift up slowly, and are gone after 60 ticks (1 s) | ticks | — | guess | Director |
 | popup_color | (255, 80, 150) | RGB | — | guess | Director (picked by guardian on request) |
 | look_reference | A tiny swirling galaxy inside a transparent crystal, with a cloud and a ring around it. A fusion of red, black and purple. The crystal stays upright; the galaxy swirls inside and the crystal glints. The rare one shines more | — | — | guess | Director |
+| art_canvas | 24 × 24 per coin: the 12 × 20 crystal centered, the 22 × 8 ring across its middle, the cloud inside the square. The design image is a strip of two: common, then rare | px | — | guess | main session, away decision 2026-10-31 |
 | palette | crystal lit side (200, 30, 90) crimson; crystal shade side (70, 0, 60) black-purple; galaxy core (15, 0, 20) near black; ring and rim (255, 80, 150) bright red-pink; rare glint (255, 220, 240) | RGB | — | guess | Director (picked by guardian on request) |
 | placeholder_look | the crystal shape split down the middle: left half lit side, right half shade side, with a 1 px rim. A 1 px ring, an ellipse 22 × 8, across the crystal's middle. Rare: a small glint at the upper left of the crystal. No cloud, no animation | px, RGB from `palette` | — | guess | Director (picked by guardian on request) |
 | sound | a pickup sound: AA-03 | — | — | TBD | AA-03 |

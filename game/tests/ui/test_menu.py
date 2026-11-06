@@ -1,316 +1,251 @@
-"""Menu tests: the title, the three items in menu order, the marker on the selected one.
+"""Menu tests: the title, the three items in menu order, the lit one, the hint and the rulers.
 
-Contract: docs/contracts/systems/game-flow.md, Interface (ui/screen_look.py, ui/menu.py) and
-Presentation, Menu and the shared items (Text, Lines and blank lines, Selection marker, Cache, Only
-draws). The texts, the font sizes, the spacing and the marker are stand-ins from scope report
-DRA-125, Values needed (Menu); the GDD does not hold them until UI-03 and UI-04.
+Contract: docs/contracts/systems/screens.md, Interface (ui/menu.py) and Presentation, Menu;
+10-ui.md, `menu_screen`, `menu_look` and `menu_hint`. Every size and color is read from the real
+tuning/screens.json through the `screen_rules` fixture.
 
-Positions are read from the drawn pixels (`pygame.image.tobytes`), never from a font size. The
-menu is drawn on a black surface, so the ink is the text alone. Every line is compared with the
-same text rendered here in the default font (`_reference`), and each line's place is worked out
-from the ink's own offset in that render. A label is measured on a picture where another item has
-the marker, so the marker never touches the band being read. The fonts' `get_linesize()` and
-`get_height()` give the contract's layout (one blank title line, the block's bottom), as in
-`test_game_over.py`.
+Positions are read from the drawn pixels, never from a font size: the menu is drawn on a black
+surface, so a bright pixel is ink. The lit (selected) item has pale text and cyan brackets; the
+others are dim, so a pale pixel (every channel above ``LIT_LEVEL``) marks the lit item only.
 """
 
 from itertools import pairwise
-from typing import NamedTuple
 
 import pygame
 import pytest
 
-import ui.menu as menu_view
-import ui.screen_look as look_view
 from core.game_flow import MenuItem
-from ui.menu import draw_menu
-from ui.screen_look import screen_font
+from ui.menu import MENU_HINT_TEXT, draw_menu
+from ui.screen_look import ScreenLook
+from ui.screen_rules import ScreenRules
 
-SIZES: tuple[tuple[int, int], ...] = ((640, 480), (800, 600))
-"""Surfaces drawn on: the canvas (03-world-and-camera.md, screen_w, screen_h (guess)) and a larger
-one, so the centering is shown to follow the surface and not a constant."""
-
-TITLE_TEXT: str = "DRIFTWARD ACE"
-TITLE_FONT_SIZE: int = 32
-"""Source: scope report DRA-125, Values needed, Menu: title, 32 px."""
+SIZES: tuple[tuple[int, int], ...] = ((856, 518), (640, 480), (1000, 700))
+"""Surfaces drawn on: the window (10-ui.md, window_screens), the play-area size and a larger one,
+so the centering is shown to follow the surface and not a constant."""
 
 ITEMS: tuple[MenuItem, ...] = (MenuItem.PLAY, MenuItem.INSTRUCTIONS, MenuItem.LEADERBOARD)
 """Menu order, top first. Source: 02-game-flow.md, menu_items (locked)."""
 
-LABELS: dict[MenuItem, str] = {
-    MenuItem.PLAY: "Play",
-    MenuItem.INSTRUCTIONS: "Instructions",
-    MenuItem.LEADERBOARD: "Leaderboard",
-}
-ITEM_FONT_SIZE: int = 24
-ITEM_SPACING: int = 40
-"""Source: scope report DRA-125, Values needed, Menu: items at 24 px, 40 px apart."""
+INK_LEVEL: int = 60
+"""A pixel with a channel above this is ink."""
 
-MARKER: str = ">"
-"""Source: scope report DRA-125, Values needed, Menu: the selected item has `>` in front of it."""
+LIT_LEVEL: int = 200
+"""A pixel with every channel above this is the lit item's pale text."""
 
-TEXT_COLOR: tuple[int, int, int] = (255, 255, 255)
-"""Source: scope report DRA-125, Values needed (white text)."""
-
-GRAY: int = 60
-"""A background below white, for the checks that show nothing fills the surface."""
-
-CENTER_TOLERANCE_PX: int = 1
-"""A line's rect is placed by integer halves, so its center may be one px off the surface's."""
-
-BLOCK_TOLERANCE_PX: int = 1
-"""The block's top is an integer half, so its middle may be one px off the surface's."""
-
-Band = tuple[int, int, int, int]
-"""One line of ink: top row, bottom row, left column, right column, all inclusive."""
+CENTER_TOLERANCE_PX: int = 3
+"""Slack for centering read from ink (glyph bearings, the trailing letter-spacing)."""
 
 
-class _Ref(NamedTuple):
-    """A text rendered here: its ink rectangle and where that sits in the render."""
-
-    crop: tuple[bytes, ...]
-    image_width: int
-    image_height: int
-    ink_left: int
-    ink_top: int
-
-
-def _surface(size: tuple[int, int], gray: int = 0) -> pygame.Surface:
+def _menu(
+    look: ScreenLook,
+    selection: MenuItem,
+    size: tuple[int, int] = SIZES[0],
+    gray: int = 0,
+) -> pygame.Surface:
     surface = pygame.Surface(size)
     surface.fill((gray, gray, gray))
+    draw_menu(surface, look, selection)
     return surface
 
 
-def _levels(surface: pygame.Surface) -> bytes:
-    """The red level of every pixel, row by row. Every picture here is gray, so it is the level."""
-    return pygame.image.tobytes(surface, "RGB")[::3]
+def _ink(surface: pygame.Surface, area: pygame.Rect, level: int = INK_LEVEL) -> pygame.Rect | None:
+    """The rectangle of the bright pixels inside ``area``, in surface coordinates; None if none."""
+    clipped = area.clip(surface.get_rect())
+    dark = pygame.mask.from_threshold(
+        surface.subsurface(clipped), (0, 0, 0, 255), (level, level, level, 255)
+    )
+    dark.invert()
+    boxes = dark.get_bounding_rects()
+    if not boxes:
+        return None
+    return boxes[0].unionall(boxes[1:]).move(clipped.topleft)
 
 
-def _bands(surface: pygame.Surface) -> list[Band]:
-    """Each run of rows holding ink, with its ink columns."""
+def _lit_count(surface: pygame.Surface, area: pygame.Rect) -> int:
+    """How many pixels inside ``area`` are pale: every channel above ``LIT_LEVEL``."""
+    part = surface.subsurface(area.clip(surface.get_rect()))
+    pale = pygame.mask.from_threshold(part, (255, 255, 255, 255), (255 - LIT_LEVEL,) * 3 + (255,))
+    return pale.count()
+
+
+def _rows(surface: pygame.Surface) -> list[tuple[int, int]]:
+    """Each run of pixel rows holding ink between the rulers: top row and bottom row."""
+    rulers_w = 30
     width, height = surface.get_size()
-    levels = _levels(surface)
-    bands: list[Band] = []
-    top: int | None = None
+    area = pygame.Rect(rulers_w, 0, width - 2 * rulers_w, height)
+    bands: list[tuple[int, int]] = []
+    start: int | None = None
     for y in range(height + 1):
-        inked = y < height and any(levels[y * width : (y + 1) * width])
-        if inked and top is None:
-            top = y
-        elif not inked and top is not None:
-            columns = [x for x in range(width) if any(levels[r * width + x] for r in range(top, y))]
-            bands.append((top, y - 1, columns[0], columns[-1]))
-            top = None
+        row = pygame.Rect(area.left, y, area.width, 1)
+        inked = y < height and _ink(surface, row) is not None
+        if inked and start is None:
+            start = y
+        elif not inked and start is not None:
+            bands.append((start, y - 1))
+            start = None
     return bands
 
 
-def _crop(levels: bytes, width: int, band: Band) -> tuple[bytes, ...]:
-    """The band's ink rectangle, one bytes row per pixel row."""
-    top, bottom, left, right = band
-    return tuple(levels[y * width + left : y * width + right + 1] for y in range(top, bottom + 1))
+def _item_ink(look: ScreenLook, size: tuple[int, int]) -> list[pygame.Rect]:
+    """The ink of each item, found from the bands between the title and the hint."""
+    surface = _menu(look, MenuItem.PLAY, size)
+    bands = _rows(surface)
+    assert len(bands) == 5, f"{size}: expected title, 3 items and hint, got bands {bands}"
+    return [
+        _ink(surface, pygame.Rect(30, top, size[0] - 60, bottom - top + 1))
+        or pygame.Rect(0, 0, 0, 0)
+        for top, bottom in bands[1:4]
+    ]
 
 
-def _crop_at(levels: bytes, width: int, left: int, top: int, w: int, h: int) -> tuple[bytes, ...]:
-    return tuple(levels[y * width + left : y * width + left + w] for y in range(top, top + h))
-
-
-def _reference(text: str, size: int) -> _Ref:
-    """``text`` in the default font at ``size``, white on black: its ink and the ink's offset."""
-    image = pygame.font.Font(None, size).render(text, True, TEXT_COLOR)
-    canvas = _surface(image.get_size())
-    canvas.blit(image, (0, 0))
-    band = _bands(canvas)[0]
-    crop = _crop(_levels(canvas), canvas.get_width(), band)
-    return _Ref(crop, image.get_width(), image.get_height(), band[2], band[0])
-
-
-def _picture(selection: MenuItem, size: tuple[int, int], gray: int = 0) -> pygame.Surface:
-    surface = _surface(size, gray)
-    draw_menu(surface, selection)
-    return surface
-
-
-def _other(index: int) -> MenuItem:
-    """An item that is not ``ITEMS[index]``, so that item is drawn with no marker."""
-    return ITEMS[(index + 1) % len(ITEMS)]
-
-
-def _assert_line(levels: bytes, width: int, band: Band, ref: _Ref, what: str) -> None:
-    """The band is exactly ``ref``'s ink and its render is centered across ``width``."""
-    assert (band[1] - band[0] + 1, band[3] - band[2] + 1) == (len(ref.crop), len(ref.crop[0])), (
-        f"{what}: the ink is not the text's size"
-    )
-    assert _crop(levels, width, band) == ref.crop, f"{what}: not the default font's render"
-    rect_left = band[2] - ref.ink_left
-    assert abs(2 * rect_left + ref.image_width - width) <= CENTER_TOLERANCE_PX, (
-        f"{what}: not centered across {width}: rect left {rect_left}, "
-        f"render width {ref.image_width}"
-    )
-
-
-def _label_places(size: tuple[int, int]) -> dict[MenuItem, tuple[int, int]]:
-    """Each label's render rect, (left, top), read from a picture where it has no marker."""
-    places: dict[MenuItem, tuple[int, int]] = {}
-    for index, item in enumerate(ITEMS):
-        band = _bands(_picture(_other(index), size))[1 + index]
-        ref = _reference(LABELS[item], ITEM_FONT_SIZE)
-        places[item] = (band[2] - ref.ink_left, band[0] - ref.ink_top)
-    return places
-
-
-def test_the_menu_shows_the_title_then_the_three_items_each_centered(
-    pygame_headless: None,
-) -> None:
-    title_ref = _reference(TITLE_TEXT, TITLE_FONT_SIZE)
+def test_three_items_between_the_title_and_the_hint_in_menu_order(look: ScreenLook) -> None:
     for size in SIZES:
-        width = size[0]
-        for index, item in enumerate(ITEMS):
-            surface = _picture(_other(index), size)
-            bands = _bands(surface)
-            assert len(bands) == 1 + len(ITEMS), f"{size=} {item}: lines of ink: {bands}"
-            levels = _levels(surface)
-            _assert_line(levels, width, bands[0], title_ref, f"{size=} title")
-            label_ref = _reference(LABELS[item], ITEM_FONT_SIZE)
-            _assert_line(levels, width, bands[1 + index], label_ref, f"{size=} {item}")
+        items = _item_ink(look, size)
+        assert [i.top for i in items] == sorted(i.top for i in items), f"{size}: items out of order"
+        # With the last item selected, the first two are dim: PLAY is shorter than INSTRUCTIONS.
+        surface = _menu(look, MenuItem.LEADERBOARD, size)
+        areas = [pygame.Rect(30, i.top - 6, size[0] - 60, i.height + 12) for i in items]
+        dim = [_ink(surface, area) for area in areas[:2]]
+        assert dim[0] is not None
+        assert dim[1] is not None
+        assert dim[0].width < dim[1].width, f"{size}: PLAY is not shorter than INSTRUCTIONS"
 
 
-def test_the_items_are_the_spacing_apart_and_the_block_is_centered_down_the_surface(
-    pygame_headless: None,
-) -> None:
-    title_line = pygame.font.Font(None, TITLE_FONT_SIZE).get_linesize()
-    item_height = pygame.font.Font(None, ITEM_FONT_SIZE).get_height()
-    title_ref = _reference(TITLE_TEXT, TITLE_FONT_SIZE)
+def test_title_is_above_the_items_and_centered(look: ScreenLook) -> None:
     for size in SIZES:
-        height = size[1]
-        title_top = _bands(_picture(ITEMS[0], size))[0][0] - title_ref.ink_top
-        places = _label_places(size)
-        tops = [places[item][1] for item in ITEMS]
-        # One blank title line under the title, then the items' tops the spacing apart.
-        assert tops[0] == title_top + 2 * title_line, f"{size=}: first item at {tops[0]}"
-        for upper, lower in pairwise(tops):
-            assert lower - upper == ITEM_SPACING, f"{size=}: items at {tops}"
-        # The block, the title's top to the last item's bottom, is centered down the surface.
-        block_bottom = tops[-1] + item_height
-        assert abs(title_top + block_bottom - height) <= BLOCK_TOLERANCE_PX, (
-            f"{size=}: the block {title_top}..{block_bottom} is not centered on {height}"
+        surface = _menu(look, MenuItem.PLAY, size)
+        bands = _rows(surface)
+        title = _ink(
+            surface, pygame.Rect(30, bands[0][0], size[0] - 60, bands[0][1] - bands[0][0] + 1)
+        )
+        assert title is not None
+        assert abs(title.centerx - size[0] / 2) <= CENTER_TOLERANCE_PX, f"{size}: title off center"
+        assert bands[0][1] < bands[1][0], f"{size}: the title touches the first item"
+
+
+def test_items_are_centered_and_evenly_spaced(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    menu = screen_rules.menu
+    for size in SIZES:
+        items = _item_ink(look, size)
+        for item in items:
+            assert abs(item.centerx - size[0] / 2) <= CENTER_TOLERANCE_PX, f"{size}: off center"
+        steps = [b.centery - a.centery for a, b in pairwise(items)]
+        assert all(abs(step - (menu.item_h + menu.item_gap)) <= 3 for step in steps), (
+            f"{size}: item steps {steps}, expected {menu.item_h + menu.item_gap}"
         )
 
 
-def test_the_marker_is_only_left_of_the_selected_item_at_its_rows(
-    pygame_headless: None,
-) -> None:
-    space = pygame.font.Font(None, ITEM_FONT_SIZE).size(" ")[0]
-    item_height = pygame.font.Font(None, ITEM_FONT_SIZE).get_height()
-    marker_ref = _reference(MARKER, ITEM_FONT_SIZE)
-    marker_h, marker_w = len(marker_ref.crop), len(marker_ref.crop[0])
+def test_block_is_centered_vertically(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    menu = screen_rules.menu
     for size in SIZES:
-        width = size[0]
-        places = _label_places(size)
-        levels = {item: _levels(_picture(item, size)) for item in ITEMS}
-        for item in ITEMS:
-            label_left, label_top = places[item]
-            label_ink_left = label_left + _reference(LABELS[item], ITEM_FONT_SIZE).ink_left
-            for other in ITEMS:
-                if other is item:
-                    continue
-                # What the marker adds: the pixels that are brighter with `item` selected.
-                added = [
-                    (i % width, i // width)
-                    for i, (now, before) in enumerate(zip(levels[item], levels[other], strict=True))
-                    if now > before
-                ]
-                assert added, f"{size=} {item}: no marker"
-                assert {y for _, y in added} <= set(range(label_top, label_top + item_height)), (
-                    f"{size=} {item}: marker ink outside the item's rows"
-                )
-                assert max(x for x, _ in added) < label_ink_left, (
-                    f"{size=} {item}: marker ink not left of the label"
-                )
-                # One marker, in the label's font, its top on the label's top and its right edge
-                # one space left of the label's left edge.
-                expected_left = label_left - space - marker_ref.image_width + marker_ref.ink_left
-                expected_top = label_top + marker_ref.ink_top
-                bounds = (
-                    min(x for x, _ in added),
-                    min(y for _, y in added),
-                    max(x for x, _ in added),
-                    max(y for _, y in added),
-                )
-                assert bounds == (
-                    expected_left,
-                    expected_top,
-                    expected_left + marker_w - 1,
-                    expected_top + marker_h - 1,
-                ), f"{size=} {item}: marker ink at {bounds}"
-                assert (
-                    _crop_at(levels[item], width, expected_left, expected_top, marker_w, marker_h)
-                    == marker_ref.crop
-                ), f"{size=} {item}: the marker is not {MARKER!r} in the label's font"
+        surface = _menu(look, MenuItem.PLAY, size)
+        bands = _rows(surface)
+        # The block runs from the title's top to the last item's bottom edge (its box, not its ink).
+        last = _item_ink(look, size)[-1]
+        bottom = last.centery + menu.item_h // 2
+        middle = (bands[0][0] + bottom) / 2
+        assert abs(middle - size[1] / 2) <= 10, f"{size}: block middle {middle}, not {size[1] / 2}"
 
 
-def test_the_labels_do_not_move_with_the_selection(pygame_headless: None) -> None:
-    title_ref = _reference(TITLE_TEXT, TITLE_FONT_SIZE)
+def test_exactly_the_selected_item_is_lit(look: ScreenLook) -> None:
     for size in SIZES:
-        width = size[0]
-        places = _label_places(size)
-        title_band = _bands(_picture(ITEMS[0], size))[0]
+        spots = _item_ink(look, size)
+        areas = [pygame.Rect(30, s.top - 6, size[0] - 60, s.height + 12) for s in spots]
         for selection in ITEMS:
-            levels = _levels(_picture(selection, size))
-            assert _crop(levels, width, title_band) == title_ref.crop, f"{size=}: title moved"
-            for item in ITEMS:
-                ref = _reference(LABELS[item], ITEM_FONT_SIZE)
-                left, top = places[item]
-                got = _crop_at(
-                    levels,
-                    width,
-                    left + ref.ink_left,
-                    top + ref.ink_top,
-                    len(ref.crop[0]),
-                    len(ref.crop),
-                )
-                assert got == ref.crop, f"{size=} {selection=}: {item} moved or changed"
+            surface = _menu(look, selection, size)
+            lit = [_lit_count(surface, area) for area in areas]
+            index = ITEMS.index(selection)
+            assert lit[index] > 0, f"{size}: {selection} is not lit"
+            assert all(count == 0 for i, count in enumerate(lit) if i != index), (
+                f"{size}: {selection} selected but lit counts are {lit}"
+            )
 
 
-def test_the_menu_draws_the_same_pixels_twice_and_changes_nothing_but_the_surface(
-    pygame_headless: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_selected_item_has_cyan_brackets_and_the_others_do_not(
+    look: ScreenLook, screen_rules: ScreenRules
 ) -> None:
-    # Fonts are built once per size and kept.
-    for font_size in (TITLE_FONT_SIZE, ITEM_FONT_SIZE):
-        assert screen_font(font_size) is screen_font(font_size)
-    texts_before = dict(menu_view.MENU_ITEM_TEXTS)
-    caplog.set_level(0)
+    cyan = screen_rules.palette["frame_lights"]
+    spots = _item_ink(look, SIZES[0])
+    areas = [pygame.Rect(30, s.top - 6, SIZES[0][0] - 60, s.height + 12) for s in spots]
     for selection in ITEMS:
-        first = pygame.image.tobytes(_picture(selection, SIZES[0]), "RGB")
-        second = pygame.image.tobytes(_picture(selection, SIZES[0]), "RGB")
-        assert first == second, f"{selection}: two draws, two pictures"
-        # Nothing fills the background: every pixel with no ink stays the background's.
-        on_gray = pygame.image.tobytes(_picture(selection, SIZES[0], gray=GRAY), "RGB")
-        assert all(
-            bright == GRAY for ink, bright in zip(first, on_gray, strict=True) if ink == 0
-        ), f"{selection}: the draw changed pixels with no ink"
-        # The same surface size in and out, and the one call is all it takes.
-        surface = _picture(selection, SIZES[1])
-        assert surface.get_size() == SIZES[1]
-    assert caplog.records == [], "the view logged"
-    assert dict(menu_view.MENU_ITEM_TEXTS) == texts_before
-    # Every fixed text is rendered once, on the first draw: after that, no render per frame.
-    renders: list[str] = []
+        surface = _menu(look, selection)
+        counts = [
+            pygame.mask.from_threshold(
+                surface.subsurface(area), (*cyan, 255), (40, 40, 40, 255)
+            ).count()
+            for area in areas
+        ]
+        index = ITEMS.index(selection)
+        assert counts[index] > 0, f"{selection}: no cyan brackets"
+        assert all(c == 0 for i, c in enumerate(counts) if i != index), f"cyan elsewhere: {counts}"
 
-    class CountingFont:
-        def __init__(self, font: pygame.font.Font) -> None:
-            self._font = font
 
-        def render(self, text: str, antialias: bool, color: tuple[int, int, int]) -> pygame.Surface:
-            renders.append(text)
-            return self._font.render(text, antialias, color)
+def test_changing_the_selection_changes_only_the_two_items(look: ScreenLook) -> None:
+    size = SIZES[0]
+    spots = _item_ink(look, size)
+    first = _menu(look, MenuItem.PLAY)
+    second = _menu(look, MenuItem.INSTRUCTIONS)
+    width = size[0]
+    a = pygame.image.tobytes(first, "RGB")
+    b = pygame.image.tobytes(second, "RGB")
+    changed = [
+        y
+        for y in range(size[1])
+        if a[y * width * 3 : (y + 1) * width * 3] != b[y * width * 3 : (y + 1) * width * 3]
+    ]
+    assert changed, "the selection did not move"
+    message = f"rows {changed[0]}..{changed[-1]} changed, outside the first two items"
+    assert spots[0].top - 12 <= changed[0], message
+    assert changed[-1] <= spots[1].bottom + 12, message
 
-        def __getattr__(self, name: str) -> object:
-            return getattr(self._font, name)
 
-    def counting(size: int) -> CountingFont:
-        return CountingFont(screen_font(size))
+def test_hint_is_the_last_line_and_centered(look: ScreenLook, screen_rules: ScreenRules) -> None:
+    menu = screen_rules.menu
+    assert MENU_HINT_TEXT == "Up & Down to choose. Enter to start."
+    for size in SIZES:
+        surface = _menu(look, MenuItem.PLAY, size)
+        bands = _rows(surface)
+        hint = _ink(
+            surface, pygame.Rect(30, bands[-1][0], size[0] - 60, bands[-1][1] - bands[-1][0] + 1)
+        )
+        assert hint is not None
+        assert hint.bottom <= size[1] - menu.hint_bottom, f"{size}: the hint is too low"
+        assert hint.bottom >= size[1] - menu.hint_bottom - 6, f"{size}: the hint is too high"
+        assert abs(hint.centerx - size[0] / 2) <= CENTER_TOLERANCE_PX, f"{size}: hint off center"
+        assert bands[-1][0] > bands[-2][1], f"{size}: the hint touches the last item"
 
-    for module in (menu_view, look_view):
-        monkeypatch.setattr(module, "screen_font", counting, raising=False)
-    for selection in ITEMS * 2:
-        _picture(selection, SIZES[0])
-    assert renders == [], f"rendered again on later frames: {renders}"
+
+def test_rulers_are_drawn_and_nothing_else_is_near_the_sides(
+    look: ScreenLook, screen_rules: ScreenRules
+) -> None:
+    rulers = screen_rules.rulers
+    for size in SIZES:
+        surface = _menu(look, MenuItem.PLAY, size)
+        assert _ink(surface, pygame.Rect(0, 0, rulers.inset_x + rulers.w, size[1])) is not None
+        assert (
+            _ink(
+                surface,
+                pygame.Rect(
+                    size[0] - rulers.inset_x - rulers.w, 0, rulers.inset_x + rulers.w, size[1]
+                ),
+            )
+            is not None
+        )
+        free = pygame.Rect(rulers.inset_x + rulers.w + 1, 0, 80, size[1])
+        assert _ink(surface, free) is None, f"{size}: ink between the ruler and the content"
+
+
+def test_the_menu_never_fills_the_background(look: ScreenLook) -> None:
+    surface = _menu(look, MenuItem.PLAY, gray=60)
+    for point in ((3, 3), (50, 200), (SIZES[0][0] - 4, 300)):
+        assert surface.get_at(point)[:3] == (60, 60, 60), f"{point} was painted over"
+
+
+def test_redraw_is_the_same_picture(look: ScreenLook) -> None:
+    first = pygame.image.tobytes(_menu(look, MenuItem.LEADERBOARD), "RGB")
+    assert pygame.image.tobytes(_menu(look, MenuItem.LEADERBOARD), "RGB") == first
+
+
+@pytest.mark.parametrize("selection", ITEMS)
+def test_every_selection_draws(look: ScreenLook, selection: MenuItem) -> None:
+    assert _ink(_menu(look, selection), pygame.Rect(0, 0, *SIZES[0])) is not None

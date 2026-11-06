@@ -25,13 +25,14 @@ A comet that dives across the screen on a straight, steep diagonal. By default i
 | specialty | none | — | — | locked | Director |
 | graze | yes | — | — | locked | 06-scoring.md |
 | look_reference | Orange-yellow comet with a fading trail | — | — | guess | Director |
+| art_canvas | 64 × 64 for the big fireball, flying down and to the right at `angle`. The head's center sits at (44, 44); the trail runs back toward the top-left corner along the path and may reach past the tail hitbox. `invert` is the same image mirrored. The small one is the same art shrunk to 42 × 42 | px | — | guess | main session, away decision 2026-10-31 |
 | placeholder_look | two filled circles the size of its hitbox: head orange (255, 140, 0), tail dark yellow (200, 160, 0) | RGB | — | guess | Director |
 | start | just outside the screen ([../07-drifters.md](../07-drifters.md) rule 14). Default: at the top-left corner, head's center on the left wall, head's bottom edge on the top edge. With `invert`: the same at the right wall. A placement may set another x along the top, or a side entry at a set y | px | — | guess | Director |
 
 At Level 1 the 35° path splits into about 2.5 px/tick down and 1.8 px/tick sideways. From the top-left corner it crosses the floor near x 336, about 3.2 s later. Derived from the guesses above; not tuning keys.
 
 ## Rules
-1. **Appears:** at its start spot, then flies into view. Its entry warning shows first, where it will appear: at its x against the top edge for a top entry, at its y against the side edge for a side entry ([../07-drifters.md](../07-drifters.md) rule 9). The warning copy is tilted along its path, with the tail pointing back, so it also shows which way it will fly.
+1. **Appears:** at its start spot, then flies into view. Its entry warning shows first, where it will appear: at its x against the top edge for a top entry, at its y against the side edge for a side entry ([../07-drifters.md](../07-drifters.md) rule 9).
 2. **Telegraph:** none. The entry warning is its only warning.
 3. **Moves:** in a straight line at `speed` along its path, at `angle` from straight down, every tick. Down and to the right; down and to the left with `invert`. A side entry from the left wall flies right; with `invert` it enters from the right wall and flies left. No targeting, no turning. The scroll doesn't add to it ([../03-world-and-camera.md](../03-world-and-camera.md) rule 9).
 4. **Hits:** touching the head or the tail is a hit ([../05-lives-and-damage.md](../05-lives-and-damage.md)).

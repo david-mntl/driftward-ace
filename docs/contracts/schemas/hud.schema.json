@@ -1,0 +1,835 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/hud.schema.json",
+  "title": "HUD values",
+  "description": "The file game/tuning/hud.json: the side panel HUD's colors, sizes, positions, counts and timings, read in both run modes. Every field is required: no default lives in code. Positions marked panel space count from the panel's top-left plus panel.content_y. All values are guesses from the approved mock-up (10-ui.md, hud_*). The baked pictures in game/assets/hud_*.png come from tools/art/hud_panel.py, which reads this same file: run it again after changing a color, a size or a position of a baked part. Loaded and checked by game/app/hud_tuning.py at startup into ui.hud_rules.HudRules. Look only: no field changes play. Owner of the schema: architect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "palette",
+    "window",
+    "panel",
+    "frame",
+    "score",
+    "hearts",
+    "level",
+    "graze",
+    "motion",
+    "fonts"
+  ],
+  "properties": {
+    "palette": {
+      "description": "The HUD colors as #rrggbb, 17 of them. Meanings: 12-art-and-audio.md, HUD colors. The tool tools/art/hud_panel.py bakes them into the pictures; run it again after a change.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ship_lines",
+        "ship_lines_light",
+        "plating",
+        "hearts",
+        "last_life",
+        "score",
+        "level",
+        "graze",
+        "panel_body",
+        "frame_metal",
+        "frame_highlight",
+        "frame_lights",
+        "fuchsia_spill",
+        "dim",
+        "line",
+        "tile_bg",
+        "footer_dot"
+      ],
+      "properties": {
+        "ship_lines": {
+          "description": "Main line: frame edge, wireframe spines, box edges, bar ramp start, footer dot.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "ship_lines_light": {
+          "description": "Second line: wireframe outline, jets, scan line, gradient end.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "plating": {
+          "description": "Titles and text: digits, rivets, gasket.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "hearts": {
+          "description": "A life left: the lit hearts.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "last_life": {
+          "description": "Warning: the last heart, high level.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "score": {
+          "description": "The score: tile tops, score bar end.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "level": {
+          "description": "The level: number and climb bars.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "graze": {
+          "description": "The graze: dial, count, sweep.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "panel_body": {
+          "description": "The console glass: panel and box fill.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "frame_metal": {
+          "description": "The frame's body.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "frame_highlight": {
+          "description": "The frame's edge shade and the pillar caps.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "frame_lights": {
+          "description": "Lights: corner lights, pillar strip, bevel line.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "fuchsia_spill": {
+          "description": "The black hole's light spilling on the frame's bottom left. Black means off.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "dim": {
+          "description": "Off: unlit tile tops, bars, dim zeros.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "line": {
+          "description": "Thin rules: the footer line.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "tile_bg": {
+          "description": "The digit tile's dark glass.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "footer_dot": {
+          "description": "The footer's empty dot outline.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      }
+    },
+    "window": {
+      "description": "The window and where the play area sits (03-world-and-camera.md). The baked pictures must fit it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height",
+        "field_x",
+        "field_y",
+        "dim_alpha"
+      ],
+      "properties": {
+        "width": {
+          "description": "Window width, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "description": "Window height, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "field_x": {
+          "description": "Left edge of the play area in the window, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "field_y": {
+          "description": "Top edge of the play area in the window, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "dim_alpha": {
+          "description": "Black over the whole window behind the pause box and game over, 0 (none) to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      }
+    },
+    "panel": {
+      "description": "The side panel.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "width",
+        "content_y",
+        "scale"
+      ],
+      "properties": {
+        "x": {
+          "description": "Left edge of the panel in the window, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "width": {
+          "description": "Panel width, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "content_y": {
+          "description": "Distance from the window's top to the panel space's row 0. All panel positions below add it. Centers the content in the taller window.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "scale": {
+          "description": "Size of the panel's design against the mock-up, a multiple. Read by the art tool only: it scales the parts it draws from fixed shapes (wireframe, hearts, dial, footer). Every position and size in this file is already at this scale.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "frame": {
+      "description": "The cockpit frame and its pillar.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pillar_width",
+        "sheen",
+        "sheen_rows",
+        "light_radius",
+        "spill"
+      ],
+      "properties": {
+        "pillar_width": {
+          "description": "Width of the pillar that covers the panel's left edge, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "sheen": {
+          "description": "Show the glass sheen over the play area. Off by default: nothing is drawn over the play area.",
+          "type": "boolean"
+        },
+        "sheen_rows": {
+          "description": "The sheen is drawn in strips this many rows tall, each cut to the bands' own width, so the game blends only pixels that have sheen. Smaller strips blend fewer pixels but make more blits.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "light_radius": {
+          "description": "Radius of the four corner lights of the frame, px.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "spill": {
+          "description": "Strength of the black hole's spill on the frame's bottom left, 0..1 (shown only when fuchsia_spill is not black).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "score": {
+      "description": "Score box, tiles, bar and best. Positions are panel space.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "box",
+        "label_x",
+        "label_y",
+        "tile_count",
+        "tile_x",
+        "tile_y",
+        "tile_w",
+        "tile_h",
+        "tile_pitch",
+        "tile_top",
+        "bar_x",
+        "bar_y",
+        "bar_w",
+        "bar_h",
+        "bar_segments",
+        "bar_gap",
+        "bar_step",
+        "best_label_x",
+        "best_y",
+        "best_right",
+        "best_separator"
+      ],
+      "properties": {
+        "box": {
+          "description": "Score box: x, y, width, height.",
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "label_x": {
+          "description": "SCORE label left, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "label_y": {
+          "description": "SCORE label vertical centre, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "tile_count": {
+          "description": "Digit tiles. The score shows at most 10^tile_count - 1.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "tile_x": {
+          "description": "Left edge of the first tile.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "tile_y": {
+          "description": "Top of the tiles.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "tile_w": {
+          "description": "Tile width.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "tile_h": {
+          "description": "Tile height.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "tile_pitch": {
+          "description": "Distance from one tile's left edge to the next.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "tile_top": {
+          "description": "Height of the bar on top of each tile.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_x": {
+          "description": "Left of the score bar.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "bar_y": {
+          "description": "Top of the score bar.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "bar_w": {
+          "description": "Width of the whole score bar.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_h": {
+          "description": "Height of the score bar.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_segments": {
+          "description": "Segments in the bar.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_gap": {
+          "description": "Gap between segments.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "bar_step": {
+          "description": "With no best score the bar fills toward the next multiple of this.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "best_label_x": {
+          "description": "BEST label left.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "best_y": {
+          "description": "BEST row vertical centre.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "best_right": {
+          "description": "Right edge of the best number.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "best_separator": {
+          "description": "Text between digit groups of the best score. Empty means none.",
+          "type": "string",
+          "maxLength": 3
+        }
+      }
+    },
+    "hearts": {
+      "description": "The lives on the hull wireframe. Positions are panel space.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slots",
+        "cell_w",
+        "cell_h",
+        "ship_box"
+      ],
+      "properties": {
+        "slots": {
+          "description": "Heart centres in fill order: first life, second, third.",
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "description": "x, y",
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "cell_w": {
+          "description": "Width of one heart image.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "cell_h": {
+          "description": "Height of one heart image.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "ship_box": {
+          "description": "Where the wireframe picture sits: x, y, width, height.",
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "level": {
+      "description": "Level box. Positions are panel space.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "box",
+        "label_x",
+        "label_y",
+        "number_x",
+        "number_y",
+        "bars",
+        "bar_w",
+        "bar_pitch",
+        "bar_base_h",
+        "bar_step_h",
+        "bars_right",
+        "bars_bottom",
+        "tier_mid",
+        "tier_high",
+        "tier_mid_mix"
+      ],
+      "properties": {
+        "box": {
+          "description": "Level box: x, y, width, height.",
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "label_x": {
+          "description": "LEVEL label left.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "label_y": {
+          "description": "LEVEL label vertical centre.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "number_x": {
+          "description": "Left of the level number.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "number_y": {
+          "description": "Vertical centre of the level number.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "bars": {
+          "description": "Climb bars. Equal to the number of levels (08-difficulty.md).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_w": {
+          "description": "Bar width.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_pitch": {
+          "description": "Distance from one bar's left edge to the next.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_base_h": {
+          "description": "Height of the first bar.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bar_step_h": {
+          "description": "Each next bar is this much taller.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "bars_right": {
+          "description": "Right edge of the last bar.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "bars_bottom": {
+          "description": "Row the bars stand on.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "tier_mid": {
+          "description": "From this level the number is halfway to the last-life color.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "tier_high": {
+          "description": "From this level the number is the last-life color.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "tier_mid_mix": {
+          "description": "The mid tier's color: share of the way from the level color to the last-life color, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "graze": {
+      "description": "Graze dial. Positions are panel space.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "center",
+        "radius",
+        "inner_radius",
+        "wedge_radius",
+        "count_limit",
+        "label_x",
+        "label_y"
+      ],
+      "properties": {
+        "center": {
+          "description": "Dial centre.",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "radius": {
+          "description": "Outer ring radius.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "inner_radius": {
+          "description": "Dashed ring radius.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "wedge_radius": {
+          "description": "Sweep wedge radius.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "count_limit": {
+          "description": "Widest the count may be, px. A wider count shrinks to fit.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "label_x": {
+          "description": "GRAZE label centre x.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "label_y": {
+          "description": "GRAZE label vertical centre.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "motion": {
+      "description": "Timings in ticks (60 per second) and scales. Look only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sweep_ticks",
+        "sweep_frames",
+        "scan_ticks",
+        "scan_x",
+        "scan_w",
+        "scan_from",
+        "scan_to",
+        "beat_ticks",
+        "beat_scale",
+        "beat_peak_at",
+        "beat_end_at",
+        "beat_steps",
+        "break_ticks",
+        "break_keys",
+        "bump_ticks",
+        "bump_scale",
+        "bump_peak_at",
+        "ring_ticks",
+        "ring_frames",
+        "ring_from",
+        "ring_to",
+        "ring_radius"
+      ],
+      "properties": {
+        "sweep_ticks": {
+          "description": "One turn of the radar wedge.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "sweep_frames": {
+          "description": "Pictures in that turn.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "scan_ticks": {
+          "description": "One fall of the scan line.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "scan_x": {
+          "description": "Scan line left.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "scan_w": {
+          "description": "Scan line width.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "scan_from": {
+          "description": "Scan line top row at the start of a fall.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "scan_to": {
+          "description": "Scan line row at the end of a fall.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "beat_ticks": {
+          "description": "One heartbeat of the last heart.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "beat_scale": {
+          "description": "Largest heart size in the beat, as a multiple.",
+          "type": "number",
+          "minimum": 1
+        },
+        "beat_peak_at": {
+          "description": "Share of the beat where the heart is biggest, 0..1.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "beat_end_at": {
+          "description": "Share of the beat where it is back to normal, 0..1.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "beat_steps": {
+          "description": "Pre-scaled sizes between normal and biggest.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "break_ticks": {
+          "description": "Length of a heart's break.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "break_keys": {
+          "description": "The break's keys in order: [share of the break 0..1, brightness 0..1, look]. Look is white (a white flash), hue (shifted color) or plain. The first share is 0, the last 1. Brightness is blended between keys; the look is the earlier key's.",
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "enum": [
+                  "white",
+                  "hue",
+                  "plain"
+                ]
+              }
+            ]
+          }
+        },
+        "bump_ticks": {
+          "description": "The graze count's swell.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "bump_scale": {
+          "description": "Largest size of the count in the swell, as a multiple.",
+          "type": "number",
+          "minimum": 1
+        },
+        "bump_peak_at": {
+          "description": "Share of the swell where the count is biggest, 0..1.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "ring_ticks": {
+          "description": "The graze ring's growth.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "ring_frames": {
+          "description": "Pictures in that growth.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "ring_from": {
+          "description": "Ring size at the start, as a multiple of ring_radius.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ring_to": {
+          "description": "Ring size at the end, as a multiple of ring_radius.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ring_radius": {
+          "description": "Ring radius at size 1, px.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "fonts": {
+      "description": "Fonts and text sizes. The files are under assets/.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ui_file",
+        "label_file",
+        "label_size",
+        "value_size",
+        "tile_size",
+        "graze_size",
+        "level_size",
+        "label_spacing",
+        "label_mix",
+        "value_mix"
+      ],
+      "properties": {
+        "ui_file": {
+          "description": "Static Exo 2 Bold file for numbers.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label_file": {
+          "description": "Share Tech Mono file for the small labels.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label_size": {
+          "description": "Label size, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "value_size": {
+          "description": "BEST number size, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "tile_size": {
+          "description": "Score digit size, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "graze_size": {
+          "description": "Graze count size, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "level_size": {
+          "description": "Level number size, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "label_spacing": {
+          "description": "Extra px between label letters.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "label_mix": {
+          "description": "Label color: share of the way from panel_body to plating, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "value_mix": {
+          "description": "BEST number color: share from panel_body to plating, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

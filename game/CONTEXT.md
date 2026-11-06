@@ -92,7 +92,7 @@ The script stops the server when it ends, for any reason, so no server is left r
 If the port is already in use, the script exits with a message. Another run may still be going. Don't kill a process you did not start. Report it.
 
 ### Build check
-`pygbag --archive game` builds `game/build/web.zip`. That zip is the release package for static hosting (itch.io or GitHub Pages). It is a build check, not how you test. Run it to prove the package builds, and report the command and path. You never need to unzip it or serve it for the browser test: the script serves the live build.
+`python -m pygbag --template web/start.tmpl --archive game` builds `game/build/web.zip`. The template `web/start.tmpl` is the game's start page; a build without it gets pygbag's default page. That zip is the release package for static hosting (itch.io or GitHub Pages). It is a build check, not how you test. Run it to prove the package builds, and report the command and path. You never need to unzip it or serve it for the browser test: the script serves the live build.
 
 The release package holds runtime files only. `pygbag.ini` at the repo root lists what pygbag leaves out (`[DEPENDENCIES] ignoreDirs`, `ignoreFiles`): `tests/`, `scripts/`, `CONTEXT.md` files, `requirements.txt`, `ruff.toml`. pygbag reads it from the folder it runs in, so run every build from the repo root. After a build, list the archive and confirm none of those files is in it.
 

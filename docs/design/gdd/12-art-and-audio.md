@@ -28,9 +28,10 @@ The player never reads this. It gives the art a feeling to aim at.
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
 | placeholder_bg | (0, 0, 0) | RGB | — | guess | starting placeholder |
-| art_style | smooth: drawn at 4× the game size with gradients and glossy rims, then shrunk to game size. Not pixel art. Shown at 1× | — | — | guess | Director |
+| art_style | smooth: drawn large first, 8× the game size for sprites up to 64 px on their longest side and 4× for bigger ones, with gradients and glossy rims, then shrunk to game size. The large master is kept so details can be redrawn. Not pixel art. Shown at 1× | — | — | guess | Director (8× for small sprites: Director 2026-10-31, "generate the pictures a bit bigger so we can shrink them") |
 | palette | the color language below. Exact RGB values come with the drawn art | — | — | guess | Director |
-| glow | hazards, warnings and coins only. The HUD stays flat. The ship: SH-06 | — | — | guess | Director |
+| glow | hazards, warnings and coins only. The HUD and the screens stay flat ([10-ui.md](10-ui.md#values), `ui_glow`). The ship: SH-06 | — | — | guess | Director |
+| hud_look | the side panel and cockpit frame: see [10-ui.md](10-ui.md#values) (`hud_*`, `cockpit_frame`) and the HUD colors below. Drawn at 4× and shrunk like every sprite, shown at 1×. Text is drawn at 1× | — | — | guess | Director |
 | motion | look only. 2 or 3 states per object (for example idle, charge, fire), each a short loop of frames drawn ahead of time | — | — | guess | Director |
 | background | three layers, described below | — | — | guess | Director |
 | background_numbers | painting sway loop 900; planets on screen 3; planet speed 0.15; planet size ×1; river light specks 30 at most; river loop 900; river and swirl strength 0.6; swirl specks 8; swirl loop 480; bottom glow 40 tall, strength 0.25. The near layer has no numbers yet: it is not built | ticks; planets; px/tick; ×; specks; ticks; 0..1; specks; ticks; px; 0..1 | see tuning file | guess | AA-02, Director: use guesses, tune later |
@@ -47,6 +48,48 @@ The player never reads this. It gives the art a feeling to aim at.
 | Pale white-cyan | electricity | chain lightning, electric ball: a pale white-cyan core with thin purple and fuchsia arcs. Kept away from the ship's blue |
 | Deep cobalt blue with pale plating | you, untouched | the ship and its cockpit: cobalt neon lines, a blue flame, silver-grey and pale plating |
 
+### HUD colors
+The HUD has its own colors, set by the Director. Under the anomaly's magnetism everything turns pink, so the panel's lines and readouts glow fuchsia and violet, with cyan lights and a few warm accents. They are starting values, all kept in one tuning file.
+
+| Key | Color | Means | Used on |
+|---|---|---|---|
+| ship_lines | #ff00ae | the main line | frame edge, wireframe spines, box edges, bar ramp start, footer dot |
+| ship_lines_light | #bd7cfe | the second line | wireframe outline, jets, scan line, gradient end |
+| plating | #f7f7f7 | titles and text | digits, labels, rivets, gasket |
+| hearts | #f79afe | a life left | lit hearts |
+| last_life | #ff8a3d | warning, last life | the last heart, high level |
+| score | #b48cff | the score | tile tops, score bar end |
+| level | #ffc800 | the level | level number, climb bars |
+| graze | #f89ffe | the graze | the radar dial, its count, the sweep |
+| panel_body | #0a1029 | the console's glass | panel and box fill |
+| frame_metal | #080f24 | the frame's body | the frame |
+| frame_highlight | #080e23 | the frame's edge shade | the frame's ends |
+| frame_lights | #3dfffc | lights | corner lights, pillar strip, bevel line |
+| fuchsia_spill | #000000 | the black hole's light spilling on the frame's bottom left. Black means off | frame edge, one corner light |
+| dim | #29346a | off | unlit tile tops, unlit bars, dim zeros |
+| line | #232c55 | thin rules | the footer line |
+| tile_bg | #04061a | the tile's dark glass | behind each digit |
+| footer_dot | #33408a | the footer's empty dot | both ends of the footer line |
+
+### Screen colors
+The screens (menu, pause box, game over, instructions, leaderboard) have their own palette, Mono Violet, in the screens tuning file. It is not the HUD palette. The lines and lights are cyan, the text is pale violet-white, and gold marks the level, first place and coins. They are starting values.
+
+| Key | Color | Means | Used on |
+|---|---|---|---|
+| ship_lines | #9d6bff | the main line | the FALL card's topic and icon |
+| ship_lines_light | #c9b5ff | the second line | the PAUSE card's topic and icon, the rock's lines in the GRAZE icon |
+| frame_lights | #8be9ff | lights | borders, corner brackets, scan lines, key caps, the selected choice's fade, the picker cursor |
+| panel_body | #0c0b24 | the glass | every box and card fill |
+| score | #d8c8ff | the score | the score digits |
+| level | #ffd166 | gold | the level reached (`LV`), coins |
+| hearts | #e6a8ff | a life | the heart in the FALL icon |
+| graze | #e6a8ff | the graze | the GRAZE icon |
+| last_life | #ff9e5e | warning | the WARNING icon, the ship's flame in the FLY icon |
+| plating | #f4f1ff | titles and text | titles, names, captions |
+| rank_1 | #ffd166 | first place | the leaderboard's top row |
+| rank_2 | #cfd2ff | second place | the leaderboard's second row |
+| rank_3 | #f0a07a | third place | the leaderboard's third row |
+
 ### Background
 - **Far layer.** One large painting. Rivers of stars, gas and debris curve toward a dim, distant black hole at the bottom left, mostly off screen. The rays sway very slowly, and a soft patch of light turns along the hole's rim. It is a loop of frames made ahead of time, faded from one to the next, and it keeps the painting's brightness. The sway is slow and small, so it never pulls the eye off the objects.
 - **River light.** Small glowing specks and streaks travel along the curves into the black hole, so the rivers look like they flow. Their number is capped. A small swirl loops around the black hole.
@@ -60,7 +103,7 @@ The player never reads this. It gives the art a feeling to aim at.
 3. Glow is pre-rendered, never computed per frame. Source: Director.
 4. Particles have a hard cap (`particle_cap`). Source: Director.
 5. Audio format and unlock rules: [15-tech-constraints.md](15-tech-constraints.md).
-6. **Coins own solid fuchsia.** A solid, bright fuchsia shape always means a coin. Hazards may carry fuchsia only as thin accents. Source: Director.
+6. **Coins own solid fuchsia.** In the play area, a solid, bright fuchsia shape always means a coin. Hazards may carry fuchsia only as thin accents. Source: Director. The HUD is the one exception (rule 14).
 7. **The background stays behind.** It is always dimmer and less saturated than anything the player can touch. Hazards falling over the black hole corner stay easy to see. Source: Director; Pillar 2.
 8. **Rim light.** Every object the anomaly touched gets a thin fuchsia rim on its bottom side, the side facing the black hole. The ship has none: it is untouched. Source: Director.
 9. **Looks never change play.** Animation, rotation frames and random looks are visual only. Hitboxes never rotate, move or resize with the look. Source: Director; [07-drifters.md](07-drifters.md) rule 8.
@@ -68,6 +111,7 @@ The player never reads this. It gives the art a feeling to aim at.
 11. **Painted once.** Background layers are images made ahead of time and loaded by the game, never drawn shape by shape each frame. A layer that moves is a loop of such images. Source: Director.
 12. **Words, not pictures.** The style is defined in words in this file. Images from other works are never part of this design and never ship. Only art made for the game, or converted from a source that is free to use and credited, ships. Source: Director.
 13. **Motion must show at game size.** A turn smaller than about 20° does not read on a sprite this small. A turning object uses a full turn in steps of 45° or less, so the loop has no back-and-forth. One exception: a part that swings on a fixed body, like the satellite's panels, goes back and forth. The light and the rim stay fixed while the shape turns. Frames sit in one strip, all the same size. Source: Director.
+14. **HUD colors are their own.** The HUD, the frame and the panel use the colors in the HUD colors table and may use solid fuchsia and pink, and the wireframe of the ship may be fuchsia, not cobalt. The play-area rules (rules 6 and 8, and the ship's cobalt) do not apply there. The wireframe is a hull schematic, not the ship's paint. Gold (the level), violet (the score) and orange (the last life) are new color meanings that only the HUD uses. Source: Director.
 
 ## Edge cases
 - Art for a drifter whose spec is still draft: wait, or use a placeholder shape the Director approves.

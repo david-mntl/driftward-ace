@@ -29,6 +29,7 @@ A saucer that crosses the screen from one side to the other, weaving up and down
 | specialty | none | — | — | locked | Director |
 | graze | yes, once per UFO | — | — | locked | 06-scoring.md |
 | look_reference | Saucer with a green dome. No beam | — | — | guess | Director |
+| art_canvas | 40 × 20: the disc in the bottom 10 rows, the dome above it, centered on the disc's top edge | px | — | guess | main session, away decision 2026-10-31 |
 | placeholder_look | the two hitbox shapes, filled: disc grey (170, 170, 185), dome green (90, 220, 110) | RGB | — | guess | Director |
 | start | just outside the left wall, at its placed y ([../07-drifters.md](../07-drifters.md) rule 14). With `invert`: just outside the right wall. The placed y must sit inside `band` | px | — | guess | Director |
 

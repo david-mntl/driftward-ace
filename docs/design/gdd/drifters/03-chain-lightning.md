@@ -24,8 +24,8 @@ Two or three glowing nodes fall from the top in a fixed layout. They charge with
 | fire_ticks | 120 (2 s). Timer × never shortens it. A set value per level may come later | ticks | — | guess | Director |
 | cycle | charge, fire, charge, fire… until it leaves. No pause besides the charge | — | — | locked | Director |
 | entry_warning_ticks | the shared value ([../07-drifters.md](../07-drifters.md)) | ticks | — | — | 07-drifters.md |
-| entry_warning_icon | always the `trio_triangle` layout, whatever the variant. The real layout is a surprise | — | — | locked | Director |
-| entry_warning_size | the shared size rule ([../07-drifters.md](../07-drifters.md), Values): the same fixed size as every warning. The `trio_triangle` icon is scaled to fit, for every variant, so the size doesn't give the layout away | px | — | guess | Director |
+| entry_warning_icon | not shown since decision 130: every warning is the shared plain sign. Was: always the `trio_triangle` layout, whatever the variant | — | — | locked | Director |
+| entry_warning_size | the shared size rule ([../07-drifters.md](../07-drifters.md), Values): the same plain sign as every warning, so it gives no layout away | px | — | guess | Director |
 | telegraph | the charge: small blue rays around each node, more of them and faster as the charge fills; at the end they become the lightning between the nodes | — | — | locked | Director |
 | charge_rays | 4 per node at most. The first ray shows when the charge starts, and one more every quarter of the charge: every 30 ticks (0.5 s) at Level 1. All 4 show for the last quarter, just before it fires | rays | — | guess | Director |
 | ray_length | 6, out from the node's edge, one per diagonal (45°, 135°, 225°, 315°), in that order | px | — | guess | Director (value proposed in chat) |
@@ -48,7 +48,7 @@ Two or three glowing nodes fall from the top in a fixed layout. They charge with
 
 ## Rules
 1. **One drifter.** The nodes are parts of one chain lightning, never drifters of their own. Its position is the center of the box around all its nodes; the variant and `invert` set where each node sits around it. All nodes move together.
-2. **Appears:** at its placed x, just above the top edge ([../07-drifters.md](../07-drifters.md) rule 14), then falls into view. Its entry warning shows first, in the shared look ([../07-drifters.md](../07-drifters.md), Values) with the triangle icon, at the x of the node nearest the ship when the warning starts, against the top edge. If two nodes are equally near, the leftmost one. The warning stays there.
+2. **Appears:** at its placed x, just above the top edge ([../07-drifters.md](../07-drifters.md) rule 14), then falls into view. Its entry warning shows first, in the shared look ([../07-drifters.md](../07-drifters.md), Values), at the x of the node nearest the ship when the warning starts, against the top edge. If two nodes are equally near, the leftmost one. The warning stays there.
 3. **Telegraph:** the charge starts the moment it appears and lasts `charge_ticks`. It shows when the strike comes, not which nodes connect. That is part of this hazard on purpose: the player learns that the lightning always joins the nodes.
 4. **Moves:** straight down at `speed` on screen, every tick. No targeting. The scroll doesn't add to it ([../03-world-and-camera.md](../03-world-and-camera.md) rule 9).
 5. **Fires:** after the charge, every arc fires for `fire_ticks`, then the next charge starts. An arc fires only while both its nodes are on screen (any part visible). A node that has left takes its arcs with it; the other arcs keep working while their own nodes are on screen.

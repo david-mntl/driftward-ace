@@ -56,7 +56,7 @@ jobs:
 
       # pygbag reads pygbag.ini from its working directory, so this runs from the repo root.
       - name: Build web.zip
-        run: python -m pygbag --archive game
+        run: python -m pygbag --template web/start.tmpl --archive game
 
       - name: Check the release package holds runtime files only
         run: python .github/scripts/check_release_package.py

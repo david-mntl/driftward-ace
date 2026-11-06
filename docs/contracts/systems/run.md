@@ -313,7 +313,7 @@ def draw_points_popup(surface: pygame.Surface, popup: PointsPopup) -> None: ...
     # One popup's text, centered on its x and y. Draws only.
 ```
 
-The game-over screen's view, `game/ui/game_over.py` (`draw_game_over`, `draw_final_score` and, from DRA-125, `draw_game_over_choices`), moved to `docs/contracts/systems/game-flow.md` in DRA-125: it is a screen of the game flow. `score_text` (`game/ui/score_text.py`) is in `docs/contracts/systems/hud.md`, Interface.
+The game-over screen's view, `game/ui/game_over.py` (`draw_game_over`, `draw_final_score` and, from DRA-125, `draw_game_over_choices`), moved to `docs/contracts/systems/game-flow.md` in DRA-125: it is a screen of the game flow. Its look and signatures (they now take a `ScreenLook`) are in `docs/contracts/systems/screens.md` (DRA-147). `score_text` (`game/ui/score_text.py`) is in `docs/contracts/systems/hud.md`, Interface.
 
 ### DRA-117: what graze adds and changes
 Existing signatures are read from the code. Only the new and changed ones are here. Every new default constant names its GDD source and holds no value of its own: the value is the GDD's.

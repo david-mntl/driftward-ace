@@ -3,34 +3,41 @@ Status: draft
 Depends on: [04-ship.md](04-ship.md), [05-lives-and-damage.md](05-lives-and-damage.md), [08-difficulty.md](08-difficulty.md)
 
 ## Summary
-The screen is a fixed 640×480 view. It never follows the ship. The world scrolls down past it at a steady speed set by the level, so the ship feels like it flies forward. Distance counts that scroll, wherever the ship is on screen. The top line is a ceiling, the bottom edge is the floor, and the side walls are solid.
+The play area is a fixed 640×480 view, the glass of a cockpit window. It never follows the ship. The world scrolls down past it at a steady speed set by the level, so the ship feels like it flies forward. Distance counts that scroll, wherever the ship is on screen. The top line is a ceiling, the bottom edge is the floor, and the side walls are solid. The window is larger: a frame runs round the play area and a side panel sits to its right. Neither covers a pixel of it.
 
 ```
- x=0                              x=640
-  +--------------------------------+  y=0
-  |            hazards v           |
-  |                                |  warning space
-  |- - - - - - TOP LINE - - - - - -|  y=168 (35% down), ceiling
-  |                                |
-  |               A  ship          |  312 px top line to floor
-  |                                |  world scrolls down v
-  |################################|  y=480 floor
-  +--------------------------------+
-  wall                          wall
+ window 856 × 518
+ +------------------------------------------------------+ y=0
+ | frame                                    |pillar|     |
+ |  +-----------------------------+         |      |     |
+ |  | play area 640 × 480         |         | side panel |
+ |  |        hazards v            |         | 184 wide   |
+ |  |- - - - - TOP LINE - - - - - |         |            |
+ |  |             A  ship         |         |            |
+ |  |#############################|         |            |
+ |  +-----------------------------+         |            |
+ | frame                                    |            |
+ +------------------------------------------------------+ y=518
+   x=16 to 656 inside the window; y=10 to 490
 ```
+Walls, top line, floor and every wave coordinate count from the play area's own top-left, as before.
 
 ## Values
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
-| screen_w | 640 | px | — | guess | Director |
-| screen_h | 480 | px | — | guess | Director |
+| screen_w | 640. The play area's width | px | — | guess | Director |
+| screen_h | 480. The play area's height | px | — | guess | Director |
 | top_line_ratio | 0.35 | of screen_h, from top | — | locked | Director |
 | px_per_meter | 10 | px/m | — | locked | Director |
 | scroll_base | 1.1 | px/tick | TBD (SH-02) | guess | Director tuning guess |
 | scroll_start_delay | 30 | ticks (0.5 s) after play starts | — | guess | Director |
 | distance_start | 0 | m, when play starts | — | locked | Director |
 | ship_start | (320, 240), at rest: the same point as `fall_respawn` ([05-lives-and-damage.md](05-lives-and-damage.md#values)) | screen x, y | — | guess | Director |
-| play_area | TBD | px | — | TBD | WC-07 |
+| window_w | 856 | px | — | guess | Director |
+| window_h | 518 | px | — | guess | Director |
+| play_area_x | 16. Distance from the window's left edge to the play area | px | — | guess | Director |
+| play_area_y | 10. Distance from the window's top edge to the play area | px | — | guess | Director |
+| play_area | exactly `screen_w` × `screen_h`, at (`play_area_x`, `play_area_y`) in the window. The rest of the window is the frame (16 px left and right, 10 px above, 28 px below) and the side panel ([10-ui.md](10-ui.md)) | — | — | locked | Director |
 
 ## Rules
 1. **Coordinates.** World: x to the right, y **up**. Screen: pygame, y **down**. Wave placements count from the wave's start ([09-waves.md](09-waves.md) rule 2). Source: Director. The exact conversion is a technical detail, not a design rule.
@@ -46,12 +53,15 @@ The screen is a fixed 640×480 view. It never follows the ship. The world scroll
    - **Moving drifters** move on their own (meteorite, fireball, satellite). Their speed is their speed on screen, scaled by the level's hazard speed ([08-difficulty.md](08-difficulty.md)). The scroll doesn't add to it.
    Each drifter's spec says which kind it is.
 
+10. **Window and play area.** The window is `window_w` × `window_h`. The play area sits inside it at (`play_area_x`, `play_area_y`). The frame, the pillar and the panel are drawn outside the play area and never over it, so the player sees every hazard right up to the wall and floor. Where the frame's corners are cut or rounded, the cut is outside the play area. Source: Director.
+11. **Screens that fill the window.** The menu, the instructions page and the leaderboard page use the whole window. Their background fills it too. The pause box and the game-over screen are centered on the whole window ([10-ui.md](10-ui.md)).
+
 ## Edge cases
-- Until WC-07 is answered, every rule here assumes the play area is the whole window. If a HUD strip or side margins are added, walls, floor, top line and fall distance move with the play area.
+- Walls, floor, top line and fall distance move with the play area, not with the window. A frame or panel change never moves them.
 - The ship hovers in one spot: distance still grows. Points beyond surviving come from coins and grazes, which sit near danger ([01-vision.md](01-vision.md), Pillar 3).
 
 ## Open
-- WC-07, SH-02.
+- SH-02.
 
 ## How to extend
 A new screen-space rule (a new line, zone or edge) goes here, with its value in Values and its ratio of `screen_w` or `screen_h`, never a bare pixel number, so it survives a screen size change.

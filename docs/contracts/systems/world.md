@@ -1,11 +1,11 @@
 # World: screen geometry
 Version: 3
-Status: frozen
-Features: DRA-6, DRA-13, DRA-19
+Status: draft
+Features: DRA-6, DRA-13, DRA-19, HUD-PANEL
 Created by: architect
 
 ## Purpose
-Give every system one home for the screen's size and the lines the rules use: the side walls, the top line and the floor. The screen is fixed and never follows the ship (01-vision.md, locked decision 2). There is no camera. The world scrolls down past the fixed screen; the scroll and the distance live in `docs/contracts/systems/scroll.md`, not here.
+Give every system one home for the play area's size and the lines the rules use: the side walls, the top line and the floor. The play area is fixed and never follows the ship (01-vision.md, locked decision 2). There is no camera. The world scrolls down past the fixed screen; the scroll and the distance live in `docs/contracts/systems/scroll.md`, not here.
 
 All rules use screen px. World coordinates with y up (03-world-and-camera.md, rule 1) are for wave files, which don't exist yet. The feature that adds wave loading defines the conversion.
 
@@ -41,12 +41,12 @@ TOP_LINE_Y: Final[int]                # = round(SCREEN_H * TOP_LINE_RATIO) -> 16
 Screen coordinates, pygame style: x to the right, y down, in pixels. The left wall is x 0, the right wall is x `SCREEN_W`, the floor is y `SCREEN_H`.
 
 ## Rules
-- Screen is 640×480. Source: 03-world-and-camera.md, screen_w, screen_h (guess).
+- The play area is 640×480. Source: 03-world-and-camera.md, screen_w, screen_h (guess).
 - The top line sits at `screen_h × top_line_ratio` = 168. It is computed from the ratio, never written as a bare 168. It is a ceiling for the ship (`systems/ship.md`, step 7). Source: 03-world-and-camera.md, rule 2 and How to extend.
 - The screen never moves. No camera offset exists, and none is added. Source: 03-world-and-camera.md, rule 3; 01-vision.md, locked decision 2.
 - The side walls are at x 0 and x `SCREEN_W`. Source: 03-world-and-camera.md, rule 6.
 - The floor is the bottom edge of the screen, y `SCREEN_H`. Source: 03-world-and-camera.md, rule 5.
-- The whole window is the play area. Source: 03-world-and-camera.md, Edge cases (WC-07 still open).
+- `SCREEN_W` and `SCREEN_H` are the play area, not the window. From HUD-PANEL the window is 856 × 518 (`tuning/hud.json`, `window`) and the play area sits in it at (16, 10). Every rule here counts from the play area's own top-left, and the app draws the world on a subsurface of the window, so no core or ui file changes its coordinates. The frame and panel never cover a pixel of it. The window's numbers live in `systems/hud.md` and the tuning file, never in `core.world`. Source: 03-world-and-camera.md, rules 10 and 11 and Values (`window_*`, `play_area*`); WC-07 closed.
 - Constants only: one stdlib import, `typing.Final`, and no logger, no code. Source: game/CONTEXT.md, Logging (a constants-only module has no logger); scope report DRA-19, item 5 (core constants are `Final`).
 - Every constant is `Final`. Source: scope report DRA-19, item 5.
 

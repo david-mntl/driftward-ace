@@ -81,3 +81,7 @@ Tuning loader (`app/tuning.py`, DRA-29). Source: scope report DRA-29, Limits; ga
 - Builds `DrifterTuning(drifters={...}, switches=PlaytestSwitches(...), hazards=HazardRules(...))` with plain dicts, `Circle` and `Box` from `core.collision`. Core trusts these values.
 - Extra files in `drifters/` that match no `DrifterType` are not read. Test task DRA-29-09 fails on them.
 - Logs one INFO line after a good load: `tuning loaded drifters=%s hazard_speed_scaling=%s timer_scaling=%s rehit_cooldown=%d rehit_dim=%.2f telegraph_min=%d graze_margin=%g`, the drifter types as a comma-separated list of values, and the cooldown, dim, telegraph minimum and graze margin in use (DRA-39 adds the cooldown and dim, DRA-47 the telegraph minimum, DRA-117 the graze margin). INFO because it is startup. Nothing else.
+
+## hud.json (HUD-PANEL)
+`game/app/hud_tuning.py`, `load_hud_rules() -> HudRules`. Reads `tuning/hud.json` once, in both run modes, before the window opens (the window's size comes from it). Checks every rule of `docs/contracts/schemas/hud.schema.json` by hand and builds `HudRules` (`systems/hud.md`, Interface). Unlike the background file, every field is required and there are no defaults in code: a missing file raises `FileNotFoundError`, a missing, unknown or bad field raises `ValueError` naming `tuning/hud.json` and the field. Logs one INFO line after a good load: `hud loaded window=%dx%d panel_x=%d`. Not a startup module: it imports `ui`, so only `app.frame` imports it, inside the guard. Source: 10-ui.md, rule 12; systems/hud.md, Rules.
+

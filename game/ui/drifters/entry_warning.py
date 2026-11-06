@@ -1,126 +1,98 @@
-"""The entry warning: a glow with spikes and a small copy of the drifter, drawn at its entry.
+"""The entry warning: one plain warning sign, a triangle with an exclamation mark, drawn at entry.
 
 Source: docs/contracts/systems/drifters.md, Presentation, Entry warning; 07-drifters.md,
-entry_warning values (guess). Every warning has the same size, whatever the drifter. One image
-is built per drifter on its first warning frame and blitted every frame after. It only draws.
+entry_warning values (guess). Every warning is the same sign, whatever the drifter. The image is
+built once, on the first warning frame, and blitted every frame after. It only draws.
 """
 
 from __future__ import annotations
 
 import logging
 import math
-import random
-from typing import TYPE_CHECKING, Final
+from functools import cache
+from itertools import pairwise
+from typing import Final
 
 import pygame
 
-from core.drifters.base import ENTRY_WARNING_SIZE, Drifter, DrifterType
-
-if TYPE_CHECKING:
-    from ui.drifters.registry import DrifterView
+from core.drifters.base import ENTRY_WARNING_SIZE, Drifter
 
 log = logging.getLogger(__name__)
 
-ENTRY_WARNING_GLOW: Final[tuple[int, int, int]] = (255, 220, 120)
-"""Glow and spike color, RGB. Source: 07-drifters.md, entry_warning_glow (guess)."""
+type _Point = tuple[float, float]
 
-ENTRY_WARNING_COPY_SIZE: Final[int] = 14
-"""Longest side of the drifter's copy inside the warning, px. It fits inside the glow
-(diameter GLOW_RATIO * ENTRY_WARNING_SIZE). Source: 07-drifters.md, entry_warning_size (guess)."""
+ENTRY_WARNING_COLOR: Final[tuple[int, int, int]] = (255, 158, 94)
+"""Sign color, RGB, #ff9e5e, the WARNING card's orange. Source: 07-drifters.md,
+entry_warning_color (guess)."""
 
-SPIKE_COUNT_MIN: Final[int] = 6
-"""Fewest spikes in one warning. Source: 07-drifters.md, entry_warning_spikes (guess)."""
+FILL_ALPHA: Final[float] = 0.26
+"""Opacity of the triangle's fill, 0..1. The outline and mark are opaque. Source: 07-drifters.md,
+entry_warning_look (guess)."""
 
-SPIKE_COUNT_MAX: Final[int] = 9
-"""Most spikes in one warning. Source: 07-drifters.md, entry_warning_spikes (guess)."""
+OUTLINE_WIDTH: Final[float] = 1.5
+"""Triangle outline width, px. Source: 07-drifters.md, entry_warning_look (guess)."""
 
-GLOW_RATIO: Final[float] = 0.75
-"""Glow radius as a share of the warning's radius, 0..1. A placeholder choice, not in the GDD:
-drifters.md, Rationale."""
+MARK_WIDTH: Final[float] = 1.4
+"""Width of the exclamation mark's bar, px. Source: 07-drifters.md, entry_warning_look (guess)."""
 
-type _Key = tuple[int, DrifterType, str, float]
+MARK_BAR: Final[tuple[float, float]] = (0.32, 0.68)
+"""Top and bottom of the mark's bar, as shares of the triangle's height from its apex."""
 
-_IMAGES: dict[_Key, pygame.Surface] = {}
-"""Built warning images, one per drifter. Dropped when the drifter turns ACTIVE."""
+MARK_DOT: Final[tuple[float, float]] = (0.84, 0.056)
+"""Center of the mark's dot and its radius, as shares of the triangle's height from its apex."""
+
+_SUPERSAMPLE: Final[int] = 4
+"""Times larger the sign is drawn before it is scaled down, so its edges are smooth."""
 
 
-def draw_entry_warning(surface: pygame.Surface, drifter: Drifter, view: DrifterView) -> None:
-    """Blit the drifter's warning image centered on `drifter.warning_center()`, rounded to px.
-
-    Builds the image on the first call for the drifter, and reuses it after. The image is sized on
-    `drifter.warning_copy().width` and shows that copy, not the drifter itself.
-    """
-    key: _Key = _key(drifter)
-    image: pygame.Surface | None = _IMAGES.get(key)
-    if image is None:
-        image = _build_image(drifter, view)
-        _IMAGES[key] = image
+def draw_entry_warning(surface: pygame.Surface, drifter: Drifter) -> None:
+    """Blit the warning sign centered on `drifter.warning_center()`, rounded to px."""
+    image: pygame.Surface = _sign_image()
     center_x, center_y = drifter.warning_center()
     surface.blit(image, image.get_rect(center=(round(center_x), round(center_y))))
 
 
-def drop_entry_warning(drifter: Drifter) -> None:
-    """Forget the warning image of `drifter`. Does nothing when it has none."""
-    _IMAGES.pop(_key(drifter), None)
+@cache
+def _sign_image() -> pygame.Surface:
+    """Return the sign: a point-up triangle, translucent fill, opaque outline and mark.
 
-
-def _key(drifter: Drifter) -> _Key:
-    """Return the cache key: the image depends only on these four facts."""
-    return (drifter.uid, drifter.drifter_type, drifter.variant, drifter.warning_tilt_degrees())
-
-
-def _build_image(drifter: Drifter, view: DrifterView) -> pygame.Surface:
-    """Return the warning image: glow, spikes, then the drifter's warning copy on top.
-
-    The copy is drawn at full brightness, turned by `drifter.warning_tilt_degrees()`.
-
-    Square, side 2 * ceil(R) + 1, with the warning's center on its middle pixel, so nothing
-    lies more than R from the center, where R = ENTRY_WARNING_SIZE / 2, px.
+    Square, side 2 * ceil(R) + 1, with the warning's center on its middle pixel, where
+    R = ENTRY_WARNING_SIZE / 2, px. The triangle is equilateral, centered on its middle, with its
+    corners R - OUTLINE_WIDTH / 2 from the center, so its round outline never reaches past R.
+    Drawn at _SUPERSAMPLE times its size and scaled down. Built once, shared by every drifter.
     """
-    copy: Drifter = drifter.warning_copy()
-    radius: float = ENTRY_WARNING_SIZE / 2
-    half: int = math.ceil(radius)
-    image: pygame.Surface = pygame.Surface((2 * half + 1, 2 * half + 1), pygame.SRCALPHA)
-    center: tuple[int, int] = (half, half)
-    pygame.draw.circle(image, ENTRY_WARNING_GLOW, center, GLOW_RATIO * radius)
-    _draw_spikes(image, center, drifter.uid, radius)
-    _draw_copy(image, copy, drifter.warning_tilt_degrees(), view)
-    return image
+    side: int = 2 * math.ceil(ENTRY_WARNING_SIZE / 2) + 1
+    big: pygame.Surface = pygame.Surface(
+        (side * _SUPERSAMPLE, side * _SUPERSAMPLE), pygame.SRCALPHA
+    )
+    middle: float = side * _SUPERSAMPLE / 2
+    corner: float = (ENTRY_WARNING_SIZE / 2 - OUTLINE_WIDTH / 2) * _SUPERSAMPLE
+    triangle: list[_Point] = [
+        (middle + corner * math.cos(angle), middle - corner * math.sin(angle))
+        for angle in (math.pi / 2, math.pi * 7 / 6, -math.pi / 6)
+    ]
+    apex: float = triangle[0][1]
+    height: float = 1.5 * corner
+
+    fill: pygame.Surface = pygame.Surface(big.get_size(), pygame.SRCALPHA)
+    pygame.draw.polygon(fill, (*ENTRY_WARNING_COLOR, round(255 * FILL_ALPHA)), triangle)
+    big.blit(fill, (0, 0))
+    _round_line(big, [*triangle, triangle[0]], OUTLINE_WIDTH * _SUPERSAMPLE)
+    _round_line(
+        big,
+        [(middle, apex + MARK_BAR[0] * height), (middle, apex + MARK_BAR[1] * height)],
+        MARK_WIDTH * _SUPERSAMPLE,
+    )
+    pygame.draw.circle(
+        big, ENTRY_WARNING_COLOR, (middle, apex + MARK_DOT[0] * height), MARK_DOT[1] * height
+    )
+    return pygame.transform.smoothscale(big, (side, side))
 
 
-def _draw_copy(image: pygame.Surface, copy: Drifter, tilt: float, view: DrifterView) -> None:
-    """Draw `copy` centered on `image`, turned counterclockwise by `tilt` degrees.
-
-    The copy is scaled so its longest side is ENTRY_WARNING_COPY_SIZE px.
-    A turned copy is drawn on its own transparent surface first, so turning never touches the glow.
-    """
-    center: tuple[float, float] = (image.get_width() // 2, image.get_height() // 2)
-    scale: float = ENTRY_WARNING_COPY_SIZE / max(copy.width, copy.height)
-    if tilt == 0.0:
-        view(image, copy, center, scale, 1.0)
-        return
-    layer: pygame.Surface = pygame.Surface(image.get_size(), pygame.SRCALPHA)
-    view(layer, copy, center, scale, 1.0)
-    turned: pygame.Surface = pygame.transform.rotate(layer, tilt)
-    image.blit(turned, turned.get_rect(center=(round(center[0]), round(center[1]))))
-
-
-def _draw_spikes(
-    image: pygame.Surface,
-    center: tuple[int, int],
-    seed: int,
-    radius: float,
-) -> None:
-    """Draw 6 to 9 1 px spikes from `center`, each out of the glow and not past `radius`.
-
-    Count, then an angle and a length per spike, from `random.Random(seed)`.
-    """
-    rng: random.Random = random.Random(seed)
-    for _ in range(rng.randint(SPIKE_COUNT_MIN, SPIKE_COUNT_MAX)):
-        angle: float = rng.uniform(0, math.tau)
-        length: float = rng.uniform(GLOW_RATIO * radius, radius)
-        tip: tuple[float, float] = (
-            center[0] + length * math.cos(angle),
-            center[1] + length * math.sin(angle),
-        )
-        pygame.draw.line(image, ENTRY_WARNING_GLOW, center, tip, 1)
+def _round_line(image: pygame.Surface, points: list[_Point], width: float) -> None:
+    """Draw a polyline through `points` in ENTRY_WARNING_COLOR, round at every end and joint."""
+    thick: int = max(round(width), 1)
+    for start, end in pairwise(points):
+        pygame.draw.line(image, ENTRY_WARNING_COLOR, start, end, thick)
+    for point in points:
+        pygame.draw.circle(image, ENTRY_WARNING_COLOR, point, thick / 2)
