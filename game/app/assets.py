@@ -10,6 +10,8 @@ from core.world import SCREEN_H, SCREEN_W
 from ui.background_view import BackgroundArt, BackgroundRules, build_background
 from ui.hud import HEART_CELL_COUNT, HudArt
 from ui.hud_rules import HudRules
+from ui.level_up_rules import LevelUpLook
+from ui.level_up_view import LevelUpFonts
 from ui.screen_rules import ScreenRules
 
 log = logging.getLogger(__name__)
@@ -141,4 +143,22 @@ def load_screen_fonts(rules: ScreenRules) -> dict[str, pygame.font.Font]:
         role.name: pygame.font.Font(path, role.size) for role in rules.fonts.roles
     }
     log.info("screen fonts loaded %d roles from %s", len(fonts), rules.fonts.text_file)
+    return fonts
+
+
+def load_level_up_fonts(hud_rules: HudRules, look: LevelUpLook) -> LevelUpFonts:
+    """Load the banner's two fonts: Exo 2 Bold for the number, Share Tech Mono for LEVEL.
+
+    Call it once, after pygame.init(). A missing file raises FileNotFoundError (from pygame).
+    Source: systems/level-up/tuning.md, Interface.
+    """
+    fonts: LevelUpFonts = LevelUpFonts(
+        number=pygame.font.Font(ASSETS_DIR / hud_rules.fonts.ui_file, look.number.font_size),
+        label=pygame.font.Font(ASSETS_DIR / hud_rules.fonts.label_file, look.label.font_size),
+    )
+    log.info(
+        "level up fonts loaded number=%s label=%s",
+        hud_rules.fonts.ui_file,
+        hud_rules.fonts.label_file,
+    )
     return fonts

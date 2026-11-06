@@ -18,7 +18,7 @@
     "box_flash": "level"
   },
   "band": {
-    "height": 120, "alpha": 120, "center_offset_y": 0,
+    "height": 120, "alpha": 0, "center_offset_y": 0,
     "open_start": 0, "open_end": 10,
     "close_start": 100, "close_end": 124, "close_glass_share": 0.65,
     "hairline_width": 1, "corner_tick_length": 6
