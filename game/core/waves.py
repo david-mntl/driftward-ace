@@ -18,6 +18,7 @@ from enum import Enum
 from typing import Final
 
 from core.drifters.spawner import Placement
+from core.level_up import NO_LEVEL_UP, LevelUpRules
 from core.levels import FIRST_LEVEL, LEVEL_COUNT, check_level, rest_gap_mult
 from core.scroll import DISTANCE_DECIMALS
 
@@ -159,15 +160,22 @@ class WaveRun:
     spawns_due: tuple[Placement, ...] = ()
     """Placements that came due on the last tick, in order."""
 
+    level_up_rules: LevelUpRules = NO_LEVEL_UP
+    """The level-up values this run plays with. Never changes in a run."""
+
+    level_rose: bool = False
+    """True on the state after a tick on which the level rose, False on every other state."""
+
     @property
     def current_wave_id(self) -> str | None:
         """Return the playing wave's id, or None while resting."""
         return None if self.resting else self.wave_id
 
 
-def start_waves(book: WaveBook, seed: int) -> WaveRun:
+def start_waves(book: WaveBook, seed: int, level_up_rules: LevelUpRules = NO_LEVEL_UP) -> WaveRun:
     """Return a run's waves at tick 0: Wave 0 at Level 1, starting at 0 px, nothing due.
 
+    `level_up_rules` is kept in the state. Left out, the run has no level-up rest.
     Source: waves.md, Rules, The order.
     """
     log.debug("wave start id=%s level=%d random=%s", book.wave_zero_id, FIRST_LEVEL, False)
@@ -180,6 +188,7 @@ def start_waves(book: WaveBook, seed: int) -> WaveRun:
         spawned=0,
         pick_seed=seed,
         run_seed=seed,
+        level_up_rules=level_up_rules,
     )
 
 
@@ -190,7 +199,7 @@ def step_waves(waves: WaveRun, distance_px: float) -> WaveRun:
     `spawns_due` holds every placement that came due on this tick, across every wave that played
     on it. Source: waves.md, Rules, The wave clock.
     """
-    state: WaveRun = replace(waves, spawns_due=())
+    state: WaveRun = replace(waves, spawns_due=(), level_rose=False)
     if state.resting:
         rest_left: int = state.rest_ticks_left - 1
         if rest_left > 0:
@@ -218,7 +227,7 @@ def next_run_waves(waves: WaveRun) -> WaveRun:
     Source: waves.md, Rules, Seeds.
     """
     next_seed: int = random.Random(waves.run_seed).getrandbits(SEED_BITS)
-    return start_waves(waves.book, next_seed)
+    return start_waves(waves.book, next_seed, waves.level_up_rules)
 
 
 def pick_pool_wave(book: WaveBook, level: int, last_wave_id: str, chooser: random.Random) -> str:
@@ -252,18 +261,33 @@ def _count_due(wave: Wave, spawned: int, into: float) -> int:
 
 
 def _end_wave(state: WaveRun, wave: Wave) -> WaveRun:
-    """Return the state after `wave` ends: the level rise, then the rest gap if it is above 0."""
+    """Return the state after `wave` ends: the level rise, then the rest if it is above 0.
+
+    The rest is the rest gap at the level reached, plus the level-up rest when the level rose.
+    The rise flag stays True once a rise has set it during this `step_waves` call.
+    """
     log.debug("wave end id=%s", wave.wave_id)
     level: int = state.level
     next_slot: int = state.next_slot
+    rose: bool = False
     if next_slot >= len(state.book.level_slots(level)) and level < LEVEL_COUNT:
         level = _next_level_with_slots(state.book, level)
         next_slot = 0
+        rose = True
         log.debug("level up level=%d", level)
     rest: int = rest_gap_ticks(level, wave.extra_rest_ticks)
+    if rose:
+        rest += state.level_up_rules.rest_ticks
     if rest > 0:
         log.debug("rest start ticks=%d", rest)
-    return replace(state, level=level, next_slot=next_slot, resting=rest > 0, rest_ticks_left=rest)
+    return replace(
+        state,
+        level=level,
+        next_slot=next_slot,
+        resting=rest > 0,
+        rest_ticks_left=rest,
+        level_rose=state.level_rose or rose,
+    )
 
 
 def _next_level_with_slots(book: WaveBook, level: int) -> int:
