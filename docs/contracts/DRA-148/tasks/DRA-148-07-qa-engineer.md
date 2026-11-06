@@ -4,12 +4,12 @@ Assignee: qa-engineer
 Writes to: game/tests/
 Contract: docs/contracts/systems/level-up.md, docs/contracts/systems/waves.md
 Impact: docs/contracts/DRA-148/impact.md
-Status: open
+Status: done
 Linear: DRA-155
 
 ## Read in the contract
-- level-up.md: `systems/level-up/core.md`: Interface (`core/level_up.py`, `core/waves.py`); Rules (The level-up rest, The rise flag)
-- waves.md: Rules, The wave clock, steps 3.1, 3.2 and 2a
+- systems/level-up/core.md: Interface, The level-up rest, The rise flag
+- waves.md: Rules, The wave clock, 3.1, 3.2, 2a
 
 ## Builds
 - `game/tests/core/test_level_up_waves.py` (new)

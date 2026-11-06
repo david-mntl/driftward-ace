@@ -4,13 +4,13 @@ Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/level-up.md, docs/contracts/systems/hud.md
 Impact: docs/contracts/DRA-148/impact.md
-Status: open
+Status: done
 Linear: DRA-153
 
 ## Read in the contract
-- level-up.md: `systems/level-up/view.md`: Interface (`LevelSlot`, `HudView.__init__`, `draw`, `level_slot`); Presentation (the table; The HUD pop; Cost; What the views never do)
-- level-up.md: `systems/level-up/core.md`: Interface (`shown_level`), Rules (The shown level)
-- hud.md: Presentation (the Level row), Rules (the level pop and the level bars), Rationale ("A class, not functions", "All motion is frames made ahead of time")
+- systems/level-up/view.md: Interface, LevelSlot, level_slot, Presentation, The HUD pop, Cost, What the views never do
+- systems/level-up/core.md: Interface, shown_level, The shown level
+- hud.md: Presentation, Rules, The level pop, The level bars, Rationale, A class, All motion is frames made ahead of time
 
 ## Builds
 - `game/ui/hud.py` (changed): `LevelSlot`, the optional look and banner arguments, the shown level, the pop (number, new climb bar, box outline) and `level_slot`

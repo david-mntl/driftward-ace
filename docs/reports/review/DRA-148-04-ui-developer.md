@@ -13,7 +13,7 @@ Created by: implementation-reviewer
 | ID | Severity | Where | Status |
 |---|---|---|---|
 | DRA-148-04-F1 | must-fix | game/ui/level_up_view.py:415 | fixed |
-| DRA-148-04-F2 | note | game/ui/level_up_view.py:21 | not fixable |
+| DRA-148-04-F2 | note | game/ui/level_up_view.py:21 | fixed |
 | DRA-148-04-F3 | should-fix | game/ui/level_up_view.py:341 | fixed |
 
 ### DRA-148-04-F1
@@ -23,6 +23,7 @@ Change: build the tint from the digit's fill pixels only, so the stripe's alpha 
 
 ### DRA-148-04-F2
 `ui/hud.py` imports `Tiles` and the private `_ink_tiles` (line 21, used at 562); the contract's import list for this module names `HudView` and `LevelSlot`. The contract does ask for the HUD's sheen method, so the reuse is right; only the private name crossing modules is a smell. The implementer flagged it. Change: none here; the Director may later make it public or move it to a shared `ui` module (a rename in task 05's file).
+Resolved 2026-11-06 at close-out: the Director chose to fix it. `_ink_tiles` is now the public `ink_tiles` in `ui/hud.py`, and `level_up_view.py` imports that name.
 
 ### DRA-148-04-F3
 The number's center is computed twice: `__init__` lines 110 to 114 (`_number_center`) and `_build_number` line 341 (`center_y`, a second copy of the same sum). Rule: no duplicated blocks (checklist 8); if `band.center_offset_y` or `number.center_offset_y` logic changes, the fall distance and the draw position drift apart.

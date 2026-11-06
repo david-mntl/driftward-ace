@@ -1,6 +1,6 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
-Version: 18
-Status: draft
+Version: 19
+Status: frozen
 Features: HUD-PANEL, DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111, DRA-117, DRA-125, DRA-126, DRA-147, DRA-148
 Created by: architect
 
@@ -49,6 +49,6 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 | [release](app/release.md) | Interface, Rules | you change the launch script, the release package or `pygbag.ini`. | 11.6 KB |
 | [save-storage](app/save-storage.md) | Interface, Rules | you change how the saves are read from or written to the browser's localStorage. | 5.1 KB |
 | [startup](app/startup.md) | Diagram, Interface, Rules | you change startup, the run mode switch, logging or the import boundary. | 8.6 KB |
-| [tuning-loader](app/tuning-loader.md) | Interface, Rules, level_up.json (DRA-148), hud.json (HUD-PANEL) | you change how the tuning files are loaded and checked. | 27.4 KB |
+| [tuning-loader](app/tuning-loader.md) | Interface, Rules, level_up.json (DRA-148), hud.json (HUD-PANEL) | you change how the tuning files are loaded and checked. | 27.0 KB |
 | [wave-loading](app/wave-loading.md) | Interface, Rules | you change how wave files are read and loaded. | 2.4 KB |
 <!-- parts:end -->

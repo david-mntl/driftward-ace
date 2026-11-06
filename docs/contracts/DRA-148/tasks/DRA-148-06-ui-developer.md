@@ -4,12 +4,12 @@ Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/level-up.md
 Impact: docs/contracts/DRA-148/impact.md
-Status: open
+Status: done
 Linear: DRA-154
 
 ## Read in the contract
-- level-up.md: `systems/level-up/view.md`: Interface (`LevelUpView.draw_flight`); Presentation (The flight; Cost; What the views never do)
-- level-up.md: `systems/level-up/rationale.md`: "The flight ends on the pop's first size"
+- systems/level-up/view.md: Interface, LevelUpView.draw_flight, Presentation, The flight, Cost, What the views never do
+- systems/level-up/rationale.md: The flight ends on the pop's first size
 
 ## Builds
 - `game/ui/level_up_view.py` (changed): `draw_flight`, and the flight's pre-rendered sizes built in `__init__`

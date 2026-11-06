@@ -1,6 +1,6 @@
 # Level-up moment: the level-up rest, the banner, the HUD level pop and the `level_up` cue
-Version: 0
-Status: draft
+Version: 1
+Status: frozen
 Features: DRA-148
 Created by: architect
 

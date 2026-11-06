@@ -4,12 +4,12 @@ Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/level-up.md
 Impact: docs/contracts/DRA-148/impact.md
-Status: open
+Status: done
 Linear: DRA-152
 
 ## Read in the contract
-- level-up.md: `systems/level-up/view.md`: Diagram; Interface (`LevelUpFonts`, `LevelUpView.__init__`, `draw_banner`, `bump_offset`); Presentation (the table; The banner on the play area; The bump; Cost; What the views never do)
-- level-up.md: `systems/level-up/rationale.md`: "Everything is drawn from images made once", "Draw order: behind the world, flight over it"
+- systems/level-up/view.md: Diagram, Interface, Presentation, The banner on the play area, The bump, Cost, What the views never do
+- systems/level-up/rationale.md: Everything is drawn from images made once, Draw order
 
 ## Builds
 - `game/ui/level_up_view.py` (new): `LevelUpFonts`, `LevelUpView` with `__init__`, `draw_banner` and `bump_offset`. `draw_flight` is task DRA-148-06; leave it out or as a stub that draws nothing

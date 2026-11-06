@@ -1,6 +1,6 @@
 # HUD
-Version: 7
-Status: draft
+Version: 8
+Status: frozen
 Features: DRA-13, DRA-23, DRA-61, DRA-76, DRA-117, DRA-125, DRA-126, DRA-148, HUD-PANEL
 Created by: architect
 

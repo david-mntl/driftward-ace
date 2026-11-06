@@ -4,12 +4,12 @@ Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/level-up.md
 Impact: docs/contracts/DRA-148/impact.md
-Status: open
+Status: done
 Linear: DRA-151
 
 ## Read in the contract
-- level-up.md: `systems/level-up/view.md`: Interface (`ui/level_up_rules.py` and `ui/level_up_motion.py` blocks); Presentation (the paragraphs for the glass, the number, the bump, the flight and the HUD pop, for what each curve drives)
-- level-up.md: `docs/contracts/schemas/level-up.schema.json`, whose sections the look records mirror
+- systems/level-up/view.md: Interface, Presentation
+- docs/contracts/schemas/level-up.schema.json
 
 ## Builds
 - `game/ui/level_up_rules.py` (new)

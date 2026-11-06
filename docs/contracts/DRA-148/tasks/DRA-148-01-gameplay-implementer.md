@@ -4,12 +4,12 @@ Assignee: gameplay-implementer
 Writes to: game/core/
 Contract: docs/contracts/systems/level-up.md, docs/contracts/systems/waves.md
 Impact: docs/contracts/DRA-148/impact.md
-Status: open
+Status: done
 Linear: DRA-149
 
 ## Read in the contract
-- level-up.md: `systems/level-up/core.md`: Diagram (the table and the classes), Interface (`core/level_up.py` and `core/waves.py` blocks), Rules (The level-up rest, The rise flag, Purity)
-- waves.md: Interface (`WaveRun`, `start_waves`, `next_run_waves`); Rules, The wave clock, steps 3.1, 3.2 and 2a; Rationale (the level-up rest is added in the wave clock)
+- systems/level-up/core.md: Diagram, Interface, The level-up rest, The rise flag, Purity
+- waves.md: Interface, WaveRun, start_waves, next_run_waves, The wave clock, 3.1, 3.2, 2a, Rationale
 
 ## Builds
 - `game/core/level_up.py` (new): the rules record, `NO_LEVEL_UP`, the banner record and its start and step functions, `shown_level`

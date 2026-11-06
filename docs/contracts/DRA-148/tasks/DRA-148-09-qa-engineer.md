@@ -4,13 +4,13 @@ Assignee: qa-engineer
 Writes to: game/tests/
 Contract: docs/contracts/systems/level-up.md, docs/contracts/systems/hud.md
 Impact: docs/contracts/DRA-148/impact.md
-Status: open
+Status: done
 Linear: DRA-157
 
 ## Read in the contract
-- level-up.md: `systems/level-up/view.md`: Interface (`ui/level_up_motion.py`, `HudView`, `LevelSlot`); Presentation (the table; The bump; The HUD pop; What the views never do)
-- level-up.md: `systems/level-up/core.md`: Rules (The shown level)
-- hud.md: Rules (the level pop and the level bars)
+- systems/level-up/view.md: Interface, Presentation, The bump, The HUD pop, What the views never do
+- systems/level-up/core.md: Rules, The shown level
+- hud.md: Rules, The level pop, The level bars
 
 ## Builds
 - `game/tests/ui/test_level_up_motion.py` (new)

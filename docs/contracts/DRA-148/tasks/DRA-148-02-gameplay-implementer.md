@@ -4,12 +4,12 @@ Assignee: gameplay-implementer
 Writes to: game/core/
 Contract: docs/contracts/systems/level-up.md, docs/contracts/systems/run.md
 Impact: docs/contracts/DRA-148/impact.md
-Status: open
+Status: done
 Linear: DRA-150
 
 ## Read in the contract
-- level-up.md: `systems/level-up/core.md`: Diagram, Interface (the `core/run.py` block), Rules (The banner, Pause, Game over and a new run, The shown level, The `level_up` cue, Logging)
-- run.md: Interface, "DRA-148: the level-up banner"; Rules, step 9b, The last life, A last-life tick, A game-over tick, `next_run`
+- systems/level-up/core.md: Diagram, Interface, The banner, Pause, Game over and a new run, The shown level, The `level_up` cue, Logging
+- run.md: Interface, DRA-148: the level-up banner, step 9b, The last life, A last-life tick, A game-over tick, `next_run`
 
 ## Builds
 - `game/core/run.py` (changed): the `level_up` field, the two properties, step 9b on the playing and the last-life tick
