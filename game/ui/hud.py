@@ -413,7 +413,7 @@ class HudView:
             self._origin[1] + top - pad,
         )
         return tuple(
-            (tile, (origin[0] + at[0], origin[1] + at[1])) for tile, at in _ink_tiles(image)
+            (tile, (origin[0] + at[0], origin[1] + at[1])) for tile, at in ink_tiles(image)
         )
 
     def _label(self, text: str) -> pygame.Surface:
@@ -753,7 +753,7 @@ class HudView:
         return self._graze_numbers[grazes]
 
 
-def _ink_tiles(image: pygame.Surface) -> Tiles:
+def ink_tiles(image: pygame.Surface) -> Tiles:
     """Cut ``image`` into ``INK_TILE`` cells, each trimmed to its ink, as copies with their offset.
 
     A thin shape then costs a few small blits, never one blit of its whole bounding box. Cells with

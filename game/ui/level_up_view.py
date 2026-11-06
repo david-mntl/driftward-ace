@@ -19,7 +19,7 @@ import pygame
 from core.level_up import LevelUpBanner
 from core.levels import FIRST_LEVEL, LEVEL_COUNT
 from core.world import SCREEN_H, SCREEN_W
-from ui.hud import HudView, LevelSlot, Tiles, _ink_tiles
+from ui.hud import HudView, LevelSlot, Tiles, ink_tiles
 from ui.level_up_motion import (
     band_shares,
     bump_offset,
@@ -704,7 +704,7 @@ def _ring_frames(look: LevelUpLook) -> tuple[Tiles, ...]:
         pygame.draw.circle(
             image, (*look.colors["ring"], alpha), (half, half), round(diameter / 2), ring.width
         )
-        frames.append(tuple((tile, (dx - half, dy - half)) for tile, (dx, dy) in _ink_tiles(image)))
+        frames.append(tuple((tile, (dx - half, dy - half)) for tile, (dx, dy) in ink_tiles(image)))
     return tuple(frames)
 
 
