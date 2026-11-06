@@ -47,8 +47,8 @@ HALF: float = 16.0
 SCREEN_W: float = 640.0
 """px. Source: 03-world-and-camera.md, Values, screen_w (guess)."""
 
-TOP_LINE_Y: float = 168.0
-"""Screen y of the top line: round(480 * 0.35). Source: 03-world-and-camera.md, rule 2."""
+TOP_LINE_Y: float = 84.0
+"""Screen y of the top line: round(480 * 0.175). Source: 03-world-and-camera.md, rule 2."""
 
 SPAWN_X: float = 320.0
 """Source: 05-lives-and-damage.md, fall_respawn (locked)."""
@@ -75,7 +75,7 @@ NO_KEY: Thrust = Thrust()
 ISLAND_X: float = 320.0
 ISLAND_Y: float = 330.0
 """Where an island's center is put: a whole screen's room on every side of it for a ship pushed
-out, clear of the walls, the top line (168) and the floor."""
+out, clear of the walls, the top line (84) and the floor."""
 
 DEPTH: float = 3.0
 """How far into a surface the ship is put, px."""
@@ -603,36 +603,34 @@ def test_push_never_goes_through_a_side_wall() -> None:
 
 
 def test_push_never_goes_above_the_top_line_and_takes_the_next_shortest_way() -> None:
-    # The island is rows 140 to 260, x 260 to 380. The ship's foot is 10 px in its top: up, 10 px,
-    # would put the ship's top edge at 108, above the top line (168). Left is 26 px, down 142,
+    # The island is rows 56 to 176, x 260 to 380. The ship's foot is 10 px in its top: up, 10 px,
+    # would put the ship's top edge at 24, above the top line (84). Left is 26 px, down 142,
     # right 126: left.
-    near_the_end = block_ship(
-        Ship(270.0, 134.0, 0.0, 0.0), box_ground((320.0, 200.0, 120.0, 120.0))
-    )
-    assert_ship(near_the_end, 244.0, 134.0, 0.0, 0.0)
+    near_the_end = block_ship(Ship(270.0, 50.0, 0.0, 0.0), box_ground((320.0, 116.0, 120.0, 120.0)))
+    assert_ship(near_the_end, 244.0, 50.0, 0.0, 0.0)
     # In the middle of a 320 wide island left and right are 176: down, 142, is the next shortest.
     in_the_middle = block_ship(
-        Ship(320.0, 134.0, 0.0, 0.0), box_ground((320.0, 200.0, 320.0, 120.0))
+        Ship(320.0, 50.0, 0.0, 0.0), box_ground((320.0, 116.0, 320.0, 120.0))
     )
-    assert_ship(in_the_middle, 320.0, 276.0, 0.0, 0.0)
-    # The ship's top edge may end exactly on the line: an island top at 200 puts the foot's bottom
-    # at 200 and the ship's center at 184, top edge 168. One px higher (199) would put it at 167.
-    on_the_line = block_ship(Ship(320.0, 194.0, 0.0, 0.0), box_ground((320.0, 260.0, 320.0, 120.0)))
-    assert_ship(on_the_line, 320.0, 184.0, 0.0, 0.0)
+    assert_ship(in_the_middle, 320.0, 192.0, 0.0, 0.0)
+    # The ship's top edge may end exactly on the line: an island top at 116 puts the foot's bottom
+    # at 116 and the ship's center at 100, top edge 84. One px higher (115) would put it at 83.
+    on_the_line = block_ship(Ship(320.0, 110.0, 0.0, 0.0), box_ground((320.0, 176.0, 320.0, 120.0)))
+    assert_ship(on_the_line, 320.0, 100.0, 0.0, 0.0)
     past_the_line = block_ship(
-        Ship(320.0, 194.0, 0.0, 0.0), box_ground((320.0, 259.0, 320.0, 120.0))
+        Ship(320.0, 110.0, 0.0, 0.0), box_ground((320.0, 175.0, 320.0, 120.0))
     )
-    assert_ship(past_the_line, 320.0, 335.0, 0.0, 0.0)  # down: the bar's top (178) to 319 is 141
+    assert_ship(past_the_line, 320.0, 251.0, 0.0, 0.0)  # down: the bar's top (94) to 235 is 141
 
 
 def test_straight_down_is_always_left_when_every_other_way_is_refused() -> None:
-    # Two islands side by side cover x 0 to 640, rows 140 to 260. Up passes the top line, left and
+    # Two islands side by side cover x 0 to 640, rows 56 to 176. Up passes the top line, left and
     # right pass the walls. Down is not refused.
-    ground = box_ground((160.0, 200.0, 320.0, 120.0), (480.0, 200.0, 320.0, 120.0))
+    ground = box_ground((160.0, 116.0, 320.0, 120.0), (480.0, 116.0, 320.0, 120.0))
 
-    pushed = block_ship(Ship(320.0, 134.0, 0.0, 0.0), ground)
+    pushed = block_ship(Ship(320.0, 50.0, 0.0, 0.0), ground)
 
-    assert_ship(pushed, 320.0, 276.0, 0.0, 0.0)
+    assert_ship(pushed, 320.0, 192.0, 0.0, 0.0)
     assert pushed.against_island is True
 
 
@@ -886,13 +884,13 @@ def test_the_respawn_spot_is_just_above_an_island_that_holds_the_point() -> None
 
 
 def test_the_respawn_spot_is_below_when_above_would_pass_the_top_line() -> None:
-    # Box rows 190 to 310: above is 66 up, y 174, top edge 158, past 168. Below is 86 down: 326.
-    assert_respawn(spawn_clear(box_ground((320.0, 250.0, 120.0, 120.0))), 326.0)
-    # Above may put the top edge exactly on the top line: rows 200 to 280, up 56 and down 56
-    # (a tie), y 184, top edge 168. A box one px taller (rows 199 to 281) is 57 each way: top edge
-    # 167, past the line, so below: 297.
-    assert_respawn(spawn_clear(box_ground((320.0, 240.0, 120.0, 80.0))), 184.0)
-    assert_respawn(spawn_clear(box_ground((320.0, 240.0, 120.0, 82.0))), 297.0)
+    # Box rows 100 to 400: above is 156 up, y 84, top edge 68, past 84. Below is 176 down: 416.
+    assert_respawn(spawn_clear(box_ground((320.0, 250.0, 120.0, 300.0))), 416.0)
+    # Above may put the top edge exactly on the top line: rows 116 to 364, up 140 and down 140
+    # (a tie), y 100, top edge 84. A box one px taller (rows 115 to 365) is 141 each way: top edge
+    # 83, past the line, so below: 381.
+    assert_respawn(spawn_clear(box_ground((320.0, 240.0, 120.0, 248.0))), 100.0)
+    assert_respawn(spawn_clear(box_ground((320.0, 240.0, 120.0, 250.0))), 381.0)
     # Above is allowed and 46 up, but below is 16 down: the nearer one. Rows 210 to 240.
     assert_respawn(spawn_clear(box_ground((320.0, 225.0, 120.0, 30.0))), 256.0)
 
@@ -984,10 +982,10 @@ def test_island_contact_comes_between_wall_hit_and_top_line_stop(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.DEBUG, logger=SHIP_LOGGER)
-    # A thin island against the left wall, rows 70 to 190, x 0 to 20. The ship hits the wall, is
+    # A thin island against the left wall, rows 0 to 120, x 0 to 20. The ship hits the wall, is
     # pushed right (up is refused by the top line, down is 41 px), then the top line stops it.
-    ground = box_ground((10.0, 130.0, 20.0, 120.0))
-    ship = Ship(17.0, 170.0, -5.0, -5.0)
+    ground = box_ground((10.0, 60.0, 20.0, 120.0))
+    ship = Ship(17.0, 100.0, -5.0, -5.0)
 
     after = step(ship, NO_KEY, ground)
 
