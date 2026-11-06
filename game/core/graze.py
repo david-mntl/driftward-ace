@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass, replace
 from typing import Final
 
-from core.collision import Hitbox, hitboxes_overlap
+from core.collision import Hitbox, hitboxes_near, hitboxes_overlap
 from core.drifters.base import Drifter, GrazeState, TouchEffect
 from core.popup import PointsPopup, PopupKind
 from core.ship import Ship
@@ -129,13 +129,20 @@ def check_grazes(drifters: tuple[Drifter, ...], ship_box: Hitbox, may_pay: bool)
 
 
 def _check_one(drifter: Drifter, ship_box: Hitbox, may_pay: bool) -> tuple[Drifter, bool]:
-    """Return the drifter with its graze state brought up to date, and whether it paid."""
+    """Return the drifter with its graze state brought up to date, and whether it paid.
+
+    The graze zone is the hitbox grown by `graze_margin` (`Drifter.graze_zone`), so a hitbox not
+    `hitboxes_near` the ship within that margin neither touches the ship nor holds it in its
+    zone: the exact tests are skipped, with the same result. Speed only.
+    """
     if drifter.effect_on_touch() is not TouchEffect.HIT or drifter.graze_state is GrazeState.SPENT:
         return drifter, False
-    if hitboxes_overlap(drifter.current_hitbox(), ship_box):
-        return replace(drifter, graze_state=GrazeState.SPENT), False
-    if _ship_in_zone(drifter, ship_box):
-        return _with_state(drifter, GrazeState.INSIDE), False
+    hitbox: Hitbox = drifter.current_hitbox()
+    if hitboxes_near(hitbox, ship_box, drifter.graze_margin):
+        if hitboxes_overlap(hitbox, ship_box):
+            return replace(drifter, graze_state=GrazeState.SPENT), False
+        if _ship_in_zone(drifter, ship_box):
+            return _with_state(drifter, GrazeState.INSIDE), False
     if drifter.graze_state is GrazeState.INSIDE and may_pay:
         return replace(drifter, graze_state=GrazeState.SPENT), True
     return _with_state(drifter, GrazeState.OUTSIDE), False
