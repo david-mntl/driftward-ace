@@ -1,7 +1,7 @@
 # Run: lives, score, coins, grazes, falls, hits, drifters, respawn wait, last life and game over
 Version: 13
-Status: frozen
-Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-117, DRA-125, DRA-126
+Status: draft
+Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-117, DRA-125, DRA-126, DRA-148
 Created by: architect
 
 ## Purpose
@@ -522,6 +522,21 @@ class Run:
 ```
 The game flow reads `level_reached` when the game-over screen opens and saves it with the score (`docs/contracts/systems/game-flow.md`, Opening GAME_OVER).
 
+### DRA-148: the level-up banner
+Existing signatures are read from the code. The new state, its step and the shown level are in `docs/contracts/systems/level-up/core.md`. One new field, last, with a default, so every existing `Run(...)` and `replace(run, ...)` call still builds.
+```python
+# game/core/run.py, changed. Imports also core.level_up.
+class Run:
+    ...
+    level_up: LevelUpBanner | None = None   # the banner on screen, or None. Only step 9b changes it
+
+    @property
+    def hud_level(self) -> int: ...      # shown_level(level_up, level): the level the HUD shows
+    @property
+    def level_up_cue(self) -> bool: ...  # level_up is not None and its age_ticks is 0: the level_up sound cue's hook
+```
+`level` stays the waves' real level and is what the scroll, the spawner, `level_reached`, the saves and the debug overlay use.
+
 ## Presentation
 The run's fields reach the screen in these places. Every fact shown is a core field; no view works one out.
 
@@ -538,7 +553,8 @@ The run's fields reach the screen in these places. Every fact shown is a core fi
 | `run.score` | the SCORE line at the top left, `score_text(run.score)`: see `docs/contracts/systems/hud.md`. On the game-over screen, also its score line, through `draw_final_score` (`docs/contracts/systems/game-flow.md`). From DRA-125 it reads `final_score` once the last life is lost, so both show the frozen score. From DRA-61. Source: 10-ui.md, hud_score (locked), rule 2, game_over_screen; 02-game-flow.md, rules 8 and 10 |
 | `run.lives` | the hearts at the top right. See `docs/contracts/systems/hud.md`. At 0, from the last life on, no heart shows: the lost heart disappears as before (scope report DRA-125, Feature) |
 | `run.ship`, `run.scroll` | the ship view, the debug overlay and the starfield read them. The HUD reads the meters only through `run.score`. The stars move at the level's scroll speed through `run.scroll.distance_px` (DRA-76) |
-| `run.waves`, `run.level` | the debug overlay's `wave` and `level` lines (`docs/contracts/systems/debug-overlay.md`; `docs/contracts/systems/waves.md`, Presentation). Not on the HUD. From DRA-76. Source: 10-ui.md, debug_overlay, debug_overlay_layout (guess); scope report DRA-76, Out (the level on the HUD) |
+| `run.waves`, `run.level` | the debug overlay's `wave` and `level` lines (`docs/contracts/systems/debug-overlay.md`; `docs/contracts/systems/waves.md`, Presentation). The HUD's level readout reads `run.hud_level` (DRA-148, below). From DRA-76. Source: 10-ui.md, debug_overlay, debug_overlay_layout (guess) |
+| `run.level_up`, `run.hud_level` (DRA-148) | the level-up banner on the play area, the number's flight, the play area's picture bump and the HUD level pop; the HUD's level number and climb bars show `run.hud_level`. All in `docs/contracts/systems/level-up/view.md`, Presentation. Source: 10-ui.md, `level_up_banner`, `hud_level_pop`, rule 14 |
 
 The game-over screen (box, GAME OVER, score line, RETRY and MENU) is presented in `docs/contracts/systems/game-flow.md`, Presentation, from DRA-125. Under it the world shows frozen where it was when the last-life delay ended: the drifters, the popups and the graze rings still on screen. The ship never shows there: it burst on the last life.
 
@@ -575,7 +591,7 @@ The game-over screen (box, GAME OVER, score line, RETRY and MENU) is presented i
 ## Rules
 Values: every constant above has its value and source on its line. `lives_start`, `invuln_ticks` and `points_per_meter` are locked. The blink and the box are temporary stand-ins the Director approved in chat (scope report DRA-23). The score line's text, look and place are the Director's (scope report DRA-61), not in the GDD (UI-01 and UI-04 are TBD). The popup's length (60 ticks) and color are `guess` in the GDD; its rise (0.5 px a tick), start (the coin's center), font, layer and end with no fade are Director approvals not in the GDD (scope report DRA-62, Not in GDD). Its length and rise come from the coin's tuning file, through the coin (`systems/drifters.md`, Rules, Coin). The graze values (DRA-117): `graze_points` is locked; the graze popup's length and rise and the graze ring's sizes, length and line width are `guess`, and so are both graze colors. The points, the popup's and the ring's numbers come from `game/tuning/scoring.json` through `graze_rules`, with their defaults in `core/graze.py`; the colors stay constants in the views, as for every placeholder look so far. `graze_margin` (locked) comes through each hazard (`systems/drifters/shared/base.md`, Graze zone). The last life (DRA-125): `last_life_delay` is `guess` (02-game-flow.md); the burst's count, speed, size and white color are stand-ins the Director approved (scope report DRA-125, Values needed, Burst), not in the GDD, until LD-08. The delay and the burst's numbers come from `game/tuning/last_life.json` through `last_life_rules`, with their defaults in `core/last_life.py`; the color stays a constant in the view.
 
-Step numbers changed in DRA-29: the DRA-23 steps 3 (wait), 4 (scroll), 5 (fall) and 6 (`held`) are now steps 4, 5, 6 and 10. Changed again in DRA-39: the DRA-29 steps 8 (drop) and 9 (`held`) are now steps 9 and 10, after the new step 8 (cool down). Closed task files and the earlier integration checks in `systems/app.md` use the old numbers. DRA-62 adds steps 3a (popups) and 5a (collect) and keeps every other number, so the code, `systems/drifters.md` and the DRA-39 to DRA-61 checks keep theirs. DRA-76 adds step 9a (waves) the same way, and DRA-117 step 5b (graze).
+Step numbers changed in DRA-29: the DRA-23 steps 3 (wait), 4 (scroll), 5 (fall) and 6 (`held`) are now steps 4, 5, 6 and 10. Changed again in DRA-39: the DRA-29 steps 8 (drop) and 9 (`held`) are now steps 9 and 10, after the new step 8 (cool down). Closed task files and the earlier integration checks in `systems/app.md` use the old numbers. DRA-62 adds steps 3a (popups) and 5a (collect) and keeps every other number, so the code, `systems/drifters.md` and the DRA-39 to DRA-61 checks keep theirs. DRA-76 adds step 9a (waves) the same way, DRA-117 step 5b (graze) and DRA-148 step 9b (level-up banner).
 
 The level (DRA-76). `run.level` is read once going into the tick and used by steps 3 and 5: the whole tick moves at one speed. Step 9a may raise it; the raised level is in the returned run, so the next tick moves at its speed and the drifters `add_drifters` adds after this tick are born at it. Source: 08-difficulty.md, rule 1 and Edge cases; 91-decision-log.md, row 65; `systems/scroll.md`, Rationale (the new speed starts the tick after the level rises).
 
@@ -618,6 +634,7 @@ A playing tick (`game_over` False), in this order:
 8. **Cool down** (DRA-39). Every drifter whose cooldown did not start in step 7 on this tick, and whose `rehit_ticks_left` is above 0, gets `rehit_ticks_left - 1`. Every playing tick: protected ticks, ticks during the respawn wait and ticks with a fall included. So a hazard that hit on tick T can't hit on ticks T+1 to T+`rehit_cooldown_ticks`, has `rehit_ticks_left` 0 in the state after tick T+`rehit_cooldown_ticks`, and can hit again from the tick after. Source: 05-lives-and-damage.md, rule 1.5 ("can't hit the ship again for rehit_cooldown ticks"), rehit_cooldown (guess); the counting follows invulnerability (step 2, and Rationale).
 9. **Drop**. Remove every drifter whose phase is GONE (from DRA-62: a collected coin) or whose `is_off_screen()` is True. `is_off_screen()` is False for a drifter that has not yet entered (DRA-39). The rest keep their order. Source: 07-drifters.md, rule 12; 91-decision-log.md, row 58; drifters/01-meteorite.md and drifters/02-satellite.md, rule 5.
 9a. **Waves** (DRA-76), only when `run.waves` is not None: `waves = step_waves(run.waves, scroll.distance_px)`, with the scroll from step 5. It works out the placements due on this tick, ends waves, raises the level and runs the rest gap (`docs/contracts/systems/waves.md`, Rules, The wave clock). Every playing tick: during the respawn wait, on protected ticks, on a fall tick and on the tick lives reach 0, because the world keeps scrolling then. The run never spawns the due placements itself: they are in `run.wave_spawns_due` for the app's `add_drifters` call after the tick. With `waves` None nothing happens. Source: 09-waves.md, rules 2, 4 and 9; 08-difficulty.md, rule 1; 03-world-and-camera.md, rule 4; scope report DRA-76, Limits.
+9b. **Level-up banner** (DRA-148), right after 9a, on every tick that stepped the waves: start it on the tick `waves.level_rose` is True and `waves.level_up_rules.rest_ticks > 0`, age it on every tick after, and set it to None when the run has a burst (the last life) or core drops it at its lifetime. `docs/contracts/systems/level-up/core.md`, Rules (The banner) holds the order. It only sets `level_up`; nothing else in the tick reads it. Source: 08-difficulty.md, rule 10; 10-ui.md, `level_up_banner`; scope report DRA-148, Feature.
 10. `held = thrust` in the returned run.
 
 If nothing happened, the returned run has the new ship, scroll, drifters, popups, graze rings and waves, `invuln_ticks_left = left`, the `waiting` from step 4, the same `lives`, the same `coin_points` and the same `grazes`.
@@ -628,7 +645,7 @@ If nothing happened, the returned run has the new ship, scroll, drifters, popups
 - `burst = start_burst(run.last_life_rules, x, y)`, at the point step 6.3 or 7.5 names. Source: 05-lives-and-damage.md, rule 5; scope report DRA-125, Values needed (Burst).
 - `final_level = ` the run's level at that point of the tick: the level the tick was flown at, since step 9a, which may raise it, comes after (DRA-126). Source: 11-save-data.md, entry_fields ("level reached") and Edge cases ("the level when the last life is lost, frozen with the score"); 91-decision-log.md, row 95; 02-game-flow.md, rule 8 (from the burst on, nothing the world does counts for the run).
 - Log INFO `last life score=%d` with the final score.
-- Steps 8, 9, 9a and 10 then run as on any playing tick: the tick runs in full. No life-lost feedback but the burst: no flash, no HUD break (scope report DRA-125, Objection 1).
+- Steps 8, 9, 9a, 9b and 10 then run as on any playing tick: the tick runs in full. Step 9b finds the burst and sets `level_up` to None (DRA-148). No life-lost feedback but the burst: no flash, no HUD break (scope report DRA-125, Objection 1).
 
 **A last-life tick** (DRA-125), `run.last_life` True going in. The world runs on without the ship; in this order:
 1. Drifters as in step 3, with `ctx = TickContext(ship=run.ship, scroll_step_px=scroll_step_px(run.scroll, run.level))`: the ship as it was left, where it burst. Each drifter keeps doing what it does. Source: 02-game-flow.md, rule 8 ("drifters keep moving"); 91-decision-log.md, row 82 ("The world keeps moving").
@@ -636,15 +653,15 @@ If nothing happened, the returned run has the new ship, scroll, drifters, popups
 3. No wait, no ground, no wells, no ship step: `ship` stays as it was. Source: 05-lives-and-damage.md, rule 5 ("never rebuilds").
 4. Scroll as in step 5: the world keeps scrolling at the level's speed. The meters go on counting in `scroll`, but not in the score. Source: 02-game-flow.md, rule 8.
 5. No collect (5a), no graze (5b), no fall (6), no hit (7): nothing can touch the ship and no points come in. Every drifter's `graze_state` stays as it was. Source: 02-game-flow.md, rule 8 ("Nothing can hit the ship and the score is frozen: no distance, coins or grazes count").
-6. Cool down (8), drop (9) and waves (9a) as on a playing tick: cooldowns run, drifters that leave are dropped, the wave clock runs on the scroll and placements come due. The app adds them after the tick as on any stepped tick, so new drifters keep coming in during the delay. Source: 09-waves.md, rules 2 and 9 (waves run on the scroll's distance); 02-game-flow.md, rule 8.
+6. Cool down (8), drop (9), waves (9a) and the level-up banner (9b, DRA-148: the burst is set, so `level_up` is None and no banner starts) as on a playing tick: cooldowns run, drifters that leave are dropped, the wave clock runs on the scroll and placements come due. The app adds them after the tick as on any stepped tick, so new drifters keep coming in during the delay. Source: 09-waves.md, rules 2 and 9 (waves run on the scroll's distance); 02-game-flow.md, rule 8.
 7. `burst = step_burst(run.burst)`. If the new burst is `finished`: `game_over = True` and log INFO `game over score=%d` with the final score. So game over comes on tick L + `delay_ticks` for a last life lost on tick L (Diagram). Source: 02-game-flow.md, rule 8 and last_life_delay (guess).
 8. `held = thrust`. The keys play no other part: the arrows do nothing. Source: 02-game-flow.md, rule 8 ("Keys do nothing").
 
 A game-over tick (`game_over` True):
-- The ship, the scroll, the drifters, the popups, the graze rings, the burst, the coin points, the grazes, the final score, the lives, the timer and the waves don't change. Nothing is updated, collected or dropped, and the wave clock doesn't run. Only `held = thrust`. The arrows never start a new run: from DRA-125 the run has no retry of its own. Source: 02-game-flow.md, rules 10 and 11; 91-decision-log.md, row 79 (retry is Enter or Space, not an arrow).
+- The ship, the scroll, the drifters, the popups, the graze rings, the burst, the coin points, the grazes, the final score, the lives, the timer, the waves and (DRA-148) the level-up banner (already None) don't change. Nothing is updated, collected or dropped, and the wave clock doesn't run. Only `held = thrust`. The arrows never start a new run: from DRA-125 the run has no retry of its own. Source: 02-game-flow.md, rules 10 and 11; 91-decision-log.md, row 79 (retry is Enter or Space, not an arrow).
 
 `next_run(run)` (DRA-125):
-- Logs INFO `new run`, then returns `start_run(waves=next_run_waves(run.waves), graze_rules=run.graze_rules, last_life_rules=run.last_life_rules)`, or with `waves=None` when `run.waves` is None: a new run with no drifters, `next_uid` 1, 0 grazes, no popups, no rings, no burst, no final score, no final level (DRA-126), 3 lives, the ship at the center point at rest; with waves, Wave 0 again at Level 1 with a new seed for its picks (DRA-76). Everything resets; the graze and last-life values stay. Source: 02-game-flow.md, rules 5 and 11; 09-waves.md, rules 3 and 4 (Wave 0 first every run, picks new every run); scope report DRA-76, Feature ("Retry starts a fresh run: Wave 0, Level 1, new random picks").
+- Logs INFO `new run`, then returns `start_run(waves=next_run_waves(run.waves), graze_rules=run.graze_rules, last_life_rules=run.last_life_rules)`, or with `waves=None` when `run.waves` is None: a new run with no drifters, `next_uid` 1, 0 grazes, no popups, no rings, no burst, no final score, no final level (DRA-126), no level-up banner (DRA-148), 3 lives, the ship at the center point at rest; with waves, Wave 0 again at Level 1 with a new seed for its picks (DRA-76). Everything resets; the graze and last-life values stay. Source: 02-game-flow.md, rules 5 and 11; 09-waves.md, rules 3 and 4 (Wave 0 first every run, picks new every run); scope report DRA-76, Feature ("Retry starts a fresh run: Wave 0, Level 1, new random picks").
 - It is the one way a run follows another: RETRY and Play after MENU both use it (`docs/contracts/systems/game-flow.md`). The new run is first stepped on the tick after.
 
 **Burst** (DRA-125, `core/last_life.py`). A stand-in until LD-08 (10-ui.md, life_lost_feedback, TBD). Source for every item: scope report DRA-125, Values needed (Burst: squares "from the ship's center, in 12 evenly spread directions, 1 px per tick, fading from full to 0 opacity over `last_life_delay`. They don't move with the scroll"), with the count, speed and size from `last_life_rules`.

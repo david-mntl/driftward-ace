@@ -1,0 +1,55 @@
+{
+  "level_up_rest": 150,
+  "arrival_tick": 124,
+  "banner_ticks": 150,
+  "colors": {
+    "glass": "panel_body",
+    "hairline": "frame_lights",
+    "label": "plating",
+    "number_top": "#fff6d6",
+    "number_bottom": "level",
+    "number_outline": "panel_body",
+    "ring": "#fff6d6",
+    "streak": "#fff6d6",
+    "glint": "#fff6d6",
+    "pip_lit": "level",
+    "pip_unlit": "dim",
+    "flash": "#ffffff",
+    "box_flash": "level"
+  },
+  "band": {
+    "height": 120, "alpha": 120, "center_offset_y": 0,
+    "open_start": 0, "open_end": 10,
+    "close_start": 100, "close_end": 124, "close_glass_share": 0.65,
+    "hairline_width": 1, "corner_tick_length": 6
+  },
+  "number": {
+    "font_size": 88, "outline_width": 2, "center_offset_y": 0,
+    "fall_start": 4, "fall_end": 22, "fall_overshoot_px": 10, "fall_peak_share": 0.72,
+    "fall_stretch_x": 0.92, "fall_stretch_y": 1.12,
+    "squash_ticks": 8, "squash_x": 1.2, "squash_y": 0.82, "pose_steps": 4
+  },
+  "label": {
+    "font_size": 14, "offset_y": -48,
+    "fade_in_start": 22, "fade_in_end": 36,
+    "spacing_wide": 14, "spacing_normal": 4, "spacing_steps": 5
+  },
+  "hold": { "fade_out_start": 96, "fade_out_end": 106 },
+  "pips": {
+    "size": 10, "pitch": 18, "offset_y": 48,
+    "start": 26, "end": 48, "pop_ticks": 6, "flash_ticks": 10
+  },
+  "ring": { "start_diameter": 48, "end_diameter": 170, "width": 2, "ticks": 18 },
+  "streaks": {
+    "count": 12, "ticks": 14, "length": 20, "width": 2,
+    "start_radius": 34, "end_radius": 130
+  },
+  "glint": { "start": 44, "end": 60, "frames": 8, "width": 14, "slant_degrees": 20, "strength": 0.8 },
+  "bump": { "pixels": 3, "ticks": 14, "peak_share": 0.25 },
+  "fly": { "start": 100, "arc_px": 40, "steps": 8 },
+  "pop": {
+    "ticks": 24, "start_scale": 1.45, "undershoot_scale": 0.94, "undershoot_share": 0.6,
+    "flash_ticks": 14, "steps": 12,
+    "bar_flash_ticks": 18, "box_flash_ticks": 20, "box_flash_width": 1, "box_corner_cut": 8
+  }
+}

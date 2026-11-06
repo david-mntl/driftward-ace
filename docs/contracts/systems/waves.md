@@ -1,13 +1,13 @@
 # Waves: wave files, the wave book, the wave clock, playlists and the random picker
 Version: 3
-Status: frozen
-Features: DRA-76, DRA-104, DRA-111
+Status: draft
+Features: DRA-76, DRA-104, DRA-111, DRA-148
 Created by: architect
 
 ## Purpose
 A normal run is made of waves. A wave is a hand-authored group of drifters, each placed at a scroll distance from the wave's start; it plays as the world scrolls past. This contract holds the waves and playlists as core data (the wave book), the check that turns the decoded wave and playlist files into a book or refuses them, the wave state one run carries (the level, the wave playing, the rest gap, the next random pick), its one-tick step (the wave clock and the playlist runner), and the random picker.
 
-Every run opens with Wave 0 at Level 1. Then each level plays its playlist: its fixed waves in order, then `random_count` random picks. When the last wave of a level's playlist ends, the level goes up by one on that tick. After Level 8's playlist, random picks play forever at Level 8. A random pick is a pool wave allowed at the current level, never the wave that just played, and new every run. Between two waves there is a rest gap: `rest_gap_base` × the level's Rest gap × (0 ticks for now), plus the extra rest of the wave that ended. The world keeps scrolling through it.
+Every run opens with Wave 0 at Level 1. Then each level plays its playlist: its fixed waves in order, then `random_count` random picks. When the last wave of a level's playlist ends, the level goes up by one on that tick. After Level 8's playlist, random picks play forever at Level 8. A random pick is a pool wave allowed at the current level, never the wave that just played, and new every run. Between two waves there is a rest gap: `rest_gap_base` × the level's Rest gap × (0 ticks for now), plus the extra rest of the wave that ended. When the wave that ended raised the level, a fixed level-up rest is added on top (`docs/contracts/systems/level-up/core.md`). The world keeps scrolling through it.
 
 The wave state lives inside the run (`docs/contracts/systems/run.md`, `Run.waves`): it freezes at game over, and a retry starts it again from Wave 0 with new picks. Its level is the run's level: the scroll speed (`docs/contracts/systems/scroll.md`) and the spawner read it. A run with no wave state plays no waves and stays at Level 1: that is the debug test spawn list.
 
@@ -52,6 +52,8 @@ classDiagram
     start_px, spawned
     pick_seed, run_seed
     spawns_due: tuple~Placement~
+    level_up_rules: LevelUpRules
+    level_rose: bool
     current_wave_id() str|None
   }
   WaveBook --> Wave
@@ -75,7 +77,7 @@ flowchart TD
   END -- yes --> E1["the wave ends<br/>log wave end"]
   E1 --> E2{"its level's playlist done<br/>and level < 8?"}
   E2 -- yes --> E3["level rises<br/>(past any empty playlist)<br/>log level up"] --> E4
-  E2 -- no --> E4["rest = rest_gap_ticks(level, extra_rest_ticks)"]
+  E2 -- no --> E4["rest = rest_gap_ticks(level, extra_rest_ticks)<br/>+ level_up_rules.rest_ticks when the level rose (DRA-148)"]
   E4 --> E5{"rest > 0?"}
   E5 -- yes --> E6["resting, rest_ticks_left = rest<br/>log rest start"] --> OUT
   E5 -- no --> E7["start the next wave<br/>start_px = old start_px + length_px"] --> C
@@ -115,7 +117,8 @@ The level is 2 in the state after tick 3630, and tick 3631 is the first that scr
 ```python
 # game/core/waves.py
 # Imports: stdlib (collections.abc, dataclasses, enum, logging, math, random, typing), core.levels,
-# core.scroll (DISTANCE_DECIMALS), core.drifters.spawner (Placement). Never pygame, ui or app.
+# core.level_up (DRA-148: LevelUpRules, NO_LEVEL_UP), core.scroll (DISTANCE_DECIMALS),
+# core.drifters.spawner (Placement). Never pygame, ui or app.
 # Every module-level constant is typing.Final.
 
 REST_GAP_BASE_TICKS: Final[int] = 0  # 08-difficulty.md, rest_gap_base, ticks (guess; the real value is DF-02)
@@ -179,22 +182,26 @@ class WaveRun:
     pick_seed: int              # seed of the next random pick, >= 0
     run_seed: int               # the seed this run's waves started from, >= 0
     spawns_due: tuple[Placement, ...] = ()   # placements that came due on the last tick, in order
+    level_up_rules: LevelUpRules = NO_LEVEL_UP   # DRA-148. core.level_up. The level-up values this run plays with. Never changes in a run
+    level_rose: bool = False    # DRA-148. True on the state after a tick on which the level rose; False on every other
 
     @property
     def current_wave_id(self) -> str | None: ...
         # None while resting, else wave_id.
 
 
-def start_waves(book: WaveBook, seed: int) -> WaveRun: ...
+def start_waves(book: WaveBook, seed: int, level_up_rules: LevelUpRules = NO_LEVEL_UP) -> WaveRun: ...
     # Wave 0 at Level 1: level FIRST_LEVEL, next_slot 0, wave_id book.wave_zero_id, start_px 0.0,
-    # spawned 0, pick_seed seed, run_seed seed, nothing due. Logs its wave start.
+    # spawned 0, pick_seed seed, run_seed seed, nothing due, level_rose False, level_up_rules kept
+    # (DRA-148; left out, no level-up rest: a run plays as before). Logs its wave start.
 
 def step_waves(waves: WaveRun, distance_px: float) -> WaveRun: ...
     # One playing tick. distance_px is the run's scroll distance after this tick's scroll step.
     # Pure apart from event logging. Never mutates its input.
 
 def next_run_waves(waves: WaveRun) -> WaveRun: ...
-    # The waves of the next run: start_waves(waves.book, random.Random(waves.run_seed).getrandbits(64)).
+    # The waves of the next run: start_waves(waves.book, random.Random(waves.run_seed).getrandbits(64),
+    # waves.level_up_rules) (DRA-148 keeps the rules).
 
 def pick_pool_wave(book: WaveBook, level: int, last_wave_id: str, chooser: random.Random) -> str: ...
     # One random pick. Draws from chooser only.
@@ -253,7 +260,8 @@ The wave clock (`step_waves`, steps as in the Diagram). Source: 09-waves.md, rul
 2. **Due.** `into = round(distance_px - start_px, DISTANCE_DECIMALS)`, px of scroll into the playing wave. Every placement from index `spawned` on whose `at_px <= into` is due, in placement order, and `spawned` moves past them. A placement is due once, on the first tick its trigger is reached. So a trigger of 0 is due on the tick its wave starts (for Wave 0, tick 1 of play).
 3. **End.** When `into >= length_px` the wave ends on this tick. Every placement with `at_px <= into` is due first (step 2). A placement whose `at_px` is beyond the wave's length is never due.
    1. **Level rise.** If the wave that ended filled the last slot of its level's playlist (`next_slot >= len(level_slots(level))`) and `level < LEVEL_COUNT`: `level + 1` and `next_slot = 0`. While the new level is below `LEVEL_COUNT` and its playlist has no slots, `level + 1` again. Log `level up` once, with the new level. At Level 8 the level never rises. Source: 08-difficulty.md, rule 1 ("Each level ends on the tick the last wave of its playlist ends, and the next level starts on that tick"), Edge cases (no Level 9).
-   2. **Rest gap.** `rest = rest_gap_ticks(level, ended_wave.extra_rest_ticks)`, with the level after 3.1. Above 0: `resting = True`, `rest_ticks_left = rest`; nothing more this tick. Source: 08-difficulty.md, rules 6 and rest_gap_base; 09-waves.md, rule 11.
+   2. **Rest gap.** `rest = rest_gap_ticks(level, ended_wave.extra_rest_ticks)`, with the level after 3.1. From DRA-148, when 3.1 raised the level on this call, `level_up_rules.rest_ticks` is added to it: `rest = rest_gap_ticks(...) + level_up_rules.rest_ticks`, never scaled. Above 0: `resting = True`, `rest_ticks_left = rest`; nothing more this tick. Source: 08-difficulty.md, rules 6 and 10, and rest_gap_base; 09-waves.md, rule 11; `docs/contracts/systems/level-up/core.md`, Rules (The level-up rest).
+   2a. **The rise flag** (DRA-148). `level_rose` is set to False at the start of every `step_waves` call, as `spawns_due` is, and to True when 3.1 raised the level during the call. Source: `docs/contracts/systems/level-up/core.md`, Rules (The rise flag).
    3. **Next wave.** With no rest, the next wave starts on this tick at `start_px = old start_px + old length_px`, where the last one ended, and step 2 runs again for it with the same `distance_px`. So a wave that ends partway through a tick's scroll loses none of that scroll, and waves keep their layout end to end.
 4. `spawns_due` in the returned state holds every placement that came due on this tick, across every wave that played on it, in order. `()` when none.
 - The level only changes in 3.1, so it never changes inside a wave. Source: 08-difficulty.md, Edge cases.
@@ -326,6 +334,7 @@ Other rules:
 - **After a rest, the next wave starts at the distance of the tick the rest ends.** The rest is counted in ticks, and the world moved during it; there is no earlier distance to start from.
 - **The rest counts down from the tick after the wave ends.** A rest of R ticks then shows on exactly R states, like the blink and the cooldown in `systems/run.md`.
 - **The level rises before the rest gap is worked out.** 08-difficulty.md, rule 6 uses "the level current when the gap starts", and rule 1 starts the next level on the tick the last wave ends, which is the tick the gap starts. With `rest_gap_base` 0 this has no effect yet.
+- **The level-up rest is added in the wave clock, not in `rest_gap_ticks` (DRA-148).** `rest_gap_ticks(level, extra)` stays the gap alone, with the signature every caller and test knows; the clock adds the fixed level-up rest only where it knows the level rose. The rules ride in the wave state so `step_run` and `next_run_waves` keep their signatures; `NO_LEVEL_UP` as the default keeps every run built without them resting as before. `docs/contracts/systems/level-up/rationale.md` has the rest.
 - **The scaled rest rounds up.** The GDD has one rule for a scaled tick count, "A scaled timer rounds up to a whole tick" (08-difficulty.md, rule 4). The rest gap is the same kind of number, so it follows that rule. No effect while `rest_gap_base` is 0.
 - **A level whose playlist has no slots is passed on the tick it starts.** 08-difficulty.md, rule 1 ends a level when its last wave ends; a level with no waves has nothing to wait for. The loader doesn't refuse it, because the scope report's list of refusals doesn't include it. No placeholder playlist is empty.
 - **Wave 0 is no slot.** 08-difficulty.md, rule 1: "Wave 0 plays at Level 1, before the Level 1 playlist." Counting it outside the playlist keeps `random_count` and the fixed list exactly what the Director writes for Level 1.

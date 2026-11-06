@@ -1,7 +1,7 @@
 # HUD
 Version: 7
 Status: draft
-Features: DRA-13, DRA-23, DRA-61, DRA-76, DRA-117, DRA-125, DRA-126, HUD-PANEL
+Features: DRA-13, DRA-23, DRA-61, DRA-76, DRA-117, DRA-125, DRA-126, DRA-148, HUD-PANEL
 Created by: architect
 
 ## Purpose
@@ -82,6 +82,9 @@ class HudView:
         # Never touches the play area except for the sheen. Keeps the last lives and grazes to start the motions.
     def dim(self, window: pygame.Surface) -> None: ...
         # Black at window.dim_alpha over the whole window. Called before the pause box and the game-over screen.
+    # DRA-148 changes __init__ (an optional level_up_look), draw (an optional level_up banner) and adds
+    # level_slot(level). They are in docs/contracts/systems/level-up/view.md, Interface (HudView, LevelSlot).
+    # With the new arguments left out the HUD is exactly the HUD above.
 
 def clamp_score(score: int, digits: int) -> int: ...   # min(score, 10**digits - 1). Pure.
 def lit_segments(score: int, best: int | None, segments: int, step: int) -> int: ...   # the score bar. Pure.
@@ -120,7 +123,7 @@ The app opens the window from the rules: `pygame.display.set_mode((rules.window.
 | BEST | label and the grouped number (comma), right-aligned, only when `best` is not None | the number is rendered again only when `best` changes |
 | Hearts | slots center, right, left, top, bottom: slot `i` lit while `i < lives`. Lit: the lit image; lost: dim; last life (`lives == 1`) the lit slot uses the last image | blits |
 | Scan line | `scan` at a y that falls from `y0` to `y1` once per `scan_ticks` | one blit |
-| Level | the number in the tier color, the bars: lit up to the level, ramp `level` to `last_life`; bars past `level` are `dim` | number cached by level; rect fills |
+| Level | the number in the tier color, the bars: lit up to the level, ramp `level` to `last_life`; bars past `level` are `dim`. From DRA-148 the level is `shown_level(level_up, run.level)`: the old level until the level-up flight arrives, then the new one with the pop (`systems/level-up/view.md`, Presentation) | number cached by level; rect fills; the pop's frames made at startup |
 | Radar | frame `(tick % sweep_ticks) * frames // sweep_ticks` of the wedge | one blit |
 | Graze count | cached by value, centered in the dial, shrunk to fit `count_limit` | rendered again only when the count changes |
 | Frame | the strips of `hud_frame.png` round the play area and at the pillar, then the sheen over the play area when `frame.sheen` is on, as strips `sheen_rows` tall trimmed to where they have any sheen (about 60 000 px, not the play area's 307 200) | blits |
@@ -141,6 +144,7 @@ Pause and game over: the app calls `HudView.dim(window)` after the HUD, then dra
 - Per frame the HUD makes no new surface, except the count's and the best's text when they change and the count's swell frames while it swells. Source: 10-ui.md, rule 11; 15-tech-constraints.md, rule 5.
 - The score shows `min(score, 10**tile_count - 1)`. The tiles never show a number the score doesn't have. Source: 10-ui.md, `hud_score`.
 - Score bar: with `best` not None and above 0, the target is `best`; else the next multiple of `bar_step` above the score. Lit segments are `ceil(min(1, score / target) * segments)`, 0 at score 0. Source: 10-ui.md, `hud_score_bar`.
+- The level pop (DRA-148): the HUD keeps the old level until the banner's arrival tick and plays the pop after it; the whole rule, its timings and its cost rules are in `systems/level-up/view.md`. It is the one motion that reads a core age (`level_up.age_ticks`) instead of the view clock, so it freezes with the run. Source: 10-ui.md, `hud_level_pop`.
 - The level bars count `level.bars` (8). `lit = min(level, bars)`. Source: 10-ui.md, `hud_level`; 08-difficulty.md, rule 1.
 - Fonts: Exo 2 Bold for the numbers, Share Tech Mono for the labels. Both are static files in `assets/fonts/`. Source: 10-ui.md, `hud_fonts`.
 - `score_text`, `graze_text`, `best_text` and `group_digits` in `ui/score_text.py` are unchanged. The HUD doesn't use `score_text`, `graze_text` or `best_text`. The game-over screen and the leaderboard still do. BEST on the panel groups with `score.best_separator` instead of the space of `group_digits`. Source: scope DRA-61 and DRA-126 for the other screens; 10-ui.md, `hud_best`.
