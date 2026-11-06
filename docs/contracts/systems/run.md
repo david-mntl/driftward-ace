@@ -182,7 +182,7 @@ zone gone with the ship inside         yes     SPENT (chain lightning or electri
 # Imports: stdlib, core.ship, core.scroll, core.collision, core.levels, core.drifters (DRA-29),
 # core.popup (DRA-62), core.waves (DRA-76). Never pygame, ui or app. Every module-level constant is typing.Final.
 
-LIVES_START: Final[int] = 3  # 05-lives-and-damage.md, lives_start (locked)
+LIVES_START: Final[int] = 5  # 05-lives-and-damage.md, lives_start (locked; 3 until the 2026-11-06 hotfix)
 INVULN_TICKS: Final[int] = 60  # 05-lives-and-damage.md, invuln_ticks (locked; 30 until the 2026-11-06 hotfix)
 BLINK_SWAP_TICKS: Final[int] = (
     6  # scope report DRA-23, blink: one visible/hidden swap every 0.1 s

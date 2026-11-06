@@ -32,7 +32,7 @@ Do not reopen. Changing one needs the Director's explicit go-ahead and a row in 
 2. The screen is fixed and never follows the ship. The world scrolls down past it at a steady speed set by the level, and distance counts that scroll. Falling off the floor (the bottom edge) costs a life. [03-world-and-camera.md](03-world-and-camera.md)
 3. Side walls are solid. They stop the ship with no bounce. [03-world-and-camera.md](03-world-and-camera.md)
 4. Every game rule runs on a fixed 60 Hz tick. Gravity is always on. Horizontal velocity has drag. Fall speed is capped. [04-ship.md](04-ship.md)
-5. The ship has 3 lives. A hit or a fall costs one, then brief invulnerability. No stun: losing a life never freezes the ship or takes control away. [05-lives-and-damage.md](05-lives-and-damage.md)
+5. The ship has 5 lives. A hit or a fall costs one, then brief invulnerability. No stun: losing a life never freezes the ship or takes control away. [05-lives-and-damage.md](05-lives-and-damage.md)
 6. Hazards are defined by behavior archetype, not by visual skin. [07-drifters.md](07-drifters.md)
 7. Waves are hand-authored JSON. Every run opens with the same fixed Wave 0. Its only hazard is the meteorite; it may also hold coins. [09-waves.md](09-waves.md)
 8. A main menu shows after click-to-start: Play, Instructions, Leaderboard. The instructions open only from the menu. [02-game-flow.md](02-game-flow.md)
