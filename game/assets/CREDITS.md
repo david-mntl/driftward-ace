@@ -27,7 +27,7 @@
 
 ## Drifters
 
-All own work, drawn by script (Pillow + numpy) from the designs the Director picked on 2026-11-05. No outside source. The large masters stay in staging/assets/sprites/anim/ (not shipped).
+All own work, drawn by script (Pillow + numpy) from the designs the Director picked on 2026-11-05. No outside source. The large masters and design stills are not kept in the repo. The scripts that build ufo_broken, ufo_clean and fireball read staged inputs that were removed, so those three cannot be rebuilt as they are.
 
 - sprites/ufo_broken.png: the broken UFO, 8 frames of 40x20, played in random order. tools/art/ufo-broken-anim.py, built on the staged ufo-d2-r2 master.
 - sprites/ufo_clean.png: the clean UFO, 8 frames of 40x20, a loop. tools/art/ufo-clean-anim.py, from ufo-d3-r3 (tools/art/ufo-d3.py).
