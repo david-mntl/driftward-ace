@@ -31,7 +31,7 @@ from core.ship import Ship, Thrust, ship_hitbox, spawn
 LIVES_START: int = 3
 """Source: 05-lives-and-damage.md, Values, lives_start (locked)."""
 
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Ticks. Source: 05-lives-and-damage.md, Values, invuln_ticks (locked)."""
 
 THRUST_SIDE: float = 0.42
@@ -358,7 +358,7 @@ def test_an_invulnerable_ship_takes_no_hit_until_it_ends() -> None:
 
 
 def test_a_hit_starts_the_cooldown_and_the_drifter_keeps_moving() -> None:
-    speed: float = 0.5
+    speed: float = 0.25
     start: Meteorite = rock(speed=speed)
     assert start.may_hit_ship()
     assert start.rehit_ticks_left == 0

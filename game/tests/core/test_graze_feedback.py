@@ -91,7 +91,7 @@ GRAZE_RING_END: float = 32.0
 GRAZE_RING_WIDTH: int = 1
 """Source: 06-scoring.md, graze_ring (guess)."""
 
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, invuln_ticks (locked)."""
 
 HOME_X: float = 320.0

@@ -86,7 +86,7 @@ REHIT_COOLDOWN: int = 180
 """Ticks. Source: 05-lives-and-damage.md, rehit_cooldown (guess)."""
 
 LIVES_START: int = 3
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
 RUN_LOGGER = "core.run"

@@ -81,7 +81,7 @@ GRAZE_MARGIN: float = 14.0
 """px. Source: 06-scoring.md, graze_margin (locked)."""
 
 LIVES_START: int = 3
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
 REHIT_COOLDOWN: int = 180

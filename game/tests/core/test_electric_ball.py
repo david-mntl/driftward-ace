@@ -105,7 +105,7 @@ REHIT_DIM: float = 0.75
 """Source: 05-lives-and-damage.md, rehit_cooldown, rehit_dim (guess)."""
 
 LIVES_START: int = 3
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
 RUN_LOGGER = "core.run"

@@ -76,7 +76,7 @@ FALL_CAP: float = 5.5
 """px/tick², px/tick. Source: 04-ship.md, Values, gravity, fall_cap (guess)."""
 
 LIVES_START: int = 3
-INVULN_TICKS: int = 30
+INVULN_TICKS: int = 60
 """Source: 05-lives-and-damage.md, Values, lives_start, invuln_ticks (locked)."""
 
 SPAWN_X: float = 320.0
