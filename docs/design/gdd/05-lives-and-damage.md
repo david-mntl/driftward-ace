@@ -3,13 +3,13 @@ Status: draft
 Depends on: [03-world-and-camera.md](03-world-and-camera.md), [04-ship.md](04-ship.md), [07-drifters.md](07-drifters.md), [10-ui.md](10-ui.md)
 
 ## Summary
-The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor is a **fall**. Both cost a life. There is no stun: the ship keeps its momentum and the player keeps control, because Pillar 1 rules out an instant stop. Instead the game makes the loss impossible to miss (flash, breaking life icon, ship bursting and rebuilding) and gives half a second of invulnerability to recover. No lives left means game over.
+The ship has 3 lives. Touching a hazard is a **hit**. Dropping below the floor is a **fall**. Both cost a life. There is no stun: the ship keeps its momentum and the player keeps control, because Pillar 1 rules out an instant stop. Instead the game makes the loss impossible to miss (flash, breaking life icon, ship bursting and rebuilding) and gives one second of invulnerability to recover. No lives left means game over.
 
 ## Values
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
 | lives_start | 3 | lives | — | locked | [01-vision.md](01-vision.md), Locked decisions |
-| invuln_ticks | 30 | ticks (0.5 s) | — | locked | Director |
+| invuln_ticks | 60 | ticks (1 s) | — | locked | Director, 2026-11-06 (was 30) |
 | invuln_blink | yes | — | — | locked | Director |
 | blink_period | TBD | ticks | — | TBD | LD-04 |
 | fall_respawn | screen center (320, 240), at rest | screen px | — | locked | Director |

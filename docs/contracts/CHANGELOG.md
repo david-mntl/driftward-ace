@@ -220,3 +220,9 @@
 - Changed: `game/ui/drifters/entry_warning.py` (one cached sign image; `draw_entry_warning(surface, obj)` loses its `view` argument; `drop_entry_warning` removed); `game/ui/drifters/registry.py` (calls); `systems/drifters/shared/views.md` (Diagram, Interface, Presentation, Entry warning).
 - Tests: `game/tests/ui/test_entry_warning.py` rewritten for the sign: its size, nothing past the radius, its color, the mark, and the same image at the warning center.
 - Not changed, now unused by the UI: core `warning_copy()` and `warning_tilt_degrees()` on every drifter, the chain lightning's `entry_warning_icon` tuning field, and the contract text that describes them (`shared/base.md`, `shared/base-interface.md`, the drifter `core.md`, `view.md` and `rationale.md` files, integration checks DRA-47 and DRA-56). Removing them is a structural change for the Architect.
+
+## Invulnerability 1 s, 2026-11-06
+- Numbers-only hotfix. The Director ordered it, and the main session applied it outside the pipeline. `invuln_ticks` 30 to 60 (0.5 s to 1 s). GDD: `05-lives-and-damage.md` Values and Summary, `90-open-questions.md` LD-08, `91-decision-log.md` row 134.
+- Changed: `INVULN_TICKS` in `game/core/run.py`; `systems/run.md` constant line and the blink table (now T to T+60). No interface change, so the version stays 13.
+- Tests: the `INVULN_TICKS` copies in 13 core test files are 60. Four scenarios were timed around 30 ticks and now follow `INVULN_TICKS`: the blink pattern and the log test (`test_run.py`), the slow rock's speed 0.5 to 0.25 so it still overlaps the ship past the longer window (`test_run_drifters.py`), the last-life rock's cooldown (`test_run_last_life.py`) and the UFO's end-of-invulnerability tick (`test_ufo.py`).
+- Not changed: past task files and integration checks keep their 30-tick timings as history. The browser build was not re-run.

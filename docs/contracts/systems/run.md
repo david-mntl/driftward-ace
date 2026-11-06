@@ -75,10 +75,10 @@ flowchart TD
 
 Invulnerability and blink after a respawn or a hit on tick T (`BLINK_SWAP_TICKS` = 6):
 ```
-state after tick   T    T+1..T+5   T+6..T+11   T+12..T+17   T+18..T+23   T+24..T+29   T+30
-invuln_ticks_left  30   29..25     24..19      18..13       12..7        6..1         0
-ship_visible       yes  yes        no          yes          no           yes          yes (solid)
-protected on tick       T+1 .......................................................... T+30
+state after tick   T    T+1..T+5   T+6..T+11   T+12..T+17   ...   T+48..T+53   T+54..T+59   T+60
+invuln_ticks_left  60   59..55     54..49      48..43       ...   12..7        6..1         0
+ship_visible       yes  yes        no          yes          ...   yes          no           yes (solid)
+protected on tick       T+1 ................................................................ T+60
 ```
 
 Drifters entering, with the app's call after the tick (`docs/contracts/systems/app.md`):
@@ -183,7 +183,7 @@ zone gone with the ship inside         yes     SPENT (chain lightning or electri
 # core.popup (DRA-62), core.waves (DRA-76). Never pygame, ui or app. Every module-level constant is typing.Final.
 
 LIVES_START: Final[int] = 3  # 05-lives-and-damage.md, lives_start (locked)
-INVULN_TICKS: Final[int] = 30  # 05-lives-and-damage.md, invuln_ticks (locked)
+INVULN_TICKS: Final[int] = 60  # 05-lives-and-damage.md, invuln_ticks (locked; 30 until the 2026-11-06 hotfix)
 BLINK_SWAP_TICKS: Final[int] = (
     6  # scope report DRA-23, blink: one visible/hidden swap every 0.1 s
 )
