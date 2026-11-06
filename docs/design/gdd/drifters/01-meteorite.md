@@ -23,10 +23,10 @@ A rock that falls straight down from the top. It has no logic: it just falls. It
 | graze | yes | — | — | locked | 06-scoring.md |
 | looks | a list of named skins, filled when the art is drawn. Every skin keeps the variant's size and hitbox. Until then: one placeholder look | — | — | guess | Director |
 | look_pick | random, each time a meteorite appears. Looks only; the game plays the same | — | — | guess | Director |
-| look_reference | A plain rock, floating and falling. No tail and no glow: the fireball is the comet. Tumbles slowly as it falls: one full turn, always the same way | — | — | guess | Director |
+| look_reference | A plain rock, floating and falling. No tail and no glow: the fireball is the comet. Tumbles slowly as it falls: it turns on its own tilted axis like a real rock (not flat, like a watch hand), one full turn, always the same way. Each look has its own axis tilt (Director 2026-11-05) | — | — | guess | Director |
 | art_canvas | the design image is one still frame of the medium rock, 28 × 28, the rock filling the hitbox circle. The 8 turn frames are drawn from it later. Small and big are the same art shrunk or grown to 20 and 40 | px | — | guess | main session, away decision 2026-10-31 |
-| look_frames | 8 drawn frames, the same rock turned 45° each, so the 8 frames make one full turn. Played in order 1 to 8, then again from 1. Frame size = the variant width, square. All looks use the same count | frames | — | guess | Director |
-| look_ticks_per_frame | 5 (one full turn = 40 ticks, about 1.5 turns a second). Each rock starts at a random frame | ticks | — | guess | Director |
+| look_frames | 32 drawn frames, the same rock turned 11.25° on its axis each, so the 32 frames make one full turn. Played in order 1 to 32, then again from 1. Frame size = the variant width, square. All looks use the same count (was 8 flat 45° steps; Director 2026-11-05: "stiff, not smooth") | frames | — | guess | Director |
+| look_ticks_per_frame | 3 (one full turn = 96 ticks, 1.6 s). Each rock starts at a random frame | ticks | — | guess | Director |
 | placeholder_look | a filled circle as wide as the variant, grey (140, 140, 140) | RGB | — | guess | Director |
 | start_y | just above the top edge: its bottom edge on the top edge, so center y = −width ÷ 2. A placement may set another y | px | — | guess | Director |
 

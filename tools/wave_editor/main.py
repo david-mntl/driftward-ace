@@ -16,6 +16,7 @@ GAME_DIR: Path = Path(__file__).resolve().parents[2] / "game"
 sys.path.insert(0, str(GAME_DIR))
 
 import pygame
+from app.drifter_looks_tuning import install_drifter_looks
 from bench import Bench
 from core.run import Run
 from core.ship import Thrust
@@ -110,6 +111,7 @@ def main() -> None:
     except (ValueError, OSError) as err:
         sys.exit(f"cannot start: {err}")
     bench: Bench = editor.bench
+    install_drifter_looks(bench.tuning)
     clock = pygame.time.Clock()
     playing: bool = True
     speed_index: int = SPEEDS.index(1.0)

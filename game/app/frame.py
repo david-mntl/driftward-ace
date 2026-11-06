@@ -1,6 +1,7 @@
 """The async frame loop on the fixed 60 Hz tick. Imported only by app.loop.start, inside the guard.
 
-Before the first frame it loads and checks the drifter tuning, the graze values, the last-life
+Before the first frame it loads and checks the drifter tuning, then the drifter looks and builds
+their sprites, the graze values, the last-life
 values, the saves from the browser's localStorage and the wave files (both modes) and, in debug
 mode only, the debug test spawn list, then builds the first run and wraps it with the saves in the
 game flow, which opens on the menu. The run plays the
@@ -27,6 +28,7 @@ import pygame
 from app.assets import load_background, load_hud_art, load_screen_fonts
 from app.background_tuning import load_background_rules
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
+from app.drifter_looks_tuning import install_drifter_looks
 from app.hud_tuning import load_hud_rules
 from app.mode import RunMode
 from app.saves import load_saves, write_saves
@@ -130,6 +132,7 @@ async def frame_loop(mode: RunMode) -> None:
     ship_look: ShipLook = load_ship_look()
     debug: bool = mode is RunMode.DEBUG
     tuning: DrifterTuning = load_tuning()
+    install_drifter_looks(tuning)
     graze_rules: GrazeRules = load_graze_rules()
     last_life_rules: LastLifeRules = load_last_life_rules()
     saves: Saves | None = load_saves()

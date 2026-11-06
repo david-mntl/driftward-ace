@@ -9,6 +9,7 @@ from app.drifters import coin_tuning as coin_tuning
 from app.drifters import electric_ball_tuning as electric_ball_tuning
 from app.drifters import fireball_tuning as fireball_tuning
 from app.drifters import floating_island_tuning as floating_island_tuning
+from app.drifters import meteorite_tuning as meteorite_tuning
 from app.drifters import planet_tuning as planet_tuning
 from app.drifters import satellite_tuning as satellite_tuning
 from app.drifters import ufo_tuning as ufo_tuning
