@@ -33,6 +33,10 @@ FIELD_FILE: Final[Path] = SPRITES_DIR / "satellite_field.png"
 _strips: dict[Path, list[pygame.Surface]] = {}
 """Each strip cut into frames. Loaded on the first draw."""
 
+_mirrored: dict[Path, list[pygame.Surface]] = {}
+"""Each strip's frames mirrored left to right, made on the first draw that needs them, so a
+satellite flying left never builds a new image per frame."""
+
 _warned_mismatch: list[bool] = [False]
 """Set once the swing strip's frame count has been logged as not matching the tuning."""
 
@@ -50,18 +54,16 @@ def render_satellite(
     Scaled by `scale`; colors are times `brightness` (0..1). A drifter that isn't a flying
     Satellite (a stand-in, a warning copy) shows frame 0 of each, facing right.
     """
-    swing: list[pygame.Surface] = _frames(SWING_FILE)
-    field: list[pygame.Surface] = _frames(FIELD_FILE)
+    flip: bool = isinstance(drifter, Satellite) and drifter.invert
+    swing: list[pygame.Surface] = _frames(SWING_FILE, flip)
+    field: list[pygame.Surface] = _frames(FIELD_FILE, flip)
     swing_index: int = 0
     field_index: int = 0
-    flip: bool = False
-    if isinstance(drifter, Satellite):
-        flip = drifter.invert
-        if drifter.phase is Phase.ACTIVE:
-            swing_index = _swing_index(drifter, len(swing))
-            field_index = (drifter.ticks_in_phase // drifter.field_ticks_per_frame) % len(field)
+    if isinstance(drifter, Satellite) and drifter.phase is Phase.ACTIVE:
+        swing_index = _swing_index(drifter, len(swing))
+        field_index = (drifter.ticks_in_phase // drifter.field_ticks_per_frame) % len(field)
     for image in (field[field_index], swing[swing_index]):
-        _blit(surface, image, center, scale, brightness, flip)
+        _blit(surface, image, center, scale, brightness)
 
 
 def _swing_index(drifter: Satellite, count: int) -> int:
@@ -84,11 +86,8 @@ def _blit(
     center: tuple[float, float],
     scale: float,
     brightness: float,
-    flip: bool,
 ) -> None:
-    """Blit one frame, mirrored, scaled and dimmed as asked, centered on the rounded `center`."""
-    if flip:
-        image = pygame.transform.flip(image, True, False)
+    """Blit one frame, scaled and dimmed as asked, centered on the rounded `center`."""
     if scale != 1.0:
         size = (max(1, round(image.get_width() * scale)), max(1, round(image.get_height() * scale)))
         image = pygame.transform.smoothscale(image, size)
@@ -99,7 +98,19 @@ def _blit(
     surface.blit(image, image.get_rect(center=(round(center[0]), round(center[1]))))
 
 
-def _frames(path: Path) -> list[pygame.Surface]:
+def _frames(path: Path, mirror: bool) -> list[pygame.Surface]:
+    """Return the strip's frames, mirrored left to right when `mirror`. Each list is made once.
+
+    Raises ValueError when the strip's width isn't a whole number of its height.
+    """
+    if not mirror:
+        return _strip(path)
+    if path not in _mirrored:
+        _mirrored[path] = [pygame.transform.flip(frame, True, False) for frame in _strip(path)]
+    return _mirrored[path]
+
+
+def _strip(path: Path) -> list[pygame.Surface]:
     """Load a strip of square frames once and cut it up.
 
     Raises ValueError when its width isn't a whole number of its height.
