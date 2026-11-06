@@ -35,6 +35,7 @@ None. Terms only.
 | Playlist | A level's list of waves: fixed waves in order, then a number of random pool waves. See [09-waves.md](09-waves.md). |
 | Pool wave | A wave that can be picked for a random slot, from its `min_level` on. See [09-waves.md](09-waves.md). |
 | Rest gap | The pause between two waves. Shrinks with level. A wave may add a fixed extra rest after itself. |
+| Level-up rest | A fixed extra rest after the last wave of a level, before the next level's first wave. The level-up banner plays in it. |
 | Scroll | The world sliding down past the fixed screen. See [03-world-and-camera.md](03-world-and-camera.md). |
 | Seam | The first 120 px of a wave. No hazard is on screen there (wave_check). |
 | Specialty | An optional extra behavior a drifter has on top of its movement (a pull, a lunge, a pulse). Can be on or off. See [07-drifters.md](07-drifters.md). |

@@ -20,6 +20,7 @@ Level table. Source: Director. Status: locked, except the Timer × row: guess (1
 | Key | Value | Unit | Range | Status | Source |
 |---|---|---|---|---|---|
 | rest_gap_base | 0 | ticks | — | guess | Director. The real value is DF-02 |
+| level_up_rest | 150 (2.5 s) | ticks | — | guess | Main session for the Director, away (DRA-148) |
 | tier_1_drifters | TBD | — | — | TBD | DF-01 |
 | tier_2_drifters | TBD | — | — | TBD | DF-01 |
 | tier_3_drifters | TBD | — | — | TBD | DF-01 |
@@ -34,6 +35,7 @@ Level table. Source: Director. Status: locked, except the Timer × row: guess (1
 7. **Tier unlocks.** From its level on, a tier's drifters may appear in waves.
 8. **Lava** becomes available from Level 4. It is a wave hazard with random timing, not an always-on state ([drifters/11-lava-walls.md](drifters/11-lava-walls.md)).
 9. **Nothing else scales.** No extra drifters, no bigger hitboxes, no shorter warnings beyond what hazard speed and Timer × imply. Source: Director.
+10. **Level-up rest.** On the tick the level rises, `level_up_rest` ticks are added to the rest after that wave, on top of the rest gap and the wave's extra rest. It never scales with level. The next level's first wave starts only after it. The level-up banner plays in this time ([10-ui.md](10-ui.md) rule 14). The scroll keeps running (03-world-and-camera.md rule 4). Wave 0 ending is no rise, and Level 8 never rises again, so neither gets it. Source: Director (a fixed time between levels, before the new level's first wave).
 
 ## Edge cases
 - **Cap at Level 8:** there is no Level 9. After Level 8's playlist, Level 8 values hold forever (rule 1).
