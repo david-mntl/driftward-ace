@@ -30,6 +30,7 @@ from core.graze import (
     step_graze_rings,
 )
 from core.last_life import DEFAULT_LAST_LIFE_RULES, Burst, LastLifeRules, start_burst, step_burst
+from core.level_up import LevelUpBanner, shown_level, start_level_up, step_level_up
 from core.levels import FIRST_LEVEL
 from core.popup import PointsPopup, step_popups
 from core.scroll import Scroll, scroll_step_px, start_scroll, step_scroll
@@ -140,6 +141,10 @@ class Run:
     """The level on the tick lives reach 0, going into its waves step. None before. Source:
     systems/run.md, Interface (DRA-126)."""
 
+    level_up: LevelUpBanner | None = None
+    """The level-up banner on screen, or None. Only step 9b changes it. Source: systems/run.md,
+    Interface (DRA-148)."""
+
     @property
     def last_life(self) -> bool:
         """True from the tick lives reach 0 until game over: the world runs on without the ship.
@@ -203,6 +208,23 @@ class Run:
         if self.final_level is not None:
             return self.final_level
         return self.level
+
+    @property
+    def hud_level(self) -> int:
+        """The level the HUD shows, 1 to 8: the old level until the banner's arrival, else `level`.
+
+        Source: systems/level-up/core.md, Interface and Rules (The shown level).
+        """
+        return shown_level(self.level_up, self.level)
+
+    @property
+    def level_up_cue(self) -> bool:
+        """True on exactly the state after the rise tick, when the banner is at age 0.
+
+        The hook for the level_up sound cue. Source: systems/level-up/core.md, Rules (The
+        `level_up` cue).
+        """
+        return self.level_up is not None and self.level_up.age_ticks == 0
 
     @property
     def wave_spawns_due(self) -> tuple[Placement, ...]:
@@ -613,13 +635,33 @@ def _drop_drifters(run: Run) -> Run:
 
 
 def _step_run_waves(run: Run) -> Run:
-    """Step the run's waves with this tick's scroll distance (step 9a). No waves: unchanged.
+    """Step the run's waves with this tick's scroll distance (step 9a), then the banner (9b).
 
-    Source: systems/run.md, Rules, step 9a.
+    No waves: unchanged.
+    Source: systems/run.md, Rules, steps 9a and 9b.
     """
     if run.waves is None:
         return run
-    return replace(run, waves=step_waves(run.waves, run.scroll.distance_px))
+    stepped: Run = replace(run, waves=step_waves(run.waves, run.scroll.distance_px))
+    return _step_level_up_banner(stepped, run.level)
+
+
+def _step_level_up_banner(run: Run, previous_level: int) -> Run:
+    """Set the level-up banner after the waves stepped (step 9b), in the contract's order.
+
+    `previous_level` is the level going into step 9a. With a burst the banner is None. Else a
+    level rise starts a banner when the rules' rest is on, else an existing banner ages one tick.
+    Source: systems/level-up/core.md, Rules (The banner).
+    """
+    waves: WaveRun | None = run.waves
+    if run.burst is not None or waves is None:
+        return replace(run, level_up=None)
+    if waves.level_rose and waves.level_up_rules.rest_ticks > 0:
+        banner: LevelUpBanner = start_level_up(waves.level_up_rules, previous_level, waves.level)
+        return replace(run, level_up=banner)
+    if run.level_up is None:
+        return run
+    return replace(run, level_up=step_level_up(run.level_up))
 
 
 def _respawn_ship(ground: Ground) -> Ship:

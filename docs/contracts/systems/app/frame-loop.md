@@ -58,6 +58,13 @@ flow: GameFlow  # DRA-125. start_flow(start_run(waves=..., graze_rules=graze_rul
 # random.getrandbits(64)), or None when plays_list; saves from DRA-126); replaced by step_flow()
 # every tick, by add_flow_drifters() after every tick, and by stop_saves() after a failed write
 # (DRA-126). Replaces the bare `run` of DRA-23 to DRA-117
+level_up_rules: LevelUpRules  # DRA-148. app.level_up_tuning.load_level_up(hud_rules) once, in both modes, right
+# after load_last_life_rules(). Never reloaded. The first run's waves start with it:
+# start_waves(book, random.getrandbits(64), level_up_rules)
+level_up_look: LevelUpLook  # DRA-148. The other half of that same load
+level_up_view: LevelUpView  # DRA-148. Built once, before the first frame, after the HUD:
+# LevelUpView(level_up_look, load_level_up_fonts(hud_rules, level_up_look), hud,
+# (hud_rules.window.field_x, hud_rules.window.field_y)). The HUD is built with level_up_look as its third argument
 thrust: Thrust  # rebuilt once per frame from the held arrow keys
 confirm: bool  # DRA-125. Rebuilt once per frame: Enter or Space held now
 focus_lost_pending: bool  # DRA-125. Set when a focus-lost event is read; given to the next tick, then cleared
@@ -92,6 +99,12 @@ Frame loop (`app/frame.py`, `frame_loop(mode)`):
 - **Drifters behind the ship (DRA-29).** Warnings and meteorites are drawn after the starfield and before the ship, so the player's ship stays on top where they cross.
 - **Popups over the drifters (DRA-62).** The points popups are drawn after every drifter, so they show over the other drifters, by Director decision, and before the ship, which stays on top as it does over every drifter. Source: scope report DRA-62, Limits and Decision log (Q5, Director override of Objection 1); systems/run.md, Presentation.
 - **Graze rings over the ship (DRA-117).** The rings are drawn right after the ship's place, so they show over the ship they grow from, and under the debug overlay, the Game Over box and the HUD. They don't follow the blink: a ring is not the ship. Graze popups are in `run.popups` and drawn with the coins' popups, in their DRA-62 place. Source: systems/run.md, Presentation (Graze ring); 06-scoring.md, graze_ring.
+- **The level-up banner (DRA-148).** Before the first frame, both modes: `level_up_rules, level_up_look = load_level_up(hud_rules)`, right after `load_last_life_rules()`; a bad or missing `level_up.json` raises inside the guard (`systems/level-up/tuning.md`). The first run's waves are `start_waves(book, seed, level_up_rules)`; a run with no waves (the test spawn list) has no banner. Draw order, with `run = flow.run` and `banner = run.level_up`:
+  1. On the play area (`_draw_run`): the starfield, then `level_up_view.draw_banner(field, banner)`, then everything `_draw_run` drew before (drifters, popups, ship or burst, graze rings, debug outlines, overlay, wave lines). So the banner is behind everything the player must see.
+  2. In `_draw`, right after `_draw_run`: `offset = level_up_view.bump_offset(banner)`; when it is not 0, `field.scroll(0, offset)`. This moves only the play area's picture: the frame, the panel and the HUD are drawn after it and stay still. A game position never reads it. It never follows the ship.
+  3. `hud.draw(window, run, best, ticks, level_up=banner)`.
+  4. `level_up_view.draw_flight(window, banner)`, right after the HUD and before `hud.dim`, so a paused game dims the flight with everything else.
+  The app draws the same on `PLAYING`, `PAUSED` and `GAME_OVER` (the banner is None on game over). It reads `banner` only through `flow.run`; it keeps no copy. No code in the app reads `run.level_up_cue` in this feature: nothing plays. If `Surface.scroll` misbehaves on the play-area subsurface in the browser build, the Integration Engineer reports it and stops: the bump needs a Director decision. Source: `systems/level-up/view.md`, Diagram and Presentation; 10-ui.md, rule 14; 01-vision.md, locked decision 2.
 - **`below_overlay`** is gone (HUD-PANEL). The HUD left the play area, so it can't meet the debug overlay and the flag is gone. Source: 10-ui.md, rule 1.
 - `pygame.QUIT`: log INFO `quit` and leave the loop. That only happens on desktop.
 - **Arrow keys** (Up, Down, Left, Right): on `KEYDOWN` log DEBUG `key down key=%s x=%.2f y=%.2f`, on `KEYUP` log DEBUG `key up key=%s x=%.2f y=%.2f`, with names `up`, `down`, `left`, `right` and the ship's `x` and `y` (`run.ship.x`, `run.ship.y` from DRA-23) at the moment the event is read (before this frame's ticks). Example: `key down key=up x=320.00 y=240.00`. No other arrow event is logged. From DRA-125 x and y are `flow.run.ship.x` and `.y`, on every screen. Source: game/CONTEXT.md, Logging (a key pressed or released is an event). 01-vision.md, locked decision 1. Director decision (DRA-6: the integration check compares y between key-down and key-up).

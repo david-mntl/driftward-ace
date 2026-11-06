@@ -25,11 +25,12 @@ from collections.abc import Sequence
 
 import pygame
 
-from app.assets import load_background, load_hud_art, load_screen_fonts
+from app.assets import load_background, load_hud_art, load_level_up_fonts, load_screen_fonts
 from app.background_tuning import load_background_rules
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.drifter_looks_tuning import install_drifter_looks
 from app.hud_tuning import load_hud_rules
+from app.level_up_tuning import load_level_up
 from app.mode import RunMode
 from app.saves import load_saves, write_saves
 from app.screens_tuning import load_screen_rules
@@ -50,6 +51,7 @@ from core.game_flow import (
 )
 from core.graze import GrazeRules
 from core.last_life import LastLifeRules
+from core.level_up import LevelUpBanner, LevelUpRules
 from core.run import Run, start_run
 from core.saves import Saves
 from core.ship import Thrust
@@ -70,6 +72,8 @@ from ui.hud import HudView
 from ui.hud_rules import HudRules
 from ui.instructions import draw_instructions
 from ui.leaderboard import draw_leaderboard
+from ui.level_up_rules import LevelUpLook
+from ui.level_up_view import LevelUpView
 from ui.menu import draw_menu
 from ui.pause_box import draw_pause_box
 from ui.popup_view import draw_points_popup
@@ -124,7 +128,6 @@ async def frame_loop(mode: RunMode) -> None:
     field: pygame.Surface = window.subsurface(
         pygame.Rect(hud_rules.window.field_x, hud_rules.window.field_y, SCREEN_W, SCREEN_H)
     )
-    hud: HudView = HudView(hud_rules, load_hud_art(hud_rules))
     screen_rules: ScreenRules = load_screen_rules()
     look: ScreenLook = ScreenLook(screen_rules, load_screen_fonts(screen_rules))
     backdrop: WindowBackdrop = WindowBackdrop(window.get_size())
@@ -135,12 +138,17 @@ async def frame_loop(mode: RunMode) -> None:
     install_drifter_looks(tuning)
     graze_rules: GrazeRules = load_graze_rules()
     last_life_rules: LastLifeRules = load_last_life_rules()
+    level_up_rules: LevelUpRules
+    level_up_look: LevelUpLook
+    level_up_rules, level_up_look = load_level_up(hud_rules)
+    hud: HudView = HudView(hud_rules, load_hud_art(hud_rules), level_up_look)
+    level_up_view: LevelUpView = _build_level_up_view(hud_rules, level_up_look, hud)
     saves: Saves | None = load_saves()
     book: WaveBook = load_wave_book(tuning)
     spawn_list: DebugSpawnList | None = load_debug_spawns(tuning) if debug else None
     list_plays: bool = spawn_list is not None and spawn_list.play == PLAY_LIST
     run: Run = start_run(
-        waves=None if list_plays else start_waves(book, random.getrandbits(64)),
+        waves=None if list_plays else start_waves(book, random.getrandbits(64), level_up_rules),
         graze_rules=graze_rules,
         last_life_rules=last_life_rules,
     )
@@ -186,10 +194,22 @@ async def frame_loop(mode: RunMode) -> None:
             ship_look,
             flow,
             overlay_visible,
+            level_up_view,
         )
         pygame.display.flip()
         await asyncio.sleep(0)
     log.info("quit")
+
+
+def _build_level_up_view(hud_rules: HudRules, look: LevelUpLook, hud: HudView) -> LevelUpView:
+    """Build the level-up view once, before the first frame: every image it draws is made here.
+
+    Source: systems/app/frame-loop.md, Rules, The level-up banner; systems/level-up/view.md, Cost.
+    """
+    window = hud_rules.window
+    return LevelUpView(
+        look, load_level_up_fonts(hud_rules, look), hud, (window.field_x, window.field_y)
+    )
 
 
 def _read_events(run: Run, debug: bool, overlay_visible: bool) -> tuple[bool, bool, bool]:
@@ -313,6 +333,7 @@ def _draw(
     ship_look: ShipLook,
     flow: GameFlow,
     overlay_visible: bool,
+    level_up_view: LevelUpView | None = None,
 ) -> None:
     """Draw the screen the flow shows on the window.
 
@@ -324,8 +345,14 @@ def _draw(
     """
     if flow.screen in _RUN_SCREENS:
         draw_background(field, background, background_ticks)
-        _draw_run(field, flow, overlay_visible, ship_look, int(background_ticks))
-        hud.draw(window, flow.run, flow.best, int(background_ticks))
+        _draw_run(field, flow, overlay_visible, ship_look, int(background_ticks), level_up_view)
+        banner: LevelUpBanner | None = flow.run.level_up if level_up_view is not None else None
+        offset: int = level_up_view.bump_offset(banner) if level_up_view is not None else 0
+        if offset != 0:
+            field.scroll(0, offset)
+        hud.draw(window, flow.run, flow.best, int(background_ticks), level_up=banner)
+        if level_up_view is not None:
+            level_up_view.draw_flight(window, banner)
         if flow.screen is Screen.PAUSED:
             hud.dim(window)
             draw_pause_box(window, look)
@@ -348,19 +375,24 @@ def _draw_run(
     overlay_visible: bool,
     ship_look: ShipLook,
     ticks: int,
+    level_up_view: LevelUpView | None = None,
 ) -> None:
-    """Draw the starfield, the drifters, the points popups, the ship while shown or the burst in the
-    last life, the graze rings and the debug outlines, overlay and wave lines if visible, all on
-    `surface`, the play area.
+    """Draw the starfield, the level-up banner, the drifters, the points popups, the ship while
+    shown or the burst in the last life, the graze rings and the debug outlines, overlay and wave
+    lines if visible, all on `surface`, the play area.
 
     Drifters sit behind the ship, and the popups over the drifters and behind the ship. The ship
     shows its flames only while it flies: not paused, not waiting to respawn. `ticks` steps the
     flame flicker. The burst takes the ship's place. The graze rings sit over the ship and don't
-    follow its blink. The HUD is not drawn here: it lives outside the play area. Source:
+    follow its blink. The banner sits right after the starfield, so it never hides any of them;
+    with no `level_up_view` (None) no banner, bump or flight is drawn and the HUD gets no banner.
+    The HUD is not drawn here: it lives outside the play area. Source:
     systems/app/frame-loop.md, Rules, Draw and Drifters behind the ship, Graze rings over the ship.
     """
     run: Run = flow.run
     draw_starfield(surface, run.scroll)
+    if level_up_view is not None:
+        level_up_view.draw_banner(surface, run.level_up)
     for drifter in run.drifters:
         render_drifter(surface, drifter)
     for popup in run.popups:

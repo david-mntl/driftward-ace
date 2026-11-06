@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/level-up.schema.json",
+  "title": "Level-up moment",
+  "description": "The file game/tuning/level_up.json: the level-up rest, the banner's timeline, look and motion, and the HUD level pop, read in both run modes. DRA-148. The file must exist; every field of every section is required and nothing has a default in code. Ticks are counted from the tick the level rises (age 0, the state after that tick). Colors are either '#rrggbb' or a key of the HUD palette in game/tuning/hud.json. The three top-level numbers go to core.level_up.LevelUpRules; every section goes to ui.level_up_rules.LevelUpLook, the record of the same name (docs/contracts/systems/level-up/tuning.md). Loaded and checked by hand by game/app/level_up_tuning.py at startup (no schema library: pygbag has none), which also checks the rules a schema can't express (the same part). Owner of the schema: architect. Contract: docs/contracts/systems/level-up.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "level_up_rest",
+    "arrival_tick",
+    "banner_ticks",
+    "colors",
+    "band",
+    "number",
+    "label",
+    "hold",
+    "pips",
+    "ring",
+    "streaks",
+    "glint",
+    "bump",
+    "fly",
+    "pop"
+  ],
+  "$defs": {
+    "tick": {
+      "description": "A tick count from the rise tick, an integer, never a bool.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "count": {
+      "description": "A length in ticks or a count, an integer >= 1, never a bool.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "share": {
+      "description": "A number above 0 and below 1.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "color": {
+      "description": "'#rrggbb' or a key of the HUD palette (game/tuning/hud.json, palette).",
+      "type": "string",
+      "pattern": "^(#[0-9a-fA-F]{6}|[a-z][a-z0-9_]*)$"
+    }
+  },
+  "properties": {
+    "level_up_rest": {
+      "description": "Ticks added to the rest after the last wave of a level, on a level rise. 08-difficulty.md, level_up_rest (guess). 0 turns the rest, the banner, the pop and the cue off. Never scaled by level. Maps to LevelUpRules.rest_ticks.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "arrival_tick": {
+      "description": "Age at which the flying number reaches the HUD and the HUD level box switches to the new level and pops. 10-ui.md, level_up_banner and hud_level_pop (guess). Must be below banner_ticks. Maps to LevelUpRules.arrival_ticks.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "banner_ticks": {
+      "description": "States the banner lives on before core drops it (age 0 to banner_ticks - 1). At most level_up_rest when that is above 0; at least arrival_tick + pop.ticks. Maps to LevelUpRules.banner_ticks.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "colors": {
+      "description": "Every banner and pop color. Palette keys reuse the HUD's colors (12-art-and-audio.md, HUD colors); the two new colors are hex. No fuchsia, no fuchsia key: solid fuchsia in the play area means a coin (12-art-and-audio.md, rule 6).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "glass",
+        "hairline",
+        "label",
+        "number_top",
+        "number_bottom",
+        "number_outline",
+        "ring",
+        "streak",
+        "glint",
+        "pip_lit",
+        "pip_unlit",
+        "flash",
+        "box_flash"
+      ],
+      "properties": {
+        "glass": { "description": "The band's glass.", "$ref": "#/$defs/color" },
+        "hairline": { "description": "The two hairlines and their corner ticks.", "$ref": "#/$defs/color" },
+        "label": { "description": "The word LEVEL.", "$ref": "#/$defs/color" },
+        "number_top": { "description": "The number's gradient at its top.", "$ref": "#/$defs/color" },
+        "number_bottom": { "description": "The number's gradient at its bottom.", "$ref": "#/$defs/color" },
+        "number_outline": { "description": "The number's outline.", "$ref": "#/$defs/color" },
+        "ring": { "description": "The ring that bursts out on landing.", "$ref": "#/$defs/color" },
+        "streak": { "description": "The light streaks.", "$ref": "#/$defs/color" },
+        "glint": { "description": "The glint that crosses the number.", "$ref": "#/$defs/color" },
+        "pip_lit": { "description": "A lit pip.", "$ref": "#/$defs/color" },
+        "pip_unlit": { "description": "An unlit pip.", "$ref": "#/$defs/color" },
+        "flash": { "description": "The white of the new pip's flash, the HUD number's flash and the new climb bar's flash.", "$ref": "#/$defs/color" },
+        "box_flash": { "description": "The level box outline's flash.", "$ref": "#/$defs/color" }
+      }
+    },
+    "band": {
+      "description": "The see-through glass band across the middle of the play area and its two hairlines.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "height",
+        "alpha",
+        "center_offset_y",
+        "open_start",
+        "open_end",
+        "close_start",
+        "close_end",
+        "close_glass_share",
+        "hairline_width",
+        "corner_tick_length"
+      ],
+      "properties": {
+        "height": { "description": "Full height of the glass, px.", "type": "integer", "minimum": 2 },
+        "alpha": { "description": "Glass opacity, 0 to 255. 0 draws no glass (the hairlines stay): the escape hatch if the band costs too much.", "type": "integer", "minimum": 0, "maximum": 255 },
+        "center_offset_y": { "description": "Px the band's center sits below the play area's center. May be negative.", "type": "integer" },
+        "open_start": { "description": "Age the band starts to open.", "$ref": "#/$defs/tick" },
+        "open_end": { "description": "Age it is fully open.", "$ref": "#/$defs/count" },
+        "close_start": { "description": "Age the band starts to close.", "$ref": "#/$defs/count" },
+        "close_end": { "description": "Age it is fully closed. At most arrival_tick.", "$ref": "#/$defs/count" },
+        "close_glass_share": { "description": "Share of the closing window in which the glass closes; the hairlines pull in during the rest of it.", "$ref": "#/$defs/share" },
+        "hairline_width": { "description": "Hairline thickness, px.", "type": "integer", "minimum": 1 },
+        "corner_tick_length": { "description": "Length of the small tick at each hairline end, px. 0 draws none.", "type": "integer", "minimum": 0 }
+      }
+    },
+    "number": {
+      "description": "The big level number: type, outline, fall, landing squash.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "font_size",
+        "outline_width",
+        "center_offset_y",
+        "fall_start",
+        "fall_end",
+        "fall_overshoot_px",
+        "fall_peak_share",
+        "fall_stretch_x",
+        "fall_stretch_y",
+        "squash_ticks",
+        "squash_x",
+        "squash_y",
+        "pose_steps"
+      ],
+      "properties": {
+        "font_size": { "description": "Exo 2 Bold size, px.", "type": "integer", "minimum": 8 },
+        "outline_width": { "description": "Outline thickness, px. 0 draws none.", "type": "integer", "minimum": 0 },
+        "center_offset_y": { "description": "Px the number's resting center sits below the band's center. May be negative.", "type": "integer" },
+        "fall_start": { "description": "Age the number starts to fall, from fully above the play area.", "$ref": "#/$defs/tick" },
+        "fall_end": { "description": "Age it lands (the landing tick). The squash, the bump, the ring and the streaks start here.", "$ref": "#/$defs/count" },
+        "fall_overshoot_px": { "description": "Px the number goes past its resting place before it settles back. 0 for none.", "type": "number", "minimum": 0 },
+        "fall_peak_share": { "description": "Share of the fall at which the number is deepest past its place.", "$ref": "#/$defs/share" },
+        "fall_stretch_x": { "description": "Width scale while it falls.", "type": "number", "exclusiveMinimum": 0 },
+        "fall_stretch_y": { "description": "Height scale while it falls.", "type": "number", "exclusiveMinimum": 0 },
+        "squash_ticks": { "description": "Ticks the landing squash takes to settle back to 1x.", "$ref": "#/$defs/count" },
+        "squash_x": { "description": "Width scale on the landing tick.", "type": "number", "exclusiveMinimum": 0 },
+        "squash_y": { "description": "Height scale on the landing tick.", "type": "number", "exclusiveMinimum": 0 },
+        "pose_steps": { "description": "Pre-rendered sizes between the squash and 1x. The view picks the nearest.", "$ref": "#/$defs/count" }
+      }
+    },
+    "label": {
+      "description": "The word LEVEL above the number: Share Tech Mono, letter-spaced.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "font_size",
+        "offset_y",
+        "fade_in_start",
+        "fade_in_end",
+        "spacing_wide",
+        "spacing_normal",
+        "spacing_steps"
+      ],
+      "properties": {
+        "font_size": { "description": "Share Tech Mono size, px.", "type": "integer", "minimum": 6 },
+        "offset_y": { "description": "Px the label's center sits from the band's center (negative is above).", "type": "integer" },
+        "fade_in_start": { "description": "Age it starts to fade in.", "$ref": "#/$defs/tick" },
+        "fade_in_end": { "description": "Age it is fully in, letter spacing back to normal.", "$ref": "#/$defs/count" },
+        "spacing_wide": { "description": "Letter spacing at the start of the fade-in, px.", "type": "integer", "minimum": 0 },
+        "spacing_normal": { "description": "Letter spacing when settled, px.", "type": "integer", "minimum": 0 },
+        "spacing_steps": { "description": "Pre-rendered spacings between wide and normal.", "$ref": "#/$defs/count" }
+      }
+    },
+    "hold": {
+      "description": "When the label and the pips fade out, ahead of the flight.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fade_out_start", "fade_out_end"],
+      "properties": {
+        "fade_out_start": { "description": "Age the label and the pips start to fade.", "$ref": "#/$defs/count" },
+        "fade_out_end": { "description": "Age they are gone.", "$ref": "#/$defs/count" }
+      }
+    },
+    "pips": {
+      "description": "The row of one pip per level under the number (the climb bars, as pips).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "pitch", "offset_y", "start", "end", "pop_ticks", "flash_ticks"],
+      "properties": {
+        "size": { "description": "Width and height of a diamond, px.", "type": "integer", "minimum": 2 },
+        "pitch": { "description": "Px from one pip's center to the next.", "type": "integer", "minimum": 1 },
+        "offset_y": { "description": "Px the row's center sits from the band's center (positive is below).", "type": "integer" },
+        "start": { "description": "Age the first pip starts to appear.", "$ref": "#/$defs/tick" },
+        "end": { "description": "Age the last pip is fully in.", "$ref": "#/$defs/count" },
+        "pop_ticks": { "description": "Ticks one pip takes to appear. At most end - start.", "$ref": "#/$defs/count" },
+        "flash_ticks": { "description": "Ticks the new pip's white flash takes to fade to its lit color.", "$ref": "#/$defs/count" }
+      }
+    },
+    "ring": {
+      "description": "The ring that bursts out of the number on landing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_diameter", "end_diameter", "width", "ticks"],
+      "properties": {
+        "start_diameter": { "description": "Px across on the landing tick.", "type": "number", "exclusiveMinimum": 0 },
+        "end_diameter": { "description": "Px across as it fades out.", "type": "number", "exclusiveMinimum": 0 },
+        "width": { "description": "Line width, px.", "type": "integer", "minimum": 1 },
+        "ticks": { "description": "States it shows on from the landing tick.", "$ref": "#/$defs/count" }
+      }
+    },
+    "streaks": {
+      "description": "The short light streaks that fly out of the number on landing, evenly spread.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "ticks", "length", "width", "start_radius", "end_radius"],
+      "properties": {
+        "count": { "description": "How many streaks.", "$ref": "#/$defs/count" },
+        "ticks": { "description": "States they show on from the landing tick.", "$ref": "#/$defs/count" },
+        "length": { "description": "Length of one streak, px.", "type": "number", "exclusiveMinimum": 0 },
+        "width": { "description": "Thickness, px.", "type": "integer", "minimum": 1 },
+        "start_radius": { "description": "Distance of a streak's inner end from the number's center on the landing tick, px.", "type": "number", "minimum": 0 },
+        "end_radius": { "description": "Distance it flies out to by its last state, px.", "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "glint": {
+      "description": "The one light glint that sweeps across the number.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "frames", "width", "slant_degrees", "strength"],
+      "properties": {
+        "start": { "description": "Age the glint starts to cross.", "$ref": "#/$defs/tick" },
+        "end": { "description": "Age it has crossed.", "$ref": "#/$defs/count" },
+        "frames": { "description": "Pre-rendered positions of the glint across the number.", "$ref": "#/$defs/count" },
+        "width": { "description": "Width of the glint band, px.", "type": "integer", "minimum": 1 },
+        "slant_degrees": { "description": "Lean of the band from vertical, degrees, 0 up to 89.", "type": "number", "minimum": 0, "maximum": 89 },
+        "strength": { "description": "How far the glint pulls the number's colors toward the glint color, above 0 up to 1.", "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "bump": {
+      "description": "The play area's picture bumps down on landing and springs back. Drawing only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pixels", "ticks", "peak_share"],
+      "properties": {
+        "pixels": { "description": "Px the picture moves down at the peak. 0 turns the bump off.", "type": "integer", "minimum": 0 },
+        "ticks": { "description": "Ticks from the landing tick until the picture is back.", "$ref": "#/$defs/count" },
+        "peak_share": { "description": "Share of the bump at which the picture is lowest.", "$ref": "#/$defs/share" }
+      }
+    },
+    "fly": {
+      "description": "The number's flight into the HUD level box. It ends on arrival_tick.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "arc_px", "steps"],
+      "properties": {
+        "start": { "description": "Age the number leaves its place and starts to shrink and fly. Below arrival_tick.", "$ref": "#/$defs/count" },
+        "arc_px": { "description": "How far the flight's path bows up from the straight line, px. 0 flies straight.", "type": "number", "minimum": 0 },
+        "steps": { "description": "Pre-rendered sizes along the flight. The view picks the nearest.", "$ref": "#/$defs/count" }
+      }
+    },
+    "pop": {
+      "description": "The HUD level readout's pop on arrival, in the level box.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ticks",
+        "start_scale",
+        "undershoot_scale",
+        "undershoot_share",
+        "flash_ticks",
+        "steps",
+        "bar_flash_ticks",
+        "box_flash_ticks",
+        "box_flash_width",
+        "box_corner_cut"
+      ],
+      "properties": {
+        "ticks": { "description": "Ticks from arrival until the pop is over. At least every flash length below.", "$ref": "#/$defs/count" },
+        "start_scale": { "description": "Size of the number on arrival as a multiple of its normal size. Above 1.", "type": "number", "exclusiveMinimum": 1 },
+        "undershoot_scale": { "description": "The smallest multiple the number settles through before it rests at 1. Above 0, at most 1.", "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "undershoot_share": { "description": "Share of the pop at which it is at undershoot_scale.", "$ref": "#/$defs/share" },
+        "flash_ticks": { "description": "Ticks the number's white flash takes to fade to its tier color.", "$ref": "#/$defs/count" },
+        "steps": { "description": "Pre-rendered frames of the pop per level (size and flash together).", "$ref": "#/$defs/count" },
+        "bar_flash_ticks": { "description": "Ticks the new climb bar's white flash takes to fade to its lit color.", "$ref": "#/$defs/count" },
+        "box_flash_ticks": { "description": "Ticks the box outline's flash takes to fade out.", "$ref": "#/$defs/count" },
+        "box_flash_width": { "description": "Thickness of the flashing outline, px.", "type": "integer", "minimum": 1 },
+        "box_corner_cut": { "description": "Size of the level box's two cut corners, px. It must equal the cut the panel art draws (10 x panel.scale in tools/art/hud_panel.py).", "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

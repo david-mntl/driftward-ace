@@ -233,3 +233,11 @@
 - Changed: `LIVES_START` in `game/core/run.py`; `systems/run.md` constant line; `systems/hud.md` sketch, Interface comment, Presentation rows and States (draft, version stays 7); docstrings in `game/ui/hud_rules.py` and `tools/art/hud_panel.py`.
 - Tests: the `LIVES_START` copies in the core tests are 5, with new copies in `test_game_flow.py`, `test_graze_feedback.py` and `ui/test_hud.py`. Log lines that named the life count after the first loss now use `LIVES_START - 1`. The log test in `test_run.py` starts its falls at 3 lives. The HUD heart tests cover 5, 4, 3 and 2 lives and all 5 slots.
 - Not changed: past task files, reports and integration checks keep their 3-life numbers as history. The browser build was not re-run.
+
+## DRA-148, 2026-11-06
+- `systems/app.md`: 18 to 19, frozen.
+- `systems/hud.md`: 7 to 8, frozen.
+- `systems/level-up.md`: 0 to 1, frozen.
+- `systems/run.md`: 13 to 14, frozen.
+- `systems/waves.md`: 3 to 4, frozen.
+- Level-up moment: a 2.5 s rest after each level rise, a banner that drops the new level in and flies it into the HUD, and a HUD level pop. All values in tuning/level_up.json; glass fill off for frame rate.

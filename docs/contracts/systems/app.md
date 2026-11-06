@@ -1,7 +1,7 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
-Version: 18
-Status: draft
-Features: HUD-PANEL, DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111, DRA-117, DRA-125, DRA-126, DRA-147
+Version: 19
+Status: frozen
+Features: HUD-PANEL, DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111, DRA-117, DRA-125, DRA-126, DRA-147, DRA-148
 Created by: architect
 
 ## Purpose
@@ -13,7 +13,7 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 |---|---|---|---|
 | [debug-spawns](app/debug-spawns.md) | Interface, Rules | you change the debug spawn list: its file, checks, rows or timing. | 13.1 KB |
 | [error-handling](app/error-handling.md) | Interface, Presentation, Rules | you change the error guard or the error screen. | 5.4 KB |
-| [frame-loop](app/frame-loop.md) | Interface, Rules | you change the frame loop: ticks, keys, draw order, the catch-up cap. | 19.5 KB |
+| [frame-loop](app/frame-loop.md) | Interface, Rules | you change the frame loop: ticks, keys, draw order, the catch-up cap. | 21.8 KB |
 | [general](app/general.md) | Purpose, Interface | you want the overview of the app, or a rule that fits no area. | 4.7 KB |
 | [integration-checks/DRA-104](app/integration-checks/DRA-104.md) | Rules | you run or extend the browser checks for the UFO (DRA-104). | 7.6 KB |
 | [integration-checks/DRA-111](app/integration-checks/DRA-111.md) | Rules | you run or extend the browser checks for the electric ball (DRA-111). | 7.8 KB |
@@ -21,6 +21,7 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 | [integration-checks/DRA-125](app/integration-checks/DRA-125.md) | Rules | you run or extend the browser checks for the screens: menu, instructions, leaderboard, pause, last life and game over (DRA-125). | 11.5 KB |
 | [integration-checks/DRA-126](app/integration-checks/DRA-126.md) | Rules | you run or extend the browser checks for the saves: top 10, name entry, game-over messages, BEST and the filled leaderboard (DRA-126). | 7.0 KB |
 | [integration-checks/DRA-13](app/integration-checks/DRA-13.md) | Rules | you run or extend the browser checks for the scroll, the starfield and the HUD (DRA-13). | 2.4 KB |
+| [integration-checks/DRA-148](app/integration-checks/DRA-148.md) | Rules | you run or extend the browser checks for the level-up moment (DRA-148). | 5.3 KB |
 | [integration-checks/DRA-19](app/integration-checks/DRA-19.md) | Rules | you run or extend the browser checks for the review follow-ups (no new gameplay) (DRA-19). | 1.2 KB |
 | [integration-checks/DRA-23](app/integration-checks/DRA-23.md) | Rules | you run or extend the browser checks for the run: lives, hits and game over (DRA-23). | 4.9 KB |
 | [integration-checks/DRA-29](app/integration-checks/DRA-29.md) | Rules | you run or extend the browser checks for the drifter base, the meteorite and the debug spawn list (DRA-29). | 7.7 KB |
@@ -48,6 +49,6 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 | [release](app/release.md) | Interface, Rules | you change the launch script, the release package or `pygbag.ini`. | 11.6 KB |
 | [save-storage](app/save-storage.md) | Interface, Rules | you change how the saves are read from or written to the browser's localStorage. | 5.1 KB |
 | [startup](app/startup.md) | Diagram, Interface, Rules | you change startup, the run mode switch, logging or the import boundary. | 8.6 KB |
-| [tuning-loader](app/tuning-loader.md) | Interface, Rules, hud.json (HUD-PANEL) | you change how the tuning files are loaded and checked. | 26.7 KB |
+| [tuning-loader](app/tuning-loader.md) | Interface, Rules, level_up.json (DRA-148), hud.json (HUD-PANEL) | you change how the tuning files are loaded and checked. | 27.0 KB |
 | [wave-loading](app/wave-loading.md) | Interface, Rules | you change how wave files are read and loaded. | 2.4 KB |
 <!-- parts:end -->

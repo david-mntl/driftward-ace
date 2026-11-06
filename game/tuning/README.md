@@ -220,3 +220,211 @@ Field names carry their range. `*_alpha` is a whole number from 0 to 255. `*_str
 
 `blur` is off by default on the pages that have a moving background (instructions, leaderboard): the blur is the one part drawn live every frame, and it costs frame rate in the browser.
 
+# level_up.json
+
+The level-up moment: the extra rest after a level rise, the banner that plays in it, and the pop in the HUD level box. You edit it by hand. The game reads it once at startup, in both run modes, so change a value and reload the page. Every field of every section is required. Nothing has a default in code.
+
+The loader is `game/app/level_up_tuning.py`. The schema is `docs/contracts/schemas/level-up.schema.json`, with every field described. The rules are in `docs/contracts/systems/level-up/tuning.md`. A missing file, a missing or unknown field, a wrong type or a value out of range shows the error screen with the file and the field.
+
+Only `level_up_rest` touches play: it is a rest between waves. Every other value changes how the banner looks and moves, and nothing else. Nothing here is baked into a picture file. The view builds every image it needs once at startup, so there is no art tool to run.
+
+## Time and position
+
+- **Ticks.** 60 ticks = 1 second. Every `*_start`, `*_end`, `*_tick` and `*_ticks` value is an age: ticks counted from the tick the level rises (age 0). The shipped timeline runs 150 ticks, 2.5 s.
+- **Px.** Screen px in the play area. `*_offset_y` is measured down from the band's center, so a negative value moves the thing up. `center_offset_y` in `band` moves the band from the middle of the play area.
+- **Whole numbers vs. decimals.** `*_ticks`, `*_px`, `*_size`, `*_width`, `*_steps`, `*_pixels` and `count` are whole numbers. Scales and shares are decimals. A share is above 0 and below 1.
+- **Colors.** `#rrggbb`, or a key of the HUD `palette` in `hud.json` (`panel_body`, `frame_lights`, `plating`, `level`, `dim`). Don't use fuchsia: solid fuchsia in the play area means a coin.
+
+## Top level
+
+| Field | Default | What it does |
+|---|---|---|
+| `level_up_rest` | `150` | Ticks added to the rest after the last wave of a level, when the level rises. The next level's first wave starts only after it. It never scales with level. `0` turns the whole feature off: no rest, no banner, no pop, no sound cue. |
+| `arrival_tick` | `124` | The age the flying number reaches the HUD. The level box switches to the new level and pops on this tick. Whole number, 1 or more, below `banner_ticks`. |
+| `banner_ticks` | `150` | How many ticks the banner lives (age 0 to `banner_ticks` - 1). Never more than `level_up_rest`, and never less than `arrival_tick` + `pop.ticks`. |
+
+## colors
+
+Every color the banner and the pop use.
+
+| Field | Default | What it colors |
+|---|---|---|
+| `glass` | `panel_body` | The band's glass. |
+| `hairline` | `frame_lights` | The two hairlines and their corner ticks. |
+| `label` | `plating` | The word LEVEL. |
+| `number_top` | `#fff6d6` | The number's gradient at its top. |
+| `number_bottom` | `level` | The number's gradient at its bottom (the level gold). |
+| `number_outline` | `panel_body` | The number's outline. |
+| `ring` | `#fff6d6` | The ring that bursts out on landing. |
+| `streak` | `#fff6d6` | The light streaks. |
+| `glint` | `#fff6d6` | The glint that crosses the number. |
+| `pip_lit` | `level` | A lit pip. |
+| `pip_unlit` | `dim` | An unlit pip. |
+| `flash` | `#ffffff` | The white flash of the new pip, the HUD number and the new climb bar. |
+| `box_flash` | `level` | The flash of the level box outline. |
+
+## band
+
+The see-through band across the middle of the play area, with a hairline on its top and bottom edge.
+
+| Field | Default | What it does |
+|---|---|---|
+| `height` | `120` | Height of the glass, px. 2 or more. Keep it tall enough that LEVEL, the number and the pips sit between the hairlines. |
+| `alpha` | `0` | Glass opacity, 0 to 255. `0` draws no glass and keeps the hairlines. It ships at 0 because the glass cost frame rate in the browser (about 40 fps while open, against about 58). `120` is the see-through look. |
+| `center_offset_y` | `0` | Px the band's center sits below the play area's center. May be negative. |
+| `open_start` | `0` | Age the band starts to open. |
+| `open_end` | `10` | Age it is fully open. |
+| `close_start` | `100` | Age the band starts to close. |
+| `close_end` | `124` | Age it is fully closed. At most `arrival_tick`. |
+| `close_glass_share` | `0.65` | The share of the closing time in which the glass closes. The hairlines pull in during the rest of it. |
+| `hairline_width` | `1` | Hairline thickness, px. |
+| `corner_tick_length` | `6` | Length of the small tick at each end of a hairline, px. `0` draws none. |
+
+## number
+
+The big level number: its type, outline, fall and landing squash.
+
+| Field | Default | What it does |
+|---|---|---|
+| `font_size` | `88` | Exo 2 Bold size, px. 8 or more. |
+| `outline_width` | `2` | Outline thickness, px. `0` draws none. |
+| `center_offset_y` | `0` | Px the number's resting center sits below the band's center. |
+| `fall_start` | `4` | Age the number starts to fall in from above the play area. |
+| `fall_end` | `22` | Age it lands. The squash, the bump, the ring and the streaks start on this tick. |
+| `fall_overshoot_px` | `10` | Px the number sinks past its resting place before it settles back. `0` for none. |
+| `fall_peak_share` | `0.72` | The share of the fall at which the number is deepest past its place. |
+| `fall_stretch_x` | `0.92` | Width scale while it falls. Below 1 is narrower. |
+| `fall_stretch_y` | `1.12` | Height scale while it falls. Above 1 is taller. |
+| `squash_ticks` | `8` | Ticks the landing squash takes to settle back to normal size. |
+| `squash_x` | `1.2` | Width scale on the landing tick. |
+| `squash_y` | `0.82` | Height scale on the landing tick. |
+| `pose_steps` | `4` | How many sizes between the squash and normal size are drawn ahead of time. The view picks the nearest. More steps look smoother and cost more memory at startup. |
+
+## label
+
+The word LEVEL above the number, in Share Tech Mono. Its letters start spread wide and close in as it fades in.
+
+| Field | Default | What it does |
+|---|---|---|
+| `font_size` | `14` | Size, px. 6 or more. |
+| `offset_y` | `-48` | Px the label's center sits from the band's center. Negative is above. |
+| `fade_in_start` | `22` | Age it starts to fade in. |
+| `fade_in_end` | `36` | Age it is fully in, with the spacing back to normal. |
+| `spacing_wide` | `14` | Letter spacing at the start of the fade-in, px. |
+| `spacing_normal` | `4` | Letter spacing when it has settled, px. |
+| `spacing_steps` | `5` | How many spacings between wide and normal are drawn ahead of time. |
+
+## hold
+
+When the label and the pips fade out, just before the flight.
+
+| Field | Default | What it does |
+|---|---|---|
+| `fade_out_start` | `96` | Age the label and the pips start to fade. |
+| `fade_out_end` | `106` | Age they are gone. |
+
+## pips
+
+The row of one diamond per level under the number. The pips up to the new level are lit.
+
+| Field | Default | What it does |
+|---|---|---|
+| `size` | `10` | Width and height of a diamond, px. 2 or more. |
+| `pitch` | `18` | Px from one pip's center to the next. |
+| `offset_y` | `48` | Px the row's center sits from the band's center. Positive is below. |
+| `start` | `26` | Age the first pip starts to appear. |
+| `end` | `48` | Age the last pip is fully in. |
+| `pop_ticks` | `6` | Ticks one pip takes to appear. At most `end` - `start`. |
+| `flash_ticks` | `10` | Ticks the new pip's white flash takes to fade to its lit color. |
+
+## ring
+
+The ring that bursts out of the number on landing.
+
+| Field | Default | What it does |
+|---|---|---|
+| `start_diameter` | `48` | Px across on the landing tick. Must be below `end_diameter`. |
+| `end_diameter` | `170` | Px across as it fades out. |
+| `width` | `2` | Line width, px. |
+| `ticks` | `18` | How many ticks it shows, from the landing tick. |
+
+## streaks
+
+The short light streaks that fly out of the number on landing, spread evenly round it.
+
+| Field | Default | What it does |
+|---|---|---|
+| `count` | `12` | How many streaks. |
+| `ticks` | `14` | How many ticks they show, from the landing tick. |
+| `length` | `20` | Length of one streak, px. |
+| `width` | `2` | Thickness, px. |
+| `start_radius` | `34` | Distance of a streak's inner end from the number's center on the landing tick, px. Must be below `end_radius`. |
+| `end_radius` | `130` | Distance it flies out to by its last tick, px. |
+
+## glint
+
+The one light band that sweeps across the number.
+
+| Field | Default | What it does |
+|---|---|---|
+| `start` | `44` | Age the glint starts to cross. |
+| `end` | `60` | Age it has crossed. At most `hold.fade_out_start`. |
+| `frames` | `8` | How many positions of the glint across the number are drawn ahead of time. |
+| `width` | `14` | Width of the glint band, px. |
+| `slant_degrees` | `20` | Lean of the band from vertical, 0 to 89. |
+| `strength` | `0.8` | How far the glint pulls the number's colors toward the glint color. Above 0, up to 1. |
+
+The glint only lights the digit, never the outline or the space round it.
+
+## bump
+
+The play area's picture dips down on landing and springs back. It is drawing only. No hitbox moves, and neither does the ship.
+
+| Field | Default | What it does |
+|---|---|---|
+| `pixels` | `3` | Px the picture moves down at its lowest. `0` turns the bump off. |
+| `ticks` | `14` | Ticks from the landing tick until the picture is back. |
+| `peak_share` | `0.25` | The share of the bump at which the picture is lowest. |
+
+## fly
+
+The number's flight into the HUD level box. It ends on `arrival_tick`.
+
+| Field | Default | What it does |
+|---|---|---|
+| `start` | `100` | Age the number leaves its place and starts to shrink and fly. Below `arrival_tick`. |
+| `arc_px` | `40` | How far the path bows up from the straight line, px. `0` flies straight. |
+| `steps` | `8` | How many sizes along the flight are drawn ahead of time. The view picks the nearest. |
+
+## pop
+
+The HUD level box's pop when the number arrives.
+
+| Field | Default | What it does |
+|---|---|---|
+| `ticks` | `24` | Ticks from arrival until the pop is over. At least as long as `flash_ticks`, `bar_flash_ticks` and `box_flash_ticks`. |
+| `start_scale` | `1.45` | Size of the number on arrival, as a multiple of its normal size. Above 1. |
+| `undershoot_scale` | `0.94` | The smallest multiple the number settles through before it rests at 1. Above 0, at most 1. |
+| `undershoot_share` | `0.6` | The share of the pop at which the number is at `undershoot_scale`. |
+| `flash_ticks` | `14` | Ticks the number's white flash takes to fade to its tier color. |
+| `steps` | `12` | How many frames of the pop are drawn ahead of time, per level (size and flash together). |
+| `bar_flash_ticks` | `18` | Ticks the new climb bar's white flash takes to fade to its lit color. |
+| `box_flash_ticks` | `20` | Ticks the level box outline's flash takes to fade out. |
+| `box_flash_width` | `1` | Thickness of the flashing outline, px. |
+| `box_corner_cut` | `8` | Size of the level box's two cut corners, px. It must match the cut the panel art draws (10 × `panel.scale` in `tools/art/hud_panel.py`). Change it only with the art. |
+
+## Timing rules
+
+The loader refuses a file that breaks one of these, and names the fields:
+
+- `arrival_tick` is below `banner_ticks`. With `level_up_rest` above 0, `banner_ticks` is at most `level_up_rest`.
+- `arrival_tick` + `pop.ticks` is at most `banner_ticks`.
+- Band: `open_start` < `open_end` ≤ `close_start` < `close_end` ≤ `arrival_tick`.
+- Number: `fall_start` < `fall_end`, and `fall_end` + `squash_ticks` is at most `fly.start`.
+- What starts on landing ends before the flight: `fall_end` + the longest of `ring.ticks`, `streaks.ticks` and `bump.ticks` is at most `fly.start`.
+- Label and pips: `label.fade_in_start` < `label.fade_in_end` ≤ `hold.fade_out_start` < `hold.fade_out_end` ≤ `arrival_tick`. And `pips.start` < `pips.end` ≤ `hold.fade_out_start`.
+- Glint: `glint.start` < `glint.end` ≤ `hold.fade_out_start`.
+- Flight: `fly.start` < `arrival_tick`.
+
+To make the banner longer, raise `level_up_rest` first, then `banner_ticks`, then move the later ages (`close_*`, `hold.*`, `fly.start`, `arrival_tick`) to match.
+
