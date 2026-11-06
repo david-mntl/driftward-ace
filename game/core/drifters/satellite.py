@@ -5,6 +5,7 @@ always matches the drawn frame. Source: docs/contracts/systems/drifters.md, Rule
 drifters/02-satellite.md.
 """
 
+import functools
 import logging
 import math
 from dataclasses import dataclass, replace
@@ -171,21 +172,10 @@ class Satellite(Drifter):
         """
         if self.phase is not Phase.ACTIVE:
             return ()
-        turn: float = math.radians(self.swing_angle())
-        cos_t, sin_t = math.cos(turn), math.sin(turn)
-        mirror: float = -1.0 if self.invert else 1.0
-        panels: list[Polygon] = []
-        for box in self.swing_hitbox:
-            corners: list[tuple[float, float]] = []
-            for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
-                px: float = box.cx + sx * box.w / 2
-                py: float = box.cy + sy * box.h / 2
-                corners.append((mirror * (px * cos_t + py * sin_t), -px * sin_t + py * cos_t))
-            panels.append(Polygon(tuple(corners)))
-        body: Hitbox = (
-            tuple(_mirrored(shape) for shape in self.hitbox) if self.invert else self.hitbox
+        offsets: Hitbox = _pose_offsets(
+            self.hitbox, self.swing_hitbox, self.swing_angle(), self.invert
         )
-        return place_hitbox((*body, *panels), self.x, self.y)
+        return place_hitbox(offsets, self.x, self.y)
 
     def effect_on_touch(self) -> TouchEffect:
         """Touching the body or a panel is a hit."""
@@ -197,6 +187,31 @@ class Satellite(Drifter):
         `-angle_degrees` flying down to the right, `+angle_degrees` with `invert`.
         """
         return self.angle_degrees if self.invert else -self.angle_degrees
+
+
+@functools.cache
+def _pose_offsets(
+    body: Hitbox, swing_hitbox: tuple[Box, ...], angle_degrees: float, invert: bool
+) -> Hitbox:
+    """Return the body shapes and the panel boxes turned by `angle_degrees`, as offsets.
+
+    A panel box turns about the center into a four-corner polygon; with `invert` every shape is
+    mirrored. Kept per pose: a satellite has `swing_frames` angles, so after the first swing this
+    is a lookup, not trigonometry each tick.
+    """
+    turn: float = math.radians(angle_degrees)
+    cos_t, sin_t = math.cos(turn), math.sin(turn)
+    mirror: float = -1.0 if invert else 1.0
+    panels: list[Polygon] = []
+    for box in swing_hitbox:
+        corners: list[tuple[float, float]] = []
+        for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            px: float = box.cx + sx * box.w / 2
+            py: float = box.cy + sy * box.h / 2
+            corners.append((mirror * (px * cos_t + py * sin_t), -px * sin_t + py * cos_t))
+        panels.append(Polygon(tuple(corners)))
+    placed_body: Hitbox = tuple(_mirrored(shape) for shape in body) if invert else body
+    return (*placed_body, *panels)
 
 
 def _mirrored(shape: Shape) -> Shape:
