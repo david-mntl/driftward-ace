@@ -1,0 +1,53 @@
+{
+  "dim_steps": 8,
+  "ufo": {
+    "looks": [
+      { "name": "broken", "file": "ufo_broken.png", "frame_w": 40, "frame_h": 20, "ticks_per_frame": 3, "order": "random" },
+      { "name": "clean", "file": "ufo_clean.png", "frame_w": 40, "frame_h": 20, "ticks_per_frame": 5, "order": "loop" }
+    ]
+  },
+  "meteorite": {
+    "looks": [
+      { "name": "rock_a", "file": "meteorite_rock_a.png", "frame_w": 36, "frame_h": 36, "ticks_per_frame": 3, "order": "loop" },
+      { "name": "rock_b", "file": "meteorite_rock_b.png", "frame_w": 36, "frame_h": 36, "ticks_per_frame": 3, "order": "loop" },
+      { "name": "rock_c", "file": "meteorite_rock_c.png", "frame_w": 36, "frame_h": 36, "ticks_per_frame": 3, "order": "loop" },
+      { "name": "rock_d", "file": "meteorite_rock_d.png", "frame_w": 36, "frame_h": 36, "ticks_per_frame": 3, "order": "loop" }
+    ],
+    "art_hitbox_width": 28
+  },
+  "planet": {
+    "looks": [
+      { "name": "marble", "file": "planet_marble.png", "frame_w": 64, "frame_h": 64, "ticks_per_frame": 8, "order": "loop" }
+    ],
+    "field_ring_color": [180, 120, 255],
+    "field_ring_width": 1,
+    "field_ring_radius_step": 2
+  },
+  "fireball": {
+    "strip": { "name": "dying_star", "file": "fireball.png", "frame_w": 64, "frame_h": 64, "ticks_per_frame": 4, "order": "loop" },
+    "art_head_width": 32,
+    "art_head_center": [44, 44]
+  },
+  "coin": {
+    "common": { "name": "common", "file": "coin_common.png", "frame_w": 24, "frame_h": 24, "ticks_per_frame": 6, "order": "loop" },
+    "rare": { "name": "rare", "file": "coin_rare.png", "frame_w": 24, "frame_h": 24, "ticks_per_frame": 6, "order": "loop" }
+  },
+  "electric_ball": {
+    "charge": { "name": "charge", "file": "electric_ball_charge.png", "frame_w": 24, "frame_h": 24, "ticks_per_frame": 6, "order": "loop" },
+    "charge_ticks_per_frame_end": 2,
+    "fire": { "name": "fire", "file": "electric_ball_fire.png", "frame_w": 24, "frame_h": 24, "ticks_per_frame": 3, "order": "random" },
+    "ring": { "name": "ring", "file": "electric_ball_ring.png", "frame_w": 128, "frame_h": 128, "ticks_per_frame": 3, "order": "random" },
+    "ray_color": [200, 245, 255],
+    "outline_color": [150, 220, 255]
+  },
+  "chain_lightning": {
+    "node_charge": { "name": "node_charge", "file": "chain_node_charge.png", "frame_w": 18, "frame_h": 18, "ticks_per_frame": 6, "order": "loop" },
+    "charge_ticks_per_frame_end": 2,
+    "node_fire": { "name": "node_fire", "file": "chain_node_fire.png", "frame_w": 18, "frame_h": 18, "ticks_per_frame": 3, "order": "random" },
+    "arc": { "name": "arc", "file": "chain_arc.png", "frame_w": 181, "frame_h": 16, "ticks_per_frame": 3, "order": "random" },
+    "ray_color": [200, 245, 255]
+  },
+  "floating_island": {
+    "looks": ["island_ground_1.png", "island_ground_2.png", "island_ground_3.png"]
+  }
+}

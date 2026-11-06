@@ -24,3 +24,17 @@
 - fonts/ShareTechMono.ttf: Share Tech Mono Regular, the HUD's small labels and the text of every screen. Copyright (c) 2012, Carrois Type Design, Ralph du Carrois, with Reserved Font Name 'Share'. Shipped unchanged. Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
 
 - Exo2-BlackItalic (inlined in web/start.tmpl): Exo 2 Black Italic (Latin subset, as served by Google Fonts), the game's name on the start page. Copyright 2013 The Exo 2 Project Authors (https://github.com/googlefonts/Exo-2.0). Shipped unchanged, inlined in the start page, not inside the game package. Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+
+## Drifters
+
+All own work, drawn by script (Pillow + numpy) from the designs the Director picked on 2026-11-05. No outside source. The large masters stay in staging/assets/sprites/anim/ (not shipped).
+
+- sprites/ufo_broken.png: the broken UFO, 8 frames of 40x20, played in random order. tools/art/ufo-broken-anim.py, built on the staged ufo-d2-r2 master.
+- sprites/ufo_clean.png: the clean UFO, 8 frames of 40x20, a loop. tools/art/ufo-clean-anim.py, from ufo-d3-r3 (tools/art/ufo-d3.py).
+- sprites/planet_marble.png: the marbled planet turning, 24 frames of 64x64. tools/art/planet-marble-anim.py, from planet-d5-r2 (tools/art/planet-d5.py).
+- sprites/fireball.png: the dying-star fireball, 6 frames of 64x64. tools/art/fireball-r1-anim.py, converted from the staged fireball-d4-r1 master and piskel.
+- sprites/coin_common.png and sprites/coin_rare.png: the crystal coin, 8 frames of 24x24 each. tools/art/coin-anim.py, from coin-d2-r3 (tools/art/coin-d2.py).
+- sprites/electric_ball_charge.png (8 frames of 24x24), sprites/electric_ball_fire.png (6 frames of 24x24) and sprites/electric_ball_ring.png (6 frames of 128x128): the electric ball charging, firing, and its firing circle. tools/art/electric-ball-anim.py, from electric-ball-d4-r2 (charge) and electric-ball-d2-r2 (fire).
+- sprites/chain_node_charge.png (8 frames of 18x18), sprites/chain_node_fire.png (6 frames of 18x18) and sprites/chain_arc.png (6 frames of 181x16): the chain lightning nodes and arc. tools/art/chain-lightning-anim.py, from the electric ball looks.
+- sprites/island_ground_1.png, island_ground_2.png and island_ground_3.png: the three floating-island grounds, 320x120 each, copied unchanged from floating-island-d1-r3, d2-r3 and d3-r3 (tools/art/floating-island-d1.py to d3.py).
+- sprites/meteorite_rock_a.png to meteorite_rock_d.png: the meteorite's four rock looks, 32 frames of 36x36 each, the rock turning on a tilted axis. tools/art/meteorite-d11.py --round 2 (3D bodies, style from meteorite-d10.py), own work, style described in words from a Director reference (the reference itself is not used or shipped). Picked by the Director 2026-11-05.
