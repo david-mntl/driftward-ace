@@ -194,17 +194,17 @@ class ElectricBall(Drifter):
         """Touching the firing circle is a hit."""
         return TouchEffect.HIT
 
-    def _cycle_tick(self) -> int:
+    def cycle_tick(self) -> int:
         """Return the tick within the charge-then-fire cycle, from 0."""
         return self.ticks_in_phase % (self.charge_ticks + self.fire_ticks)
 
     def is_charging(self) -> bool:
         """Return True while ACTIVE and in the charge part of the cycle."""
-        return self.phase is Phase.ACTIVE and self._cycle_tick() < self.charge_ticks
+        return self.phase is Phase.ACTIVE and self.cycle_tick() < self.charge_ticks
 
     def is_firing(self) -> bool:
         """Return True while ACTIVE and in the fire part of the cycle."""
-        return self.phase is Phase.ACTIVE and self._cycle_tick() >= self.charge_ticks
+        return self.phase is Phase.ACTIVE and self.cycle_tick() >= self.charge_ticks
 
     def ball_on_screen(self) -> bool:
         """Return True when the ball's box shares area with the screen (strict)."""
@@ -225,7 +225,7 @@ class ElectricBall(Drifter):
         """Return the rays now: 1 up to `charge_rays` while charging on screen, else 0."""
         if not (self.is_charging() and self.ball_on_screen()):
             return 0
-        return 1 + self._cycle_tick() * self.charge_rays // self.charge_ticks
+        return 1 + self.cycle_tick() * self.charge_rays // self.charge_ticks
 
     def outline_level(self) -> float:
         """Return the charge outline's share of full color, 0..1: rays shown over most rays."""

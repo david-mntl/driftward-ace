@@ -246,23 +246,23 @@ class ChainLightning(Drifter):
         """Touching a firing arc, or a node while one of its arcs fires, is a hit."""
         return TouchEffect.HIT
 
-    def _cycle_tick(self) -> int:
+    def cycle_tick(self) -> int:
         """Return the tick within the charge-then-fire cycle, from 0."""
         return self.ticks_in_phase % (self.charge_ticks + self.fire_ticks)
 
     def is_charging(self) -> bool:
         """Return True while ACTIVE and in the charge part of the cycle."""
-        return self.phase is Phase.ACTIVE and self._cycle_tick() < self.charge_ticks
+        return self.phase is Phase.ACTIVE and self.cycle_tick() < self.charge_ticks
 
     def is_firing(self) -> bool:
         """Return True while ACTIVE and in the fire part of the cycle."""
-        return self.phase is Phase.ACTIVE and self._cycle_tick() >= self.charge_ticks
+        return self.phase is Phase.ACTIVE and self.cycle_tick() >= self.charge_ticks
 
     def charge_ray_count(self) -> int:
         """Return the rays per node now: 1 up to `charge_rays` while charging, else 0."""
         if not self.is_charging():
             return 0
-        return 1 + self._cycle_tick() * self.charge_rays // self.charge_ticks
+        return 1 + self.cycle_tick() * self.charge_rays // self.charge_ticks
 
     def node_centers(self) -> tuple[Point, ...]:
         """Return each node's center, screen px, in node order."""
