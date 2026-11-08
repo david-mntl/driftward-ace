@@ -28,7 +28,7 @@ DEFAULT_INI = "pygbag.ini"
 
 APK_NAME = "game.apk"  # pygbag's inner archive with the game files
 APK_ROOT = PurePosixPath("assets")  # game/ is stored under this folder
-REQUIRED = (PurePosixPath("main.py"),)  # the browser build can't start without these
+REQUIRED = (PurePosixPath("main.py"), PurePosixPath("VERSION"))  # the build needs these
 
 
 @dataclass(frozen=True)

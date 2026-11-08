@@ -1,0 +1,72 @@
+# The game's version lives in game/VERSION (MAJOR.MINOR.PATCH).
+# On a pull request: if any shipped game file changed, the version must go up,
+# unless the pull request has the `no-version-bump` label. Adding or removing the label re-runs the check.
+# On a push to main: tag the commit v<version> if that tag doesn't exist yet.
+# The rules are in .github/scripts/check_version_bump.py. Actions are pinned to a commit SHA.
+name: Version
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bump:
+    name: Version bump
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # The whole history, so git can compare the branch with its base.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Check the version went up
+        env:
+          BASE: origin/${{ github.base_ref }}
+          SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'no-version-bump') }}
+        run: |
+          if [ "$SKIP" = "true" ]; then
+            python .github/scripts/check_version_bump.py --base "$BASE" --skip
+          else
+            python .github/scripts/check_version_bump.py --base "$BASE"
+          fi
+
+  tag:
+    name: Tag the version
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      # The tags too, so the job can see whether this version is tagged already.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Tag v<version> if new
+        run: |
+          set -euo pipefail
+          tag="v$(tr -d '[:space:]' < game/VERSION)"
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "$tag already exists, nothing to do."
+          else
+            git tag "$tag"
+            git push origin "$tag"
+            echo "Tagged $GITHUB_SHA as $tag."
+          fi
