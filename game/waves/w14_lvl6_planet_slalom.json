@@ -1,0 +1,23 @@
+{
+  "length_px": 1100,
+  "kind": "fixed",
+  "placements": [
+    { "at_px": 120, "type": "planet", "x": 115 },
+    { "at_px": 175, "type": "satellite", "y": 200, "variant": "flat" },
+    { "at_px": 220, "type": "planet", "x": 525 },
+    { "at_px": 320, "type": "planet", "x": 150 },
+    { "at_px": 420, "type": "planet", "x": 490 },
+    { "at_px": 477, "type": "coin", "x": 452, "variant": "common" },
+    { "at_px": 490, "type": "meteorite", "x": 320, "variant": "small" },
+    { "at_px": 520, "type": "planet", "x": 190 },
+    { "at_px": 617, "type": "coin", "x": 412, "variant": "common" },
+    { "at_px": 620, "type": "planet", "x": 450 },
+    { "at_px": 646, "type": "fireball", "x": 751, "variant": "small", "invert": true },
+    { "at_px": 647, "type": "meteorite", "x": 454, "variant": "small" },
+    { "at_px": 657, "type": "meteorite", "x": 260, "variant": "small" },
+    { "at_px": 702, "type": "meteorite", "x": 410, "variant": "small" },
+    { "at_px": 709, "type": "fireball", "x": 106, "variant": "small" },
+    { "at_px": 745, "type": "meteorite", "x": 300, "variant": "medium" },
+    { "at_px": 747, "type": "coin", "x": 262, "variant": "common" }
+  ]
+}
