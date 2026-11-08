@@ -23,7 +23,7 @@ Waves are hand-authored JSON files that place hazards and coins. Every run opens
 5. Only drifters whose tier is unlocked at the current level may appear ([08-difficulty.md](08-difficulty.md)).
 6. **Coins** go near hazards, never in safe spots. Source: [01-vision.md](01-vision.md), Pillar 3. Each wave sets how many coins it has; 0 is allowed. Each placement sets how near: anywhere from right beside a hazard (hard) out to `coin_near_max` × `ship_w` (easy), which is 96 px at the guessed ship width.
 7. **wave_check** runs at `check_level` and fails the wave unless all of these hold:
-   1. Every telegraph lasts ≥ `telegraph_min` ticks.
+   1. Every telegraph lasts ≥ `telegraph_min` ticks. The electric ball is left out of this check ([drifters/10-electric-ball.md](drifters/10-electric-ball.md) rule 10).
    2. Every gap the ship must pass is ≥ `gap_min` × `ship_w` ([04-ship.md](04-ship.md)), which is 80 px at the guessed ship width.
    3. A bot using arrow-key thrust and the real physics finds a path with zero hits.
    4. In the wave's first `seam_clear` px of scroll, none of its hazards is on screen. An entry warning counts as on screen. The end of a wave has no such rule: a wave that needs a clear stretch before the next one sets an extra rest (rule 11). Source: Director.
