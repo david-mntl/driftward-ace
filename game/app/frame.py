@@ -18,6 +18,7 @@ rules 1 and 2. systems/app/save-storage.md.
 """
 
 import asyncio
+import gc
 import logging
 import random
 import time
@@ -43,7 +44,7 @@ from app.mode import RunMode
 from app.mute_icon_tuning import load_mute_icon_look
 from app.saves import load_saves, write_saves
 from app.screens_tuning import load_screen_rules
-from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
+from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE, TICK_SNAP_SECONDS
 from app.ship_tuning import load_ship_look
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
 from app.waves import load_wave_book
@@ -174,6 +175,7 @@ async def frame_loop(mode: RunMode) -> None:
     background_ticks: float = 0.0
     if audio is not None:
         audio.start_music()
+    _freeze_startup_heap()
     previous: float = time.perf_counter()
     while True:
         keep_running, overlay_visible, focus_lost = _read_events(
@@ -220,6 +222,18 @@ async def frame_loop(mode: RunMode) -> None:
         pygame.display.flip()
         await asyncio.sleep(0)
     log.info("quit")
+
+
+def _freeze_startup_heap() -> None:
+    """Collect once, then move every object alive now out of the garbage collector's reach.
+
+    Fonts, images, tuning and modules live for the whole page. Left in, a full collection walks
+    all of them and holds a frame for about 30 ms in the browser, at a moment nobody can predict.
+    Frozen, it walks only what play makes. Source: 15-tech-constraints.md, rule 10.
+    """
+    gc.collect()
+    gc.freeze()
+    log.debug("startup heap frozen objects=%d", gc.get_freeze_count())
 
 
 def _build_level_up_view(hud_rules: HudRules, look: LevelUpLook, hud: HudView) -> LevelUpView:
@@ -308,6 +322,9 @@ def _run_ticks(
 ) -> tuple[GameFlow, float, bool]:
     """Run one tick per whole TICK_SECONDS in the accumulator, at most MAX_TICKS_PER_FRAME.
 
+    A tick runs when the accumulator is within TICK_SNAP_SECONDS of a whole tick; the
+    accumulator may then go slightly below 0, and the next frame pays it back.
+
     Each tick is one step_flow call; a pending focus loss reaches the first tick only. Right after
     it the due placements go in through one add_flow_drifters call: the spawn list's when
     list_plays, else the run's waves'. Never both. Then the saves are written if that tick saved
@@ -317,7 +334,7 @@ def _run_ticks(
     systems/app/frame-loop.md, Rules, Focus and Tick.
     """
     ticks: int = 0
-    while accumulator >= TICK_SECONDS and ticks < MAX_TICKS_PER_FRAME:
+    while accumulator >= TICK_SECONDS - TICK_SNAP_SECONDS and ticks < MAX_TICKS_PER_FRAME:
         flow = step_flow(
             flow, TickInput(thrust=thrust, confirm=confirm, focus_lost=focus_lost_pending)
         )
