@@ -251,3 +251,11 @@
 ## DRA-159, 2026-11-08
 - `systems/mute-icon.md`: 0 to 1, frozen.
 - M mutes and unmutes the music on every screen after the start page, and a small speaker icon shows while it is muted.
+
+## Credits page, 2026-11-08
+- The Director's call in the main session, no pipeline. The menu gets a fourth item, CREDITS, and a credits page that shows the CC BY 4.0 credits for the music loop and the level-up sound, plus courtesy lines (the CC0 game-over sound, the two fonts). Changes locked decision 8 and `menu_items`. Closes AA-05. GDD: `01-vision.md` locked decision 8, `02-game-flow.md` (`menu_items`, rule 14, diagram, edge cases), `10-ui.md` (`credits_page`, `credits_look`, `menu_screen`, `menu_look`, `window_screens`, `ui_font`), `12-art-and-audio.md` rule 12, `90-open-questions.md`, `91-decision-log.md` rows 151 and 152.
+- `systems/game-flow.md`: `Screen.CREDITS`, `MenuItem.CREDITS`; the credits page steps like the other pages (a confirm press goes to MENU). Draft, version stays 2.
+- `systems/screens.md`: new view `ui/credits.py` (`draw_credits`, `card_rects`, `CREDIT_CARDS`), new record `CreditsRules`, its Presentation. Draft, version stays 1.
+- `systems/app/frame-loop.md` and `systems/app/general.md` (in `systems/app.md`): the Draw rule calls `draw_credits` on CREDITS. Version unchanged.
+- `schemas/screens.schema.json`: new required section `credits`. `tuning/screens.json` gains it.
+- `game/assets/CREDITS.md`: new Audio section with the shipped sounds' sources and licenses.

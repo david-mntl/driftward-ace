@@ -1,13 +1,13 @@
-# Game flow: menu, instructions, leaderboard, pause, game over and name entry
+# Game flow: menu, instructions, leaderboard, credits, pause, game over and name entry
 Version: 2
 Status: draft
-Features: DRA-125, DRA-126, HUD-PANEL, DRA-147
+Features: DRA-125, DRA-126, HUD-PANEL, DRA-147, Credits page
 Created by: architect
 
 ## Purpose
 The screens around a run and the keys that move between them. One core state, `GameFlow`, holds which screen shows, the run (`docs/contracts/systems/run.md`), the saves (`docs/contracts/systems/saves.md`), the menu's selection, the game-over screen's message, letter picker and selection, and the keys held on the last tick. Each tick it reads what the player did (the arrows, a confirm key, a focus loss), decides what that does on the current screen, and steps the run only while the run plays.
 
-After pygbag's click-to-start the menu shows Play, Instructions and Leaderboard, with Play selected. Up and down move the selection and wrap around; a confirm key picks it. Instructions opens one page; Leaderboard opens the top 10, in place order, or "No scores yet." when the list is empty or saves don't work. A confirm key goes back to the menu. Play starts the run. During play a confirm key or a focus loss pauses: the PAUSE box shows over the frozen world, and only a confirm key resumes. When the last life is lost the run plays its last-life delay, where keys and focus do nothing, then the game-over screen shows over the frozen world.
+After pygbag's click-to-start the menu shows Play, Instructions, Leaderboard and Credits, with Play selected. Up and down move the selection and wrap around; a confirm key picks it. Instructions opens one page; Leaderboard opens the top 10, in place order, or "No scores yet." when the list is empty or saves don't work; Credits opens the credits page. A confirm key goes back to the menu. Play starts the run. During play a confirm key or a focus loss pauses: the PAUSE box shows over the frozen world, and only a confirm key resumes. When the last life is lost the run plays its last-life delay, where keys and focus do nothing, then the game-over screen shows over the frozen world.
 
 The game-over screen holds everything; name entry has no screen of its own. From its first frame it shows the message for the run's place on the top 10 (NEW BEST SCORE, TOP 3, TOP 10, or GAME OVER off the list or when saves don't work), the score, and RETRY with MENU under it, RETRY selected. When the score makes the top 10, the letter picker shows between the score and RETRY, filled with the last nickname, and takes the keys: up and down change the character in the current slot, left and right move between slots, all wrapping, and a confirm key saves. A name saves the entry and becomes the last nickname; a name of only blanks saves nothing. Then the picker takes no more keys and RETRY and MENU take over: up and down move the selection and wrap, a confirm key picks it. Without the picker they take over from the first frame. RETRY starts a new run at once; MENU goes back to the menu with Play selected. The message never changes while the screen shows.
 
@@ -24,6 +24,8 @@ stateDiagram-v2
     MENU --> LEADERBOARD: confirm press on Leaderboard
     INSTRUCTIONS --> MENU: confirm press, Play selected
     LEADERBOARD --> MENU: confirm press, Play selected
+    MENU --> CREDITS: confirm press on Credits
+    CREDITS --> MENU: confirm press, Play selected
     MENU --> PLAYING: confirm press on Play<br/>(next_run first if the run is over)
     PLAYING --> PAUSED: confirm press or focus lost,<br/>not in the last life
     PAUSED --> PLAYING: confirm press
@@ -42,9 +44,9 @@ flowchart TD
   IN["flow + TickInput"] --> PR["confirm_press = keys.confirm and not flow.confirm_held<br/>up_press, down_press, left_press, right_press = that arrow<br/>in keys.thrust and not in flow.arrows_held"]
   PR --> S{"flow.screen"}
   S -- MENU --> M1{"confirm_press?"}
-  M1 -- yes --> M2["Play: PLAYING (next_run if run.game_over)<br/>Instructions: INSTRUCTIONS<br/>Leaderboard: LEADERBOARD"]
+  M1 -- yes --> M2["Play: PLAYING (next_run if run.game_over)<br/>Instructions: INSTRUCTIONS<br/>Leaderboard: LEADERBOARD<br/>Credits: CREDITS"]
   M1 -- no --> M3["up_press xor down_press: selection -1 or +1, wrapping"]
-  S -- "INSTRUCTIONS, LEADERBOARD" --> P1{"confirm_press?"}
+  S -- "INSTRUCTIONS, LEADERBOARD, CREDITS" --> P1{"confirm_press?"}
   P1 -- yes --> P2["MENU, menu_selection = MENU_START_SELECTION"]
   S -- PLAYING --> L1{"run.last_life?"}
   L1 -- yes --> STEP["run = step_run(run, keys.thrust)<br/>run_stepped = True"]
@@ -135,6 +137,7 @@ class Screen(Enum):
     MENU = "menu"
     INSTRUCTIONS = "instructions"
     LEADERBOARD = "leaderboard"
+    CREDITS = "credits"
     PLAYING = "playing"        # the run is stepped; its last life too (run.last_life)
     PAUSED = "paused"
     GAME_OVER = "game_over"
@@ -143,6 +146,7 @@ class MenuItem(Enum):          # members in menu order, top first
     PLAY = "play"
     INSTRUCTIONS = "instructions"
     LEADERBOARD = "leaderboard"
+    CREDITS = "credits"
 
 class GameOverChoice(Enum):    # members in screen order, top first
     RETRY = "retry"
@@ -323,7 +327,7 @@ The app picks what to draw from `flow.screen` (`systems/app/frame-loop.md`, Draw
 
 | Core field | Shown as |
 |---|---|
-| `flow.screen` MENU, INSTRUCTIONS, LEADERBOARD | the background filling the whole window (`WindowBackdrop`), then that page alone, centered on the window: `draw_menu`, `draw_instructions` or `draw_leaderboard`. No world, no HUD, no debug overlay. Source: scope report DRA-125, Values needed ("white text on the black background"); 02-game-flow.md, rules 2 to 4 |
+| `flow.screen` MENU, INSTRUCTIONS, LEADERBOARD, CREDITS | the background filling the whole window (`WindowBackdrop`), then that page alone, centered on the window: `draw_menu`, `draw_instructions`, `draw_leaderboard` or `draw_credits` (`systems/screens.md`). No world, no HUD, no debug overlay. Source: scope report DRA-125, Values needed ("white text on the black background"); 02-game-flow.md, rules 2 to 4 and 14 |
 | `flow.menu_selection` | which menu item has the marker. Source: 10-ui.md, menu_screen ("the selected one marked") |
 | `flow.screen` PLAYING | the world in the play area, the panel and frame round it (`systems/hud.md`), the burst during the last life |
 | `flow.screen` PAUSED | the world exactly as it was on the last tick played, the panel and frame, the whole window dimmed (`HudView.dim`), then `draw_pause_box` centered on the window. Source: 02-game-flow.md, rule 7; 10-ui.md, pause_box; scope report DRA-125, Values needed ("The HUD stays visible") |
@@ -406,13 +410,13 @@ Values. Every key and screen value comes from the GDD or the scope report; none 
 **Start** (`start_flow`). After pygbag's click-to-start the app builds its first run as before, loads the saves (`systems/app/save-storage.md`) and calls `start_flow(run, saves)`: MENU, `MENU_START_SELECTION`, `GAME_OVER_START_SELECTION`, `run_stepped` False, `saves` as given (None when saves don't work), every other DRA-126 field at its default. `confirm_held` is True and every arrow is held in `arrows_held`, so a key already down when the menu first shows does nothing until it is released and pressed again. Source: 02-game-flow.md, rules 1, 2 and 12 (pygbag's start screen is the screen before).
 
 **MENU** (02-game-flow.md, rule 2 and menu_navigation, locked; 91-decision-log.md, rows 80 and 89; 01-vision.md, locked decision 8):
-- `confirm_press` picks `menu_selection`: Play goes to PLAYING; Instructions to INSTRUCTIONS; Leaderboard to LEADERBOARD.
+- `confirm_press` picks `menu_selection`: Play goes to PLAYING; Instructions to INSTRUCTIONS; Leaderboard to LEADERBOARD; Credits to CREDITS.
 - Play: when `run.game_over` (the menu was reached through MENU), `run = next_run(run)` first. Otherwise the run is the app's first run, untouched. Either way the run is not stepped on this tick; it is first stepped on the next one, exactly as a run starts today. Source: 02-game-flow.md, rule 5.
 - Otherwise `up_press` moves the selection one item up, from the first to the last; `down_press` one item down, from the last to the first.
 - A focus loss does nothing. Source: 02-game-flow.md, Edge cases.
 - Every time MENU is entered, from a page or from GAME_OVER, `menu_selection = MENU_START_SELECTION`: the menu always opens with it selected. Source: 02-game-flow.md, rule 2 ("It opens with `menu_start_selection` selected").
 
-**INSTRUCTIONS and LEADERBOARD** (02-game-flow.md, rules 3 and 4): `confirm_press` goes to MENU. Nothing else does anything: no arrow, no focus loss. The instructions open only from the menu (01-vision.md, locked decision 8). The leaderboard page shows `flow.leaderboard`: the saves' entries, or none when saves don't work (11-save-data.md, rule 5).
+**INSTRUCTIONS, LEADERBOARD and CREDITS** (02-game-flow.md, rules 3, 4 and 14): `confirm_press` goes to MENU. Nothing else does anything: no arrow, no focus loss. The instructions open only from the menu (01-vision.md, locked decision 8). The leaderboard page shows `flow.leaderboard`: the saves' entries, or none when saves don't work (11-save-data.md, rule 5).
 
 **PLAYING**:
 - `run.last_life` True going in: `run = step_run(run, keys.thrust)`. A confirm key and a focus loss do nothing. Source: 02-game-flow.md, rule 8 ("Keys do nothing") and Edge cases ("The tab loses focus during LastLife: it doesn't pause").
