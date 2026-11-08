@@ -54,7 +54,7 @@ Walls, top line, floor and every wave coordinate count from the play area's own 
    Each drifter's spec says which kind it is.
 
 10. **Window and play area.** The window is `window_w` × `window_h`. The play area sits inside it at (`play_area_x`, `play_area_y`). The frame, the pillar and the panel are drawn outside the play area and never over it, so the player sees every hazard right up to the wall and floor. Where the frame's corners are cut or rounded, the cut is outside the play area. Source: Director.
-11. **Screens that fill the window.** The menu, the instructions page and the leaderboard page use the whole window. Their background fills it too. The pause box and the game-over screen are centered on the whole window ([10-ui.md](10-ui.md)).
+11. **Screens that fill the window.** The menu, the instructions page, the leaderboard page and the credits page use the whole window. Their background fills it too. The pause box and the game-over screen are centered on the whole window ([10-ui.md](10-ui.md)).
 
 ## Edge cases
 - Walls, floor, top line and fall distance move with the play area, not with the window. A frame or panel change never moves them.

@@ -60,7 +60,6 @@ None open.
 | AA-02 | Background numbers (guesses set, 2026-10-29; the near layer has none): how fast the middle and near layers scroll, how many river lights at most, the swirl loop length, how strong the bottom glow is. The design is set in 12-art-and-audio.md. The browser frame rate was measured on 2026-11-06 (12-art-and-audio.md, Frame-rate check): the background costs about 4 to 6 ms of a 16.7 ms frame. | 12-art-and-audio.md | Background | open |
 | AA-03 | Sounds for `level_up` and game over: done, in `sound_list`. Kept open for further sounds (menus, buttons). | 12-art-and-audio.md | Audio | open |
 | AA-04 | Particle cap. | 12-art-and-audio.md | Effects | open |
-| AA-05 | Credits for the two CC BY sources of the music loop: where they show. Needed before any public build. | 12-art-and-audio.md | Release | open |
 
 ## Scope
 | ID | Question | File | Blocks | Status |

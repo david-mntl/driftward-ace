@@ -137,7 +137,7 @@ The screens (menu, pause box, game over, instructions, leaderboard) have their o
 9. **Looks never change play.** Animation, rotation frames and random looks are visual only. Hitboxes never rotate, move or resize with the look. Source: Director; [07-drifters.md](07-drifters.md) rule 8.
 10. **A fixed pool of looks.** A drifter with several looks picks one from a fixed pool each time it appears. Art is never made new per run. Source: Director.
 11. **Painted once.** Background layers are images made ahead of time and loaded by the game, never drawn shape by shape each frame. A layer that moves is a loop of such images. Source: Director.
-12. **Words, not pictures.** The style is defined in words in this file. Images from other works are never part of this design and never ship. Only art made for the game, or converted from a source that is free to use and credited, ships. Source: Director.
+12. **Words, not pictures.** The style is defined in words in this file. Images from other works are never part of this design and never ship. Only art made for the game, or converted from a source that is free to use and credited, ships. The same goes for sounds. Every credit a license asks for shows in the game, on the menu's Credits page ([10-ui.md](10-ui.md), `credits_page`). Source: Director.
 13. **Motion must show at game size.** A turn smaller than about 20° does not read on a sprite this small. A turning object uses a full turn in steps of 45° or less, so the loop has no back-and-forth. One exception: a part that swings on a fixed body, like the satellite's panels, goes back and forth. The light and the rim stay fixed while the shape turns. Frames sit in one strip, all the same size. Source: Director.
 14. **HUD colors are their own.** The HUD, the frame and the panel use the colors in the HUD colors table and may use solid fuchsia and pink, and the wireframe of the ship may be fuchsia, not cobalt. The play-area rules (rules 6 and 8, and the ship's cobalt) do not apply there. The wireframe is a hull schematic, not the ship's paint. Gold (the level), violet (the score) and orange (the last life) are new color meanings that only the HUD uses. Source: Director. The level-up banner ([10-ui.md](10-ui.md) rule 14) is the one place the level's gold appears in the play area: on the number and the lit pips only.
 15. **Sound cues.** The game names the moments a sound will hang on, even before sound exists. `level_up` fires on the tick the level rises; a jingle that should hit with the banner's landing puts its accent about 0.37 s in. The level-up and game-over sounds now hang on it and on the burst. Source: Director (DRA-148).
@@ -146,7 +146,7 @@ The screens (menu, pause box, game over, instructions, leaderboard) have their o
 - Art for a drifter whose spec is still draft: wait, or use a placeholder shape the Director approves.
 
 ## Open
-- AA-02 (background numbers: still to tune, and the near layer's. The frame-rate check is done, see Frame-rate check), AA-04, AA-05 (credits for the music).
+- AA-02 (background numbers: still to tune, and the near layer's. The frame-rate check is done, see Frame-rate check), AA-04.
 
 ## How to extend
 A new visual or sound rule that applies to every drifter goes here. Anything specific to one drifter goes in that drifter's spec. A new color meaning is a new row in the color language, with the Director's approval.
