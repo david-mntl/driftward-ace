@@ -116,6 +116,7 @@ def test_bad_json_names_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         ("palette.score", "#12345", "palette.score must be a color like #rrggbb"),
         ("fonts.text_file", 7, "fonts.text_file must be a string"),
         ("fonts.roles", [], "fonts.roles must be a non-empty array"),
+        ("instructions.foot_group_gap", -1, "instructions.foot_group_gap"),
     ],
 )
 def test_a_bad_value_names_the_file_and_the_field(

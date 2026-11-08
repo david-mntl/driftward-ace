@@ -210,6 +210,7 @@
     "pad_y": 6,
     "text_gap": 12,
     "caption_gap": 3,
+    "foot_group_gap": 48,
     "blur": false,
     "caption_alpha": 224
   },

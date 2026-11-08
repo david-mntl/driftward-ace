@@ -228,6 +228,7 @@ class InstructionsRules:
     text_gap: int
     caption_gap: int
     caption_alpha: int
+    foot_group_gap: int
     blur: bool
 
 

@@ -18,6 +18,7 @@ import pygame
 from app.assets import load_screen_fonts
 from ui.instructions import (
     CARD_COLOR_KEYS,
+    FOOTER_GROUPS,
     INSTRUCTION_SECTIONS,
     _wrap,
     card_rects,
@@ -247,6 +248,24 @@ def test_the_footer_keys_are_centered_in_the_footer_band(look: ScreenLook) -> No
     assert ink is not None
     assert abs(ink.centerx - WINDOW[0] // 2) <= 2
     assert abs(ink.centery - band.centery) <= 2
+
+
+def test_the_footer_shows_back_then_the_music_mute_key() -> None:
+    assert FOOTER_GROUPS == ((("ENTER", "SPACE"), "BACK"), (("M",), "MUSIC ON / OFF"))
+
+
+def test_the_footer_groups_sit_foot_group_gap_apart(look: ScreenLook) -> None:
+    rules = look.rules.instructions
+    foot_top = WINDOW[1] - rules.margin_bottom - rules.foot_h
+    band = pygame.Rect(60, foot_top, WINDOW[0] - 120, rules.foot_h)
+    page = _page(look)
+    ink = _ink(page, band)
+    assert ink is not None
+    back_w = look.keys_size(*FOOTER_GROUPS[0])[0]
+    mute_w = look.keys_size(*FOOTER_GROUPS[1])[0]
+    assert abs(ink.width - (back_w + rules.foot_group_gap + mute_w)) <= 2
+    gap = pygame.Rect(ink.left + back_w + 2, foot_top, rules.foot_group_gap - 4, rules.foot_h)
+    assert _ink(page, gap) is None
 
 
 def test_nothing_is_drawn_outside_the_margins_except_the_rulers(look: ScreenLook) -> None:
