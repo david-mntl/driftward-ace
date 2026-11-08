@@ -284,6 +284,19 @@ class CreditsRules:
 
 
 @dataclass(frozen=True)
+class VersionRules:
+    """The version label in the bottom-left corner of the menu and the full-window pages.
+
+    ``margin_left`` and ``margin_bottom`` are the text's distance from the window's left and bottom
+    edges, px. ``text_alpha`` is how bright it is, 0..255.
+    """
+
+    margin_left: int
+    margin_bottom: int
+    text_alpha: int
+
+
+@dataclass(frozen=True)
 class ScreenRules:
     """Every value of tuning/screens.json."""
 
@@ -300,3 +313,4 @@ class ScreenRules:
     instructions: InstructionsRules
     leaderboard: LeaderboardRules
     credits: CreditsRules
+    version: VersionRules

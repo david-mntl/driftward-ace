@@ -253,5 +253,10 @@
     "text_alpha": 224,
     "link_alpha": 224,
     "blur": false
+  },
+  "version": {
+    "margin_left": 14,
+    "margin_bottom": 10,
+    "text_alpha": 150
   }
 }

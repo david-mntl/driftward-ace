@@ -117,6 +117,9 @@ def test_bad_json_names_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         ("fonts.text_file", 7, "fonts.text_file must be a string"),
         ("fonts.roles", [], "fonts.roles must be a non-empty array"),
         ("instructions.foot_group_gap", -1, "instructions.foot_group_gap"),
+        ("version.margin_left", -1, "version.margin_left"),
+        ("version.margin_bottom", 2.5, "version.margin_bottom"),
+        ("version.text_alpha", 256, "version.text_alpha must be an integer from 0 to 255"),
     ],
 )
 def test_a_bad_value_names_the_file_and_the_field(
@@ -134,6 +137,14 @@ def test_a_bad_value_names_the_file_and_the_field(
 def test_a_missing_field_names_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write(tmp_path, monkeypatch, _without("pause.gap"))
     with pytest.raises(ValueError, match=r"tuning/screens\.json: .*pause\.gap"):
+        load_screen_rules()
+
+
+def test_a_missing_version_section_names_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(tmp_path, monkeypatch, _without("version"))
+    with pytest.raises(ValueError, match=r"tuning/screens\.json: .*version"):
         load_screen_rules()
 
 

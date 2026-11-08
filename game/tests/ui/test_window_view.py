@@ -52,7 +52,7 @@ class Parts:
         )
         self.flow: GameFlow = start_flow(run, None)
 
-    def draw(self, screen: Screen, overlay: bool = False) -> None:
+    def draw(self, screen: Screen, overlay: bool = False, version: str | None = None) -> None:
         """Fill the window with the sentinel, then draw `screen` the way the app does."""
         self.window.fill(SENTINEL)
         flow = dataclasses.replace(self.flow, screen=screen)
@@ -67,7 +67,13 @@ class Parts:
             self.look,
             flow,
             overlay,
+            version=version,
         )
+
+    def corner(self) -> bytes:
+        """The window's bottom-left corner, where the version label sits, as raw pixels."""
+        area = pygame.Rect(0, self.window.get_height() - 40, 120, 40)
+        return pygame.image.tobytes(self.window.subsurface(area), "RGB")
 
     def sentinel_left(self) -> int:
         """Pixels still the sentinel, sampled on a grid across the whole window."""
@@ -159,3 +165,21 @@ def test_the_backdrop_covers_a_window_larger_than_the_play_area(parts: Parts) ->
     for x in range(0, surface.get_width(), 9):
         for y in range(0, surface.get_height(), 9):
             assert surface.get_at((x, y))[:3] != SENTINEL
+
+
+@pytest.mark.parametrize(
+    "screen", [Screen.MENU, Screen.INSTRUCTIONS, Screen.LEADERBOARD, Screen.CREDITS]
+)
+def test_the_version_shows_on_the_menu_and_the_pages(parts: Parts, screen: Screen) -> None:
+    parts.draw(screen)
+    without = parts.corner()
+    parts.draw(screen, version="1.0.0")
+    assert parts.corner() != without
+
+
+@pytest.mark.parametrize("screen", [Screen.PLAYING, Screen.PAUSED, Screen.GAME_OVER])
+def test_the_version_never_shows_during_a_run(parts: Parts, screen: Screen) -> None:
+    parts.draw(screen)
+    without = pygame.image.tobytes(parts.window, "RGB")
+    parts.draw(screen, version="1.0.0")
+    assert pygame.image.tobytes(parts.window, "RGB") == without
