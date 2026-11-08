@@ -101,8 +101,14 @@ IDLE = TickInput()
 CONFIRM = TickInput(confirm=True)
 FOCUS_LOST = TickInput(focus_lost=True)
 
-MENU_ORDER: tuple[MenuItem, ...] = (MenuItem.PLAY, MenuItem.INSTRUCTIONS, MenuItem.LEADERBOARD)
-"""Source: 02-game-flow.md, menu_items (locked): Play, Instructions, Leaderboard, top first."""
+MENU_ORDER: tuple[MenuItem, ...] = (
+    MenuItem.PLAY,
+    MenuItem.INSTRUCTIONS,
+    MenuItem.LEADERBOARD,
+    MenuItem.CREDITS,
+)
+"""Source: 02-game-flow.md, menu_items (locked): Play, Instructions, Leaderboard, Credits, top
+first."""
 
 CHOICE_ORDER: tuple[GameOverChoice, ...] = (GameOverChoice.RETRY, GameOverChoice.MENU)
 """Source: 02-game-flow.md, game_over_choices (locked): RETRY first."""
@@ -275,7 +281,7 @@ def test_start_flow_shows_the_menu_and_ignores_keys_held_from_the_start() -> Non
     released: GameFlow = step_flow(start_flow(RUN), IDLE)
     assert step_flow(released, CONFIRM).screen is Screen.PLAYING
     assert step_flow(released, TickInput(thrust=DOWN)).menu_selection is MenuItem.INSTRUCTIONS
-    assert step_flow(released, TickInput(thrust=UP)).menu_selection is MenuItem.LEADERBOARD
+    assert step_flow(released, TickInput(thrust=UP)).menu_selection is MenuItem.CREDITS
 
     # Each key on its own: a confirm alone, an arrow alone, held through the click.
     confirm_only: GameFlow = start_flow(RUN)
@@ -306,14 +312,14 @@ def test_up_and_down_move_the_menu_selection_one_item_per_fresh_press_and_wrap(
         held = step_flow(held, TickInput(thrust=DOWN))
     assert held.menu_selection is move(start, 1)
 
-    # Release and press again: one more item. Three presses go the whole way round.
+    # Release and press again: one more item. One press per item goes the whole way round.
     round_the_menu: GameFlow = flow
     seen: list[MenuItem] = []
     for _ in range(len(MENU_ORDER)):
         round_the_menu = after(round_the_menu, TickInput(thrust=DOWN), IDLE)
         assert isinstance(round_the_menu.menu_selection, MenuItem)
         seen.append(round_the_menu.menu_selection)
-    assert seen == [move(start, 1), move(start, 2), start]
+    assert seen == [move(start, step) for step in range(1, len(MENU_ORDER) + 1)]
     backwards: GameFlow = flow
     for _ in range(len(MENU_ORDER)):
         backwards = after(backwards, TickInput(thrust=UP), IDLE)
@@ -342,18 +348,20 @@ def test_up_and_down_move_the_menu_selection_one_item_per_fresh_press_and_wrap(
         MenuItem.PLAY: Screen.PLAYING,
         MenuItem.INSTRUCTIONS: Screen.INSTRUCTIONS,
         MenuItem.LEADERBOARD: Screen.LEADERBOARD,
+        MenuItem.CREDITS: Screen.CREDITS,
     }
     assert picked.screen is expected[start]
     assert picked.menu_selection is start
 
 
-@pytest.mark.parametrize("page", [MenuItem.INSTRUCTIONS, MenuItem.LEADERBOARD])
+@pytest.mark.parametrize("page", [MenuItem.INSTRUCTIONS, MenuItem.LEADERBOARD, MenuItem.CREDITS])
 def test_a_confirm_opens_a_page_and_a_confirm_there_goes_back_to_the_menu_with_play_selected(
     page: MenuItem,
 ) -> None:
     screens: dict[MenuItem, Screen] = {
         MenuItem.INSTRUCTIONS: Screen.INSTRUCTIONS,
         MenuItem.LEADERBOARD: Screen.LEADERBOARD,
+        MenuItem.CREDITS: Screen.CREDITS,
     }
     menu: GameFlow = flow_on(Screen.MENU, RUN, menu=page)
 
@@ -675,7 +683,14 @@ def test_retry_gives_next_run_and_playing_at_once_and_menu_gives_the_menu_with_p
 
 @pytest.mark.parametrize(
     "screen",
-    [Screen.MENU, Screen.INSTRUCTIONS, Screen.LEADERBOARD, Screen.PAUSED, Screen.GAME_OVER],
+    [
+        Screen.MENU,
+        Screen.INSTRUCTIONS,
+        Screen.LEADERBOARD,
+        Screen.CREDITS,
+        Screen.PAUSED,
+        Screen.GAME_OVER,
+    ],
 )
 def test_a_focus_loss_changes_nothing_on_the_menu_a_page_the_pause_and_game_over(
     screen: Screen,
@@ -788,6 +803,7 @@ def pure_flows() -> list[GameFlow]:
         flow_on(Screen.MENU, MOVING, menu=MenuItem.LEADERBOARD),
         flow_on(Screen.INSTRUCTIONS, MOVING),
         flow_on(Screen.LEADERBOARD, MOVING),
+        flow_on(Screen.CREDITS, MOVING),
         flow_on(Screen.PLAYING, with_rock),
         flow_on(Screen.PAUSED, with_rock),
         over_flow(),
@@ -844,7 +860,7 @@ def test_the_flow_logs_screen_changes_pauses_and_moves_only_and_the_run_lines_co
     _, lines = step(menu, TickInput(thrust=DOWN))
     assert lines == flow_line("menu select instructions")
     _, lines = step(menu, TickInput(thrust=UP))
-    assert lines == flow_line("menu select leaderboard")
+    assert lines == flow_line("menu select credits")
     for keys in (
         TickInput(thrust=Thrust(up=True, down=True)),
         TickInput(thrust=LEFT),
@@ -867,6 +883,10 @@ def test_the_flow_logs_screen_changes_pauses_and_moves_only_and_the_run_lines_co
     _, lines = step(flow_on(Screen.MENU, RUN, menu=MenuItem.LEADERBOARD), CONFIRM)
     assert lines == flow_line("screen leaderboard")
     _, lines = step(flow_on(Screen.LEADERBOARD, RUN, menu=MenuItem.LEADERBOARD), CONFIRM)
+    assert lines == flow_line("screen menu")
+    _, lines = step(flow_on(Screen.MENU, RUN, menu=MenuItem.CREDITS), CONFIRM)
+    assert lines == flow_line("screen credits")
+    _, lines = step(flow_on(Screen.CREDITS, RUN, menu=MenuItem.CREDITS), CONFIRM)
     assert lines == flow_line("screen menu")
     assert back.menu_selection is MenuItem.PLAY
 
@@ -1578,7 +1598,9 @@ def test_saves_are_kept_through_retry_menu_and_later_runs() -> None:
     assert to_menu.screen is Screen.MENU
     assert to_menu.saves is kept
     assert step_flow(to_menu, CONFIRM).saves is kept
-    board: GameFlow = after(to_menu, TickInput(thrust=UP), IDLE, CONFIRM)
+    board: GameFlow = after(
+        to_menu, TickInput(thrust=DOWN), IDLE, TickInput(thrust=DOWN), IDLE, CONFIRM
+    )
     assert board.screen is Screen.LEADERBOARD
     assert board.saves is kept
     assert board.leaderboard == kept.entries

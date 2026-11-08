@@ -69,6 +69,7 @@ from core.waves import WaveBook, start_waves
 from core.world import SCREEN_H, SCREEN_W
 from ui.background_view import BackgroundArt, draw_background
 from ui.burst_view import draw_burst
+from ui.credits import draw_credits
 from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay, draw_debug_wave_lines
 from ui.drifters.registry import render_drifter
 from ui.game_over import (
@@ -394,12 +395,12 @@ def _draw(
 ) -> None:
     """Draw the screen the flow shows on the window.
 
-    The menu, the instructions page and the leaderboard page fill the whole window: the backdrop,
+    The menu, the instructions, leaderboard and credits pages fill the whole window: the backdrop,
     then the page alone, with no world, overlay, HUD or frame. Playing, paused and game over draw
     the background and the run's world on `field`, the play area (_draw_run), then the panel and
     frame on the window. Paused and game over then dim the whole window and draw their box centered
     on it. The mute icon (when `music_muted`) goes in before the dim, so the dim darkens it and the
-    boxes sit over it; on the three pages it is the last call. Source:
+    boxes sit over it; on the menu and the pages it is the last call. Source:
     systems/app/frame-loop.md, Rules, Draw and The mute icon; systems/game-flow.md, Presentation.
     """
     if flow.screen in _RUN_SCREENS:
@@ -428,6 +429,8 @@ def _draw(
         draw_instructions(window, look)
     elif flow.screen is Screen.LEADERBOARD:
         draw_leaderboard(window, look, flow.leaderboard)
+    elif flow.screen is Screen.CREDITS:
+        draw_credits(window, look)
     if mute_icon_view is not None:
         mute_icon_view.draw(window, music_muted)
 

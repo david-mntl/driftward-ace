@@ -195,7 +195,7 @@ The game checks every picture against these numbers at startup. A mismatch shows
 
 # screens.json
 
-The look of the menu, the pause box, the game-over screens, the instructions page and the leaderboard: colors, glow, glass, fonts and the size and gaps of each screen. You edit it by hand. The game reads it once at startup, in both run modes. Every field is required.
+The look of the menu, the pause box, the game-over screens, the instructions page, the leaderboard and the credits page: colors, glow, glass, fonts and the size and gaps of each screen. You edit it by hand. The game reads it once at startup, in both run modes. Every field is required.
 
 The loader is `game/app/screens_tuning.py`. The schema is `docs/contracts/schemas/screens.schema.json`, with every field described. These values change how the screens look and nothing else. They never change play. Nothing here is baked into a picture file: the glass, the glow, the icons and the text are drawn once at startup, so a change shows after a reload.
 
@@ -217,8 +217,9 @@ Field names carry their range. `*_alpha` is a whole number from 0 to 255. `*_str
 | `menu` | The menu's items, gaps and hint. |
 | `instructions` | The page's margins, the card grid and the icon box. |
 | `leaderboard` | The page's margins, the table and the row sizes. |
+| `credits` | The page's margins, the card width, padding and gaps, and how bright the text and the links are. |
 
-`blur` is off by default on the pages that have a moving background (instructions, leaderboard): the blur is the one part drawn live every frame, and it costs frame rate in the browser.
+`blur` is off by default on the pages that have a moving background (instructions, leaderboard, credits): the blur is the one part drawn live every frame, and it costs frame rate in the browser.
 
 # level_up.json
 

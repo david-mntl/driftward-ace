@@ -200,7 +200,7 @@ class GameOverRules:
 
 @dataclass(frozen=True)
 class MenuRules:
-    """The menu: title, three items, hint. All centered. px."""
+    """The menu: title, the items, hint. All centered. px."""
 
     item_w: int
     item_h: int
@@ -261,6 +261,28 @@ class LeaderboardRules:
 
 
 @dataclass(frozen=True)
+class CreditsRules:
+    """The credits page. The cards are ``card_w`` wide and centered. px, alphas 0..255.
+
+    A card is as tall as its padding, heading and lines. ``line_gap`` is the space below each line.
+    """
+
+    margin_top: int
+    margin_bottom: int
+    head_h: int
+    foot_h: int
+    card_w: int
+    card_gap: int
+    pad_x: int
+    pad_y: int
+    heading_gap: int
+    line_gap: int
+    text_alpha: int
+    link_alpha: int
+    blur: bool
+
+
+@dataclass(frozen=True)
 class ScreenRules:
     """Every value of tuning/screens.json."""
 
@@ -276,3 +298,4 @@ class ScreenRules:
     menu: MenuRules
     instructions: InstructionsRules
     leaderboard: LeaderboardRules
+    credits: CreditsRules

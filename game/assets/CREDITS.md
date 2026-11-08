@@ -6,6 +6,15 @@
 - background_sway_00.png to background_sway_11.png: the far painting's slow sway, a loop of 12 frames baked from background.png by tools/art/background_sway.py. Own work.
 - bg_planet_0.png to bg_planet_5.png: the broken planets of the middle layer. Cut from a sheet the Director made in an AI image tool. Own work.
 
+## Audio
+
+The CC BY 4.0 credits below show in the game, on the menu's Credits page (`game/ui/credits.py`). The CC0 game-over sound and the fonts are named there too, as a courtesy.
+
+- audio/music_loop.ogg: "Lo-fi Music Guitar (Loop)" (track 52, "Under the Rain", filtered version) by Migfus20, https://freesound.org/people/Migfus20/sounds/569791/, uploaded 2021-04-28. License: Creative Commons Attribution 4.0 (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/. The author asks: "Feel free to use my music, it would be great if you credit me." The track uses "Rain, sheet roof.wav" by snarcle, https://freesound.org/people/snarcle/sounds/569370/, also CC BY 4.0. Converted from MP3 to Ogg Vorbis (quality 4). Edited for a seamless loop: trimmed to bars 2 to 47 of the original, and the last four bars (6.5 s) crossfaded into the first four, beat-aligned. Nothing else changed. Picked by the Director 2026-11-07.
+- audio/sfx_level_up.ogg: "Achievement 2" by sonically_sound, https://freesound.org/people/Sonically_Sound/sounds/625715/, uploaded 2022-03-29. License: Creative Commons Attribution 4.0 (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/. Whole 7 s sound, scaled up 1.7 dB so its peak matches the sound it replaced, a 5 ms fade-in, converted from WAV to Ogg Vorbis (quality 5). Picked by the Director 2026-11-07.
+- audio/sfx_game_over.ogg: "Game Over Arcade" by Mountain_Man, https://freesound.org/people/mountain_man/sounds/382310/, uploaded 2017-02-28. License: Creative Commons 0 (CC0), http://creativecommons.org/publicdomain/zero/1.0/. No credit needed. Converted from WAV to Ogg Vorbis (quality 5) and made 9 dB louder, so it sits with the other effects. Picked by the Director 2026-11-07.
+- audio/sfx_hit.ogg, audio/sfx_graze.ogg and audio/sfx_coin.ogg: made by the Director in jsfxr. Own work. Converted from WAV to Ogg Vorbis (quality 5), not otherwise changed. Picked by the Director 2026-11-07.
+
 ## Satellite
 
 - sprites/satellite.png and sprites/satellite_field.png: the satellite's swing frames and its turning magnetism field. Cut and animated by tools/art/satellite_swing.py from a PixelLab image (trial account) made with the Director's reference: staging/art-inbox/satellite-pixellab-a.png. Commercial use on the PixelLab trial is unconfirmed: playtest only until checked.

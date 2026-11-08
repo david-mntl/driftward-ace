@@ -1,13 +1,13 @@
 # Screens look
 Version: 1
 Status: draft
-Features: DRA-147
+Features: DRA-147, Credits page
 Created by: architect
 
 ## Purpose
-Give the menu, the pause box, the game-over screens, the instructions page and the leaderboard one look: Glass Cockpit, in the Mono Violet colors, with soft glow, in a mono font. This contract owns that look, its tuning file and the views that draw it. What each screen shows and which key does what stay in `docs/contracts/systems/game-flow.md`.
+Give the menu, the pause box, the game-over screens, the instructions page, the leaderboard and the credits page one look: Glass Cockpit, in the Mono Violet colors, with soft glow, in a mono font. This contract owns that look, its tuning file and the views that draw it. What each screen shows and which key does what stay in `docs/contracts/systems/game-flow.md`.
 
-It closes UI-03 and UI-04. It replaces the white default-font stand-ins of DRA-125 and DRA-126. Where each screen sits in the window is unchanged (`10-ui.md`, `window_screens`). Source: scope report `docs/reports/scope/DRA-147.md`; `10-ui.md`, rows `screens_look`, `pause_look`, `game_over_look`, `menu_look`, `leaderboard_look`, `instructions_text_and_look`, `ui_font`, `ui_glow`, `screen_colors`; `12-art-and-audio.md`, Screen colors.
+It closes UI-03 and UI-04. It replaces the white default-font stand-ins of DRA-125 and DRA-126. Where each screen sits in the window is unchanged (`10-ui.md`, `window_screens`). Source: scope report `docs/reports/scope/DRA-147.md`; `10-ui.md`, rows `screens_look`, `pause_look`, `game_over_look`, `menu_look`, `leaderboard_look`, `instructions_text_and_look`, `ui_font`, `ui_glow`, `screen_colors`; `12-art-and-audio.md`, Screen colors. The credits page came later (2026-11-08, no pipeline): `10-ui.md`, `credits_page` and `credits_look`; `02-game-flow.md`, rule 14.
 
 ## Diagram
 ```
@@ -28,7 +28,7 @@ flowchart LR
   R --> LF
   R --> K["ui.screen_look<br/>ScreenLook"]
   LF --> K
-  K --> V["ui views: menu, pause_box, game_over,<br/>instructions, leaderboard"]
+  K --> V["ui views: menu, pause_box, game_over,<br/>instructions, leaderboard, credits"]
   V --> W["window surface"]
 ```
 
@@ -54,6 +54,7 @@ class ScreenRules:
     menu: MenuRules                   # item size and gaps, title gap, hint distance
     instructions: InstructionsRules   # margins, bands, card grid, icon box, blur
     leaderboard: LeaderboardRules     # margins, bands, table and row sizes, column widths, blur
+    credits: CreditsRules             # margins, bands, card width, padding and gaps, text and link alphas, blur
 ```
 ```python
 # game/app/screens_tuning.py. Not a startup module (imports ui); only app.frame imports it, inside the guard.
@@ -110,7 +111,7 @@ def draw_game_over_choices(surface, look, selection: GameOverChoice, picker_show
 # game/ui/menu.py. Imports: pygame, core.game_flow (MenuItem), ui.screen_look.
 MENU_TITLE_TEXT: str              # "DRIFTWARD ACE"
 MENU_HINT_TEXT: str               # "Up & Down to choose. Enter to start."
-MENU_ITEM_TEXTS: Mapping[MenuItem, str]   # PLAY, INSTRUCTIONS, LEADERBOARD
+MENU_ITEM_TEXTS: Mapping[MenuItem, str]   # PLAY, INSTRUCTIONS, LEADERBOARD, CREDITS
 def draw_menu(surface: pygame.Surface, look: ScreenLook, selection: MenuItem) -> None: ...
 
 # game/ui/instructions.py. Imports: pygame, ui.screen_look.
@@ -122,6 +123,24 @@ def icon_rect(look: ScreenLook, card: pygame.Rect) -> pygame.Rect: ...
 # game/ui/leaderboard.py. Imports: pygame, core.saves (ScoreEntry), ui.score_text (group_digits), ui.screen_look.
 LEADERBOARD_TITLE_TEXT, LEADERBOARD_EMPTY_TEXT, LEVEL_LABEL: str   # "LEADERBOARD", "No scores yet.", "LV"
 def draw_leaderboard(surface: pygame.Surface, look: ScreenLook, entries: Sequence[ScoreEntry] = ()) -> None: ...
+
+# game/ui/credits.py. Imports: pygame, ui.screen_look, ui.screen_rules (CreditsRules).
+CREDITS_TITLE_TEXT: str           # "CREDITS"
+@dataclass(frozen=True)
+class CreditLine:                 # one line of a card
+    text: str
+    link: bool = False            # a web address, drawn in LINK_COLOR_KEY
+@dataclass(frozen=True)
+class CreditCard:                 # one card
+    heading: str
+    color_key: str                # the palette key that lights the heading
+    lines: tuple[CreditLine, ...]
+CREDIT_CARDS: tuple[CreditCard, ...]   # MUSIC, LEVEL-UP SOUND, ALSO USED, top first (10-ui.md, credits_page)
+LINK_COLOR_KEY: str               # "frame_lights"
+BACK_KEYS: tuple[str, ...]        # ("ENTER", "SPACE")
+BACK_WORD: str                    # "BACK"
+def draw_credits(surface: pygame.Surface, look: ScreenLook) -> None: ...
+def card_rects(look: ScreenLook, size: tuple[int, int]) -> list[pygame.Rect]: ...   # one rect per card, in card order
 ```
 `app.frame` builds the look once, after the window opens: `ScreenLook(screen_rules, load_screen_fonts(screen_rules))`, and passes it to `_draw`, which hands it to every view above.
 
@@ -133,9 +152,10 @@ Every view draws on the surface it is given and works from `surface.get_size()`:
 | Pause | glass box `pause.w` × `pause.h`; PAUSE (role `title`, plating, glow); under it, `pause.gap` below, the key caps ENTER and SPACE and a play triangle | box centered on the surface; word and key row are one block centered in the box |
 | Game over | glass box; the message (role `message`, plating, glow); the score line; RETRY over MENU (role `button`) | box `game_over.w` × `h`, centered; lines spread evenly between `pad_top` and `pad_bottom` |
 | Game over with the picker | the same box at `picker_w` × `picker_h`; then the slot row and the hint row between the score and the choices | lines spread evenly between `picker_pad_top` and `pad_bottom` |
-| Menu | title DRIFTWARD ACE (role `menu_title`, glow); PLAY, INSTRUCTIONS, LEADERBOARD as choices (role `menu_item`); the hint line (role `hint`, 60%, no glow); rulers | title, `title_gap` and the three items are one block centered on both axes; the hint's bottom is `hint_bottom` above the window's bottom |
+| Menu | title DRIFTWARD ACE (role `menu_title`, glow); PLAY, INSTRUCTIONS, LEADERBOARD, CREDITS as choices (role `menu_item`); the hint line (role `hint`, 60%, no glow); rulers | title, `title_gap` and the four items are one block centered on both axes; the hint's bottom is `hint_bottom` above the window's bottom |
 | Instructions | HOW TO PLAY (role `title`); six glass cards in `columns` columns; footer; rulers | title `margin_top` from the top; cards fill the window between the head band and the foot band inside `margin_x`, `gap` apart; footer centered in the foot band |
 | Leaderboard | LEADERBOARD (role `title`); the top 10 as three medal rows and seven plain rows; footer; rulers | title `margin_top` from the top; table `table_w` wide, centered, and centered between the bands as if it held ten rows |
+| Credits | CREDITS (role `title`); one glass card per entry of `CREDIT_CARDS`; footer; rulers | title `margin_top` from the top; cards `card_w` wide, centered, `card_gap` apart; the stack centered between the head band and the foot band |
 
 **Glass.** Per box or card: the picture behind it blurred (only when its `blur` is on), a `panel_body` fill at `fill_alpha`, one scan line of `frame_lights` every `scan_pitch` rows, a 1 px `frame_lights` border, four corner brackets `bracket_out` px outside the edge, and a soft glow round the border and brackets. A medal row on the leaderboard takes its rank color (`rank_1`, `rank_2`, `rank_3`) for the border, brackets and glow.
 
@@ -149,7 +169,9 @@ Every view draws on the surface it is given and works from `surface.get_size()`:
 
 **Leaderboard rows.** Medal row (`top_h` tall, `top_gap` apart): a medal picture (a crown for #1, a ribbon medal with the number for #2 and #3, `medal_size` px, rank color, glow), the nickname (role `top_name`, plating), the score (role `top_score`, rank color, right-aligned, `group_digits`), `LV n` (role `level`, `level` color). Plain row (`row_h` tall, from `rest_gap` below the medal rows): the place number without a dot (plating at 50%), the nickname (role `row`), the score, `LV n`, and a thin `frame_lights` line below at `rule_alpha`. Entry `i` is place `i + 1`. An empty list shows `LEADERBOARD_EMPTY_TEXT` (role `empty`, plating at about 65%) `empty_top` below the head band and no rows.
 
-**Footer.** The ENTER and SPACE key caps and the word BACK, centered in the foot band (instructions, leaderboard).
+**Credits cards.** Order and words as in `CREDIT_CARDS` (`10-ui.md`, `credits_page`): MUSIC (heading `ship_lines_light`), LEVEL-UP SOUND (`level`), ALSO USED (`frame_lights`). In a card the heading (role `card_title`, glow) sits `pad_y` below the top and `pad_x` from the left; `heading_gap` below it come the lines (role `card_text`, no glow), one under the other, left-aligned, each followed by `line_gap`. A plain line is plating at `text_alpha`; a link line is `frame_lights` at `link_alpha`. A card is as tall as its padding, heading and lines. Lines are not wrapped: the words are written to fit `card_w`.
+
+**Footer.** The ENTER and SPACE key caps and the word BACK, centered in the foot band (instructions, leaderboard, credits).
 
 **Rulers.** Short ticks every `minor_pitch` rows and a long one every `major_pitch`, down both sides of a full-window page, `inset_x` from the side and `inset_y` from the top and bottom.
 
@@ -157,9 +179,9 @@ Every view draws on the surface it is given and works from `surface.get_size()`:
 - The views only draw. They take the surface, the look and plain values. They never fill the background, flip the display, read a key, the focus or the run mode, change game state, log per frame or catch an error. Source: 10-ui.md, rule 5; `game/CONTEXT.md`.
 - Every color, size, gap, strength and letter-spacing comes from `tuning/screens.json`. No look value is written in code. The words fixed in the GDD stay in code as content. Source: 10-ui.md, rule 12; the Director's "everything configurable".
 - Drawn once, then kept: the glass panels, the glow, the text pictures, the icons, the medals, the fade and the rulers are built the first time a view needs them and reused. Per frame the views only blit. The text cache is cleared if it passes 512 entries. Source: 12-art-and-audio.md, rule 3; 15-tech-constraints.md, rule 5.
-- The blur is the one live cost: the picture behind a box is made smaller and scaled back up every frame. Each screen has its own `blur` switch (`pause`, `game_over`, `instructions`, `leaderboard`) and `glass.blur_down` sets the strength (1 is off). It is on for the pause box and the game-over box, where the picture behind is frozen, and off for the instructions page and the leaderboard, where the background moves. Source: 15-tech-constraints.md, rules 5 and 6; to be measured in the browser build.
+- The blur is the one live cost: the picture behind a box is made smaller and scaled back up every frame. Each screen has its own `blur` switch (`pause`, `game_over`, `instructions`, `leaderboard`, `credits`) and `glass.blur_down` sets the strength (1 is off). It is on for the pause box and the game-over box, where the picture behind is frozen, and off for the instructions page, the leaderboard and the credits page, where the background moves. Source: 15-tech-constraints.md, rules 5 and 6; to be measured in the browser build.
 - Glow is soft and only on the screens. The HUD stays flat. Source: 10-ui.md, `ui_glow`.
-- Key hints are on: the pause box, the name picker and the page footers. A key is drawn as a key cap, the arrows as small triangles. Source: 10-ui.md, `pause_box`, `game_over_look`, `instructions_text_and_look`.
+- Key hints are on: the pause box, the name picker and the page footers. A key is drawn as a key cap, the arrows as small triangles. Source: 10-ui.md, `pause_box`, `game_over_look`, `instructions_text_and_look`, `credits_look`.
 - No corner labels, no page label and no invented text on any screen. Source: 10-ui.md, `screens_look`.
 - The window size is never written here: the views read `surface.get_size()`. The numbers fit 856 × 518 (`hud.json`, `window`). Source: 10-ui.md, `window_screens`.
 - The screens use their own palette, not the HUD's. Both stay separate files. Source: 10-ui.md, `screen_colors`.
@@ -173,6 +195,8 @@ Every view draws on the surface it is given and works from `surface.get_size()`:
 - A box drawn near the surface edge: the blur works on the part of the box inside the surface.
 - The picker with a blank slot draws the slot and its line, and no character.
 - Choices while the picker takes the keys: RETRY and MENU are faint and unframed whatever `selection` says.
+- A credits line wider than the card (a larger `card_text` size or a smaller `card_w`): it runs past the card's right edge. Nothing wraps or cuts it. The shipped values leave room.
+- Credits cards taller than the space between the bands: the stack starts above the head band and runs into it. The shipped values leave room.
 
 ## Rationale
 - **A `ScreenLook` object, not module constants.** Five screens share glass, glow, text, key caps and choices. One object built from the rules holds the caches, so each look change is one tuning value, and it replaces `ui/screen_look.py`'s DRA-125 constants.
@@ -184,9 +208,10 @@ Every view draws on the surface it is given and works from `surface.get_size()`:
 ## Decisions
 - DRA-125 and DRA-126 stand-ins are replaced: white default-font text, black box, `>` marker, outline-square icons, the grey RETRY and MENU.
 - The menu now shows the GDD's `menu_hint`, which the stand-in left out.
-- Menu items are drawn in capitals (PLAY, INSTRUCTIONS, LEADERBOARD), like RETRY and MENU.
+- Menu items are drawn in capitals (PLAY, INSTRUCTIONS, LEADERBOARD, CREDITS), like RETRY and MENU.
 - The game-over score shows at least 7 digit cells with dim leading zeros, as the mock-up does, and not the plain `SCORE 61 250` of the stand-in.
 - Leaderboard place numbers have no dot (`4`, not `4.`), as in the mock-up.
 - The leaderboard's empty line "No scores yet." and the menu title DRIFTWARD ACE are carried over from the DRA-125 stand-ins. The GDD does not word them.
 - The WARNING icon is one plain sign, not a drifter, so it names no hazard.
+- The credits page (2026-11-08) reuses the `card_title` and `card_text` roles of the instructions cards, so no font role was added. Its words live in code as content, like the instructions captions. Links are text only: the page takes no mouse.
 - The ruler ticks stay as pure shapes; the corner texts of the mock-up are dropped.

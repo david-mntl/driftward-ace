@@ -237,5 +237,20 @@
     "empty_alpha": 166,
     "place_alpha": 128,
     "medal_fill_alpha": 56
+  },
+  "credits": {
+    "margin_top": 20,
+    "margin_bottom": 14,
+    "head_h": 62,
+    "foot_h": 30,
+    "card_w": 560,
+    "card_gap": 10,
+    "pad_x": 14,
+    "pad_y": 8,
+    "heading_gap": 4,
+    "line_gap": 0,
+    "text_alpha": 224,
+    "link_alpha": 224,
+    "blur": false
   }
 }

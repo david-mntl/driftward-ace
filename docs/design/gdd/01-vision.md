@@ -35,7 +35,7 @@ Do not reopen. Changing one needs the Director's explicit go-ahead and a row in 
 5. The ship has 5 lives. A hit or a fall costs one, then brief invulnerability. No stun: losing a life never freezes the ship or takes control away. [05-lives-and-damage.md](05-lives-and-damage.md)
 6. Hazards are defined by behavior archetype, not by visual skin. [07-drifters.md](07-drifters.md)
 7. Waves are hand-authored JSON. Every run opens with the same fixed Wave 0. Its only hazard is the meteorite; it may also hold coins. [09-waves.md](09-waves.md)
-8. A main menu shows after click-to-start: Play, Instructions, Leaderboard. The instructions open only from the menu. [02-game-flow.md](02-game-flow.md)
+8. A main menu shows after click-to-start: Play, Instructions, Leaderboard, Credits. The instructions open only from the menu. [02-game-flow.md](02-game-flow.md)
 9. Saves go to browser localStorage: a top 10 of nickname, score and level reached, plus the last nickname entered. Nothing else. [11-save-data.md](11-save-data.md)
 
 ## Out of scope

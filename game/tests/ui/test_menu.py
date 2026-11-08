@@ -1,4 +1,4 @@
-"""Menu tests: the title, the three items in menu order, the lit one, the hint and the rulers.
+"""Menu tests: the title, the four items in menu order, the lit one, the hint and the rulers.
 
 Contract: docs/contracts/systems/screens.md, Interface (ui/menu.py) and Presentation, Menu;
 10-ui.md, `menu_screen`, `menu_look` and `menu_hint`. Every size and color is read from the real
@@ -23,7 +23,12 @@ SIZES: tuple[tuple[int, int], ...] = ((856, 518), (640, 480), (1000, 700))
 """Surfaces drawn on: the window (10-ui.md, window_screens), the play-area size and a larger one,
 so the centering is shown to follow the surface and not a constant."""
 
-ITEMS: tuple[MenuItem, ...] = (MenuItem.PLAY, MenuItem.INSTRUCTIONS, MenuItem.LEADERBOARD)
+ITEMS: tuple[MenuItem, ...] = (
+    MenuItem.PLAY,
+    MenuItem.INSTRUCTIONS,
+    MenuItem.LEADERBOARD,
+    MenuItem.CREDITS,
+)
 """Menu order, top first. Source: 02-game-flow.md, menu_items (locked)."""
 
 INK_LEVEL: int = 60
@@ -90,20 +95,23 @@ def _item_ink(look: ScreenLook, size: tuple[int, int]) -> list[pygame.Rect]:
     """The ink of each item, found from the bands between the title and the hint."""
     surface = _menu(look, MenuItem.PLAY, size)
     bands = _rows(surface)
-    assert len(bands) == 5, f"{size}: expected title, 3 items and hint, got bands {bands}"
+    count = len(ITEMS)
+    assert len(bands) == count + 2, (
+        f"{size}: expected title, {count} items and hint, got bands {bands}"
+    )
     return [
         _ink(surface, pygame.Rect(30, top, size[0] - 60, bottom - top + 1))
         or pygame.Rect(0, 0, 0, 0)
-        for top, bottom in bands[1:4]
+        for top, bottom in bands[1 : count + 1]
     ]
 
 
-def test_three_items_between_the_title_and_the_hint_in_menu_order(look: ScreenLook) -> None:
+def test_four_items_between_the_title_and_the_hint_in_menu_order(look: ScreenLook) -> None:
     for size in SIZES:
         items = _item_ink(look, size)
         assert [i.top for i in items] == sorted(i.top for i in items), f"{size}: items out of order"
         # With the last item selected, the first two are dim: PLAY is shorter than INSTRUCTIONS.
-        surface = _menu(look, MenuItem.LEADERBOARD, size)
+        surface = _menu(look, MenuItem.CREDITS, size)
         areas = [pygame.Rect(30, i.top - 6, size[0] - 60, i.height + 12) for i in items]
         dim = [_ink(surface, area) for area in areas[:2]]
         assert dim[0] is not None

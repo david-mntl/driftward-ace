@@ -3,7 +3,7 @@ Status: draft
 Depends on: [05-lives-and-damage.md](05-lives-and-damage.md), [10-ui.md](10-ui.md), [11-save-data.md](11-save-data.md)
 
 ## Summary
-The game moves through a few fixed states. The start page comes first: the game's name over the menu's painting, a loading bar, then a prompt. One click or key press unlocks audio and opens the menu. Then the main menu shows: Play, Instructions, Leaderboard. A run plays until the last life is lost. The ship bursts, the world runs on for two seconds, then the game-over screen shows. If the score made the top 10, the player enters a name there first. RETRY starts a new run; MENU goes back to the menu.
+The game moves through a few fixed states. The start page comes first: the game's name over the menu's painting, a loading bar, then a prompt. One click or key press unlocks audio and opens the menu. Then the main menu shows: Play, Instructions, Leaderboard, Credits. A run plays until the last life is lost. The ship bursts, the world runs on for two seconds, then the game-over screen shows. If the score made the top 10, the player enters a name there first. RETRY starts a new run; MENU goes back to the menu.
 
 ```mermaid
 stateDiagram-v2
@@ -13,6 +13,8 @@ stateDiagram-v2
     Instructions --> Menu: confirm key
     Menu --> Leaderboard: Leaderboard
     Leaderboard --> Menu: confirm key
+    Menu --> Credits: Credits
+    Credits --> Menu: confirm key
     Menu --> Playing: Play
     Playing --> Playing: hit or fall, lives left
     Playing --> Paused: confirm key or focus lost
@@ -29,7 +31,7 @@ stateDiagram-v2
 | fly_keys | arrow keys | — | — | locked | [01-vision.md](01-vision.md), Locked decisions |
 | confirm_keys | Enter or Space. Both do the same everywhere | — | — | locked | Director |
 | fresh_press | every confirm key counts only on a fresh press, on every screen. A key held from the screen before does nothing | — | — | locked | Director |
-| menu_items | Play, Instructions, Leaderboard, in that order | — | — | locked | Director |
+| menu_items | Play, Instructions, Leaderboard, Credits, in that order | — | — | locked | Director |
 | menu_start_selection | Play | — | — | guess | this GDD |
 | menu_navigation | up and down arrows move the selection and wrap around at both ends; a confirm key picks it | — | — | locked | Director |
 | start_key | a confirm key on Play | — | — | locked | Director |
@@ -54,11 +56,12 @@ stateDiagram-v2
 11. **Retry.** A confirm key on RETRY starts a new run from rule 5. There is no delay. Everything resets. Retry goes straight into the run; the menu and the instructions don't show.
 12. **One press, one action.** Every confirm key counts only on a fresh press, on every screen. A key still held from the screen before does nothing on the new one. One press never does two things.
 13. **Music mute.** M mutes the music where it is. Pressing M again resumes it from the same spot, never from the start. While muted, a small icon shows ([10-ui.md](10-ui.md), `mute_icon_place`). The music plays without a break through the menu, a run, the pause and the game-over screen. Only M stops it. The effects never mute. Source: Director.
+14. **Credits.** Opens from the menu. Names the sources of the sounds and fonts the game uses, as their licenses ask. Content is in [10-ui.md](10-ui.md), `credits_page`. A confirm key goes back to the menu, which opens on `menu_start_selection`. Source: Director.
 
 ## Edge cases
 - The player saves the name and keeps the key held. The held key does not pick RETRY. They release it and press again (rule 12).
 - The player picks Play and keeps the key held. The run doesn't pause. They release it and press again to pause (rule 12).
-- The tab loses focus on the menu, the instructions, the leaderboard or GameOver: nothing changes. Only Playing pauses.
+- The tab loses focus on the menu, the instructions, the leaderboard, the credits or GameOver: nothing changes. Only Playing pauses.
 - The tab loses focus during LastLife: it doesn't pause. The two seconds run on.
 - The player pauses during the respawn wait after a fall: the wait freezes with everything else. A confirm key resumes; the respawn still needs an arrow press ([05-lives-and-damage.md](05-lives-and-damage.md) rule 2.5).
 
