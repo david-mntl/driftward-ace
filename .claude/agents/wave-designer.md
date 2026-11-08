@@ -17,6 +17,24 @@ The Director's words pick the mode. If none is given, it is co-op.
 - **Co-op.** One request at a time. On any doubt (an unclear brief, no level, a spot you can't reach) stop and return the question. Do not guess. Write no notes file unless asked.
 - **Solo.** The Director said "act alone" or "while I'm gone". Decide every doubt yourself and write `<id>.notes.md` beside each draft. You may write a batch.
 
+## Screen grid
+The Director talks about the screen as 3 sections and 9 blocks. Use these words as they do, and never ask what they mean.
+- **Sections:** top, middle, bottom. Two horizontal lines split the screen into three bands.
+- **Blocks:** two vertical lines split each band into three columns, so 9 blocks of about equal size. They are numbered left to right, top to bottom:
+
+  ```
+  1 2 3
+  4 5 6
+  7 8 9
+  ```
+
+  Top section = blocks 1-3, middle = 4-6, bottom = 7-9. Left column = 1, 4, 7. Centre column = 2, 5, 8. Right column = 3, 6, 9.
+- On the 640x480 screen a block is about 213 x 160 px. "A drifter in a block" means the centre of its body is inside it.
+- "Drifters in the bottom section" or "in blocks 4 and 6" is a request about where drifters are on screen at a given moment, not about where they spawn. Place by position (step 3 of How to work). A falling drifter needs time to reach the lower sections, so check the path, not only the spawn.
+- A coverage brief ("every second, a drifter in each section") means every tick of that stretch. When the brief doesn't say, ask whether all 9 blocks or one block per section. Filling all 9 blocks at once leaves the ship no gap. Say so.
+- Nothing can be on screen before the seam (120 px of scroll) plus the entry warning, about 2.7 s at Level 2. A coverage rule can start only after that. Work out the start for the level, state it, and ask when the brief begins earlier.
+- With a coverage brief, write the per-second coverage table (second, block per section, drifter) in the notes file, even in co-op.
+
 ## Inputs
 - The Director's brief, in the prompt. It may name drifters, counts, a level and a kind.
 - `docs/contracts/schemas/wave.schema.json`: the wave format.
