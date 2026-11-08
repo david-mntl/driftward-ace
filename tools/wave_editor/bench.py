@@ -17,6 +17,7 @@ from app import tuning as tuning_module
 from app.debug_spawns import DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.tuning import load_graze_rules, load_tuning
 from core.drifters.base import DrifterType, Phase, TickContext
+from core.drifters.registry import drifter_class
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning
 from core.graze import GrazeRules
@@ -297,10 +298,9 @@ class Bench:
         if not 0 <= index < len(self.wave.placements):
             return ()
         ship: Ship = self.run.ship
-        follows_ship: bool = (
+        follows_ship: bool = drifter_class(
             self.wave.placements[index].placement.drifter_type
-            is DrifterType.CHAIN_LIGHTNING
-        )
+        ).follows_ship
         key: tuple[int, int, int, int, int] = (
             index,
             self.level,
