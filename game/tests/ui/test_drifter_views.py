@@ -1035,13 +1035,16 @@ def test_the_island_draws_exactly_its_hitbox_and_nothing_else(
         assert matching, f"{variant} {invert} {uid}: the pixels are not a centered crop of a ground"
 
 
-def _stray_pixels(shot: Shot, cx: float, cy: float, radius: float, slack: float) -> int:
-    """Count inked pixels whose nearest point is farther than `radius` + `slack` from the center."""
+def _stray_pixels(
+    shot: Shot, cx: float, cy: float, radius: float, slack: float, min_alpha: int = 1
+) -> int:
+    """Count pixels at `min_alpha` or more whose nearest point is farther than `radius` + `slack`
+    from the center."""
     stray = 0
     reach = math.ceil(radius + slack) + 4
     for py in range(math.floor(cy) - reach, math.floor(cy) + reach):
         for px in range(math.floor(cx) - reach, math.floor(cx) + reach):
-            if shot.alpha(px, py) == 0:
+            if shot.alpha(px, py) < min_alpha:
                 continue
             dx = max(px - cx, 0.0, cx - (px + 1))
             dy = max(py - cy, 0.0, cy - (py + 1))
@@ -1051,6 +1054,9 @@ def _stray_pixels(shot: Shot, cx: float, cy: float, radius: float, slack: float)
 
 
 def test_the_firing_ring_draws_nothing_outside_the_pulse_circle_and_fills_it(real: Sprites) -> None:
+    """The ring strip is 128 px and is scaled to twice `pulse_radius` from the tuning. Scaling
+    softens its edge by under a pixel, so outside the circle only solid ink counts as drawn
+    (`ALPHA_COVERED`), as for the scaled meteorites."""
     for uid in (1, 2, 3):
         ball = _ball(uid=uid)
         radius = ball.pulse_radius
@@ -1058,7 +1064,8 @@ def test_the_firing_ring_draws_nothing_outside_the_pulse_circle_and_fills_it(rea
             d = _ball(uid=uid, ticks=ticks)
             assert d.pulse_fires()
             shot, placed = _alpha_shot(d, (200, 200))
-            assert _stray_pixels(shot, placed.x, placed.y, radius, 0.0) == 0, (uid, ticks)
+            strays = _stray_pixels(shot, placed.x, placed.y, radius, 0.0, ALPHA_COVERED)
+            assert strays == 0, (uid, ticks)
             (circle,) = placed.hitbox
             assert _uncovered(shot, circle, placed.x, placed.y, 1) == [], (uid, ticks)
 
@@ -1067,10 +1074,14 @@ def test_the_firing_ring_draws_nothing_outside_the_pulse_circle_and_fills_it(rea
 def test_the_firing_ring_stays_in_the_circle_to_the_half_pixel_a_whole_pixel_draw_allows(
     real: Sprites, x: float, y: float
 ) -> None:
-    for ticks in range(120, 240, 17):
+    """Every firing tick of the tuning's cycle, read at solid ink like the test above."""
+    ball = _ball(x=x, y=y)
+    for ticks in range(ball.charge_ticks, ball.charge_ticks + ball.fire_ticks, 7):
         d = _ball(x=x, y=y, ticks=ticks)
+        assert d.pulse_fires()
         shot, placed = _alpha_shot(d, (200, 200), center=(100 + x % 1, 100 + y % 1))
-        assert _stray_pixels(shot, placed.x, placed.y, d.pulse_radius, SQRT_HALF) == 0, ticks
+        strays = _stray_pixels(shot, placed.x, placed.y, d.pulse_radius, SQRT_HALF, ALPHA_COVERED)
+        assert strays == 0, ticks
 
 
 @pytest.mark.parametrize("variant", list(TUNING.drifters[DrifterType.CHAIN_LIGHTNING].variants))
