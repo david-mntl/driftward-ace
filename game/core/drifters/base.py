@@ -241,6 +241,10 @@ class Drifter(ABC):
     """True: the drifter's path comes from a seed, and every placement of it carries one (the
     UFO). Read by the spawner and the loaders. Source: drifters/07-ufo.md, seed (locked)."""
 
+    follows_ship: ClassVar[bool] = False
+    """True: the drifter's path depends on where the ship is (the chain lightning). Read by the
+    wave editor's path preview, which plays it with the ship held in place."""
+
     uid: int = 0
     """Unique within a run, from 1. Set by `core.run.add_drifters`. 0 before that."""
 

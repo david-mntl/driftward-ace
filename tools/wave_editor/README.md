@@ -17,9 +17,13 @@ Needs python3 and pygame-ce. Opening a game wave opens a **copy**. Nothing under
 - **Left top (WAVE):** the placements, one per row: scroll distance in px, the time it appears, its x and y, then the drifter. Bright rows have already spawned. The highlighted row is selected.
 - **Left middle (DRIFTERS):** the palette. Drifter types on the left, the variants of the chosen type on the right (`*` marks the default).
 - **Left bottom (KEYS):** the key table.
-- **Middle:** the game at 640x480, the timeline under it, then messages. A yellow ring marks the selected drifter.
-- **Right top (CONFIG):** level, speed, ghost or fly, start spot, live numbers.
+- **Middle:** the game (640x480, or bigger: see "Screen size"), the timeline under it, then messages. A yellow ring marks the selected drifter.
+- **Right top (CONFIG):** level, speed, ghost or fly, start spot, live numbers, and the **Screen** size button.
 - **Right bottom (WAVE / SELECTED):** the wave's settings, then the graze margin, then the selected placement's fields, then the values of its drifter type, each tagged W, F or P. Variant values sit under a small heading per variant.
+
+## Screen size
+
+The **Screen** button at the top right (or F2) makes the game view bigger: 1x (640x480), 1.5x, 2x, then back to 1x. The window grows with it and the WAVE list gets the extra rows. Only sizes that fit your desktop are offered; if none does, the message says so. Clicks, the x and y next to the pointer and the placing all stay in game pixels at any size. The size is not remembered: the editor starts at 1x.
 
 ## Selecting and editing
 
@@ -65,14 +69,16 @@ Ctrl+N asks for a name (lower case letters, digits, `_`) and starts an empty fix
 
 **With the mouse:** click a drifter type in the DRIFTERS panel (it takes its default variant), or click one of its variants. It is now armed: a crosshair follows the mouse over the game view and the status line says `PLACING`. Click in the game view to place it there. It stays armed, so you can click again and again; Esc stops. The drifter appears at the playhead (rounded to 10 px, never inside the first 120 px). Pause where you want it to appear, or nudge `at_px` afterwards.
 
+**Coin from the top (C):** a coin is placed by default where you click, with an `x` and a `y`, so it appears there. C switches it to come in from the top instead, like the other drifters: it gets an `x` only, starts above the screen and slides down with the scroll. The status line says `FROM TOP`. With **At spot (P)** on, the coin is on your click at the playhead's moment: the tool works out when it must start so that it passes that `y` then. Pause where the coin should be, arm it, click. The click's `y` can't be reached when the coin would have to start before the wave: the message says so, so pause later or click higher. The switch changes nothing for the other drifters. A ghost ship that touches the coin collects it, as in the game: use fly mode or another start spot (1 2 3) to watch it arrive.
+
 **Invert switch:** the pill at the top right of the DRIFTERS panel (or the I key). When it is on, every drifter you place from the palette gets `invert: true`, so you pick the mirrored version from the start. The status line says `INVERTED` while placing. It can be flipped while a drifter is armed, and applies to the next one placed. A drifter with no mirror (the meteorite and the coin) is placed as it is, and the message says so. Inverted: a satellite and a fireball come from the right and fly left; a chain lightning is mirrored.
 
 A click gives a drifter the coordinates it uses: a meteorite, a chain lightning, a fireball, a floating island, a planet and an electric ball take the click's `x` (they come in from the top), a satellite and a UFO take `y` (they cross at that height), a coin takes both. A satellite or a UFO enters from the left unless the invert switch is on.
 
-**At spot (P):** P switches it on and off. While it is on, a click places the armed drifter so that it is **on the click at the playhead's moment**, instead of starting there. Pause where the drifter should be somewhere, arm it, click the spot. The tool plays the drifter alone with the game's physics at the level you picked and works out its `at_px` and the coordinate it takes (the same ones as above). The status line says `AT SPOT`, and the message gives the trigger and how far off it lands: a drifter moves in steps, so it can be up to half a step off, usually 1 to 2 px.
+**At spot (P):** P switches it on and off. While it is on, a click places the armed drifter so that it is **on the click at the playhead's moment**, instead of starting there. Pause where the drifter should be somewhere, arm it, click the spot. The tool plays the drifter alone with the game's physics at the level you picked and works out its `at_px` and the coordinate it takes (the same ones as above). The search runs in the background: the game keeps playing and the status line says `finding a spot for ...`. Esc stops it. Wait for it to finish before you edit the wave, or the result is dropped and you click again. The status line says `AT SPOT`, and the message gives the trigger and how far off it lands: a drifter moves in steps, so it can be up to half a step off, usually 1 to 2 px.
 
 - **Refused** when the drifter's path never passes that spot at that moment: it can't get there in time without triggering inside the first 120 px, or its path doesn't go there. The message gives the nearest spot it can reach and the miss in px. A floating island waits for the 120 px too, since `wave_check` counts it for the seam.
-- **UFO:** its weave changes with where it starts, so the tool tries every height in its band. That takes a few seconds. It uses the default seed the UFO gets at its place in the list. Adding a drifter before another UFO changes that UFO's default seed, as it always has.
+- **UFO:** its weave changes with where it starts, so the tool tries every height in its band. That takes a few seconds, less on a computer with more cores (it uses worker processes, and falls back to one process if they cannot start). It uses the default seed the UFO gets at its place in the list. Adding a drifter before another UFO changes that UFO's default seed, as it always has.
 - The ship's position counts only for the chain lightning's warning. The tool uses the ship where it is now.
 - Same thing from the command line, for drafting waves without the window:
 
@@ -158,12 +164,17 @@ Nudge or type a value and it becomes **W**. D on a W value drops it back to F or
 | L | loop on / off |
 | F3 | hitboxes |
 | T | path trail on / off |
-| Esc | stop placing, or cancel a prompt, or give the focus back to the game view. It never quits. |
+| F2 | next screen size |
+| Esc | stop a search, or stop placing, or cancel a prompt, or give the focus back to the game view. It never quits. |
 | window close button | quit |
 | drag the bar | scrub |
 
 **Ghost:** the ship is hidden and held at the start spot. It cannot be hit, so the wave plays by itself.
 **Fly:** you steer with the arrow keys (only while the game view has focus). Lives work as in the game. Losing the last life plays the 2-second burst, then the timeline starts over from tick 0, or stops if loop is off. The editor has no menu and no retry.
+
+## Speed
+
+An edit (placing, nudging, deleting, typing a value) replays the timeline to the playhead from the last snapshot before the first drifter the edit touches, not from tick 0, so it is instant late in a wave too. Changing a placement, or the values of a drifter type, only reaches the run from the first placement it concerns. The graze margin reaches every drifter, so it replays from the first placement. The wave's length, kind and rest start over from tick 0. The result is always the same as a replay from tick 0.
 
 ## Hot reload
 

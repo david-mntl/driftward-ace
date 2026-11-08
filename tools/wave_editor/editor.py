@@ -4,8 +4,10 @@ Every change goes through `Bench.edit`, so the game's own checks validate it, a 
 undone, and the run replays to the current tick.
 """
 
+import copy
 import json
 from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -20,7 +22,16 @@ from core.levels import LEVEL_COUNT
 from core.scroll import scroll_speed
 from core.wave_files import SEAM_CLEAR_PX, _build_wave
 from doc import NAME, Doc, Leaf, get_leaf, leaves
-from place import CLICK_FIELDS, Spot, Unreachable, place_in_wave, placement_item
+from place import (
+    CLICK_FIELDS,
+    FROM_TOP_FIELDS,
+    Cancelled,
+    ScanPool,
+    Spot,
+    Unreachable,
+    place_in_wave,
+    placement_item,
+)
 
 ROOT: Path = doc_module.TOOL_DIR.parents[1]
 FOCUS_ORDER: tuple[str, ...] = ("game", "wave", "palette", "values")
@@ -97,6 +108,19 @@ class PromoteView:
 
 
 @dataclass
+class Job:
+    """A slow search running on a worker thread, so the window keeps playing and drawing."""
+
+    label: str
+    future: "Future[Any]"
+    finish: Callable[[Any], None]
+    """Runs on the main thread with the search's result when it is done."""
+    revision: int
+    """The bench's revision when it started. A result is dropped if the wave changed since."""
+    cancelled: bool = False
+
+
+@dataclass
 class OpenView:
     """The Open list: every wave file the editor can open, narrowed by what is typed."""
 
@@ -134,6 +158,9 @@ class Editor:
         self.at_spot: bool = False
         """Place by position: a click puts the drifter on that spot at the playhead's moment,
         instead of starting there."""
+        self.coin_top: bool = False
+        """A coin is placed so that it comes in from the top (see FROM_TOP_FIELDS), instead of
+        appearing where it is put. It changes nothing for the other drifters."""
         self.armed: tuple[str, str | None] | None = None
         """A (type, variant) waiting for a click in the game view to be placed."""
         self.panels: dict[str, pygame.Rect] = {}
@@ -149,6 +176,17 @@ class Editor:
         """Clickable rows, filled by the drawing each frame: (area, kind, index)."""
         self.regions: dict[str, pygame.Rect] = {}
         """The palette's two lists, for the mouse wheel."""
+        self.job: Job | None = None
+        """The search running now, if any. Only one at a time."""
+        self._worker: ThreadPoolExecutor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="wave-editor-search"
+        )
+        self._scan_pool: ScanPool = ScanPool()
+        """Worker processes for a UFO's slow search, started the first time it needs them."""
+        self._rows_memo: tuple[tuple[int, int | None, int], list[Row]] | None = None
+        self._palette_memo: tuple[tuple[int, int], dict[str, Any] | None] | None = None
+        """What the drawing asks for every frame, kept until the document or the selection
+        changes (the bench's `revision`), so a frame reads no file."""
 
     # ---- what is selected ---------------------------------------------------------------
 
@@ -167,7 +205,19 @@ class Editor:
 
     def rows(self) -> list[Row]:
         """The wave's settings, the shared graze values, the selected placement's fields, then
-        the values of its drifter type with W/F/P tags. Headings have no key."""
+        the values of its drifter type with W/F/P tags. Headings have no key.
+
+        Kept until the document, the selection or the level changes."""
+        key: tuple[int, int | None, int] = (
+            self.bench.revision,
+            self.selected,
+            self.bench.level,
+        )
+        if self._rows_memo is None or self._rows_memo[0] != key:
+            self._rows_memo = (key, self._build_rows())
+        return self._rows_memo[1]
+
+    def _build_rows(self) -> list[Row]:
         rows: list[Row] = []
         wave: dict[str, Any] | None = self.doc.wave
         if wave is not None:
@@ -273,6 +323,10 @@ class Editor:
         shift: bool = bool(event.mod & pygame.KMOD_SHIFT)
         if ctrl:
             return self._file_key(event.key, shift)
+        if event.key == pygame.K_ESCAPE and self.job and not self.job.cancelled:
+            self.job.cancelled = True
+            self.message = f"stopped {self.job.label}"
+            return True
         if event.key == pygame.K_ESCAPE and self.armed is not None:
             self.armed = None
             self.message = "placing stopped"
@@ -288,6 +342,9 @@ class Editor:
             return True
         if event.key == pygame.K_p:
             self.toggle_at_spot()
+            return True
+        if event.key == pygame.K_c:
+            self.toggle_coin_top()
             return True
         if event.key == pygame.K_TAB:
             self._next_focus(-1 if shift else 1)
@@ -331,21 +388,26 @@ class Editor:
 
     # ---- palette ------------------------------------------------------------------------
 
+    def _palette_values(self) -> dict[str, Any] | None:
+        """The palette's drifter type with the sandbox's layers applied. None if unreadable.
+        Kept until the document or the picked type changes."""
+        key: tuple[int, int] = (self.bench.revision, self.palette_type)
+        if self._palette_memo is None or self._palette_memo[0] != key:
+            try:
+                values: dict[str, Any] | None = self.doc.effective(
+                    TYPES[self.palette_type]
+                )
+            except (OSError, ValueError):
+                values = None
+            self._palette_memo = (key, values)
+        return self._palette_memo[1]
+
     def variants(self) -> list[str]:
         """Variant names of the palette's drifter type, from the sandbox's effective values."""
-        try:
-            values: dict[str, Any] = self.doc.effective(TYPES[self.palette_type])
-        except (OSError, ValueError):
-            return []
-        return list(values.get("variants", {}))
+        return list((self._palette_values() or {}).get("variants", {}))
 
     def default_variant(self) -> str:
-        try:
-            return str(
-                self.doc.effective(TYPES[self.palette_type]).get("default_variant", "")
-            )
-        except (OSError, ValueError):
-            return ""
+        return str((self._palette_values() or {}).get("default_variant", ""))
 
     def press_at(self, pos: tuple[int, int]) -> bool:
         """A left click outside the game view: a row of a list, or a panel to focus. True if it
@@ -398,6 +460,20 @@ class Editor:
             if self.at_spot
             else "at spot off: a click starts the drifter there"
         )
+
+    def toggle_coin_top(self) -> None:
+        """Flip the coin's from-the-top mode. It applies to the next coin placed."""
+        self.coin_top = not self.coin_top
+        self.message = (
+            "coin from the top: it scrolls in from above, and at spot (P) it is on "
+            "the spot at this moment"
+            if self.coin_top
+            else "coin from the top off: a coin appears where it is placed"
+        )
+
+    def from_top(self, drifter: str) -> bool:
+        """True if `drifter` is placed from the top now: the mode is on and it has the mode."""
+        return self.coin_top and drifter in FROM_TOP_FIELDS
 
     def _arm(self, variant: str | None) -> None:
         """Wait for a click in the game view to place the palette's drifter."""
@@ -472,7 +548,14 @@ class Editor:
         at_px: float = min(max(round(into / SNAP_PX) * SNAP_PX, SEAM_CLEAR_PX), length)
         error: Exception | None = None
         tries: tuple[dict[str, float], ...] = (
-            ({name: round(at["xy".index(name[0])]) for name in CLICK_FIELDS[drifter]},)
+            (
+                {
+                    name: round(at["xy".index(name[0])])
+                    for name in (
+                        FROM_TOP_FIELDS if self.from_top(drifter) else CLICK_FIELDS
+                    ).get(drifter, CLICK_FIELDS[drifter])
+                },
+            )
             if at is not None
             else START_FIELDS
         )
@@ -541,59 +624,109 @@ class Editor:
     ) -> None:
         """Add a drifter so that it is on `at` at the playhead's moment (place.py).
 
-        The trigger and the coordinate it takes are worked out from its path. A spot it can't
-        pass at this moment is refused with the nearest one it can. With the invert switch on,
-        a drifter that has no mirror is placed as it is.
+        The trigger and the coordinate it takes are worked out from its path, on a worker
+        thread: a UFO's search can take seconds, and the window must not freeze meanwhile.
+        A spot it can't pass at this moment is refused with the nearest one it can. With the
+        invert switch on, a drifter that has no mirror is placed as it is.
         """
         wave: dict[str, Any] | None = self.doc.wave
         if wave is None:
             self.message = "no wave to add to: open one with Ctrl+O first"
             return
+        if self.job is not None and not self.job.cancelled:
+            self.message = f"still {self.job.label}: wait for it, or Esc to cancel"
+            return
         moment: int = self.bench.run.scroll.scrolled_ticks
         if moment * scroll_speed(self.bench.level) > float(wave.get("length_px", 0)):
             self.message = "cannot place at spot: the playhead is past the wave's end"
             return
-        placements: list[Any] = list(wave.get("placements", []))
-        spot: Spot | None = None
-        error: Exception | None = None
-        for inverted in (True, False) if self.invert else (False,):
-            what: Placement = Placement(
-                drifter_type=DrifterType(drifter), variant=variant, invert=inverted
-            )
-            try:
-                spot = place_in_wave(
-                    what,
-                    at,
-                    moment,
-                    self.bench.level,
-                    self.bench.tuning,
-                    self.bench.run.ship,
-                    self.doc.wave_id,
-                    placements,
+        placements: list[Any] = copy.deepcopy(list(wave.get("placements", [])))
+        level, tuning = self.bench.level, self.bench.tuning
+        ship, wave_id, invert = self.bench.run.ship, self.doc.wave_id, self.invert
+        from_top: bool = self.from_top(drifter)
+        job: Job | None = None
+
+        def search() -> tuple[Placement, Spot] | str:
+            """The spot, or the reason there is none. Runs on the worker thread."""
+            error: Exception | None = None
+            for inverted in (True, False) if invert else (False,):
+                what: Placement = Placement(
+                    drifter_type=DrifterType(drifter), variant=variant, invert=inverted
                 )
-            except Unreachable as err:
-                self.message = f"cannot reach {at[0]:.0f}, {at[1]:.0f} now: {err}"
+                try:
+                    return what, place_in_wave(
+                        what,
+                        at,
+                        moment,
+                        level,
+                        tuning,
+                        ship,
+                        wave_id,
+                        placements,
+                        lambda: job is not None and job.cancelled,
+                        self._scan_pool,
+                        from_top,
+                    )
+                except Unreachable as err:
+                    return f"cannot reach {at[0]:.0f}, {at[1]:.0f} now: {err}"
+                except ValueError as err:
+                    error = err
+            return f"cannot add {drifter}: {error}"
+
+        def finish(found: tuple[Placement, Spot] | str) -> None:
+            if isinstance(found, str):
+                self.message = found
                 return
-            except ValueError as err:
-                error = err
-                continue
-            break
-        if spot is None:
-            self.message = f"cannot add {drifter}: {error}"
-            return
-        item: dict[str, Any] = placement_item(what, spot)
-        if not self._append(item):
-            return
-        name: str = f"{drifter} {variant}" if variant else drifter
-        if what.invert:
-            name += " (inverted)"
-        elif self.invert:
-            name += " (no invert for this drifter)"
-        where: str = ", ".join(f"{k} {v:g}" for k, v in spot.fields.items())
-        self.message = (
-            f"placed {name} at {spot.at_px} px, {where}: on the spot now, "
-            f"{spot.off_px:.1f} px off. Esc stops placing"
+            what, spot = found
+            item: dict[str, Any] = placement_item(what, spot)
+            if not self._append(item):
+                return
+            name: str = f"{drifter} {variant}" if variant else drifter
+            if what.invert:
+                name += " (inverted)"
+            elif self.invert:
+                name += " (no invert for this drifter)"
+            where: str = ", ".join(f"{k} {v:g}" for k, v in spot.fields.items())
+            self.message = (
+                f"placed {name} at {spot.at_px} px, {where}: on the spot now, "
+                f"{spot.off_px:.1f} px off. Esc stops placing"
+            )
+
+        job = Job(
+            f"finding a spot for {drifter}",
+            self._worker.submit(search),
+            finish,
+            self.bench.revision,
         )
+        self.job = job
+        self.message = ""
+
+    def poll_job(self) -> None:
+        """Call once a frame: finish the search if it is done, on the main thread."""
+        job: Job | None = self.job
+        if job is None or not job.future.done():
+            return
+        self.job = None
+        if job.cancelled:
+            return
+        try:
+            found: Any = job.future.result()
+        except Cancelled:
+            return
+        except Exception as err:  # noqa: BLE001 - a failed search must not kill the tool
+            self.message = f"cannot place: {err}"
+            return
+        if job.revision != self.bench.revision:
+            self.message = "the wave changed while searching: click the spot again"
+            return
+        job.finish(found)
+
+    def close(self) -> None:
+        """Stop the worker thread. The tool calls it on the way out."""
+        if self.job is not None:
+            self.job.cancelled = True
+        self._worker.shutdown(wait=False, cancel_futures=True)
+        self._scan_pool.close()
 
     def _reachable(self) -> dict[str, bool]:
         """Which panels can take the focus now."""
