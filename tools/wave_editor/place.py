@@ -11,10 +11,14 @@ the game, never changes it.
 """
 
 import argparse
+import functools
 import json
 import math
+import multiprocessing
+import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from concurrent.futures import Future, ProcessPoolExecutor, TimeoutError
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -48,6 +52,10 @@ CLICK_FIELDS: dict[str, tuple[str, ...]] = {
 crosses at its y, a coin sits at both. A fireball enters along the top, at its x. An island and a
 planet scroll in from the top at their x. A UFO crosses from a side at its y. An electric ball
 falls from its x."""
+FROM_TOP_FIELDS: dict[str, tuple[str, ...]] = {"coin": ("x",)}
+"""Which coordinates a click sets when the drifter must come in from the top. A coin set at an x
+and a y appears there; set at an x only it starts above the screen and slides down with the
+scroll, so its path decides where it is and when."""
 SHIP_X: dict[str, float] = {"L": 100.0, "C": 320.0, "R": 540.0}
 """Where the ship is held, by start spot, screen px. The same as the editor's ghost."""
 CHECK_LEVEL: int = 8
@@ -75,6 +83,10 @@ class Spot:
     steps, so this is up to half a tick's move."""
 
 
+class Cancelled(Exception):
+    """The caller stopped the search (see the `cancel` argument of `place_in_wave`)."""
+
+
 class Unreachable(ValueError):
     """The drifter's path never passes the target at that moment."""
 
@@ -100,28 +112,41 @@ def place_at(
     level: int,
     tuning: DrifterTuning,
     ship: Ship,
+    cancel: Callable[[], bool] | None = None,
+    pool: "ScanPool | None" = None,
+    from_top: bool = False,
 ) -> Spot:
     """Find the trigger and spawn coordinates that put `what` on `target` at `moment`.
 
     `moment` is in ticks of scroll from the wave's start, at `level`. `what` gives the type,
     variant, invert and seed; its x and y are ignored. Of the spots on its path the one it
     reaches first after spawning wins. Raises Unreachable when the path never passes the
-    target at that moment, ValueError when the game refuses the drifter.
+    target at that moment, ValueError when the game refuses the drifter. `cancel` is asked
+    between the long steps of a slow search; True stops it with Cancelled. `pool` spreads a
+    slow search over several processes; the result is the same without it. `from_top` makes a
+    drifter that can be placed in the open (the coin) come in from the top instead: it takes
+    only the coordinates of FROM_TOP_FIELDS and its trigger is worked out from its path.
     """
     name: str = what.drifter_type.value
-    free: tuple[str, ...] | None = CLICK_FIELDS.get(name)
+    free: tuple[str, ...] | None = (FROM_TOP_FIELDS if from_top else {}).get(
+        name, CLICK_FIELDS.get(name)
+    )
     if free is None:
         raise Unreachable(f"{name} cannot be placed by position")
     spawn: dict[str, int] = {axis: round(target["xy".index(axis)]) for axis in free}
     last_age: int = moment - first_due_tick(_placed(what, spawn), level, tuning)
 
     def path_of(spawn: dict[str, int]) -> list[tuple[float, float] | None]:
-        return _path(_placed(what, spawn), level, tuning, ship)
+        # Nothing reads past age last_age + 1 (the tick after the moment, for the step size).
+        return _path(_placed(what, spawn), level, tuning, ship, last_age + 1)
 
     spawn, age = _by_shift(path_of, spawn, free, target, last_age)
     off: float | None = _landing(path_of(spawn), age, target)
     if off is None:
-        spawn, age, off = _by_scan(path_of, free, target, last_age)
+        scan = functools.partial(
+            _scan_values, what, free[0], target, last_age, level, tuning, ship
+        )
+        spawn, age, off = _by_scan(path_of, free, target, last_age, scan, cancel, pool)
     return Spot(trigger_px(moment - age, level), spawn, age, off)
 
 
@@ -186,28 +211,28 @@ def _by_scan(
     free: tuple[str, ...],
     target: tuple[float, float],
     last_age: int,
+    scan: "Callable[[Iterable[int]], Nearest | None]",
+    cancel: Callable[[], bool] | None = None,
+    pool: "ScanPool | None" = None,
 ) -> tuple[dict[str, int], int, float]:
     """Try every whole spawn coordinate across the screen and keep the nearest pass.
 
     For a drifter whose path changes with its start (a UFO weaves inside its band). Slower:
-    one path per px. Raises Unreachable with the nearest spot when none lands on the target.
+    one path per px, so `pool` may spread them over processes. Raises Unreachable with the
+    nearest spot when none lands on the target.
     """
     axis: str = free[0]
     size: int = SCREEN_W if axis == "x" else SCREEN_H
-    best: tuple[float, int, int, list[tuple[float, float] | None]] | None = None
-    for value in range(size + 1):
-        try:
-            path: list[tuple[float, float] | None] = path_of({axis: value})
-        except ValueError:
-            continue
-        for age, point in enumerate(path[: last_age + 1]):
-            if point is not None and (
-                best is None or math.dist(point, target) < best[0]
-            ):
-                best = (math.dist(point, target), age, value, path)
-    if best is None:
+    values: range = range(size + 1)
+    found: Nearest | None = (
+        pool.nearest(scan, values, cancel)
+        if pool is not None
+        else _serial_nearest(scan, values, cancel)
+    )
+    if found is None:
         raise Unreachable("too early: it cannot be on screen yet at this moment")
-    distance, age, value, path = best
+    distance, age, value = found
+    path: list[tuple[float, float] | None] = path_of({axis: value})
     off: float | None = _landing(path, age, target)
     nearest: tuple[float, float] | None = path[age]
     if off is None and nearest is not None:
@@ -216,6 +241,130 @@ def _by_scan(
         )
     assert off is not None
     return {axis: value}, age, off
+
+
+Nearest = tuple[float, int, int]
+"""The closest a drifter comes to the target: (distance px, age in ticks, spawn coordinate)."""
+
+CHUNK_VALUES: int = 8
+"""Spawn coordinates searched between two looks at the cancel flag."""
+
+
+def _scan_values(
+    what: Placement,
+    axis: str,
+    target: tuple[float, float],
+    last_age: int,
+    level: int,
+    tuning: DrifterTuning,
+    ship: Ship,
+    values: Iterable[int],
+) -> Nearest | None:
+    """The nearest pass to `target` over the spawn coordinates in `values`, ages up to
+    `last_age`. The first of equal passes wins. Top level so a worker process can run it."""
+    best: Nearest | None = None
+    for value in values:
+        try:
+            path: list[tuple[float, float] | None] = _path(
+                _placed(what, {axis: value}), level, tuning, ship, last_age + 1
+            )
+        except ValueError:
+            continue
+        for age, point in enumerate(path[: last_age + 1]):
+            if point is not None:
+                distance: float = math.dist(point, target)
+                if best is None or distance < best[0]:
+                    best = (distance, age, value)
+    return best
+
+
+def _closer(best: Nearest | None, other: Nearest | None) -> Nearest | None:
+    """The nearer of two results; on a tie `best`, the one from lower coordinates."""
+    if other is not None and (best is None or other[0] < best[0]):
+        return other
+    return best
+
+
+def _chunks(values: range) -> list[range]:
+    return [
+        values[start : start + CHUNK_VALUES]
+        for start in range(0, len(values), CHUNK_VALUES)
+    ]
+
+
+def _serial_nearest(
+    scan: "Callable[[Iterable[int]], Nearest | None]",
+    values: range,
+    cancel: Callable[[], bool] | None,
+) -> Nearest | None:
+    best: Nearest | None = None
+    for chunk in _chunks(values):
+        if cancel is not None and cancel():
+            raise Cancelled
+        best = _closer(best, scan(chunk))
+    return best
+
+
+class ScanPool:
+    """Worker processes for the slow scan, started on first use and kept for the next one.
+
+    Spreads the spawn coordinates over the cores and keeps the answer of the serial search:
+    chunks are merged in order. If the processes cannot start or break, the search runs here
+    instead, and keeps doing so.
+    """
+
+    def __init__(self, workers: int | None = None) -> None:
+        self._workers: int = workers or max(1, min((os.cpu_count() or 1) - 1, 6))
+        self._pool: ProcessPoolExecutor | None = None
+        self._broken: bool = self._workers < 2
+
+    def nearest(
+        self,
+        scan: "Callable[[Iterable[int]], Nearest | None]",
+        values: range,
+        cancel: Callable[[], bool] | None = None,
+    ) -> Nearest | None:
+        """`scan` over `values` split across the workers. Raises Cancelled if `cancel` says so."""
+        if self._broken:
+            return _serial_nearest(scan, values, cancel)
+        futures: list[Future[Nearest | None]] = []
+        try:
+            if self._pool is None:
+                self._pool = ProcessPoolExecutor(
+                    max_workers=self._workers,
+                    mp_context=multiprocessing.get_context("spawn"),
+                )
+            futures = [self._pool.submit(scan, chunk) for chunk in _chunks(values)]
+            best: Nearest | None = None
+            for future in futures:
+                best = _closer(best, self._wait(future, cancel))
+        except Cancelled:
+            for future in futures:
+                future.cancel()
+            raise
+        except Exception:  # noqa: BLE001 - a broken pool must only slow the search down
+            self._broken = True
+            self.close()
+            return _serial_nearest(scan, values, cancel)
+        return best
+
+    @staticmethod
+    def _wait(
+        future: "Future[Nearest | None]", cancel: Callable[[], bool] | None
+    ) -> Nearest | None:
+        while True:
+            if cancel is not None and cancel():
+                raise Cancelled
+            try:
+                return future.result(timeout=0.05)
+            except TimeoutError:
+                continue
+
+    def close(self) -> None:
+        """Stop the workers. A search still running is dropped."""
+        if self._pool is not None:
+            self._pool.shutdown(wait=False, cancel_futures=True)
+            self._pool = None
 
 
 def _placed(what: Placement, spawn: dict[str, int]) -> Placement:
@@ -249,13 +398,20 @@ def trigger_px(tick: int, level: int) -> int:
 
 
 def _path(
-    what: Placement, level: int, tuning: DrifterTuning, ship: Ship
+    what: Placement,
+    level: int,
+    tuning: DrifterTuning,
+    ship: Ship,
+    ticks: int = MAX_AGE_TICKS,
 ) -> list[tuple[float, float] | None]:
-    """The drifter's center per tick from its trigger, None while it is not ACTIVE."""
+    """The drifter's center per tick from its trigger, None while it is not ACTIVE.
+
+    Stops after `ticks` ticks at most. A caller that only reads up to some age passes that age
+    plus the one tick after it, so the rest is never played."""
     ctx: TickContext = TickContext(ship=ship, scroll_step_px=scroll_speed(level))
     drifter = spawn_drifter(what, level, tuning).settle_warning(ctx)
     points: list[tuple[float, float] | None] = []
-    for _ in range(MAX_AGE_TICKS + 1):
+    for _ in range(min(ticks, MAX_AGE_TICKS) + 1):
         active: bool = drifter.phase is Phase.ACTIVE
         points.append((drifter.x, drifter.y) if active else None)
         drifter = drifter.update(ctx).mark_entered()
@@ -335,6 +491,9 @@ def place_in_wave(
     ship: Ship,
     wave_id: str,
     placements: list[Any],
+    cancel: Callable[[], bool] | None = None,
+    pool: ScanPool | None = None,
+    from_top: bool = False,
 ) -> Spot:
     """`place_at` for a placement added to a wave, with the default seed it will get there.
 
@@ -343,13 +502,17 @@ def place_in_wave(
     """
     speed: float = scroll_speed(level)
     seeded: Placement = seed_for(what, wave_id, placements, moment * speed)
-    spot: Spot = place_at(seeded, target, moment, level, tuning, ship)
+    spot: Spot = place_at(
+        seeded, target, moment, level, tuning, ship, cancel, pool, from_top
+    )
     for _ in range(PASSES):
         again: Placement = seed_for(what, wave_id, placements, spot.at_px)
         if again == seeded:
             break
         seeded = again
-        spot = place_at(seeded, target, moment, level, tuning, ship)
+        spot = place_at(
+            seeded, target, moment, level, tuning, ship, cancel, pool, from_top
+        )
     return spot
 
 

@@ -6,6 +6,7 @@ or the debug spawn list. Reads the game read-only. Every tick's thrust is record
 to the exact same state.
 """
 
+import math
 import tempfile
 from collections.abc import Callable
 from dataclasses import replace
@@ -15,7 +16,7 @@ import doc as doc_module
 from app import tuning as tuning_module
 from app.debug_spawns import DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.tuning import load_graze_rules, load_tuning
-from core.drifters.base import Phase, TickContext
+from core.drifters.base import DrifterType, Phase, TickContext
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning
 from core.graze import GrazeRules
@@ -27,8 +28,9 @@ from core.wave_files import _build_wave
 from core.waves import LevelPlaylist, Wave, WaveBook, WaveKind, start_waves
 from doc import Doc
 
-SNAPSHOT_TICKS: int = 60
-"""A Run snapshot is kept every this many ticks."""
+SNAPSHOT_TICKS: int = 15
+"""A Run snapshot is kept every this many ticks. A snapshot shares almost all of its data with the
+one before it, so keeping many is cheap, and an edit replays at most this many ticks."""
 
 GHOST_X: dict[str, float] = {"L": 100.0, "C": 320.0, "R": 540.0}
 """Where the ghost stands, by start spot. Screen px."""
@@ -53,6 +55,8 @@ class Bench:
         self.loop: bool = True
         self.error: str = ""
         self.ended: bool = False
+        self.revision: int = 0
+        """Counts every edit and reload. A cached view of the document is stale when it changes."""
         self._preview: tuple[
             tuple[int, ...] | None, tuple[tuple[float, float, bool], ...]
         ] = (None, ())
@@ -80,10 +84,16 @@ class Bench:
             None,
         )
 
-    def _transaction(self, change: Callable[[], None]) -> bool:
+    def _transaction(self, change: Callable[[], None], replay: bool = True) -> bool:
         """Apply `change` to the document and rebuild. On any error the document and the old
-        values stay, the message shows, and False comes back."""
+        values stay, the message shows, and False comes back.
+
+        On success the timeline is replayed to the current tick, from the last snapshot the
+        change cannot have touched (see `_untouched_before`), unless `replay` is False.
+        """
         saved = self.doc.snapshot()
+        old = (self.tuning, self.graze_rules, self.wave, self.spawn_list)
+        self.revision += 1
         try:
             change()
             self.tuning, self.graze_rules, self.wave, self.spawn_list = self._build()
@@ -93,8 +103,55 @@ class Bench:
             return False
         self.error = ""
         self._mtimes = self._scan()
-        self.replay_to(self.pos)
+        if replay:
+            self.replay_to(self.pos, self._untouched_before(*old))
         return True
+
+    def _untouched_before(
+        self,
+        old_tuning: DrifterTuning,
+        old_rules: GrazeRules,
+        old_wave: Wave,
+        old_list: DebugSpawnList | None,
+    ) -> float:
+        """Scroll distance, px, before which the timeline is the same after the edit just made.
+
+        A run that has not reached this distance yet can be kept as it is. 0 means nothing can
+        be kept. An edit reaches the run only through the drifters it spawns: a placement that
+        was added, removed or changed spawns at its `at_px`, and a changed drifter type
+        matters from the first placement of that type. Anything else (the wave's length or kind,
+        the graze values, the spawn list) starts over.
+        """
+        if (
+            self.spawn_list is not None
+            or old_list is not None
+            or self.graze_rules != old_rules
+            or replace(old_wave, placements=()) != replace(self.wave, placements=())
+        ):
+            return 0.0
+        old_items, new_items = old_wave.placements, self.wave.placements
+        limit: float = math.inf
+        for index in range(max(len(old_items), len(new_items))):
+            old_item = old_items[index] if index < len(old_items) else None
+            new_item = new_items[index] if index < len(new_items) else None
+            if old_item != new_item:
+                limit = min(item.at_px for item in (old_item, new_item) if item)
+                break
+        changed: set[DrifterType] | None = _changed_types(old_tuning, self.tuning)
+        for item in new_items:
+            if changed is None or item.placement.drifter_type in changed:
+                limit = min(limit, item.at_px)
+        return limit
+
+    def _book(self) -> WaveBook:
+        """The wave book the bench plays: the one wave, always at Wave 0."""
+        return WaveBook(
+            waves={
+                self.wave.wave_id: replace(self.wave, kind=WaveKind.POOL, min_level=1)
+            },
+            wave_zero_id=self.wave.wave_id,
+            playlists=(LevelPlaylist(),) * LEVEL_COUNT,
+        )
 
     def edit(self, change: Callable[[Doc], None]) -> bool:
         """Edit the document, check it, replay to the current tick. False: refused, undone."""
@@ -110,7 +167,7 @@ class Bench:
         def swap() -> None:
             self.doc = doc
 
-        if not self._transaction(swap):
+        if not self._transaction(swap, replay=False):
             self.doc = old
             return False
         self.restart()
@@ -145,14 +202,7 @@ class Bench:
 
     def _new_run(self) -> Run:
         assert self.wave is not None
-        book: WaveBook = WaveBook(
-            waves={
-                self.wave.wave_id: replace(self.wave, kind=WaveKind.POOL, min_level=1)
-            },
-            wave_zero_id=self.wave.wave_id,
-            playlists=(LevelPlaylist(),) * LEVEL_COUNT,
-        )
-        waves = replace(start_waves(book, 0), level=self.level)
+        waves = replace(start_waves(self._book(), 0), level=self.level)
         return self._pin(start_run(waves=waves, graze_rules=self.graze_rules))
 
     @property
@@ -241,14 +291,21 @@ class Bench:
 
         Plays that one drifter alone with the ship held where it is now and the world scrolling
         at the chosen level, until it leaves the screen. Drifters that follow the ship follow
-        this fixed ship. Empty if the placement does not spawn.
+        this fixed ship. Empty if the placement does not spawn. Only the chain lightning's path
+        depends on the ship, so a flown ship does not redo the other drifters' paths.
         """
+        if not 0 <= index < len(self.wave.placements):
+            return ()
         ship: Ship = self.run.ship
+        follows_ship: bool = (
+            self.wave.placements[index].placement.drifter_type
+            is DrifterType.CHAIN_LIGHTNING
+        )
         key: tuple[int, int, int, int, int] = (
             index,
             self.level,
-            round(ship.x),
-            round(ship.y),
+            round(ship.x) if follows_ship else 0,
+            round(ship.y) if follows_ship else 0,
             id(self.wave),
         )
         if self._preview[0] == key:
@@ -324,13 +381,31 @@ class Bench:
 
         return self._transaction(reload)
 
-    def replay_to(self, target: int) -> None:
-        """Rebuild the timeline from tick 0 with the recorded inputs, up to `target`."""
+    def replay_to(self, target: int, untouched_before: float = 0.0) -> None:
+        """Rebuild the timeline up to `target` ticks with the recorded inputs.
+
+        It starts from the last snapshot at or before `target` whose scroll distance is below
+        `untouched_before` px (the edit cannot have changed anything before that), moved onto
+        the current wave. With the default of 0 it starts from tick 0.
+        """
         recorded: list[Thrust] = self.inputs
-        self.restart()
-        for thrust in recorded[:target]:
-            before: Run = self.run
-            nxt = self._tick(before, thrust)
+        book: WaveBook = self._book()
+        kept: dict[int, Run] = {
+            tick: _on_book(run, book)
+            for tick, run in self.snapshots.items()
+            if tick <= target and run.scroll.distance_px < untouched_before
+        }
+        if kept and self.spawn_list is None:
+            base: int = max(kept)
+            self.snapshots = kept
+            self.run = kept[base]
+            self.pos = base
+            self.ended = False
+            self.inputs = recorded[:base]
+        else:
+            self.restart()
+        for thrust in recorded[self.pos : target]:
+            nxt = self._tick(self.run, thrust)
             if nxt is None:
                 break
             self.inputs.append(thrust)
@@ -339,6 +414,24 @@ class Bench:
             if self.pos % SNAPSHOT_TICKS == 0:
                 self.snapshots[self.pos] = nxt
         self.inputs.extend(recorded[len(self.inputs) :])
+
+
+def _on_book(run: Run, book: WaveBook) -> Run:
+    """`run` playing from `book` instead of the book it was made with."""
+    assert run.waves is not None
+    return replace(run, waves=replace(run.waves, book=book))
+
+
+def _changed_types(old: DrifterTuning, new: DrifterTuning) -> set[DrifterType] | None:
+    """The drifter types whose tuning differs. None: something every type shares changed too
+    (the hazard values, the playtest switches), so any type may differ."""
+    if old.switches != new.switches or old.hazards != new.hazards:
+        return None
+    return {
+        drifter_type
+        for drifter_type in DrifterType
+        if old.drifters.get(drifter_type) != new.drifters.get(drifter_type)
+    }
 
 
 def _blank_wave() -> Wave:
