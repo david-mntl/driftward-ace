@@ -1,7 +1,7 @@
 # Run: lives, score, coins, grazes, falls, hits, drifters, respawn wait, last life and game over
 Version: 14
-Status: frozen
-Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-117, DRA-125, DRA-126, DRA-148
+Status: draft
+Features: DRA-23, DRA-29, DRA-39, DRA-47, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-117, DRA-125, DRA-126, DRA-148, DRA-158
 Created by: architect
 
 ## Purpose
@@ -10,6 +10,8 @@ One run of the game, from play start to game over, as one core state. It holds t
 The last life. On the tick lives reach 0 the ship bursts and never rebuilds: the run keeps the score of that tick as the final score and starts a burst of particles at the ship's center, or at the bottom edge where it left the screen after a fall. For the last-life delay the world runs on without the ship: the scroll moves, the drifters move, the waves play and new drifters come in, the popups and graze rings age, and the burst's particles fly out and fade. Nothing collects, grazes, falls or hits, and the score stays frozen. When the delay ends the run is over: everything freezes. The run never restarts itself. The game flow (`docs/contracts/systems/game-flow.md`) decides when the run is stepped, paused, retried or left for the menu, and gets a fresh run from `next_run`: Wave 0 again, Level 1, new random picks, the same graze and last-life values.
 
 It applies the graze rule. Every tick it follows the ship through each hazard's graze zone. When the ship leaves a zone without ever having touched that hazard, while it is flying and not invulnerable, the hazard pays one graze: the count goes up by one, a graze popup rises from the ship's center and a graze ring grows around the ship. Each hazard pays at most once. A hazard that touches the ship never pays. It applies the collect rule, the fall rule and the hit rule: the ship step reports where the ship is, the drifters report where they are and what a touch does, and the run decides what it pays or costs. A coin the ship touches is collected, invulnerable or not, but never while the ship stands in the respawn wait: its points go to the coin points, it disappears, and its points popup rises from where it was for 1 s. It tells the drifters how far the world scrolls each tick, marks when each drifter has entered the screen, starts and counts down each hazard's re-hit cooldown, and drops drifters that have left or been collected. It gathers the floating islands on the field into the ground the ship can't enter and hands it to the ship step, and to the block that holds a ship standing in the respawn wait; a ship that falls respawns at the spot nearest the respawn point that no island holds. Islands never hit and never pay. It gathers the gravity field of every planet on the field and hands them to the ship step, which pulls the ship; a ship standing in the respawn wait is not stepped, so it is never pulled. A planet's body is a hazard like any other.
+
+For each tick it steps, the run also lists the sound cues that tick produced, in the order the steps produced them: a coin collected, a graze paid, a life lost. The app plays them (`docs/contracts/systems/audio.md`); the run only names them.
 
 The app starts the first run, with or without waves, and hands it to the game flow, which holds it and calls `step_run` on the ticks the run plays. After each tick the run was stepped, new drifters reach it through `add_drifters`, the only way a drifter enters a run: the placements the run's waves say are due, or in debug mode the test spawn list's. Each new drifter settles its entry warning there, from the ship at that moment.
 
@@ -537,6 +539,19 @@ class Run:
 ```
 `level` stays the waves' real level and is what the scroll, the spawner, `level_reached`, the saves and the debug overlay use.
 
+### DRA-158: the sound cues
+Existing signatures are read from the code. One new module and one new field, last, with a default, so every existing `Run(...)` and `replace(run, ...)` call still builds. The enum's shape is in `docs/contracts/systems/audio.md`, Interface.
+```python
+# game/core/sound_cue.py (new). Imports: stdlib only. Never pygame, ui or app.
+class SoundCue(Enum): HIT; GRAZE; COIN; GAME_OVER; LEVEL_UP
+
+# game/core/run.py, changed. Imports also core.sound_cue.
+class Run:
+    ...
+    sound_cues: tuple[SoundCue, ...] = ()   # the cues the last stepped tick produced, in step order. () when it had none
+```
+Only the app reads `sound_cues`; no view does. Rules, Sound cues, says when it is filled.
+
 ## Presentation
 The run's fields reach the screen in these places. Every fact shown is a core field; no view works one out.
 
@@ -637,7 +652,13 @@ A playing tick (`game_over` False), in this order:
 9b. **Level-up banner** (DRA-148), right after 9a, on every tick that stepped the waves: start it on the tick `waves.level_rose` is True and `waves.level_up_rules.rest_ticks > 0`, age it on every tick after, and set it to None when the run has a burst (the last life) or core drops it at its lifetime. `docs/contracts/systems/level-up/core.md`, Rules (The banner) holds the order. It only sets `level_up`; nothing else in the tick reads it. Source: 08-difficulty.md, rule 10; 10-ui.md, `level_up_banner`; scope report DRA-148, Feature.
 10. `held = thrust` in the returned run.
 
-If nothing happened, the returned run has the new ship, scroll, drifters, popups, graze rings and waves, `invuln_ticks_left = left`, the `waiting` from step 4, the same `lives`, the same `coin_points` and the same `grazes`.
+If nothing happened, the returned run has the new ship, scroll, drifters, popups, graze rings and waves, `invuln_ticks_left = left`, the `waiting` from step 4, the same `lives`, the same `coin_points` and the same `grazes`, and no sound cues.
+
+**Sound cues** (DRA-158). Every call of `step_run` returns a run whose `sound_cues` holds only the cues of that call. It starts from `()`, never from the cues the run came in with, so a cue is never carried to a later tick. On a playing tick the cues are appended in the order of the steps:
+1. **COIN**, one for each drifter in `collecting` (step 5a), in order.
+2. **GRAZE**, one for each drifter in `check.paid` (step 5b), in order.
+3. **HIT**, once, on the tick a life is lost: step 6 when it costs a life (not protected), or step 7 when it hits (not protected, at least one touching drifter). One life lost is one cue, whatever the number of touching drifters. A protected fall and a touch while protected lose no life and add no cue. The tick that loses the last life adds its HIT, after the COIN and GRAZE cues of that same tick.
+A last-life tick after the one that lost the life, a game-over tick, `hold_arrows` (through `step_run`), `start_run` and `next_run` give `()`. A tick on which the flow does not step the run (paused, a page, game over) leaves the previous cues in the run, so the reader plays them only after a stepped tick: `flow.run_stepped` (`docs/contracts/systems/game-flow.md`). The cues change nothing else: the score, the lives, the drifters and the popups are as they were without them. **GAME_OVER**, once, on the tick the last life is lost, appended after that tick's HIT (the burst starts that tick; the game-over screen comes `last_life_delay` ticks later and adds no cue). **LEVEL_UP**, once, on the tick the level-up banner starts (step 9b, the state where `level_up_cue` is true), appended last. The banner never starts on a tick that bursts, so the two never share a tick. A last-life tick after the first and a game-over tick still give `()`. Source: scope report DRA-158, Feature (hit on every life lost by a drifter or a fall, the last life included; graze when a graze pays; coin when a coin is collected); `91-decision-log.md`, row 145; `docs/contracts/systems/audio.md`, Rules.
 
 **The last life** (DRA-125), from step 6.3 or 7.5, on the tick lives reach 0:
 - `lives = 0`, `invuln_ticks_left = 0`, `waiting = False`. `game_over` stays False. Source: 05-lives-and-damage.md, rule 5 ("There is no invulnerability and no respawn").
@@ -699,7 +720,7 @@ Other rules:
 - Drifters never touch each other or the walls. Islands block the ship only: hazards and coins pass through them. Source: 07-drifters.md, rule 15; drifters/05-floating-islands.md, Edge cases.
 - **Islands never hit and never pay** (DRA-86). A BLOCK drifter is never in `collecting` (step 5a) or `touching` (step 7), so it logs no `drifter touch`, costs no life, starts no cooldown and adds no points. It only shapes where the ship can be (steps 4 and 6). Source: drifters/05-floating-islands.md, rule 5; systems/drifters.md, Rules, The base (Block).
 - **Planets** (DRA-96). A planet's body is a HIT drifter: steps 7 and 8 treat it like every hazard (the hit, one life, the re-hit cooldown, the dim look), and its field never hits. Its field only pulls, through the wells of step 4. A planet's field pulls the ship only, never another drifter: drifters never read the wells. Source: drifters/08-planet.md, rules 4 and 6, Edge cases; 05-lives-and-damage.md, rules 1.5 and 2.7.
-- **Grazes** (DRA-117) pay only through step 5b. Coins, floating islands, walls and lava never pay one. No graze sound. Source: 06-scoring.md, rules 5 and 8, graze_sound; scope report DRA-117, Out.
+- **Grazes** (DRA-117) pay only through step 5b. Coins, floating islands, walls and lava never pay one. A paid graze adds a GRAZE sound cue (Sound cues, above). Source: 06-scoring.md, rules 5 and 8; 12-art-and-audio.md, sound_list.
 - `step_run` and `add_drifters` use no frame time. Their only randomness is the waves' random pick, drawn from a seed held in `run.waves` (`systems/waves.md`, Seeds), and a seeded drifter's own draws, from a seed held in that drifter (the UFO's weave, `systems/drifters.md`, Rules, The base, Seeded; DRA-104). Same input, same output. Source: 15-tech-constraints.md, rule 2.
 - Whether a run has waves is fixed when it starts and kept by a retry. Source: scope report DRA-76, Limits (debug mode plays one or the other).
 - Core behaves the same in normal and debug mode. It never reads the run mode. Source: game/CONTEXT.md, Run modes.
@@ -723,6 +744,8 @@ Logging (logger `core.run`, by event, never by tick). Source: game/CONTEXT.md, L
 - Nothing else. The score, the coin points, the graze count and the burst log nothing: no line when they change (DRA-61, DRA-62, DRA-117, DRA-125). `hold_arrows` logs nothing. Popups and graze rings log nothing. A paid graze adds exactly one `drifter graze` line to its hazard's life. A hazard passing through an invulnerable ship logs nothing, and so does a cooldown starting or ending. A hazard's life logs exactly three lines, `drifter spawn`, `drifter active`, `drifter gone`, plus one `drifter touch` for each hit it takes part in. A coin never logs `drifter active` (it is born ACTIVE): a collected coin logs `drifter spawn`, `drifter touch ... effect=collect` and `drifter gone` (on the same tick, at the place it was collected); a coin that leaves logs `drifter spawn` and `drifter gone`. A floating island (DRA-86) is born ACTIVE and never touched for a hit or a collect: it logs `drifter spawn` and `drifter gone` only; the ship's `island contact` line is `core.ship`'s. A planet (DRA-96) logs like every hazard: `drifter spawn`, `drifter active`, `drifter gone`, and one `drifter touch ... effect=hit` per hit it takes part in; its pull logs nothing. A drifter that never enters never logs `drifter gone` while the run lasts, unless it is collected.
 
 ## Rationale
+- **The run lists the sound cues (DRA-158).** Core owns when a coin is collected, a graze pays or a life is lost, and must stay free of pygame. A cue list on the run, set only by `step_run`, lets a test state exactly which sounds a tick asks for, and lets the app play them without working a rule out itself. Why a list and why only after a stepped tick: `docs/contracts/systems/audio.md`, Rationale.
+- **One HIT per life lost (DRA-158).** The hit rule already makes two touching hazards one hit and one life (step 7.3), so the cue follows the life, not the touch. A fall and a touch on one tick cost only the fall (step 7), so that tick has one HIT too.
 - **The run gathers the wells, the ship step uses them (DRA-96).** The same split as the islands: the run holds the drifters and knows which are ACTIVE; the ship step owns the physics and must not import drifters. Built after step 3, the wells sit where the planets are drawn on the state after the tick.
 - **`gravity_well()` instead of a touch effect or a type test (DRA-96).** A planet is a hazard, so its touch effect is HIT and must stay that for steps 7 and 8. The field is a second, separate fact. A hook with a None default lets any drifter that ever has a field say so, and keeps the run free of drifter types, as `collect_points` did for pickups.
 - **The waiting ship is not pulled (DRA-96).** The run doesn't step a waiting ship, and the pull lives in the step, so leaving the wells out of `block_ship` is all it takes to meet rule 4's "not during the respawn wait". A ship standing in a field therefore doesn't drift into the planet before the player is back in control.
