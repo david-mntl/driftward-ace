@@ -1,4 +1,4 @@
-"""Menu screen: the title, the three items with the selected one lit and bracketed, the hint.
+"""Menu screen: the title, the four items with the selected one lit and bracketed, the hint.
 
 Source: docs/contracts/systems/screens.md, Interface (ui/menu.py); 10-ui.md, `menu_screen`,
 `menu_look` and `menu_hint`. The view takes the look and the selection as a plain value and only
@@ -29,13 +29,14 @@ MENU_ITEM_TEXTS: Final[Mapping[MenuItem, str]] = MappingProxyType(
         MenuItem.PLAY: "PLAY",
         MenuItem.INSTRUCTIONS: "INSTRUCTIONS",
         MenuItem.LEADERBOARD: "LEADERBOARD",
+        MenuItem.CREDITS: "CREDITS",
     }
 )
 """Each item's label, in capitals like RETRY and MENU. 02-game-flow.md, menu_items."""
 
 
 def draw_menu(surface: pygame.Surface, look: ScreenLook, selection: MenuItem) -> None:
-    """Draw the title, the three items, the hint and the rulers onto ``surface``. Units: px.
+    """Draw the title, the items, the hint and the rulers onto ``surface``. Units: px.
 
     The title, ``title_gap``, then the items (``item_w`` by ``item_h``, ``item_gap`` apart, in
     ``MenuItem`` order) are one block, centered on both axes. ``selection`` is lit and bracketed,

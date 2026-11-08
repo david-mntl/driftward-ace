@@ -42,6 +42,7 @@ class Screen(Enum):
     MENU = "menu"
     INSTRUCTIONS = "instructions"
     LEADERBOARD = "leaderboard"
+    CREDITS = "credits"
     PLAYING = "playing"
     """The run is stepped, its last life too (`run.last_life`)."""
     PAUSED = "paused"
@@ -54,6 +55,7 @@ class MenuItem(Enum):
     PLAY = "play"
     INSTRUCTIONS = "instructions"
     LEADERBOARD = "leaderboard"
+    CREDITS = "credits"
 
 
 class GameOverChoice(Enum):
@@ -191,7 +193,7 @@ def step_flow(flow: GameFlow, keys: TickInput) -> GameFlow:
     match flow.screen:
         case Screen.MENU:
             stepped = _step_menu(idle, presses)
-        case Screen.INSTRUCTIONS | Screen.LEADERBOARD:
+        case Screen.INSTRUCTIONS | Screen.LEADERBOARD | Screen.CREDITS:
             stepped = _step_page(idle, presses)
         case Screen.PLAYING:
             stepped = _step_playing(idle, keys, presses)
@@ -250,6 +252,8 @@ def _step_menu(flow: GameFlow, presses: _Presses) -> GameFlow:
             return _enter(flow, Screen.INSTRUCTIONS)
         case MenuItem.LEADERBOARD:
             return _enter(flow, Screen.LEADERBOARD)
+        case MenuItem.CREDITS:
+            return _enter(flow, Screen.CREDITS)
 
 
 def _with_fresh_run(flow: GameFlow) -> GameFlow:
@@ -260,7 +264,7 @@ def _with_fresh_run(flow: GameFlow) -> GameFlow:
 
 
 def _step_page(flow: GameFlow, presses: _Presses) -> GameFlow:
-    """INSTRUCTIONS and LEADERBOARD: a confirm press goes back to the menu."""
+    """INSTRUCTIONS, LEADERBOARD and CREDITS: a confirm press goes back to the menu."""
     if presses.confirm:
         return _enter_menu(flow)
     return flow

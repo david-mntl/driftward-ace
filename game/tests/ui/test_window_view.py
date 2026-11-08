@@ -84,7 +84,9 @@ def parts(pygame_headless: None) -> Parts:
     return Parts()
 
 
-@pytest.mark.parametrize("screen", [Screen.MENU, Screen.INSTRUCTIONS, Screen.LEADERBOARD])
+@pytest.mark.parametrize(
+    "screen", [Screen.MENU, Screen.INSTRUCTIONS, Screen.LEADERBOARD, Screen.CREDITS]
+)
 def test_the_menu_pages_fill_the_whole_window(parts: Parts, screen: Screen) -> None:
     parts.draw(screen)
     assert parts.sentinel_left() == 0
