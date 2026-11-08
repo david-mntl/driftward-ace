@@ -233,6 +233,42 @@ def test_the_real_chain_lightning_charge_passes_at_level_8() -> None:
     assert run(chain)["telegraph"] == "PASS"
 
 
+BALL = wave(1400, {"at_px": 300, "type": "electric_ball", "x": 300})
+
+
+def _ball_charge_under_the_minimum() -> bool:
+    return bool(findings(BALL, "telegraph"))
+
+
+def test_an_exempt_drifter_type_is_left_out_of_the_telegraph_check() -> None:
+    if not _ball_charge_under_the_minimum():
+        pytest.skip("the shipped electric ball charge passes at level 8 without the exemption")
+    assert run(BALL)["telegraph"] == "FAIL"
+    exempt = Config(telegraph_exempt=frozenset({"electric_ball"}))
+    assert run(BALL, config=exempt)["telegraph"] == "PASS"
+
+
+def test_an_exemption_leaves_the_other_drifters_checked(tmp_path: Path) -> None:
+    folder = tmp_path / "tuning"
+    shutil.copytree(GAME_TUNING, folder)
+    path = folder / "drifters" / "chain_lightning.json"
+    values = json.loads(path.read_text())
+    values["charge_ticks"] = 50  # x 0.70 at level 8 = 35, under 45
+    path.write_text(json.dumps(values))
+    original = tuning_module.TUNING_DIR
+    tuning_module.TUNING_DIR = folder
+    try:
+        mixed = wave(
+            1400,
+            {"at_px": 300, "type": "chain_lightning", "x": 300, "variant": "pair_flat"},
+            {"at_px": 300, "type": "electric_ball", "x": 500},
+        )
+        exempt = Config(telegraph_exempt=frozenset({"electric_ball"}))
+        assert run(mixed, config=exempt)["telegraph"] == "FAIL"
+    finally:
+        tuning_module.TUNING_DIR = original
+
+
 # ---- config, passes, command line ---------------------------------------------------------
 
 
@@ -245,6 +281,17 @@ def test_config_rejects_a_bad_level(tmp_path: Path) -> None:
 
 def test_the_shipped_config_loads_and_tests_level_8() -> None:
     assert load_config().levels == (8,)
+
+
+def test_the_shipped_config_exempts_the_electric_ball_from_the_telegraph_check() -> None:
+    assert load_config().telegraph_exempt == frozenset({"electric_ball"})
+
+
+def test_config_rejects_an_unknown_telegraph_exempt_type(tmp_path: Path) -> None:
+    bad = tmp_path / "config.json"
+    bad.write_text(json.dumps({"telegraph_exempt": ["electric_bal"]}))
+    with pytest.raises(ValueError, match="telegraph_exempt"):
+        load_config(bad)
 
 
 def test_fingerprint_changes_with_the_wave_and_with_the_tuning(tmp_path: Path) -> None:
