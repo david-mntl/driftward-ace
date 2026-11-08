@@ -47,6 +47,7 @@ from core.ship import (
     spawn_clear,
     step,
 )
+from core.sound_cue import SoundCue
 from core.waves import WaveRun, next_run_waves, step_waves
 from core.world import SCREEN_H
 
@@ -144,6 +145,10 @@ class Run:
     level_up: LevelUpBanner | None = None
     """The level-up banner on screen, or None. Only step 9b changes it. Source: systems/run.md,
     Interface (DRA-148)."""
+
+    sound_cues: tuple[SoundCue, ...] = ()
+    """The sound cues the last stepped tick produced, in step order. () when it had none.
+    Source: systems/run.md, Interface (DRA-158)."""
 
     @property
     def last_life(self) -> bool:
@@ -340,11 +345,12 @@ def gravity_wells(drifters: Sequence[Drifter]) -> tuple[GravityWell, ...]:
 def step_run(run: Run, thrust: Thrust) -> Run:
     """Advance the run one fixed 60 Hz tick and return the new run. Never mutates the input.
 
-    Pure apart from event logging on `core.run`. Same run and thrust in, same run out.
+    Pure apart from event logging on `core.run`. Same run and thrust in, same run out. The
+    returned run's `sound_cues` holds only this tick's cues, never the ones it came in with.
     Source: systems/run.md, Rules; 15-tech-constraints.md, rule 2.
     """
     if run.game_over:
-        return hold_arrows(run, thrust)
+        return replace(hold_arrows(run, thrust), sound_cues=())
     if run.burst is not None:
         return _step_last_life(run, run.burst, thrust)
     return _step_playing(run, thrust)
@@ -397,6 +403,7 @@ def _step_playing(run: Run, thrust: Thrust) -> Run:
         invuln_ticks_left=left,
         waiting=stands,
         held=thrust,
+        sound_cues=(),
     )
     collected: Run = stepped if stands else _apply_collect(stepped)
     grazed: Run = _apply_graze(collected, may_pay=not protected and not stands)
@@ -474,6 +481,7 @@ def _apply_collect(stepped: Run) -> Run:
         drifters=tuple(drifters),
         coin_points=stepped.coin_points + points,
         popups=stepped.popups + tuple(popups),
+        sound_cues=stepped.sound_cues + (SoundCue.COIN,) * sum(collecting),
     )
 
 
@@ -482,7 +490,8 @@ def _apply_graze(stepped: Run, *, may_pay: bool) -> Run:
 
     `may_pay` is False when the ship was protected going into the tick or stands in the respawn
     wait. Each paid graze adds one to `grazes`, a graze popup after the popups steps 3a and 5a
-    left, a graze ring after the rings step 3a kept, and one log line. Nothing else changes.
+    left, a graze ring after the rings step 3a kept, a GRAZE cue and one log line. Nothing else
+    changes.
     Source: systems/run.md, Rules, step 5b.
     """
     check: GrazeCheck = check_grazes(stepped.drifters, ship_hitbox(stepped.ship), may_pay)
@@ -496,6 +505,7 @@ def _apply_graze(stepped: Run, *, may_pay: bool) -> Run:
         grazes=stepped.grazes + paid,
         popups=stepped.popups + (graze_popup(rules, stepped.ship),) * paid,
         graze_rings=stepped.graze_rings + (graze_ring(rules),) * paid,
+        sound_cues=stepped.sound_cues + (SoundCue.GRAZE,) * paid,
     )
 
 
@@ -514,16 +524,22 @@ def _apply_fall(stepped: Run, protected: bool, ground: Ground) -> Run:
         return replace(stepped, ship=_respawn_ship(ground), waiting=False)
     lives: int = stepped.lives - 1
     log.debug("life lost lives=%d", lives)
+    lost: Run = _with_hit_cue(stepped)
     if lives > 0:
         _log_respawn(fell, waits=True)
         return replace(
-            stepped,
+            lost,
             lives=lives,
             ship=_respawn_ship(ground),
             waiting=True,
             invuln_ticks_left=INVULN_TICKS,
         )
-    return _start_last_life(stepped, fell.x, SCREEN_H)
+    return _start_last_life(lost, fell.x, SCREEN_H)
+
+
+def _with_hit_cue(run: Run) -> Run:
+    """Return the run with a HIT cue appended: one per life lost (steps 6 and 7)."""
+    return replace(run, sound_cues=(*run.sound_cues, SoundCue.HIT))
 
 
 def _start_last_life(stepped: Run, burst_x: float, burst_y: float) -> Run:
@@ -532,7 +548,7 @@ def _start_last_life(stepped: Run, burst_x: float, burst_y: float) -> Run:
     `final_score` is the score so far this tick, the coin and graze of this tick included.
     `final_level` is the level the tick was flown at: the waves step that may raise it comes
     later in the tick. The ship stays where it is, the run is not over, and the tick goes on with
-    steps 8 to 10.
+    steps 8 to 10. The tick's cues gain GAME_OVER, after its HIT.
     Source: 05-lives-and-damage.md, rule 5; systems/run.md, Rules, The last life.
     """
     final: int = stepped.score
@@ -545,6 +561,7 @@ def _start_last_life(stepped: Run, burst_x: float, burst_y: float) -> Run:
         final_score=final,
         final_level=stepped.level,
         burst=start_burst(stepped.last_life_rules, burst_x, burst_y),
+        sound_cues=(*stepped.sound_cues, SoundCue.GAME_OVER),
     )
 
 
@@ -590,7 +607,7 @@ def _apply_hit(stepped: Run, protected: bool) -> Run:
         drifters.append(replace(drifter, rehit_ticks_left=drifter.rehit_cooldown_ticks))
     lives: int = stepped.lives - 1
     log.debug("life lost lives=%d", lives)
-    hit = replace(stepped, drifters=tuple(drifters), lives=lives)
+    hit = replace(_with_hit_cue(stepped), drifters=tuple(drifters), lives=lives)
     if lives > 0:
         return replace(hit, invuln_ticks_left=INVULN_TICKS)
     return _start_last_life(hit, hit.ship.x, hit.ship.y)
@@ -658,7 +675,7 @@ def _step_level_up_banner(run: Run, previous_level: int) -> Run:
         return replace(run, level_up=None)
     if waves.level_rose and waves.level_up_rules.rest_ticks > 0:
         banner: LevelUpBanner = start_level_up(waves.level_up_rules, previous_level, waves.level)
-        return replace(run, level_up=banner)
+        return replace(run, level_up=banner, sound_cues=(*run.sound_cues, SoundCue.LEVEL_UP))
     if run.level_up is None:
         return run
     return replace(run, level_up=step_level_up(run.level_up))
@@ -695,6 +712,7 @@ def _step_last_life(run: Run, burst: Burst, thrust: Thrust) -> Run:
         graze_rings=step_graze_rings(run.graze_rings),
         burst=step_burst(burst),
         held=thrust,
+        sound_cues=(),
     )
     return _end_last_life(_step_run_waves(_drop_drifters(_cool_down(stepped, drifters))))
 

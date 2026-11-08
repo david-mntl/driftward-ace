@@ -35,6 +35,7 @@ stateDiagram-v2
 | start_key | a confirm key on Play | — | — | locked | Director |
 | pause_key | a confirm key, during Playing. The same key resumes | — | — | locked | Director |
 | pause_on_focus_loss | yes | — | — | locked | Director |
+| mute_key | M. Mutes and unmutes the music only. The effects always play. Works on every screen after the start page, the pause and the game-over screen included. It never picks, moves or confirms anything. Fresh press only. The mute is not saved: every page load starts with the music on | — | — | locked | Director |
 | last_life_delay | 120 (2 s): from the ship bursting to the next screen | ticks | — | guess | Director |
 | game_over_choices | RETRY, with MENU under it. RETRY is selected first. Up and down move the selection and wrap around; a confirm key picks it | — | — | locked | Director |
 | retry_key | a confirm key on RETRY | — | — | locked | Director |
@@ -46,12 +47,13 @@ stateDiagram-v2
 4. **Leaderboard.** Opens from the menu. Shows the top 10 ([11-save-data.md](11-save-data.md)). It opens even when the list is empty or saves don't work. A confirm key goes back to the menu.
 5. **Playing.** Every run starts the same way: 5 lives, score 0, distance 0 m, Level 1, Wave 0, the ship at the center point at rest, and the scroll starting after its start delay ([03-world-and-camera.md](03-world-and-camera.md)). See [05-lives-and-damage.md](05-lives-and-damage.md) and [09-waves.md](09-waves.md).
 6. A hit or a fall inside Playing costs a life. The game stays in Playing. Invulnerability and the fall respawn happen inside it ([05-lives-and-damage.md](05-lives-and-damage.md)).
-7. **Paused.** A confirm key during Playing pauses. So does the browser tab or window losing focus. A PAUSE box shows in the middle of the screen. Everything freezes: physics, scroll, drifters, timers, invulnerability, cooldowns and the respawn wait. A confirm key resumes. Getting focus back does not resume on its own. The pause has no other options. Arrow keys do nothing while paused.
-8. **LastLife.** Entered the tick the last life is lost ([05-lives-and-damage.md](05-lives-and-damage.md) rule 5). The ship bursts and never rebuilds. The game-over sound plays as it bursts, once the game has sound ([12-art-and-audio.md](12-art-and-audio.md), AA-03). For `last_life_delay` ticks the world keeps scrolling and drifters keep moving while the particles float. Nothing can hit the ship and the score is frozen: no distance, coins or grazes count. Keys do nothing. Then the game goes to GameOver.
+7. **Paused.** A confirm key during Playing pauses. So does the browser tab or window losing focus. A PAUSE box shows in the middle of the screen. Everything freezes: physics, scroll, drifters, timers, invulnerability, cooldowns and the respawn wait. A confirm key resumes. Getting focus back does not resume on its own. The pause has no other options. Arrow keys do nothing while paused. M still works (rule 13).
+8. **LastLife.** Entered the tick the last life is lost ([05-lives-and-damage.md](05-lives-and-damage.md) rule 5). The ship bursts and never rebuilds. The game-over sound plays as it bursts, after the hit sound ([12-art-and-audio.md](12-art-and-audio.md), `sound_list`). For `last_life_delay` ticks the world keeps scrolling and drifters keep moving while the particles float. Nothing can hit the ship and the score is frozen: no distance, coins or grazes count. Keys do nothing. Then the game goes to GameOver.
 9. **Name entry.** Part of GameOver, not a screen of its own. It shows only when saves work and the run's score makes the top 10. The player picks a name and saves it with a confirm key. Until then, RETRY and MENU take no keys. Rules are in [11-save-data.md](11-save-data.md).
 10. **GameOver.** Everything is frozen. From its first frame it shows the result message for the run's place, the score, and RETRY with MENU under it. When the score makes the top 10, the letter picker shows too (rule 9). Content is in [10-ui.md](10-ui.md). The message never changes while the screen shows.
 11. **Retry.** A confirm key on RETRY starts a new run from rule 5. There is no delay. Everything resets. Retry goes straight into the run; the menu and the instructions don't show.
 12. **One press, one action.** Every confirm key counts only on a fresh press, on every screen. A key still held from the screen before does nothing on the new one. One press never does two things.
+13. **Music mute.** M mutes the music where it is. Pressing M again resumes it from the same spot, never from the start. While muted, a small icon shows ([10-ui.md](10-ui.md), `mute_icon_place`). The music plays without a break through the menu, a run, the pause and the game-over screen. Only M stops it. The effects never mute. Source: Director.
 
 ## Edge cases
 - The player saves the name and keeps the key held. The held key does not pick RETRY. They release it and press again (rule 12).
@@ -64,4 +66,4 @@ stateDiagram-v2
 - None.
 
 ## How to extend
-A new screen (settings) is a new state. Add it to the diagram and rules, give it its key in Values, and check the key against Locked decision 1 in [01-vision.md](01-vision.md): arrows fly, Enter or Space confirms.
+A new screen (settings) is a new state. Add it to the diagram and rules, give it its key in Values, and check the key against Locked decision 1 in [01-vision.md](01-vision.md): arrows fly, Enter or Space confirms, M mutes the music.

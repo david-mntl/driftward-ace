@@ -18,6 +18,7 @@ rules 1 and 2. systems/app/save-storage.md.
 """
 
 import asyncio
+import gc
 import logging
 import random
 import time
@@ -25,16 +26,25 @@ from collections.abc import Sequence
 
 import pygame
 
-from app.assets import load_background, load_hud_art, load_level_up_fonts, load_screen_fonts
+from app.assets import (
+    load_background,
+    load_hud_art,
+    load_level_up_fonts,
+    load_mute_icon,
+    load_screen_fonts,
+)
+from app.audio import AudioPlayer, load_audio
+from app.audio_tuning import AudioLevels, load_audio_levels
 from app.background_tuning import load_background_rules
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
 from app.drifter_looks_tuning import install_drifter_looks
 from app.hud_tuning import load_hud_rules
 from app.level_up_tuning import load_level_up
 from app.mode import RunMode
+from app.mute_icon_tuning import load_mute_icon_look
 from app.saves import load_saves, write_saves
 from app.screens_tuning import load_screen_rules
-from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE
+from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE, TICK_SNAP_SECONDS
 from app.ship_tuning import load_ship_look
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
 from app.waves import load_wave_book
@@ -75,6 +85,7 @@ from ui.leaderboard import draw_leaderboard
 from ui.level_up_rules import LevelUpLook
 from ui.level_up_view import LevelUpView
 from ui.menu import draw_menu
+from ui.mute_icon import MuteIconLook, MuteIconView
 from ui.pause_box import draw_pause_box
 from ui.popup_view import draw_points_popup
 from ui.screen_look import ScreenLook
@@ -141,6 +152,10 @@ async def frame_loop(mode: RunMode) -> None:
     level_up_rules: LevelUpRules
     level_up_look: LevelUpLook
     level_up_rules, level_up_look = load_level_up(hud_rules)
+    audio_levels: AudioLevels = load_audio_levels()
+    audio: AudioPlayer | None = load_audio(audio_levels)
+    mute_icon_look: MuteIconLook = load_mute_icon_look(hud_rules)
+    mute_icon_view: MuteIconView = MuteIconView(mute_icon_look, load_mute_icon(mute_icon_look))
     hud: HudView = HudView(hud_rules, load_hud_art(hud_rules), level_up_look)
     level_up_view: LevelUpView = _build_level_up_view(hud_rules, level_up_look, hud)
     saves: Saves | None = load_saves()
@@ -158,9 +173,14 @@ async def frame_loop(mode: RunMode) -> None:
     accumulator: float = 0.0
     was_capped: bool = False
     background_ticks: float = 0.0
+    if audio is not None:
+        audio.start_music()
+    _freeze_startup_heap()
     previous: float = time.perf_counter()
     while True:
-        keep_running, overlay_visible, focus_lost = _read_events(flow.run, debug, overlay_visible)
+        keep_running, overlay_visible, focus_lost = _read_events(
+            flow.run, debug, overlay_visible, audio
+        )
         if not keep_running:
             break
         focus_lost_pending = focus_lost_pending or focus_lost
@@ -179,6 +199,7 @@ async def frame_loop(mode: RunMode) -> None:
             spawn_list,
             list_plays,
             tuning,
+            audio,
         )
         was_capped = _apply_cap(accumulator, was_capped)
         if was_capped:
@@ -195,10 +216,24 @@ async def frame_loop(mode: RunMode) -> None:
             flow,
             overlay_visible,
             level_up_view,
+            mute_icon_view,
+            audio is not None and audio.music_paused,
         )
         pygame.display.flip()
         await asyncio.sleep(0)
     log.info("quit")
+
+
+def _freeze_startup_heap() -> None:
+    """Collect once, then move every object alive now out of the garbage collector's reach.
+
+    Fonts, images, tuning and modules live for the whole page. Left in, a full collection walks
+    all of them and holds a frame for about 30 ms in the browser, at a moment nobody can predict.
+    Frozen, it walks only what play makes. Source: 15-tech-constraints.md, rule 10.
+    """
+    gc.collect()
+    gc.freeze()
+    log.debug("startup heap frozen objects=%d", gc.get_freeze_count())
 
 
 def _build_level_up_view(hud_rules: HudRules, look: LevelUpLook, hud: HudView) -> LevelUpView:
@@ -212,14 +247,17 @@ def _build_level_up_view(hud_rules: HudRules, look: LevelUpLook, hud: HudView) -
     )
 
 
-def _read_events(run: Run, debug: bool, overlay_visible: bool) -> tuple[bool, bool, bool]:
+def _read_events(
+    run: Run, debug: bool, overlay_visible: bool, audio: AudioPlayer | None
+) -> tuple[bool, bool, bool]:
     """Drain the event queue. Log arrow and confirm keys with the ship's x/y, note a focus loss,
-    and toggle the overlay on F3.
+    toggle the overlay on F3 and flip the music mute on M.
 
-    F3 works in debug mode only and never reaches core. Returns (keep_running, overlay_visible,
-    focus_lost); keep_running is False on pygame.QUIT, focus_lost is True when any event in
-    FOCUS_LOST_EVENTS was read. Source: systems/app/frame-loop.md, Rules, Arrow keys, Confirm keys
-    log, Focus and Focus log.
+    F3 works in debug mode only and never reaches core. M works on every screen when there is a
+    mixer (audio is not None), on a fresh press only, and never reaches core. Returns
+    (keep_running, overlay_visible, focus_lost); keep_running is False on pygame.QUIT, focus_lost
+    is True when any event in FOCUS_LOST_EVENTS was read. Source: systems/app/frame-loop.md,
+    Rules, Arrow keys, Confirm keys log, Focus and Focus log, Music mute.
     """
     keep_running: bool = True
     focus_lost: bool = False
@@ -241,7 +279,17 @@ def _read_events(run: Run, debug: bool, overlay_visible: bool) -> tuple[bool, bo
         elif debug and event.type == pygame.KEYDOWN and event.key == pygame.K_F3:
             overlay_visible = not overlay_visible
             log.debug("overlay visible=%s", overlay_visible)
+        elif audio is not None and event.type == pygame.KEYDOWN and event.key == pygame.K_m:
+            _toggle_mute(audio)
     return keep_running, overlay_visible, focus_lost
+
+
+def _toggle_mute(audio: AudioPlayer) -> None:
+    """Resume the music if it is paused, else pause it. The player logs the change."""
+    if audio.music_paused:
+        audio.resume_music()
+    else:
+        audio.pause_music()
 
 
 def _held_keys() -> tuple[Thrust, bool]:
@@ -270,22 +318,29 @@ def _run_ticks(
     spawn_list: DebugSpawnList | None,
     list_plays: bool,
     tuning: DrifterTuning,
+    audio: AudioPlayer | None,
 ) -> tuple[GameFlow, float, bool]:
     """Run one tick per whole TICK_SECONDS in the accumulator, at most MAX_TICKS_PER_FRAME.
+
+    A tick runs when the accumulator is within TICK_SNAP_SECONDS of a whole tick; the
+    accumulator may then go slightly below 0, and the next frame pays it back.
 
     Each tick is one step_flow call; a pending focus loss reaches the first tick only. Right after
     it the due placements go in through one add_flow_drifters call: the spawn list's when
     list_plays, else the run's waves'. Never both. Then the saves are written if that tick saved
-    an entry (_write_saves). Returns (flow, accumulator left, focus loss
+    an entry (_write_saves). Right after step_flow, when the flow stepped the run, the tick's sound
+    cues play (audio, None when there is no mixer). Returns (flow, accumulator left, focus loss
     still pending: True only when no tick ran). Source: 15-tech-constraints.md, rules 2 and 7;
     systems/app/frame-loop.md, Rules, Focus and Tick.
     """
     ticks: int = 0
-    while accumulator >= TICK_SECONDS and ticks < MAX_TICKS_PER_FRAME:
+    while accumulator >= TICK_SECONDS - TICK_SNAP_SECONDS and ticks < MAX_TICKS_PER_FRAME:
         flow = step_flow(
             flow, TickInput(thrust=thrust, confirm=confirm, focus_lost=focus_lost_pending)
         )
         focus_lost_pending = False
+        if audio is not None and flow.run_stepped:
+            audio.play_cues(flow.run.sound_cues)
         due: Sequence[Placement] = (
             debug_spawns_due(spawn_list, flow.run.scroll.ticks)
             if spawn_list is not None and list_plays
@@ -334,6 +389,8 @@ def _draw(
     flow: GameFlow,
     overlay_visible: bool,
     level_up_view: LevelUpView | None = None,
+    mute_icon_view: MuteIconView | None = None,
+    music_muted: bool = False,
 ) -> None:
     """Draw the screen the flow shows on the window.
 
@@ -341,7 +398,9 @@ def _draw(
     then the page alone, with no world, overlay, HUD or frame. Playing, paused and game over draw
     the background and the run's world on `field`, the play area (_draw_run), then the panel and
     frame on the window. Paused and game over then dim the whole window and draw their box centered
-    on it. Source: systems/app/frame-loop.md, Rules, Draw; systems/game-flow.md, Presentation.
+    on it. The mute icon (when `music_muted`) goes in before the dim, so the dim darkens it and the
+    boxes sit over it; on the three pages it is the last call. Source:
+    systems/app/frame-loop.md, Rules, Draw and The mute icon; systems/game-flow.md, Presentation.
     """
     if flow.screen in _RUN_SCREENS:
         draw_background(field, background, background_ticks)
@@ -353,6 +412,8 @@ def _draw(
         hud.draw(window, flow.run, flow.best, int(background_ticks), level_up=banner)
         if level_up_view is not None:
             level_up_view.draw_flight(window, banner)
+        if mute_icon_view is not None:
+            mute_icon_view.draw(window, music_muted)
         if flow.screen is Screen.PAUSED:
             hud.dim(window)
             draw_pause_box(window, look)
@@ -367,6 +428,8 @@ def _draw(
         draw_instructions(window, look)
     elif flow.screen is Screen.LEADERBOARD:
         draw_leaderboard(window, look, flow.leaderboard)
+    if mute_icon_view is not None:
+        mute_icon_view.draw(window, music_muted)
 
 
 def _draw_run(
