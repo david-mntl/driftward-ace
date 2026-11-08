@@ -33,6 +33,7 @@ from core.game_flow import GameFlow, Screen, TickInput, start_flow, step_flow
 from core.level_up import LevelUpBanner, LevelUpRules
 from core.run import Run, next_run, start_run, step_run
 from core.ship import Ship, Thrust
+from core.sound_cue import SoundCue
 from core.waves import (
     LevelPlaylist,
     Wave,
@@ -325,6 +326,19 @@ def test_the_cue_is_true_on_the_rise_state_only_and_a_rest_of_0_has_no_banner_an
             assert state.level_up_cue is False, tick
             assert state.hud_level == state.level, tick
     assert timeline(RISE + 5, rules=OFF)[RISE].level == 2
+
+
+def test_the_level_up_sound_cue_is_on_the_rise_state_only_and_never_with_a_rest_of_0() -> None:
+    climb: list[Run] = timeline(400, climb_book())
+    cued: list[int] = [
+        tick for tick, state in enumerate(climb) if SoundCue.LEVEL_UP in state.sound_cues
+    ]
+    assert cued == rises(climb)
+    for tick in cued:
+        assert climb[tick].sound_cues.count(SoundCue.LEVEL_UP) == 1
+    for rules in (OFF, None):
+        for state in timeline(400, climb_book(), rules):
+            assert SoundCue.LEVEL_UP not in state.sound_cues
 
 
 def test_the_hud_shows_the_previous_level_until_the_arrival_age_then_the_real_level() -> None:
