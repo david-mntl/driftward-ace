@@ -1,6 +1,6 @@
 """The wave_check config: `config.json` next to this file, owned by the Director.
 
-Part 1 reads `levels`, `skip`, `start_spots`, `limits` and `track_ticks_max`. The bot check
+Part 1 reads `levels`, `skip`, `telegraph_exempt`, `start_spots`, `limits` and `track_ticks_max`. The bot check
 (`--bot`) also reads `bot`. `limits.gap_min_ship_widths` is for the gap check, not built yet. A key
 left out keeps the default below, which are the GDD's values (09-waves.md, Values) or, for `bot`,
 the tool's own starting values.
@@ -10,6 +10,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from core.drifters.base import DrifterType
 
 CONFIG_FILE: Path = Path(__file__).resolve().parent / "config.json"
 
@@ -47,6 +49,8 @@ class Config:
     levels: tuple[int, ...] = DEFAULT_LEVELS
     skip: frozenset[str] = frozenset()
     """Wave ids that are never checked."""
+    telegraph_exempt: frozenset[str] = frozenset()
+    """Drifter types the telegraph check leaves out. Every other check still runs on them."""
     start_spots: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_SPOTS))
     """Ship x at the start of a wave, by name. The ship's y is the game's spawn y."""
     seam_clear_px: float = 120.0
@@ -78,6 +82,10 @@ def load_config(path: Path = CONFIG_FILE) -> Config:
     skip: Any = data.get("skip", [])
     if not isinstance(skip, list) or not all(isinstance(item, str) for item in skip):
         raise ValueError(f"{path.name}: skip must be a list of wave ids")
+    exempt: Any = data.get("telegraph_exempt", [])
+    known: set[str] = {kind.value for kind in DrifterType}
+    if not isinstance(exempt, list) or not all(item in known for item in exempt):
+        raise ValueError(f"{path.name}: telegraph_exempt must be a list of drifter types")
     spots: Any = data.get("start_spots", DEFAULT_SPOTS)
     if (
         not isinstance(spots, dict)
@@ -94,6 +102,7 @@ def load_config(path: Path = CONFIG_FILE) -> Config:
     return Config(
         levels=tuple(levels),
         skip=frozenset(skip),
+        telegraph_exempt=frozenset(exempt),
         start_spots={name: float(x) for name, x in spots.items()},
         seam_clear_px=_number(path, limits, "seam_clear_px", 120.0),
         coin_near_ship_widths=_number(path, limits, "coin_near_ship_widths", 3.0),

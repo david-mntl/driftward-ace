@@ -144,14 +144,21 @@ def _telegraph(
 
 
 def check_telegraph(ctx: Context) -> Result:
-    """Every telegraph lasts at least telegraph_min ticks at this level, before the game's floor."""
+    """Every telegraph lasts at least telegraph_min ticks at this level, before the game's floor.
+
+    A drifter type in the config's `telegraph_exempt` is left out and named in the note.
+    """
     minimum: int = ctx.tuning.hazards.telegraph_min_ticks
     found: list[Finding] = []
     seen: set[str] = set()
     plain: set[DrifterType] = set()
+    exempt: set[str] = set()
     for track in ctx.tracks:
         drifter_type: DrifterType = track.item.placement.drifter_type
         if drifter_type in seen or drifter_type in plain:
+            continue
+        if drifter_type.value in ctx.config.telegraph_exempt:
+            exempt.add(drifter_type.value)
             continue
         telegraph: tuple[int, str] | None = _telegraph(ctx.tuning, ctx.level, drifter_type)
         if telegraph is None:
@@ -170,6 +177,8 @@ def check_telegraph(ctx: Context) -> Result:
                 )
             )
     note: str = f"telegraph_min {minimum} ticks; checked: {', '.join(sorted(t.value for t in seen)) or 'none in this wave'}"
+    if exempt:
+        note += f"; exempt: {', '.join(sorted(exempt))}"
     return _result("telegraph", f"telegraph >= {minimum} ticks", found, note)
 
 
