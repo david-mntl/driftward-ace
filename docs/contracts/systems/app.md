@@ -13,7 +13,7 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 |---|---|---|---|
 | [debug-spawns](app/debug-spawns.md) | Interface, Rules | you change the debug spawn list: its file, checks, rows or timing. | 13.1 KB |
 | [error-handling](app/error-handling.md) | Interface, Presentation, Rules | you change the error guard or the error screen. | 5.4 KB |
-| [frame-loop](app/frame-loop.md) | Interface, Rules | you change the frame loop: ticks, keys, draw order, the catch-up cap. | 25.3 KB |
+| [frame-loop](app/frame-loop.md) | Interface, Rules | you change the frame loop: ticks, keys, draw order, the catch-up cap. | 26.5 KB |
 | [general](app/general.md) | Purpose, Interface | you want the overview of the app, or a rule that fits no area. | 4.7 KB |
 | [integration-checks/DRA-104](app/integration-checks/DRA-104.md) | Rules | you run or extend the browser checks for the UFO (DRA-104). | 7.6 KB |
 | [integration-checks/DRA-111](app/integration-checks/DRA-111.md) | Rules | you run or extend the browser checks for the electric ball (DRA-111). | 7.8 KB |
@@ -23,7 +23,7 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 | [integration-checks/DRA-13](app/integration-checks/DRA-13.md) | Rules | you run or extend the browser checks for the scroll, the starfield and the HUD (DRA-13). | 2.4 KB |
 | [integration-checks/DRA-148](app/integration-checks/DRA-148.md) | Rules | you run or extend the browser checks for the level-up moment (DRA-148). | 5.3 KB |
 | [integration-checks/DRA-158](app/integration-checks/DRA-158.md) | Rules | you run or extend the browser checks for the game audio, first iteration (DRA-158). | 3.7 KB |
-| [integration-checks/DRA-159](app/integration-checks/DRA-159.md) | Rules | you run or extend the browser checks for the music mute (DRA-159). | 3.7 KB |
+| [integration-checks/DRA-159](app/integration-checks/DRA-159.md) | Rules | you run or extend the browser checks for the music mute (DRA-159). | 5.2 KB |
 | [integration-checks/DRA-19](app/integration-checks/DRA-19.md) | Rules | you run or extend the browser checks for the review follow-ups (no new gameplay) (DRA-19). | 1.2 KB |
 | [integration-checks/DRA-23](app/integration-checks/DRA-23.md) | Rules | you run or extend the browser checks for the run: lives, hits and game over (DRA-23). | 4.9 KB |
 | [integration-checks/DRA-29](app/integration-checks/DRA-29.md) | Rules | you run or extend the browser checks for the drifter base, the meteorite and the debug spawn list (DRA-29). | 7.7 KB |

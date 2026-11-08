@@ -8,7 +8,7 @@ Status: open
 Linear: DRA-164
 
 ## Read in the contract
-- mute-icon.md: Interface, game/ui/mute_icon.py; Rules, Look (2 and 5); Rules, Placement (6, 8 and 9); Rules, Loading (15); Rules, Cost (18)
+- mute-icon.md: Interface, game/ui/mute_icon.py, Rules, Look, Its size on screen, It blinks, Placement, The icon sits in the bottom-right corner, It adds no text anywhere, It never covers a pixel of the play area, Loading, The icon's rectangle must lie inside the window, Cost, Cheap to draw
 
 ## Builds
 - `game/tests/ui/test_mute_icon.py` (new)

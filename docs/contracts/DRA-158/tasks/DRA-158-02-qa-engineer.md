@@ -8,7 +8,7 @@ Status: open
 Linear: DRA-161
 
 ## Read in the contract
-- run.md: Interface, DRA-158: the sound cues; Rules, Sound cues; steps 5a, 5b, 6 and 7; The last life; A last-life tick
+- run.md: Interface, DRA-158: the sound cues, Rules, Sound cues, step 5a, step 5b, step 6, step 7, The last life, A last-life tick
 - game-flow.md: Rules, `run_stepped`
 
 ## Builds

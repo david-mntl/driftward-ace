@@ -8,7 +8,7 @@ Status: open
 Linear: DRA-162
 
 ## Read in the contract
-- mute-icon.md: Interface, The picture; Interface, game/tuning/mute_icon.json; Rules, Look (1 to 5); Rules, Cost (18); Rationale, A picture, baked from tuning
+- mute-icon.md: Interface, The picture, game/tuning/mute_icon.json, Rules, Look, Cost, Cheap to draw, Rationale, A picture, baked from tuning
 - mute_icon.schema.json: `size`, `speaker_color`, `slash_color`
 
 ## Builds

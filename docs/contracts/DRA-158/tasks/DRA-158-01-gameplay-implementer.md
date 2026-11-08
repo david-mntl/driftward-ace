@@ -8,8 +8,8 @@ Status: open
 Linear: DRA-160
 
 ## Read in the contract
-- audio.md: Interface (`game/core/sound_cue.py`), Rules 1 to 4
-- run.md: Interface, DRA-158: the sound cues; Rules, Sound cues; steps 5a, 5b, 6 and 7; The last life; A last-life tick; A game-over tick; `hold_arrows`; `next_run`
+- audio.md: Interface, `game/core/sound_cue.py`, Rules, Which sounds
+- run.md: Interface, DRA-158: the sound cues, Rules, Sound cues, step 5a, step 5b, step 6, step 7, The last life, A last-life tick, A game-over tick, `hold_arrows`, `next_run`
 
 ## Builds
 - `game/core/sound_cue.py` (new): `SoundCue`
