@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/mute_icon.schema.json",
+  "title": "Mute icon",
+  "description": "The file game/tuning/mute_icon.json: the muted-music icon's margin, its size and its two colors, read in both run modes. DRA-159. The file must exist and every field is required: nothing has a default in code. The values are the GDD's mute_icon_look (10-ui.md, guess); the colors are picks from the palettes in 12-art-and-audio.md. margin and size are read by game/app/mute_icon_tuning.py at startup into ui.mute_icon.MuteIconLook; size and both colors are also read by tools/art/mute_icon.py, which bakes assets/mute_icon.png from them. Rules the schema cannot express are in docs/contracts/systems/mute-icon.md, Rules, Loading (the icon's rectangle lies inside the window and does not touch the play area). Owner of the schema: architect. Contract: docs/contracts/systems/mute-icon.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "margin",
+    "size",
+    "speaker_color",
+    "slash_color"
+  ],
+  "properties": {
+    "margin": {
+      "description": "Distance in px from the window's right edge and from its bottom edge to the icon. An integer, never a bool. Maps to MuteIconLook.margin. GDD: mute_icon_look.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "size": {
+      "description": "Width and height of the icon in px on screen. The picture assets/mute_icon.png must be exactly this size. An integer, never a bool. Maps to MuteIconLook.size. GDD: mute_icon_look.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "speaker_color": {
+      "description": "The speaker's color: a pale violet-white from the palettes in 12-art-and-audio.md, as #rrggbb. Read by tools/art/mute_icon.py only. GDD: mute_icon_look.",
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "slash_color": {
+      "description": "The slash's color: a fuchsia from the palettes in 12-art-and-audio.md, as #rrggbb. Read by tools/art/mute_icon.py only. GDD: mute_icon_look.",
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    }
+  }
+}

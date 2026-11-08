@@ -1,0 +1,11 @@
+{
+  "music_master": 80,
+  "effects_master": 80,
+  "loop_level": 100,
+  "hit_level": 100,
+  "graze_level": 25,
+  "coin_level": 83,
+  "game_over_level": 100,
+  "level_up_level": 60,
+  "effect_channels": 8
+}

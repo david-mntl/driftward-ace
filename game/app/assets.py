@@ -12,6 +12,7 @@ from ui.hud import HEART_CELL_COUNT, HudArt
 from ui.hud_rules import HudRules
 from ui.level_up_rules import LevelUpLook
 from ui.level_up_view import LevelUpFonts
+from ui.mute_icon import MuteIconLook
 from ui.screen_rules import ScreenRules
 
 log = logging.getLogger(__name__)
@@ -32,6 +33,10 @@ layer."""
 PLANET_FILES: tuple[str, ...] = tuple(f"bg_planet_{index}.png" for index in range(6))
 """The broken planets of the middle layer, each cut to its own bounds. Source:
 12-art-and-audio.md, Background, middle layer."""
+
+
+MUTE_ICON_PICTURE: str = "mute_icon.png"
+"""The muted-music icon's picture, in ASSETS_DIR. Baked by tools/art/mute_icon.py."""
 
 
 def load_background(rules: BackgroundRules) -> BackgroundArt:
@@ -162,3 +167,20 @@ def load_level_up_fonts(hud_rules: HudRules, look: LevelUpLook) -> LevelUpFonts:
         hud_rules.fonts.label_file,
     )
     return fonts
+
+
+def load_mute_icon(look: MuteIconLook) -> pygame.Surface:
+    """Load the muted-music picture with its alpha and check it is look.size square.
+
+    Call it once, after the display is open. A missing file raises FileNotFoundError (from
+    pygame). A wrong size raises ValueError naming the file, the size found and the size expected.
+    Source: docs/contracts/systems/mute-icon.md, Interface and Rules 16.
+    """
+    image: pygame.Surface = _load(MUTE_ICON_PICTURE, True)
+    expected: tuple[int, int] = (look.size, look.size)
+    if image.get_size() != expected:
+        raise ValueError(
+            f"assets/{MUTE_ICON_PICTURE}: size is {image.get_size()}, expected {expected} "
+            "(tuning/mute_icon.json); run tools/art/mute_icon.py"
+        )
+    return image

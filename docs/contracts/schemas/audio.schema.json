@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/audio.schema.json",
+  "title": "Audio levels",
+  "description": "The file game/tuning/audio.json: the music's and the effects' levels and the number of effect channels, read in both run modes. DRA-158. The file must exist and every field is required: nothing has a default in code. The levels are the GDD's audio_levels (12-art-and-audio.md, guess); a sound's loudness is its master times its own level, both in percent. effect_channels is the Architect's pick (scope report DRA-158, Values needed), not in the GDD. Loaded and checked by game/app/audio_tuning.py at startup into AudioLevels. Owner of the schema: architect. Contract: docs/contracts/systems/audio.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "music_master",
+    "effects_master",
+    "loop_level",
+    "hit_level",
+    "graze_level",
+    "coin_level",
+    "game_over_level",
+    "level_up_level",
+    "effect_channels"
+  ],
+  "properties": {
+    "music_master": {
+      "description": "The music's master level, percent. Loudness of the loop is this times loop_level. An int or a float, never a bool. Maps to AudioLevels.music_master. GDD: audio_levels (music master).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "effects_master": {
+      "description": "The effects' master level, percent. Loudness of an effect is this times its own level. An int or a float, never a bool. Maps to AudioLevels.effects_master. GDD: audio_levels (effects master).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "loop_level": {
+      "description": "The music loop's own level, percent. An int or a float, never a bool. Maps to AudioLevels.loop_level. GDD: audio_levels (loop).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "hit_level": {
+      "description": "The hit effect's own level, percent. Never above 100: a louder hit is a louder file. An int or a float, never a bool. Maps to AudioLevels.hit_level. GDD: audio_levels (hit).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "graze_level": {
+      "description": "The graze effect's own level, percent. An int or a float, never a bool. Maps to AudioLevels.graze_level. GDD: audio_levels (graze).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "coin_level": {
+      "description": "The coin effect's own level, percent. An int or a float, never a bool. Maps to AudioLevels.coin_level. GDD: audio_levels (coin).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "game_over_level": {
+      "description": "The game-over effect's own level, percent. Never above 100: a louder sound is a louder file. An int or a float, never a bool. Maps to AudioLevels.game_over_level.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "level_up_level": {
+      "description": "The level-up effect's own level, percent. An int or a float, never a bool. Maps to AudioLevels.level_up_level.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "effect_channels": {
+      "description": "How many effects can sound at once. A cue that finds no free channel is dropped; a playing sound is never cut. Maps to AudioLevels.effect_channels. Not in the GDD: the Architect's pick (scope report DRA-158, Values needed).",
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
