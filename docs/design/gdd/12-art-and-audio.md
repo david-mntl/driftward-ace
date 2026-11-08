@@ -55,6 +55,18 @@ Measured 2026-11-06 in a browser build (Chromium, desktop), wave 4 at Level 2: u
 
 The fix made the collision and graze checks skip far-apart shapes. Every result is the same as before. The background and the HUD together cost about 8 to 10 ms of every frame, even with nothing on the field.
 
+### Stutter check
+Measured 2026-11-08 in a browser build (Chromium, headless, desktop), music and sounds on, a ship that never dies, the waves from the start, 120 s per run. A stutter is one frame that takes far longer than 16.7 ms: the picture holds, then jumps.
+
+| Measure | Old loop | New loop (decision 149) |
+|---|---|---|
+| Garbage-collector freeze, longest | 38 and 56 ms (one in every run) | under 1 ms |
+| Frames over 40 ms, per 2 minutes | 69 and 79 | 61 and 55 |
+| Frames that ran 3 to 5 catch-up ticks | 64 and 66 | none |
+| Game speed | 60 ticks/s | 59.5 ticks/s |
+
+Each slow frame made the next one run extra ticks, which made it slow too: every freeze over 70 ms followed one. The game speed dips a little because time owed past 2 ticks is dropped. A blank page doing the same amount of work stuttered zero times on the same machine. The stutters left come from the test machine's own CPU stalls, so the numbers say more about the change than about a player's PC. Every frame still spends about 10 ms of its 16.7 on the game, so a short stall anywhere can drop one.
+
 ### Color language
 | Color | Means | Used on |
 |---|---|---|
