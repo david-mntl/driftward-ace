@@ -428,3 +428,48 @@ The loader refuses a file that breaks one of these, and names the fields:
 
 To make the banner longer, raise `level_up_rest` first, then `banner_ticks`, then move the later ages (`close_*`, `hold.*`, `fly.start`, `arrival_tick`) to match.
 
+
+---
+
+# audio.json
+
+How loud the music and the sound effects are. The loader is `game/app/audio_tuning.py`. The schema is `docs/contracts/schemas/audio.schema.json`.
+
+The file must exist and every field is required. Nothing has a default in code. A missing field, an unknown field, a value out of range or a bad type shows the error screen with the file and the field.
+
+A sound's loudness is its master times its own level. Both are percents. Muting a sound is `0`. The game never sets a volume above 100%: if a sound is too quiet at 100, the file itself has to be made louder.
+
+## Fields
+
+| Field | Value now | Range | What it does |
+|---|---|---|---|
+| `music_master` | `80` | 0 to 100 | Master level of the music. |
+| `effects_master` | `80` | 0 to 100 | Master level of every effect. |
+| `loop_level` | `100` | 0 to 100 | Level of the music loop, under the music master. |
+| `hit_level` | `100` | 0 to 100 | Level of the hit sound, played on every life lost. |
+| `graze_level` | `25` | 0 to 100 | Level of the graze sound. |
+| `coin_level` | `83` | 0 to 100 | Level of the coin sound. |
+| `game_over_level` | `100` | 0 to 100 | Level of the game-over sound, played as the ship bursts on the last life, after the hit. |
+| `level_up_level` | `60` | 0 to 100 | Level of the level-up sound, played when the level-up banner starts. |
+| `effect_channels` | `8` | whole number, 1 or more | How many effects can sound at once. When all are busy, a new sound is dropped. A playing sound is never cut. |
+
+The sound files are in `game/assets/audio/`: `music_loop.ogg`, `sfx_hit.ogg`, `sfx_graze.ogg`, `sfx_coin.ogg`, `sfx_game_over.ogg` and `sfx_level_up.ogg`. They are read once at startup.
+
+---
+
+# mute_icon.json
+
+The small icon that shows while the music is muted (M key). A speaker with a slash, in the bottom-right corner of the window. The loader is `game/app/mute_icon_tuning.py`. The schema is `docs/contracts/schemas/mute_icon.schema.json`.
+
+The file must exist and every field is required. An unknown field, a missing field, a bad type, or an icon that would touch the play area or leave the window shows the error screen with the file and the field.
+
+## Fields
+
+| Field | Value now | Range | What it does |
+|---|---|---|---|
+| `margin` | `8` | whole number, 0 or more | Distance in px from the window's right edge and from its bottom edge to the icon. |
+| `size` | `24` | whole number, 1 or more | Width and height of the icon on screen, in px. The picture `game/assets/mute_icon.png` must be exactly this size. |
+| `speaker_color` | `"#f4f1ff"` | `#rrggbb` | Color of the speaker. Only the art script reads it. |
+| `slash_color` | `"#ff00ae"` | `#rrggbb` | Color of the slash. Only the art script reads it. |
+
+The colors are baked into the picture. After you change a color or `size`, run `python tools/art/mute_icon.py --ship` to redraw it. Changing `margin` needs no redraw.

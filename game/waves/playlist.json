@@ -11,36 +11,51 @@
     {
       "fixed": [
         "w3_lvl2_satellite",
-        "w4_lvl2_satellite",
+        "w7_lvl2_satellite",
         "w5_lvl2_mix"
       ],
-      "random_count": 1
+      "random_count": 0
     },
     {
       "fixed": [
-        "w6_lvl3_chain_lightning"
+        "w8_lvl3_electric_ball",
+        "w9_lvl3_electric_ball"
       ],
       "random_count": 0
     },
     {
-      "fixed": [],
+      "fixed": [
+        "w10_lvl4_island_lanes",
+        "w11_lvl4_island"
+      ],
       "random_count": 0
     },
     {
-      "fixed": [],
+      "fixed": [
+        "w6_lvl5_chain_lightning",
+        "w13_lvl5_chain_gauntlet"
+      ],
       "random_count": 0
     },
     {
-      "fixed": [],
+      "fixed": [
+        "w14_lvl6_planet_slalom",
+        "w15_lvl6_planet_gates"
+      ],
       "random_count": 0
     },
     {
-      "fixed": [],
+      "fixed": [
+        "w16_lvl7_ufo_stream",
+        "w17_lvl7_ufo_pairs"
+      ],
       "random_count": 0
     },
     {
-      "fixed": [],
-      "random_count": 0
+      "fixed": [
+        "w4_lvl8_satellite"
+      ],
+      "random_count": 6
     }
   ]
 }

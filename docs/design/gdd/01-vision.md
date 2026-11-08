@@ -28,7 +28,7 @@ Every decision gets checked against these three. A design that breaks one is wro
 ## Locked decisions
 Do not reopen. Changing one needs the Director's explicit go-ahead and a row in [91-decision-log.md](91-decision-log.md). Details live in the linked file.
 
-1. Arrow keys fly the ship; nothing else does. Enter or Space confirms in menus, pauses and resumes, and starts a new run. No other keys. [02-game-flow.md](02-game-flow.md)
+1. Arrow keys fly the ship; nothing else does. Enter or Space confirms in menus, pauses and resumes, and starts a new run. The one other key is M: it mutes and unmutes the music and never touches play. No other keys. [02-game-flow.md](02-game-flow.md)
 2. The screen is fixed and never follows the ship. The world scrolls down past it at a steady speed set by the level, and distance counts that scroll. Falling off the floor (the bottom edge) costs a life. [03-world-and-camera.md](03-world-and-camera.md)
 3. Side walls are solid. They stop the ship with no bounce. [03-world-and-camera.md](03-world-and-camera.md)
 4. Every game rule runs on a fixed 60 Hz tick. Gravity is always on. Horizontal velocity has drag. Fall speed is capped. [04-ship.md](04-ship.md)

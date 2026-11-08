@@ -15,12 +15,12 @@ A single glowing ball falls from the top. It charges, and a faint ring shows how
 | variants | one: standard | — | — | guess | Director |
 | default_variant | standard | — | — | guess | Director |
 | ball_size | 16, a circle | px | — | guess | Director |
-| pulse_radius | 64, from the ball's center (128 px across, the chain lightning's node spacing) | px | — | guess | Director |
+| pulse_radius | 40, from the ball's center (80 px across) | px | — | guess | Director (64 until 2026-11-08) |
 | hitbox | while firing only: one circle, radius `pulse_radius`. The ball has none | px | — | guess | Director |
 | speed_ratio | 0.375 × the ship's top sideways speed ([../04-ship.md](../04-ship.md), derived values), straight down. Its own number; it only starts equal to the chain lightning's | — | — | guess | Director |
 | speed | ≈ 2.5 at Level 1, from `speed_ratio` and the current ship guesses | px/tick | — | guess | derived |
-| charge_ticks | 120 (2 s) | ticks | — | guess | Director (same as chain lightning) |
-| fire_ticks | 120 (2 s). Timer × never shortens it | ticks | — | guess | Director (same as chain lightning) |
+| charge_ticks | 50 (0.83 s). At Level 8 the game's floor holds it at `telegraph_min` (rule 7) | ticks | — | guess | Director (120 until 2026-11-08) |
+| fire_ticks | 50 (0.83 s). Timer × never shortens it | ticks | — | guess | Director (120 until 2026-11-08) |
 | cycle | charge, fire, charge, fire… until it leaves. No pause besides the charge | — | — | locked | Director |
 | entry_warning_ticks | the shared value ([../07-drifters.md](../07-drifters.md)) | ticks | — | — | 07-drifters.md |
 | telegraph | the charge: blue rays grow around the ball, more and faster as the charge fills, and a faint outline of the pulse circle brightens with them. It shows when and exactly where the strike lands | — | — | locked | Director |
@@ -41,7 +41,7 @@ A single glowing ball falls from the top. It charges, and a faint ring shows how
 7. **Scales:** `speed` × the level's hazard speed; `charge_ticks` × the level's Timer ×, never below `telegraph_min` ([../08-difficulty.md](../08-difficulty.md)). `fire_ticks` and `pulse_radius` never scale.
 8. **Placing:** its x. `invert` has no effect.
 9. **Looks and sounds:** placeholder until the look is drawn. The firing look stays inside the pulse circle, so the hitbox is never bigger than what the player sees. Sound: none yet.
-10. **wave_check notes:** the charge at Level 8 (120 × 0.70 = 84 ticks) must stay ≥ `telegraph_min`. The circle counts as a hazard for the bot's path only while firing.
+10. **wave_check notes:** the electric ball is left out of the telegraph check. Its charge at Level 8 (50 × 0.70 = 35 ticks) is under `telegraph_min`, and in play the game's floor holds it at `telegraph_min` (rule 7). Every other check still runs on it. The circle counts as a hazard for the bot's path only while firing.
 
 ## Edge cases
 - The ship touches the firing circle while invulnerable: no hit, the circle keeps firing.

@@ -15,7 +15,8 @@ The game is Python built for the browser. These limits are hard: breaking one br
 | hosting | static only: itch.io, GitHub Pages as backup | — | — | locked | Director |
 | tick_rate | 60 | ticks/s | — | locked | Director |
 | audio_format | .ogg only | — | — | locked | Director |
-| max_ticks_per_frame | 5 | ticks | — | guess | Director. Time owed beyond this is dropped, so the game carries on after a pause instead of jumping ahead |
+| max_ticks_per_frame | 2 | ticks | — | guess | Director (5), lowered to 2 on 2026-11-08 (decision 149). Time owed beyond this is dropped, so the game carries on after a pause instead of jumping ahead, and one late frame can't snowball |
+| tick_snap | 0.002 | s | 0 to 0.005 | guess | Decision 149. A frame this close to a whole tick still runs it, so a frame that comes a hair early never shows the same picture twice |
 | run_mode_default | normal | — | — | locked | Director |
 | debug_switch_browser | URL parameter `debug=1` | — | — | locked | Director |
 | debug_switch_desktop | environment variable `DRIFTWARD_DEBUG=1` | — | — | locked | Director |
@@ -36,6 +37,7 @@ The game is Python built for the browser. These limits are hard: breaking one br
 7. **Run modes.** Normal by default. Debug is chosen once, at launch, by one of the debug switches. Game rules are the same in both modes; debug only adds logs, the debug overlay ([10-ui.md](10-ui.md)) and a test spawn list that places drifters for testing.
 8. **Errors never freeze the page.** An unexpected error is logged with its full trace and shows the error screen ([10-ui.md](10-ui.md)).
 9. **Logging.** Log by event, never by tick: a line every tick floods the console and slows the game (rule 5).
+10. **No garbage-collector freezes.** Everything loaded before the first frame is taken out of Python's garbage collector (collected once, then frozen). A full collection over the whole startup memory holds one frame for 30 to 60 ms in the browser, at a random moment.
 
 ## Edge cases
 - A library or file type not listed here: assume it may not work in pygbag until a browser build proves it does.

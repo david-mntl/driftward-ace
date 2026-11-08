@@ -36,7 +36,8 @@ The player never reads this. It gives the art a feeling to aim at.
 | background | three layers, described below | — | — | guess | Director |
 | background_numbers | painting sway loop 900; planets on screen 3; planet speed 0.15; planet size ×1; river light specks 30 at most; river loop 900; river and swirl strength 0.6; swirl specks 8; swirl loop 480; bottom glow 40 tall, strength 0.25. The near layer has no numbers yet: it is not built | ticks; planets; px/tick; ×; specks; ticks; 0..1; specks; ticks; px; 0..1 | see tuning file | guess | AA-02, Director: use guesses, tune later |
 | audio_format | see [15-tech-constraints.md](15-tech-constraints.md#values) | — | — | locked | — |
-| sound_list | TBD | — | — | TBD | AA-03 |
+| sound_list | the first set. One looping song, a lo-fi guitar loop of about 78 s, plays from the menu on and carries on into the run. Five effects: hit (every life lost, by a drifter or by a fall), graze (a graze pays), coin (a coin is collected), game over (plays as the ship bursts on the last life, after the hit) and level up (plays when the level-up banner starts; the first 8 s of the picked track, with a 0.4 s fade-out). Effects may overlap. No sound for menus or buttons | — | — | guess | Director (audition, 2026-11-07) |
+| audio_levels | music master 80, effects master 80. Per sound: loop 100, hit 100, graze 25, coin 83, game over 100, level up 60. A sound's loudness is its master times its own level. The hit may need a louder file if 100 is too quiet | % | 0–100 | guess | Director (audition, 2026-11-07) |
 | particle_cap | TBD | particles | — | TBD | AA-04 |
 
 ### Frame-rate check
@@ -53,6 +54,18 @@ Measured 2026-11-06 in a browser build (Chromium, desktop), wave 4 at Level 2: u
 | of which HUD | not split | 3 ms | 4 ms |
 
 The fix made the collision and graze checks skip far-apart shapes. Every result is the same as before. The background and the HUD together cost about 8 to 10 ms of every frame, even with nothing on the field.
+
+### Stutter check
+Measured 2026-11-08 in a browser build (Chromium, headless, desktop), music and sounds on, a ship that never dies, the waves from the start, 120 s per run. A stutter is one frame that takes far longer than 16.7 ms: the picture holds, then jumps.
+
+| Measure | Old loop | New loop (decision 149) |
+|---|---|---|
+| Garbage-collector freeze, longest | 38 and 56 ms (one in every run) | under 1 ms |
+| Frames over 40 ms, per 2 minutes | 69 and 79 | 61 and 55 |
+| Frames that ran 3 to 5 catch-up ticks | 64 and 66 | none |
+| Game speed | 60 ticks/s | 59.5 ticks/s |
+
+Each slow frame made the next one run extra ticks, which made it slow too: every freeze over 70 ms followed one. The game speed dips a little because time owed past 2 ticks is dropped. A blank page doing the same amount of work stuttered zero times on the same machine. The stutters left come from the test machine's own CPU stalls, so the numbers say more about the change than about a player's PC. Every frame still spends about 10 ms of its 16.7 on the game, so a short stall anywhere can drop one.
 
 ### Color language
 | Color | Means | Used on |
@@ -127,13 +140,13 @@ The screens (menu, pause box, game over, instructions, leaderboard) have their o
 12. **Words, not pictures.** The style is defined in words in this file. Images from other works are never part of this design and never ship. Only art made for the game, or converted from a source that is free to use and credited, ships. Source: Director.
 13. **Motion must show at game size.** A turn smaller than about 20° does not read on a sprite this small. A turning object uses a full turn in steps of 45° or less, so the loop has no back-and-forth. One exception: a part that swings on a fixed body, like the satellite's panels, goes back and forth. The light and the rim stay fixed while the shape turns. Frames sit in one strip, all the same size. Source: Director.
 14. **HUD colors are their own.** The HUD, the frame and the panel use the colors in the HUD colors table and may use solid fuchsia and pink, and the wireframe of the ship may be fuchsia, not cobalt. The play-area rules (rules 6 and 8, and the ship's cobalt) do not apply there. The wireframe is a hull schematic, not the ship's paint. Gold (the level), violet (the score) and orange (the last life) are new color meanings that only the HUD uses. Source: Director. The level-up banner ([10-ui.md](10-ui.md) rule 14) is the one place the level's gold appears in the play area: on the number and the lit pips only.
-15. **Sound cues.** The game names the moments a sound will hang on, even before sound exists. `level_up` fires on the tick the level rises; a jingle that should hit with the banner's landing puts its accent about 0.37 s in. Which sounds play is still AA-03. Source: Director (DRA-148).
+15. **Sound cues.** The game names the moments a sound will hang on, even before sound exists. `level_up` fires on the tick the level rises; a jingle that should hit with the banner's landing puts its accent about 0.37 s in. The level-up and game-over sounds now hang on it and on the burst. Source: Director (DRA-148).
 
 ## Edge cases
 - Art for a drifter whose spec is still draft: wait, or use a placeholder shape the Director approves.
 
 ## Open
-- AA-02 (background numbers: still to tune, and the near layer's. The frame-rate check is done, see Frame-rate check), AA-03, AA-04.
+- AA-02 (background numbers: still to tune, and the near layer's. The frame-rate check is done, see Frame-rate check), AA-04, AA-05 (credits for the music).
 
 ## How to extend
 A new visual or sound rule that applies to every drifter goes here. Anything specific to one drifter goes in that drifter's spec. A new color meaning is a new row in the color language, with the Director's approval.

@@ -1,0 +1,21 @@
+{
+  "length_px": 1100,
+  "kind": "fixed",
+  "placements": [
+    { "at_px": 120, "type": "chain_lightning", "x": 140, "variant": "trio_line" },
+    { "at_px": 120, "type": "chain_lightning", "x": 500, "variant": "trio_line" },
+    { "at_px": 289, "type": "coin", "x": 320, "variant": "common" },
+    { "at_px": 326, "type": "meteorite", "x": 324, "variant": "big" },
+    { "at_px": 345, "type": "chain_lightning", "x": 320, "variant": "trio_triangle", "invert": true },
+    { "at_px": 480, "type": "meteorite", "x": 70, "variant": "small" },
+    { "at_px": 570, "type": "chain_lightning", "x": 150, "variant": "trio_diagonal" },
+    { "at_px": 570, "type": "chain_lightning", "x": 490, "variant": "trio_diagonal", "invert": true },
+    { "at_px": 628, "type": "coin", "x": 200, "variant": "common" },
+    { "at_px": 661, "type": "coin", "x": 320, "variant": "rare" },
+    { "at_px": 680, "type": "meteorite", "x": 570, "variant": "medium" },
+    { "at_px": 709, "type": "meteorite", "x": 50, "variant": "small" },
+    { "at_px": 719, "type": "satellite", "y": 127, "variant": "flat" },
+    { "at_px": 730, "type": "satellite", "y": 279, "variant": "flat", "invert": true },
+    { "at_px": 760, "type": "meteorite", "x": 321, "variant": "small" }
+  ]
+}

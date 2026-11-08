@@ -1,0 +1,29 @@
+{
+  "length_px": 1100,
+  "kind": "fixed",
+  "placements": [
+    { "at_px": 120, "type": "planet", "x": 32 },
+    { "at_px": 120, "type": "planet", "x": 120 },
+    { "at_px": 120, "type": "planet", "x": 208 },
+    { "at_px": 120, "type": "planet", "x": 296 },
+    { "at_px": 120, "type": "planet", "x": 384 },
+    { "at_px": 293, "type": "meteorite", "x": 520, "variant": "small" },
+    { "at_px": 340, "type": "planet", "x": 32 },
+    { "at_px": 340, "type": "planet", "x": 120 },
+    { "at_px": 340, "type": "planet", "x": 208 },
+    { "at_px": 340, "type": "planet", "x": 432 },
+    { "at_px": 340, "type": "planet", "x": 520 },
+    { "at_px": 340, "type": "planet", "x": 608 },
+    { "at_px": 347, "type": "coin", "x": 468, "variant": "common" },
+    { "at_px": 480, "type": "satellite", "y": 250, "variant": "flat" },
+    { "at_px": 560, "type": "planet", "x": 608 },
+    { "at_px": 560, "type": "planet", "x": 520 },
+    { "at_px": 560, "type": "planet", "x": 432 },
+    { "at_px": 560, "type": "planet", "x": 344 },
+    { "at_px": 560, "type": "planet", "x": 256 },
+    { "at_px": 560, "type": "planet", "x": 168 },
+    { "at_px": 567, "type": "coin", "x": 320, "variant": "common" },
+    { "at_px": 690, "type": "satellite", "y": 380, "variant": "flat", "invert": true },
+    { "at_px": 787, "type": "coin", "x": 90, "variant": "common" }
+  ]
+}

@@ -35,7 +35,7 @@ Each drifter is played alone with the game's physics (ship held at the start spo
 | Check | Fails when |
 |---|---|
 | placement | a drifter never enters the screen, or a hazard turns active on top of the ship at a start spot (left, center, right) |
-| telegraph | a telegraph is under `telegraph_min` at the tested level. Only the chain lightning charge is a telegraph (an entry warning is not). It compares the charge before the game's own floor, because the game clamps it and would hide a bad tuning value. |
+| telegraph | a telegraph is under `telegraph_min` at the tested level. A drifter's charge is its telegraph (an entry warning is not). It compares the charge before the game's own floor, because the game clamps it and would hide a bad tuning value. A drifter type in `telegraph_exempt` is left out and named in the note. |
 | coin_near | a coin never comes within `coin_near_ship_widths` x 32 px (96) of a hazard's hitbox while both are on screen |
 | coin_in_island | a coin's hitbox shares area with a floating island's hitbox at some tick (09-waves.md, rule 7.7). Touching an edge from outside passes. The triangle uses its slope, not its box. |
 | seam | a hazard is on screen in the wave's first `seam_clear_px` (120). An entry warning counts as on screen. The end of a wave is not checked: `extra_rest_ticks` covers it. |
@@ -53,6 +53,7 @@ The coin check grows the coin's hitbox by the limit and tests for overlap, so ne
 |---|---|
 | `levels` | levels to test. Default `[8]`, the GDD's `check_level` |
 | `skip` | wave ids that are never checked |
+| `telegraph_exempt` | drifter types the telegraph check leaves out. Every other check still runs on them. Shipped: `["electric_ball"]` (91-decision-log.md, row 150) |
 | `start_spots` | ship x at the start of a wave, by name |
 | `limits` | `seam_clear_px`, `coin_near_ship_widths`, `gap_min_ship_widths` (part 2) |
 | `track_ticks_max` | longest one drifter is followed |
