@@ -241,3 +241,13 @@
 - `systems/run.md`: 13 to 14, frozen.
 - `systems/waves.md`: 3 to 4, frozen.
 - Level-up moment: a 2.5 s rest after each level rise, a banner that drops the new level in and flies it into the HUD, and a HUD level pop. All values in tuning/level_up.json; glass fill off for frame rate.
+
+## DRA-158, 2026-11-08
+- `systems/app.md`: 19 to 20, frozen.
+- `systems/audio.md`: 0 to 1, frozen.
+- `systems/run.md`: 14 to 15, frozen.
+- The game plays a looping song and five effects (hit, graze, coin, game over, level up) on the run's sound cues.
+
+## DRA-159, 2026-11-08
+- `systems/mute-icon.md`: 0 to 1, frozen.
+- M mutes and unmutes the music on every screen after the start page, and a small speaker icon shows while it is muted.

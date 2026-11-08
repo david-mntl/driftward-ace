@@ -4,7 +4,7 @@ Assignee: art-audio-engineer
 Writes to: tools/art/, staging/assets/, game/assets/
 Contract: docs/contracts/systems/mute-icon.md, docs/contracts/schemas/mute_icon.schema.json
 Impact: docs/contracts/DRA-159/impact.md
-Status: open
+Status: done
 Linear: DRA-162
 
 ## Read in the contract

@@ -1,6 +1,6 @@
 # Mute icon
-Version: 0
-Status: draft
+Version: 1
+Status: frozen
 Features: DRA-159
 Created by: architect
 

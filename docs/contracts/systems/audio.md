@@ -1,6 +1,6 @@
 # Audio: the music loop, the effects and their levels
-Version: 0
-Status: draft
+Version: 1
+Status: frozen
 Features: DRA-158, DRA-159
 Created by: architect
 

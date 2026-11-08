@@ -4,7 +4,7 @@ Assignee: ui-developer
 Writes to: game/ui/
 Contract: docs/contracts/systems/mute-icon.md
 Impact: docs/contracts/DRA-159/impact.md
-Status: open
+Status: done
 Linear: DRA-163
 
 ## Read in the contract

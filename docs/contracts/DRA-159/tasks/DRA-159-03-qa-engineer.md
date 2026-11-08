@@ -4,7 +4,7 @@ Assignee: qa-engineer
 Writes to: game/tests/
 Contract: docs/contracts/systems/mute-icon.md
 Impact: docs/contracts/DRA-159/impact.md
-Status: open
+Status: done
 Linear: DRA-164
 
 ## Read in the contract

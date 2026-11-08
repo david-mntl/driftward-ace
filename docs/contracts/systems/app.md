@@ -1,6 +1,6 @@
 # App base: entry point, logging, run mode, loop, error guard, error screen
-Version: 19
-Status: draft
+Version: 20
+Status: frozen
 Features: HUD-PANEL, DRA-5, DRA-6, DRA-13, DRA-19, DRA-23, DRA-29, DRA-39, DRA-47, DRA-56, DRA-61, DRA-62, DRA-76, DRA-86, DRA-96, DRA-104, DRA-111, DRA-117, DRA-125, DRA-126, DRA-147, DRA-148, DRA-158, DRA-159
 Created by: architect
 
