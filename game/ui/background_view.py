@@ -37,6 +37,10 @@ RIVER_FADE_IN: float = 0.1
 RIVER_FADE_OUT: float = 0.15
 """Shares of a speck's trip it fades in and out over, 0..1."""
 
+RIVER_TRAIL: tuple[tuple[float, int], ...] = ((0.0, 0), (0.012, 2))
+"""Each river speck's dots: (share of the trip behind the speck, brightness steps dimmer).
+The speck itself, then its tail."""
+
 SWIRL_GAP: float = 6.0
 SWIRL_BAND: float = 15.0
 """The swirl rides this many px outside the dark disk, spread over a band this wide."""
@@ -226,17 +230,36 @@ def _blit_speck(
 
 
 def _draw_river(surface: pygame.Surface, art: BackgroundArt, ticks: float) -> None:
-    """Draw each river speck and a dimmer tail behind it, along its curve into the black hole."""
+    """Draw each river speck and a dimmer tail behind it, along its curve into the black hole.
+
+    Gathers every dot first and blits them in one `blits` call, in the same order and at the
+    same places as one blit per dot. It runs every frame, and in the browser each Python call
+    counts. A dot with no light left is skipped before its place is worked out.
+    """
     loop: float = art.rules.river_light_loop_ticks
+    sprites: tuple[pygame.Surface, ...] = art.speck_sprites
+    area: pygame.Rect = sprites[0].get_rect()
+    dots: list[tuple[pygame.Surface, tuple[int, int], pygame.Rect, int]] = []
     for speck in art.river:
         trip: float = (speck.phase + ticks / loop) % 1.0
-        for lag, dim in ((0.0, 0), (0.012, 2)):
+        for lag, dim in RIVER_TRAIL:
             progress: float = trip - lag
             if progress < 0:
                 continue
-            x, y = _river_point(speck.angle, progress)
             fade: float = min(progress / RIVER_FADE_IN, (1 - progress) / RIVER_FADE_OUT, 1.0)
-            _blit_speck(surface, art, x, y, round(fade * SPECK_LEVELS) - dim)
+            level: int = round(fade * SPECK_LEVELS) - dim
+            if level <= 0:
+                continue
+            x, y = _river_point(speck.angle, progress)
+            dots.append(
+                (
+                    sprites[min(level, SPECK_LEVELS) - 1],
+                    (round(x) - SPECK_RADIUS, round(y) - SPECK_RADIUS),
+                    area,
+                    pygame.BLEND_RGB_ADD,
+                )
+            )
+    surface.blits(dots, doreturn=False)
 
 
 def _river_point(angle: float, progress: float) -> tuple[float, float]:
