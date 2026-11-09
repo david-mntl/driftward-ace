@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import ClassVar, Final, Self
 
-from core.collision import Box, Hitbox, grow_hitbox, place_hitbox
+from core.collision import Bounds, Box, Hitbox, grow_hitbox, hitbox_bounds, place_hitbox
 from core.popup import PointsPopup
 from core.ship import GravityWell, Ship
 from core.world import SCREEN_H, SCREEN_W
@@ -304,6 +304,15 @@ class Drifter(ABC):
         if self.phase is not Phase.ACTIVE:
             return ()
         return place_hitbox(self.hitbox, self.x, self.y)
+
+    def hitbox_bounds(self) -> Bounds | None:
+        """Return the upright box round `current_hitbox()`, screen px, None when it is empty.
+
+        Speed only: the run and the graze check skip a drifter whose box can't reach the ship
+        before they build its hitbox. A drifter whose hitbox is costly to build may override this
+        with a box that holds the hitbox without building it.
+        """
+        return hitbox_bounds(self.current_hitbox())
 
     def graze_zone(self) -> Hitbox:
         """Return the current hitbox grown by `graze_margin`, or () unless a touch is a HIT.

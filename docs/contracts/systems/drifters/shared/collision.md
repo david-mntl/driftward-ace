@@ -68,6 +68,19 @@ def hitboxes_overlap(a: Hitbox, b: Hitbox) -> bool:
     # True when any shape of a overlaps any shape of b. Both placed. Pure.
 
 
+def hitbox_bounds(hitbox: Hitbox) -> Bounds | None:
+    ...  # Release hunt bug 02
+    # The upright box round every shape of a placed hitbox, (left, top, right, bottom) px; a line
+    # reaches half its thickness past its ends. None for an empty hitbox. Pure.
+
+
+def bounds_near(a: Bounds | None, b: Bounds | None, margin: float) -> bool:
+    ...  # Release hunt bug 02
+    # False when box a grown by margin px can't reach box b: more than BOUNDS_SLACK px apart, or
+    # either is None. hitboxes_near(a, b, m) is bounds_near(hitbox_bounds(a), hitbox_bounds(b), m).
+    # A cheap test for skipping work, never a rule. Pure.
+
+
 def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox:
     ...
     # Each shape grown by margin on every side: Circle r + margin; Box w + 2 margin, h + 2 margin;
@@ -133,3 +146,4 @@ Push-out (`core/collision.py`, DRA-86). The measure the ship's island block and 
 - **`push_directions(moving, solid)`**, in this order: `(0.0, −1.0)` up, `(0.0, 1.0)` down, `(−1.0, 0.0)` left, `(1.0, 0.0)` right; then, for each polygon of `solid` in hitbox order and each of its edges in order, its outward unit normal, then that normal turned round (inward); then the same for each polygon of `moving`. A direction within `SURFACE_TOLERANCE` of an earlier one on both components is left out. Boxes add no direction past the first four. For the ship against any island this is the four axis directions, plus the triangle's three normals both ways round, less the ones already there (its flat sides' normals are axis directions): up, down, left, right, the slope's outward normal, the slope's inward normal.
 - These three raise `TypeError("<function name> takes boxes and polygons, not '<class name>'")` for any other shape, in either hitbox. Pure.
 - What a push is for, and which direction is used, is the ship's rule (`systems/ship.md`).
+- **Speed only, same answers** (release hunt bug 02). The push-out runs every tick the ship touches an island, against every island shape on screen. So: a pair whose bounds are more than `BOUNDS_SLACK` px apart has no depth; two boxes take their depth and blocked span straight from their bounds (their unit normals are the x and y axes, so the numbers are the same); `exit_distance` skips a pair the moving shape can't reach for any `t ≥ 0` (apart across the direction, or wholly behind it); a polygon's unit normals are kept per corner tuple. None of this changes a result.

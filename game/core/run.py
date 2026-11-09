@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from typing import Final
 
-from core.collision import Hitbox, hitboxes_overlap
+from core.collision import Bounds, Hitbox, bounds_near, hitbox_bounds, hitboxes_overlap
 from core.drifters.base import Drifter, Phase, TickContext, TouchEffect
 from core.drifters.spawner import Placement, spawn_drifter
 from core.drifters.tuning import DrifterTuning
@@ -565,15 +565,18 @@ def _start_last_life(stepped: Run, burst_x: float, burst_y: float) -> Run:
     )
 
 
-def _touches_ship(drifter: Drifter, ship_box: Hitbox) -> bool:
+def _touches_ship(drifter: Drifter, ship_box: Hitbox, ship_bounds: Bounds | None) -> bool:
     """True when `drifter` is ACTIVE, a HIT on touch, able to hit now, and overlaps `ship_box`.
 
-    The drifter decides whether it can hit again (`may_hit_ship`), not the run.
+    The drifter decides whether it can hit again (`may_hit_ship`), not the run. Speed only: a
+    drifter whose box (`Drifter.hitbox_bounds`) is not `bounds_near` the ship's box can't
+    overlap it, so its hitbox is never built.
     """
     return (
         drifter.phase is Phase.ACTIVE
         and drifter.effect_on_touch() is TouchEffect.HIT
         and drifter.may_hit_ship()
+        and bounds_near(drifter.hitbox_bounds(), ship_bounds, 0.0)
         and hitboxes_overlap(drifter.current_hitbox(), ship_box)
     )
 
@@ -587,11 +590,14 @@ def _apply_hit(stepped: Run, protected: bool) -> Run:
     wait stay as they were.
     Source: 05-lives-and-damage.md, rules 1 and 4; systems/run.md, Rules, step 7.
     """
+    if protected:
+        return stepped
     ship_box: Hitbox = ship_hitbox(stepped.ship)
+    ship_bounds: Bounds | None = hitbox_bounds(ship_box)
     touching: tuple[bool, ...] = tuple(
-        _touches_ship(drifter, ship_box) for drifter in stepped.drifters
+        _touches_ship(drifter, ship_box, ship_bounds) for drifter in stepped.drifters
     )
-    if protected or not any(touching):
+    if not any(touching):
         return stepped
     drifters: list[Drifter] = []
     for drifter, touched in zip(stepped.drifters, touching, strict=True):
