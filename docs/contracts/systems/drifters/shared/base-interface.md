@@ -160,6 +160,13 @@ class Drifter(ABC):
         ...
         # () unless phase is ACTIVE. Otherwise place_hitbox(hitbox, x, y).
 
+    def hitbox_bounds(self) -> Bounds | None:
+        ...  # Release hunt bug 02
+        # hitbox_bounds(current_hitbox()): the upright box round the current hitbox, None when it
+        # is empty. Speed only: the run's hit test and the graze check skip a drifter whose box
+        # can't reach the ship before they build its hitbox. A drifter whose hitbox is costly to
+        # build may override it with a box that holds the hitbox without building it (Satellite).
+
     def graze_zone(self) -> Hitbox:
         ...
         # grow_hitbox(current_hitbox(), graze_margin) when effect_on_touch() is HIT, else ().

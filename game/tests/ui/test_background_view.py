@@ -10,7 +10,13 @@ import pygame
 import pytest
 
 from core.world import SCREEN_H, SCREEN_W
-from ui.background_view import BackgroundArt, BackgroundRules, build_background, draw_background
+from ui.background_view import (
+    SWAY_BLEND_STEPS,
+    BackgroundArt,
+    BackgroundRules,
+    build_background,
+    draw_background,
+)
 
 RULES: BackgroundRules = BackgroundRules(
     sway_loop_ticks=40,
@@ -145,6 +151,22 @@ def test_the_last_sway_frame_fades_back_into_the_first() -> None:
     art: BackgroundArt = _swayed()
     near_end: tuple[int, int, int] = _center(art, RULES.sway_loop_ticks * 0.99)
     assert all(abs(got - want) <= 2 for got, want in zip(near_end, SWAY_COLORS[0], strict=True))
+
+
+def test_the_fade_holds_each_step_then_moves_to_the_next() -> None:
+    art: BackgroundArt = _swayed()
+    step_ticks: float = RULES.sway_loop_ticks / len(SWAY_COLORS) / SWAY_BLEND_STEPS
+    start: tuple[int, int, int] = _center(art, 3 * step_ticks)
+    assert _center(art, 3.9 * step_ticks) == start
+    assert _center(art, 4 * step_ticks) != start
+
+
+def test_drawing_times_in_any_order_draws_what_a_fresh_view_draws() -> None:
+    # The fade is blended ahead between frames. Skipped frames, a jump back or a jump far ahead
+    # never change the picture a time draws.
+    art: BackgroundArt = _swayed()
+    for ticks in (0.0, 0.5, 1.0, 1.2, 4.7, 4.8, 2.0, 39.5, 0.1, 13.0, 13.0, 25.25):
+        assert _frame(art, ticks) == _frame(_swayed(), ticks), ticks
 
 
 def test_the_sway_loops_after_its_loop_length() -> None:

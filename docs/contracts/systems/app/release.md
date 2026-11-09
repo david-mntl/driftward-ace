@@ -197,12 +197,16 @@ else:
 ```
 start-driftward-ace.sh            # serves the build, prints http://localhost:<PORT>
 start-driftward-ace.sh --debug    # same build, prints http://localhost:<PORT>/?debug=1
+start-driftward-ace.sh --wave <id> # debug mode at a wave, prints http://localhost:<PORT>/?debug=1&wave=<wave id>
 ```
 
 ## Rules
 
 Launch script (`game/scripts/start-driftward-ace.sh`):
 - `--debug`: same build and same server. The only difference is the printed URL, `http://localhost:${PORT}/?debug=1`. Source: 15-tech-constraints.md, debug_switch_launcher.
+- `--wave <id>`: debug mode starting at a wave (main session, 2026-11-09). `<id>` is a wave file name in `game/waves/` without `.json`, or the start of exactly one (`w11` finds `w11_lvl4_island`). No match, or no id: list the waves to stderr and exit 2 before starting anything. Prints `http://localhost:${PORT}/?debug=1&wave=<wave id>`. Source: 15-tech-constraints.md, debug_start_wave.
+- `--wave` serves a temporary copy of `web/start.tmpl` with one added line: a page opened with no query goes on to `?debug=1&wave=<wave id>`, so plain `http://localhost:${PORT}` starts at the wave. The copy lives in a `mktemp -d` folder that the cleanup trap removes. `web/start.tmpl` and the release package never get the line.
+- Once the server answers, the script prints `Ready: <URL>` again, under pygbag's packing output.
 - No argument: unchanged behavior, prints `http://localhost:${PORT}`.
 - Any other argument: print a usage line naming the bad argument to stderr and exit non-zero before starting anything.
 - Keep the existing rules: `set -euo pipefail`, quoted variables, cleanup trap, never `--bind`. Source: game/CONTEXT.md, Good practice and INTEGRATION.
@@ -212,4 +216,4 @@ Release package (`pygbag.ini`):
 - The package (`game.apk` inside `game/build/web.zip`, and the live build the start script serves) holds only runtime files: `main.py`, `app/`, `ui/`, `core/`, and later the asset and data files the game reads. From DRA-6, `core/*.py` must be in it. From DRA-29, `tuning/` with its JSON files must be in it, along with the subpackages `core/drifters/` and `ui/drifters/`. From DRA-76, `waves/` with its JSON files. From DRA-125, `tuning/last_life.json`, `core/game_flow.py`, `core/last_life.py` and the new views in `ui/`. From the version label (2026-11-08), `VERSION`, which `check_release_package.py` requires. Source: Director decision (DRA-5 close-out, round 1 observations).
 - Left out, at least: `tests/` (with its `CONTEXT.md` and `conftest.py`), `scripts/`, `CONTEXT.md`, `requirements.txt`, `ruff.toml`. Any non-runtime file added to `game/` later is left out the same way. Source: Director decision (DRA-5 close-out).
 - Configured only in `pygbag.ini` at the repo root, `[DEPENDENCIES]` section, `ignoreDirs` and `ignoreFiles`. Built by the Integration Engineer. Source: Director decision (DRA-5 close-out). docs/crew/roster.md, row 12.
-- No pygbag flag or template change. pygbag stays at 0.9.3. Source: 15-tech-constraints.md, web_build.
+- No pygbag flag or template change. The `--wave` copy above is for the local server only. pygbag stays at 0.9.3. Source: 15-tech-constraints.md, web_build.

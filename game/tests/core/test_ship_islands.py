@@ -679,7 +679,7 @@ def test_ties_go_up_then_down_then_left_then_right(
 
 
 # ---------------------------------------------------------------------------------------------
-# Rules, Islands, Several islands: one push, never on the seam
+# Rules, Islands, Several shapes: one shape at a time, never through a bar, never on a seam
 # ---------------------------------------------------------------------------------------------
 
 L_SHAPE: Hitbox = (Box(0.0, 40.0, 320.0, 40.0), Box(-140.0, 0.0, 40.0, 120.0))
@@ -688,31 +688,129 @@ L_SHAPE: Hitbox = (Box(0.0, 40.0, 320.0, 40.0), Box(-140.0, 0.0, 40.0, 120.0))
 T_SHAPE: Hitbox = (Box(0.0, -40.0, 320.0, 40.0), Box(0.0, 0.0, 40.0, 120.0))
 """The Diagram's t_shape: the bar, then the stem."""
 
+T_SHAPE_INVERTED: Hitbox = (Box(0.0, 40.0, 320.0, 40.0), Box(0.0, 0.0, 40.0, 120.0))
+"""The Diagram's t_shape with `invert`: the bar along the bottom, the stem standing on it."""
 
-def test_one_push_clears_the_two_boxes_of_the_l_at_their_seam() -> None:
+
+def test_a_ship_in_the_corner_of_the_l_lands_on_the_bar_beside_the_upright() -> None:
     ground = Ground(place_hitbox(L_SHAPE, ISLAND_X, ISLAND_Y))
     # Relative to the island: the foot (x -126 to -94, rows 18 to 30) is 6 px into the upright
-    # and 10 px into the bar. Down clears the upright at 42 but the ship's bar is then still in
-    # the L's bar: 62 clears both. Left 66, up 90, right far more.
+    # and 10 px into the bar. Out of the upright alone: right 6. Out of the bar alone: up 10.
+    # Right 6 first, then up 10: 11.7 px in all. One push clearing both is down 62, through the
+    # bar: refused, it is longer.
     ship = Ship(ISLAND_X - 110.0, ISLAND_Y + 14.0, 0.0, 0.0)
 
     pushed = block_ship(ship, ground)
 
-    assert_ship(pushed, ISLAND_X - 110.0, ISLAND_Y + 14.0 + 62.0, 0.0, 0.0)
+    assert_ship(pushed, ISLAND_X - 104.0, ISLAND_Y + 4.0, 0.0, 0.0)
+    assert pushed.against_island is True
     assert clear_of(pushed, ground)
 
 
-def test_one_push_clears_the_two_boxes_of_the_t_at_their_seam() -> None:
+def test_a_ship_under_the_t_bar_against_the_stem_stays_under_the_bar() -> None:
     ground = Ground(place_hitbox(T_SHAPE, ISLAND_X, ISLAND_Y))
     # The foot (x -46 to -14, rows -4 to 8) is 6 px into the stem and the ship's bar is 4 px up
-    # into the T's bar. Down clears the T's bar at 4, but the foot is in the stem until its top
-    # is at 60: 64. Up 68, right 66 + more, left 136.
+    # into the T's bar. Out of the bar alone: down 4. Out of the stem alone: left 6. Down 4
+    # first, then left 6: 7.2 px in all. One push clearing both is down 64: refused.
     ship = Ship(ISLAND_X - 30.0, ISLAND_Y - 8.0, 0.0, 0.0)
 
     pushed = block_ship(ship, ground)
 
-    assert_ship(pushed, ISLAND_X - 30.0, ISLAND_Y - 8.0 + 64.0, 0.0, 0.0)
+    assert_ship(pushed, ISLAND_X - 36.0, ISLAND_Y - 4.0, 0.0, 0.0)
+    assert pushed.against_island is True
     assert clear_of(pushed, ground)
+
+
+def test_a_ship_landing_in_the_notch_of_an_inverted_t_stands_on_the_bar() -> None:
+    # Release hunt bug 01, S1 (w11, inverted T at x 404): the ship falls at the cap into the
+    # notch while holding right into the stem. The island moves 1.43 px a tick.
+    island_speed = 1.43
+    island_y = 344.7 + island_speed
+    ground = Ground(place_hitbox(T_SHAPE_INVERTED, 404.0, island_y), 0.0, island_speed)
+    stem_left = 404.0 - 20.0
+    bar_top = island_y + 20.0
+    ship = Ship(stem_left - HALF, bar_top - HALF - FALL_CAP + 2.0, 0.0, FALL_CAP)
+
+    landed = step(ship, Thrust(right=True), ground)
+
+    # Moved 0.39 px (the side thrust) into the stem and 2 px into the bar: pushed back off the
+    # stem and up onto the bar. Not 69 px down through the bar.
+    assert_ship(landed, stem_left - HALF, bar_top - HALF, 0.0, island_speed)
+    assert landed.against_island is True
+    assert clear_of(landed, ground)
+
+
+@pytest.mark.parametrize(
+    ("hitbox", "side"),
+    [
+        pytest.param(T_SHAPE, "left", id="t-left-of-the-stem"),
+        pytest.param(T_SHAPE, "right", id="t-right-of-the-stem"),
+        pytest.param(
+            (Box(0.0, -40.0, 320.0, 40.0), Box(140.0, 0.0, 40.0, 120.0)),
+            "left",
+            id="inverted-l-left-of-the-upright",
+        ),
+    ],
+)
+def test_a_ship_held_under_the_bar_against_the_stem_is_carried_never_shoved(
+    hitbox: Hitbox, side: str
+) -> None:
+    # Release hunt bug 01, S2 (w11 inverted L, w16 T): up held under the bar, the side key held
+    # into the stem or upright. Every tick the ship moves exactly as far as the island, 1.1 px.
+    stem: Box = cast(Box, hitbox[1])
+    toward_stem: float = 1.0 if side == "left" else -1.0
+    start_x: float = ISLAND_X + stem.cx - toward_stem * (stem.w / 2 + HALF)
+    start_y: float = ISLAND_Y - 20.0 + HALF
+    ship = Ship(start_x, start_y, 0.0, SCROLL_L1)
+    keys = Thrust(up=True, left=side == "right", right=side == "left")
+
+    for n in range(1, 121):
+        ground = Ground(place_hitbox(hitbox, ISLAND_X, ISLAND_Y + SCROLL_L1 * n), 0.0, SCROLL_L1)
+        ship = step(ship, keys, ground)
+        assert_ship(ship, start_x, start_y + SCROLL_L1 * n, 0.0, SCROLL_L1)
+        assert ship.against_island is True
+
+
+def test_a_ship_flying_into_a_narrowing_gap_backs_out_the_way_it_came() -> None:
+    # Release hunt bug 01, S3 (w11): an inverted triangle's slope comes down onto a rectangle's
+    # top, a gap that narrows to the left. The ship flies left and down into it, too far by a
+    # px. Shape by shape the slope and the rectangle push it back and forth without ever clearing
+    # it, and the one push along a listed direction is 80 px right, past the rectangle's end.
+    # Straight back along its motion against the island is the short way.
+    island_speed = 1.43
+    triangle: Hitbox = (Polygon(((-160.0, 60.0), (160.0, -60.0), (-160.0, -60.0))),)
+    ground = Ground(
+        (*place_hitbox(triangle, 314.0, 274.6), Box(160.0, 391.9, 320.0, 120.0)),
+        0.0,
+        island_speed,
+    )
+    ship = Ship(256.547, 312.985, -5.013, 3.31)
+
+    wedged = step(ship, NO_KEY, ground)
+
+    vx, vy = ship.vx * DRAG_X, ship.vy + GRAVITY
+    moved_x, moved_y = ship.x + vx, ship.y + vy
+    back_x, back_y = -vx, -(vy - island_speed)
+    # Back until the foot is on the rectangle's top, row 331.9: the slope is clear by then.
+    distance = (moved_y - (331.9 - HALF)) / -back_y
+    assert_ship(wedged, moved_x + distance * back_x, 331.9 - HALF, 0.0, island_speed)
+    assert wedged.x - moved_x < 2.0
+    assert wedged.against_island is True
+    assert clear_of(wedged, ground)
+
+
+def test_a_ship_sliding_over_two_islands_that_meet_keeps_its_speed_at_the_seam() -> None:
+    # Two boxes meet at x 320 with their tops at row 300. The ship stands 0.16 px into both, its
+    # foot 0.1 px past the seam. Out of the second box alone, left 0.1 is shortest, which would
+    # stop the ship on the seam. One push up 0.16 clears both and is shorter than left 0.1 then
+    # up 0.16 (0.19 px): the ship stays on top with its sideways speed.
+    ground = box_ground((240.0, 360.0, 160.0, 120.0), (400.0, 360.0, 160.0, 120.0))
+    ship = Ship(320.1 - HALF, 300.16 - HALF, 3.0, GRAVITY)
+
+    pushed = block_ship(ship, ground)
+
+    assert_ship(pushed, 320.1 - HALF, 300.0 - HALF, 3.0, 0.0)
+    assert pushed.against_island is True
 
 
 def test_one_push_clears_two_overlapping_islands() -> None:

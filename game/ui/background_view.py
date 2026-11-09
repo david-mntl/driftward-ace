@@ -60,6 +60,14 @@ GLOW_COLOR: tuple[int, int, int] = (255, 40, 200)
 SEED: int = 2901
 """Fixed seed for the layout of the river specks. No design meaning."""
 
+SWAY_BLEND_STEPS: int = 10
+"""Steps the painting takes to fade from one sway frame to the next. Each step is blended once
+and then shown with one plain blit. Chosen by eye: the sway is slow, so the steps don't show."""
+
+SWAY_BLEND_BANDS: int = 4
+"""Row bands the next fade step is blended in, one band a frame while the current step shows,
+so no frame pays for a whole blend. No design meaning."""
+
 
 @dataclass(frozen=True)
 class BackgroundRules:
@@ -99,6 +107,62 @@ class RiverSpeck:
     """Share of the loop it has already run at time 0, 0..1."""
 
 
+class PaintingFade:
+    """The painting's cross-fade, blended ahead and kept between frames. Speed only.
+
+    The picture for a time is always the same: step `n` of the loop is sway frame
+    `n // SWAY_BLEND_STEPS` with the next frame over it at the step's share. Only when the work
+    is done changes. While one step shows, the next is blended one band of rows a frame; a step
+    reached before its bands are done (a skipped frame, a jump in time) is finished on the spot.
+    """
+
+    def __init__(self, frames: tuple[pygame.Surface, ...]) -> None:
+        self._frames: tuple[pygame.Surface, ...] = frames
+        self.step_count: int = len(frames) * SWAY_BLEND_STEPS
+        self._shown: pygame.Surface = frames[0].copy()
+        self._shown_step: int = -1
+        self._next: pygame.Surface = frames[0].copy()
+        self._next_step: int = -1
+        self._next_bands: int = 0
+
+    def picture(self, step: int) -> pygame.Surface:
+        """Return the blended picture of `step`, 0 .. step_count - 1."""
+        if step != self._shown_step:
+            if step != self._next_step:
+                self._next_step = step
+                self._next_bands = 0
+            self._blend_bands(SWAY_BLEND_BANDS)
+            self._shown, self._next = self._next, self._shown
+            self._shown_step = step
+            self._next_step = -1
+        return self._shown
+
+    def prepare(self, step: int, share: float) -> None:
+        """Blend `step`, the one after the shown step, up to `share` (0..1) of its bands."""
+        if step != self._next_step:
+            self._next_step = step
+            self._next_bands = 0
+        self._blend_bands(min(SWAY_BLEND_BANDS, int(share * SWAY_BLEND_BANDS) + 1))
+
+    def _blend_bands(self, bands: int) -> None:
+        """Blend the next picture's bands until `bands` of them are done."""
+        frames: tuple[pygame.Surface, ...] = self._frames
+        index: int = self._next_step // SWAY_BLEND_STEPS % len(frames)
+        share: float = self._next_step % SWAY_BLEND_STEPS / SWAY_BLEND_STEPS
+        height: int = self._next.get_height()
+        while self._next_bands < bands:
+            top: int = height * self._next_bands // SWAY_BLEND_BANDS
+            bottom: int = height * (self._next_bands + 1) // SWAY_BLEND_BANDS
+            area: pygame.Rect = pygame.Rect(0, top, self._next.get_width(), bottom - top)
+            frames[index].set_alpha(None)
+            self._next.blit(frames[index], area, area)
+            if len(frames) > 1 and share > 0:
+                following: pygame.Surface = frames[(index + 1) % len(frames)]
+                following.set_alpha(round(share * 255))
+                self._next.blit(following, area, area)
+            self._next_bands += 1
+
+
 @dataclass(frozen=True)
 class BackgroundArt:
     """Everything the view draws, made once at startup by `build_background`."""
@@ -110,6 +174,8 @@ class BackgroundArt:
     glow: pygame.Surface | None
     river: tuple[RiverSpeck, ...]
     rules: BackgroundRules
+    fade: PaintingFade
+    """The painting's cross-fade, blended ahead. The only state the view keeps."""
 
 
 def build_background(
@@ -137,6 +203,7 @@ def build_background(
         glow=_glow(rules) if rules.glow_height > 0 else None,
         river=river,
         rules=rules,
+        fade=PaintingFade(sway),
     )
 
 
@@ -159,19 +226,15 @@ def draw_background(surface: pygame.Surface, art: BackgroundArt, ticks: float) -
 def _draw_painting(surface: pygame.Surface, art: BackgroundArt, ticks: float) -> None:
     """Draw the painting: the current sway frame, with the next one faded over it.
 
-    Sets the surface alpha of two sway frames on each call, so the result never depends on an
-    earlier call. The last frame fades back into the first.
+    The fade goes in SWAY_BLEND_STEPS steps per frame, each blended ahead (`PaintingFade`), so
+    a frame costs one plain blit and a band of the next step. The picture depends on `ticks`
+    only. The last frame fades back into the first.
     """
-    frames: tuple[pygame.Surface, ...] = art.sway
-    position: float = ticks / art.rules.sway_loop_ticks % 1.0 * len(frames)
-    index: int = int(position) % len(frames)
-    share: float = position - int(position)
-    frames[index].set_alpha(None)
-    surface.blit(frames[index], (0, 0))
-    if len(frames) > 1 and share > 0:
-        following: pygame.Surface = frames[(index + 1) % len(frames)]
-        following.set_alpha(round(share * 255))
-        surface.blit(following, (0, 0))
+    fade: PaintingFade = art.fade
+    position: float = ticks / art.rules.sway_loop_ticks % 1.0 * fade.step_count
+    step: int = int(position) % fade.step_count
+    surface.blit(fade.picture(step), (0, 0))
+    fade.prepare((step + 1) % fade.step_count, position - int(position))
 
 
 def _scaled(sprite: pygame.Surface, rules: BackgroundRules) -> pygame.Surface:

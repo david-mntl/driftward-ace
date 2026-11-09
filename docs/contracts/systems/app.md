@@ -13,8 +13,8 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 |---|---|---|---|
 | [debug-spawns](app/debug-spawns.md) | Interface, Rules | you change the debug spawn list: its file, checks, rows or timing. | 13.1 KB |
 | [error-handling](app/error-handling.md) | Interface, Presentation, Rules | you change the error guard or the error screen. | 5.4 KB |
-| [frame-loop](app/frame-loop.md) | Interface, Rules | you change the frame loop: ticks, keys, draw order, the catch-up cap. | 26.7 KB |
-| [general](app/general.md) | Purpose, Interface | you want the overview of the app, or a rule that fits no area. | 4.7 KB |
+| [frame-loop](app/frame-loop.md) | Interface, Rules | you change the frame loop: ticks, keys, draw order, the catch-up cap. | 27.0 KB |
+| [general](app/general.md) | Purpose, Interface | you want the overview of the app, or a rule that fits no area. | 6.2 KB |
 | [integration-checks/DRA-104](app/integration-checks/DRA-104.md) | Rules | you run or extend the browser checks for the UFO (DRA-104). | 7.6 KB |
 | [integration-checks/DRA-111](app/integration-checks/DRA-111.md) | Rules | you run or extend the browser checks for the electric ball (DRA-111). | 7.8 KB |
 | [integration-checks/DRA-117](app/integration-checks/DRA-117.md) | Rules | you run or extend the browser checks for the graze (DRA-117). | 6.9 KB |
@@ -48,9 +48,9 @@ Start the game, set up logging once, read the run mode once, run the async loop 
 | [rationale/startup](app/rationale/startup.md) | Rationale | you ask why the app's startup works as it does. | 3.1 KB |
 | [rationale/tuning-loader](app/rationale/tuning-loader.md) | Rationale | you ask why the app's tuning loader works as it does. | 2.6 KB |
 | [rationale/wave-loading](app/rationale/wave-loading.md) | Rationale | you ask why the app's wave loading works as it does. | 1.4 KB |
-| [release](app/release.md) | Interface, Rules | you change the launch script, the release package or `pygbag.ini`. | 11.6 KB |
+| [release](app/release.md) | Interface, Rules | you change the launch script, the release package or `pygbag.ini`. | 12.6 KB |
 | [save-storage](app/save-storage.md) | Interface, Rules | you change how the saves are read from or written to the browser's localStorage. | 5.1 KB |
-| [startup](app/startup.md) | Diagram, Interface, Rules | you change startup, the run mode switch, logging or the import boundary. | 8.6 KB |
+| [startup](app/startup.md) | Diagram, Interface, Rules | you change startup, the run mode switch, logging or the import boundary. | 8.8 KB |
 | [tuning-loader](app/tuning-loader.md) | Interface, Rules, level_up.json (DRA-148), hud.json (HUD-PANEL) | you change how the tuning files are loaded and checked. | 27.0 KB |
 | [wave-loading](app/wave-loading.md) | Interface, Rules | you change how wave files are read and loaded. | 2.4 KB |
 <!-- parts:end -->

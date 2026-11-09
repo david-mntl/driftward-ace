@@ -11,7 +11,16 @@ import math
 from dataclasses import dataclass, replace
 from typing import ClassVar, Self
 
-from core.collision import Box, Circle, Hitbox, Polygon, Shape, place_hitbox
+from core.collision import (
+    Bounds,
+    Box,
+    Circle,
+    Hitbox,
+    Polygon,
+    Shape,
+    hitbox_bounds,
+    place_hitbox,
+)
 from core.drifters.base import (
     Birth,
     Drifter,
@@ -177,6 +186,21 @@ class Satellite(Drifter):
         )
         return place_hitbox(offsets, self.x, self.y)
 
+    def hitbox_bounds(self) -> Bounds | None:
+        """Return the upright box round `current_hitbox()` without building it, None unless ACTIVE.
+
+        The box round the pose's offsets, kept per pose, moved to the satellite's center.
+        """
+        if self.phase is not Phase.ACTIVE:
+            return None
+        pose: Bounds | None = _pose_bounds(
+            self.hitbox, self.swing_hitbox, self.swing_angle(), self.invert
+        )
+        if pose is None:
+            return None
+        left, top, right, bottom = pose
+        return (self.x + left, self.y + top, self.x + right, self.y + bottom)
+
     def effect_on_touch(self) -> TouchEffect:
         """Touching the body or a panel is a hit."""
         return TouchEffect.HIT
@@ -212,6 +236,14 @@ def _pose_offsets(
         panels.append(Polygon(tuple(corners)))
     placed_body: Hitbox = tuple(_mirrored(shape) for shape in body) if invert else body
     return (*placed_body, *panels)
+
+
+@functools.cache
+def _pose_bounds(
+    body: Hitbox, swing_hitbox: tuple[Box, ...], angle_degrees: float, invert: bool
+) -> Bounds | None:
+    """Return the upright box round `_pose_offsets` for the same pose, as offsets, px."""
+    return hitbox_bounds(_pose_offsets(body, swing_hitbox, angle_degrees, invert))
 
 
 def _mirrored(shape: Shape) -> Shape:

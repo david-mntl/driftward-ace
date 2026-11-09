@@ -14,6 +14,7 @@ Source: docs/contracts/systems/drifters.md, Interface and Rules, Collision and P
 import logging
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Final
 
 log = logging.getLogger(__name__)
@@ -22,6 +23,9 @@ _Point = tuple[float, float]
 _BoxCorners = tuple[_Point, _Point, _Point, _Point]
 _Span = tuple[float, float]
 _Bounds = tuple[float, float, float, float]
+
+Bounds = _Bounds
+"""An upright box round shapes: (left, top, right, bottom), screen px, y down."""
 
 Direction = tuple[float, float]
 """A unit vector, screen px, y down: (0.0, -1.0) is up."""
@@ -148,13 +152,30 @@ def hitboxes_near(a: Hitbox, b: Hitbox, margin: float) -> bool:
     True only means the exact test is needed. An empty hitbox is near nothing. Raises TypeError
     for a shape that is not a Circle, a Box, a Line or a Polygon.
     """
-    bounds_a: list[_Bounds] = [_bounds(shape) for shape in a]
-    bounds_b: list[_Bounds] = [_bounds(shape) for shape in b]
-    if not bounds_a or not bounds_b:
+    return bounds_near(hitbox_bounds(a), hitbox_bounds(b), margin)
+
+
+def hitbox_bounds(hitbox: Hitbox) -> Bounds | None:
+    """Return the upright box round every shape of a placed hitbox, None when it is empty.
+
+    A line reaches half its thickness past its ends. Raises TypeError for a shape that is not a
+    Circle, a Box, a Line or a Polygon.
+    """
+    if not hitbox:
+        return None
+    return _joined([_bounds(shape) for shape in hitbox])
+
+
+def bounds_near(a: Bounds | None, b: Bounds | None, margin: float) -> bool:
+    """Return False when box `a` grown by `margin` px (0 or more) can't reach box `b`.
+
+    The `hitboxes_near` test on boxes already worked out: False when the grown `a` is more than
+    BOUNDS_SLACK px from `b`, or either is None (an empty hitbox is near nothing).
+    """
+    if a is None or b is None:
         return False
-    left, top, right, bottom = _joined(bounds_a)
-    grown: _Bounds = (left - margin, top - margin, right + margin, bottom + margin)
-    return not _apart(grown, _joined(bounds_b))
+    grown: Bounds = (a[0] - margin, a[1] - margin, a[2] + margin, a[3] + margin)
+    return not _apart(grown, b)
 
 
 def grow_hitbox(hitbox: Hitbox, margin: float) -> Hitbox:
@@ -181,7 +202,7 @@ def deeply_overlaps(moving: Hitbox, solid: Hitbox) -> bool:
     _require_boxes_and_polygons("deeply_overlaps", moving)
     _require_boxes_and_polygons("deeply_overlaps", solid)
     return any(
-        _pair_depth(p, q) > SURFACE_TOLERANCE for p in _polygons(moving) for q in _polygons(solid)
+        _shapes_deeply_overlap(p, q) for p in _solid_shapes(moving) for q in _solid_shapes(solid)
     )
 
 
@@ -220,9 +241,13 @@ def exit_distance(moving: Hitbox, solid: Hitbox, direction: Direction) -> float:
     if not deeply_overlaps(moving, solid):
         return 0.0
     spans: list[_Span] = []
-    for p in _polygons(moving):
-        for q in _polygons(solid):
-            span: _Span | None = _blocked_span(p, q, direction)
+    for p in _solid_shapes(moving):
+        bounds_p: _Bounds = _bounds(p)
+        for q in _solid_shapes(solid):
+            bounds_q: _Bounds = _bounds(q)
+            if _out_of_reach(bounds_p, bounds_q, direction):
+                continue
+            span: _Span | None = _shapes_blocked_span(p, bounds_p, q, bounds_q, direction)
             if span is not None:
                 spans.append(span)
     t: float = 0.0
@@ -493,15 +518,87 @@ def _area_sign(points: tuple[_Point, ...]) -> float:
     return 1.0 if twice_area > 0.0 else -1.0
 
 
-def _polygons(hitbox: Hitbox) -> tuple[tuple[_Point, ...], ...]:
-    """The corners of every box and polygon of `hitbox`. Other shapes are skipped."""
-    corners: list[tuple[_Point, ...]] = []
-    for shape in hitbox:
-        if isinstance(shape, Box):
-            corners.append(_box_corners(shape))
-        elif isinstance(shape, Polygon):
-            corners.append(shape.points)
-    return tuple(corners)
+def _solid_shapes(hitbox: Hitbox) -> tuple[Box | Polygon, ...]:
+    """The boxes and polygons of `hitbox`, in order. Other shapes are skipped."""
+    return tuple(shape for shape in hitbox if isinstance(shape, Box | Polygon))
+
+
+def _corners(shape: Box | Polygon) -> tuple[_Point, ...]:
+    """The corners of a box or polygon, in order around its edge."""
+    if isinstance(shape, Box):
+        return _box_corners(shape)
+    return shape.points
+
+
+def _shapes_deeply_overlap(p: Box | Polygon, q: Box | Polygon) -> bool:
+    """True when the pair's depth is more than SURFACE_TOLERANCE px.
+
+    Speed only, same answer as `_pair_depth`: bounds more than BOUNDS_SLACK apart can't share
+    area, and two boxes' unit normals are the x and y axes, so their depth is the smaller of the
+    two bounds overlaps.
+    """
+    bounds_p: _Bounds = _bounds(p)
+    bounds_q: _Bounds = _bounds(q)
+    if _apart(bounds_p, bounds_q):
+        return False
+    if isinstance(p, Box) and isinstance(q, Box):
+        overlap_x: float = min(bounds_p[2], bounds_q[2]) - max(bounds_p[0], bounds_q[0])
+        overlap_y: float = min(bounds_p[3], bounds_q[3]) - max(bounds_p[1], bounds_q[1])
+        return min(overlap_x, overlap_y) > SURFACE_TOLERANCE
+    return _pair_depth(_corners(p), _corners(q)) > SURFACE_TOLERANCE
+
+
+def _bounds_projection(bounds: _Bounds, axis: _Point) -> _Span:
+    """The (min, max) of the upright box's corners' dot products with `axis`."""
+    left, top, right, bottom = bounds
+    x_low, x_high = sorted((left * axis[0], right * axis[0]))
+    y_low, y_high = sorted((top * axis[1], bottom * axis[1]))
+    return (x_low + y_low, x_high + y_high)
+
+
+def _out_of_reach(moving: _Bounds, solid: _Bounds, direction: Direction) -> bool:
+    """True when a shape inside `moving`, moved any t >= 0 along `direction`, can't overlap one
+    inside `solid`: the bounds are more than BOUNDS_SLACK apart across the direction, or `solid`
+    lies wholly behind `moving` along it (any overlap needs t < 0, which `exit_distance` never
+    reaches). Speed only: such a pair adds no span the chain could use.
+    """
+    across: _Point = (-direction[1], direction[0])
+    low_m, high_m = _bounds_projection(moving, across)
+    low_s, high_s = _bounds_projection(solid, across)
+    if high_m + BOUNDS_SLACK < low_s or high_s + BOUNDS_SLACK < low_m:
+        return True
+    behind_m, _ = _bounds_projection(moving, direction)
+    _, ahead_s = _bounds_projection(solid, direction)
+    return ahead_s + BOUNDS_SLACK < behind_m
+
+
+def _shapes_blocked_span(
+    p: Box | Polygon, bounds_p: _Bounds, q: Box | Polygon, bounds_q: _Bounds, direction: Direction
+) -> _Span | None:
+    """`_blocked_span` of two shapes, with a fast path for two boxes.
+
+    Two boxes' unit normals are the x and y axes, so the span comes straight from their bounds:
+    the same numbers `_blocked_span` gives, without building corners and normals.
+    """
+    if not (isinstance(p, Box) and isinstance(q, Box)):
+        return _blocked_span(_corners(p), _corners(q), direction)
+    low: float = -math.inf
+    high: float = math.inf
+    for k, low_p, high_p, low_q, high_q in (
+        (direction[0], bounds_p[0], bounds_p[2], bounds_q[0], bounds_q[2]),
+        (direction[1], bounds_p[1], bounds_p[3], bounds_q[1], bounds_q[3]),
+    ):
+        if k == 0.0:
+            if min(high_p, high_q) - max(low_p, low_q) <= 0.0:
+                return None
+            continue
+        first: float = (high_q - low_p) / k
+        second: float = (low_q - high_p) / k
+        low = max(low, min(first, second))
+        high = min(high, max(first, second))
+    if low >= high:
+        return None
+    return (low, high)
 
 
 def _raw_normals(points: tuple[_Point, ...]) -> tuple[_Point, ...]:
@@ -509,9 +606,12 @@ def _raw_normals(points: tuple[_Point, ...]) -> tuple[_Point, ...]:
     return tuple((a[1] - b[1], b[0] - a[0]) for a, b in _edges(points))
 
 
+@lru_cache(maxsize=256)
 def _unit_normals(points: tuple[_Point, ...]) -> tuple[Direction, ...]:
     """The outward unit normal of every edge: (dy, -dx) / length for positive area, else
     (-dy, dx) / length.
+
+    Cached by corners: the push-out asks for the same shapes' normals many times in one tick.
     """
     sign: float = _area_sign(points)
     normals: list[Direction] = []
@@ -525,8 +625,16 @@ def _unit_normals(points: tuple[_Point, ...]) -> tuple[Direction, ...]:
 
 def _projection(points: tuple[_Point, ...], axis: _Point) -> _Span:
     """The (min, max) of the corners' dot products with `axis`."""
-    dots: list[float] = [p[0] * axis[0] + p[1] * axis[1] for p in points]
-    return (min(dots), max(dots))
+    axis_x, axis_y = axis
+    low: float = math.inf
+    high: float = -math.inf
+    for x, y in points:
+        dot: float = x * axis_x + y * axis_y
+        if dot < low:
+            low = dot
+        if dot > high:
+            high = dot
+    return (low, high)
 
 
 def _axes_overlap(p: tuple[_Point, ...], q: tuple[_Point, ...], axis: _Point) -> float:
@@ -557,12 +665,12 @@ def _has_direction(directions: list[Direction], candidate: Direction) -> bool:
     )
 
 
-def _axis_span(p: tuple[_Point, ...], q: tuple[_Point, ...], axis: Direction, k: float) -> _Span:
-    """The open (low, high) range of t where `p` moved by t overlaps `q` on `axis`, where
-    `k` is the movement's dot product with the axis and is not 0.
+def _axis_span(p: _Span, q: _Span, k: float) -> _Span:
+    """The open (low, high) range of t where `p` moved by t overlaps `q` on one axis, given
+    both projections on it, where `k` is the movement's dot product with the axis and is not 0.
     """
-    low_p, high_p = _projection(p, axis)
-    low_q, high_q = _projection(q, axis)
+    low_p, high_p = p
+    low_q, high_q = q
     first: float = (high_q - low_p) / k
     second: float = (low_q - high_p) / k
     return (min(first, second), max(first, second))
@@ -580,11 +688,13 @@ def _blocked_span(
     high: float = math.inf
     for axis in (*_unit_normals(p), *_unit_normals(q)):
         k: float = direction[0] * axis[0] + direction[1] * axis[1]
+        on_p: _Span = _projection(p, axis)
+        on_q: _Span = _projection(q, axis)
         if k == 0.0:
-            if _axes_overlap(p, q, axis) <= 0.0:
+            if min(on_p[1], on_q[1]) - max(on_p[0], on_q[0]) <= 0.0:
                 return None
             continue
-        axis_low, axis_high = _axis_span(p, q, axis, k)
+        axis_low, axis_high = _axis_span(on_p, on_q, k)
         low = max(low, axis_low)
         high = min(high, axis_high)
     if low >= high:
