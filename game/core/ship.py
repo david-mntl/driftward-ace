@@ -10,7 +10,8 @@ SHIP_W by SHIP_H square. `ship_hitbox` places it at the ship's center. `TOP_SIDE
 the top sideways speed with a side key held.
 
 Floating islands are ground, handed in as one `Ground`. `block_ship` moves the ship out of it the
-shortest way and drops the speed into the surface, measured against the ground's own motion.
+shortest way, one island shape at a time, and drops the speed into each surface, measured against
+the ground's own motion.
 `spawn_clear` gives the fall respawn spot moved straight up or down out of the ground.
 
 Planets pull. The run hands the step every planet's field as a `GravityWell`; `well_pull` sums
@@ -89,6 +90,11 @@ SHIP_HITBOX: Final[Hitbox] = (
 bottom. Source: 04-ship.md, hitbox (guess); 91-decision-log.md, row 35."""
 
 Wall = Literal["left", "right"]
+
+MAX_PUSH_ROUNDS: Final[int] = 4
+"""How many one-shape pushes `block_ship` tries before it settles for the one push that clears
+every shape at once. Not a game value: two shapes meet at a notch, so two rounds clear any
+island; the rest is headroom for islands that touch. Source: systems/ship.md, Rules, Islands."""
 
 _UP: Final[Direction] = (0.0, -1.0)
 _DOWN: Final[Direction] = (0.0, 1.0)
@@ -298,17 +304,105 @@ def step(
 def block_ship(ship: Ship, ground: Ground) -> Ship:
     """Push the ship out of the ground the shortest way and return it, flagged for this tick.
 
-    The ship moves just to the surface. The part of its speed going into the surface, measured
-    against the ground's own motion, is dropped; the part along it stays. `against_island` is
-    True when it was pushed, False when it was not inside. Logs `island contact` on the tick
-    the contact starts. Otherwise pure. Source: systems/ship.md, Rules, Islands.
+    The ship moves just to the surface, one island shape at a time; one push that clears every
+    shape at once is used instead when it moves the ship less. The part of its speed going into
+    each surface, measured against the ground's own motion, is dropped; the part along it stays.
+    `against_island` is True when it was pushed, False when it was not inside. Logs `island
+    contact` on the tick the contact starts. Otherwise pure. Source: systems/ship.md, Rules,
+    Islands.
     """
     moving: Hitbox = ship_hitbox(ship)
     if not ground.hitbox or not deeply_overlaps(moving, ground.hitbox):
         return replace(ship, against_island=False)
-    push: _Push = _shortest_way_out(ship, moving, ground)
+    blocked: Ship = _push_out(ship, ground)
+    if not ship.against_island:
+        log.debug("island contact x=%.2f y=%.2f", blocked.x, blocked.y)
+    return blocked
+
+
+def _push_out(ship: Ship, ground: Ground) -> Ship:
+    """Return the ship pushed clear of the ground, which holds it, with `against_island` True.
+
+    Shape by shape first (`_push_shape_by_shape`). One round is already the shortest way. After
+    two or more, or none that clear, the one push that clears every shape at once
+    (`_push_whole_ground`) is measured too, and wins unless the rounds moved the ship less by
+    more than SURFACE_TOLERANCE px. Source: systems/ship.md, Rules, Islands, rules 2 and 3.
+    """
+    by_shape, rounds = _push_shape_by_shape(ship, ground)
+    if by_shape is not None and rounds == 1:
+        return by_shape
+    whole: Ship = _push_whole_ground(ship, ground)
+    if by_shape is not None and _moved(ship, by_shape) < _moved(ship, whole) - SURFACE_TOLERANCE:
+        return by_shape
+    return whole
+
+
+def _push_shape_by_shape(ship: Ship, ground: Ground) -> tuple[Ship | None, int]:
+    """Push the ship out of one held shape at a time; return (ship, rounds) once it is clear.
+
+    Each round, every shape that holds the ship gives its shortest allowed way out of that
+    shape alone, and the shortest of those is used; ties go to the earlier shape. The speed
+    into that surface drops each round. (None, MAX_PUSH_ROUNDS) when the rounds don't clear it.
+    """
+    pushed: Ship = ship
+    for rounds in range(MAX_PUSH_ROUNDS + 1):
+        moving: Hitbox = ship_hitbox(pushed)
+        holding: Hitbox = _holding(moving, ground)
+        if not holding:
+            return pushed, rounds
+        if rounds == MAX_PUSH_ROUNDS:
+            break
+        pushes: list[_Push] = [
+            _shortest_way_out(pushed, moving, push_directions(moving, (shape,)), (shape,))
+            for shape in holding
+        ]
+        best: _Push = pushes[0]
+        for push in pushes[1:]:
+            if push.distance < best.distance - SURFACE_TOLERANCE:
+                best = push
+        pushed = _pushed(pushed, ground, best)
+    return None, MAX_PUSH_ROUNDS
+
+
+def _push_whole_ground(ship: Ship, ground: Ground) -> Ship:
+    """Return the ship moved by the one push that clears every shape of the ground at once.
+
+    It tries the directions of the shapes that hold the ship, then straight back along the
+    ship's motion against the ground (`_way_back`), and measures each against the whole
+    ground. Source: systems/ship.md, Rules, Islands, rule 2.
+    """
+    moving: Hitbox = ship_hitbox(ship)
+    holding: Hitbox = _holding(moving, ground)
+    directions: tuple[Direction, ...] = push_directions(moving, holding)
+    back: Direction | None = _way_back(ship, ground)
+    if back is not None and back not in directions:
+        directions = (*directions, back)
+    return _pushed(ship, ground, _shortest_way_out(ship, moving, directions, ground.hitbox))
+
+
+def _way_back(ship: Ship, ground: Ground) -> Direction | None:
+    """Return the unit direction opposite the ship's speed against the ground, None at rest.
+
+    The ship was clear before this tick's move, so backing out along it is a short way out of a
+    gap that narrows, like a wedge between a slope and the island below it.
+    """
+    rx: float = ship.vx - ground.velocity_x
+    ry: float = ship.vy - ground.velocity_y
+    length: float = math.hypot(rx, ry)
+    if length == 0.0:
+        return None
+    return (-rx / length, -ry / length)
+
+
+def _holding(moving: Hitbox, ground: Ground) -> Hitbox:
+    """Return the ground's shapes that `moving` is deeply inside, in ground order."""
+    return tuple(shape for shape in ground.hitbox if deeply_overlaps(moving, (shape,)))
+
+
+def _pushed(ship: Ship, ground: Ground, push: _Push) -> Ship:
+    """Return the ship moved by `push`, its speed into that surface dropped, against_island set."""
     vx, vy = _drop_speed_into_surface(ship, ground, push.direction)
-    blocked = replace(
+    return replace(
         ship,
         x=ship.x + push.distance * push.direction[0],
         y=ship.y + push.distance * push.direction[1],
@@ -316,22 +410,27 @@ def block_ship(ship: Ship, ground: Ground) -> Ship:
         vy=vy,
         against_island=True,
     )
-    if not ship.against_island:
-        log.debug("island contact x=%.2f y=%.2f", blocked.x, blocked.y)
-    return blocked
 
 
-def _shortest_way_out(ship: Ship, moving: Hitbox, ground: Ground) -> _Push:
-    """Return the shortest push that clears the ground and breaks no wall or the top line.
+def _moved(before: Ship, after: Ship) -> float:
+    """How far the ship's center moved, px."""
+    return math.hypot(after.x - before.x, after.y - before.y)
+
+
+def _shortest_way_out(
+    ship: Ship, moving: Hitbox, directions: tuple[Direction, ...], solid: Hitbox
+) -> _Push:
+    """Return the shortest push along one of `directions` that clears `solid` and breaks no wall
+    or the top line.
 
     A direction is skipped when its spot puts the ship past a side wall, or above the top line
     when it points up. A later direction wins only when shorter by more than SURFACE_TOLERANCE,
-    so ties keep the earlier one. Straight down is never skipped, so a way always exists.
-    Source: systems/ship.md, Rules, Islands, rule 2.
+    so ties keep the earlier one. `directions` always holds straight down, which is never
+    skipped, so a way always exists. Source: systems/ship.md, Rules, Islands, rule 2.
     """
     best: _Push | None = None
-    for direction in push_directions(moving, ground.hitbox):
-        distance: float = exit_distance(moving, ground.hitbox, direction)
+    for direction in directions:
+        distance: float = exit_distance(moving, solid, direction)
         if not _spot_allowed(ship, direction, distance):
             continue
         if best is None or distance < best.distance - SURFACE_TOLERANCE:
