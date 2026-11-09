@@ -1,6 +1,7 @@
 {
   "length_px": 1100,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 4,
   "placements": [
     { "at_px": 125, "type": "floating_island", "x": 370, "variant": "l_shape" },
     { "at_px": 125, "type": "floating_island", "x": 580, "variant": "box" },

@@ -1,6 +1,7 @@
 {
   "length_px": 1200,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 1,
   "extra_rest_ticks": 0,
   "placements": [
     { "at_px": 120, "type": "meteorite", "x": 452, "variant": "big" },

@@ -1,6 +1,7 @@
 {
   "length_px": 1100,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 3,
   "placements": [
     { "at_px": 140, "type": "electric_ball", "x": 80, "variant": "standard" },
     { "at_px": 147, "type": "satellite", "y": 258, "variant": "flat" },

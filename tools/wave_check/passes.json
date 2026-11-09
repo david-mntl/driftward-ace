@@ -1,7 +1,18 @@
 {
-  "suite": "part1",
+  "suite": "part1-islands",
   "passes": {
-    "l1_a@8": "936ba9536d15d6ababb353d8367e1f0d53eb30ca2a8e466dc0ca9c44711bd2f6",
-    "l1_b@8": "b49cf2548a2af7ed0d19ac171b681ff7008bc706f42478481174d4f93ef75c8e"
+    "w0_tutorial@8": "32bd7329aea09c816b5827d61be91063f5bae16dec4933003f773d63ce6a8270",
+    "w10_lvl4_island_lanes@8": "d87d989bf9bf1917a2a79a455282508f34069fae6aab41b311304218be820f50",
+    "w11_lvl4_island@8": "64cb3a80852a4c896df1ee0b6b0df59f1e833bc5b61a76ea889683f29833a591",
+    "w13_lvl5_chain_gauntlet@8": "5ec98517df6927e9746020d8748bb5b377b5300f66ece94ebd7a4e6bc2b7c1c7",
+    "w14_lvl6_planet_slalom@8": "01dca4e0c09f32c5a85d088b0c103edc1475fb005440d37c3bbbd97229e31229",
+    "w15_lvl6_planet_gates@8": "1c3a23af290d816d7beba348e78f5e0d92a42f7d3f495f82c1429136a103e26a",
+    "w16_lvl7_ufo_stream@8": "0aa5a10d5c63733a4dd05d5c94d8885af526a4e3d99abca9fa89e4e48b064db6",
+    "w17_lvl7_ufo_pairs@8": "1c69b0b461799184a6eccc7d45129cfd946ab208bc76c87999fddb5f4b3b95cb",
+    "w1_fireball@8": "829c132a9b5c568f2becf26d5c38de9c08adb1ac614f29a283b81d8a4fe0175b",
+    "w2_mix@8": "03ca48eb4b6b2d6188f5e881345e382af35f3fd6ccb775d681658c340741da8c",
+    "w5_lvl2_mix@8": "b4579a92f22fa562e9cf26f9c4886cebc4a206d8bd1e6e576db843b7b3a028ea",
+    "w8_lvl3_electric_ball@8": "9832f157842212f7a0c82a592da80655965ee209c3756cc8ba4e9e92bcb6bf76",
+    "w9_lvl3_electric_ball@8": "5d584a20b9dd4d74542854f3b816e07c839444f8b64a2fe2c3d801f80a05f165"
   }
 }

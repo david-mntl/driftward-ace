@@ -1,6 +1,7 @@
 {
   "length_px": 1100,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 6,
   "placements": [
     { "at_px": 120, "type": "planet", "x": 32 },
     { "at_px": 120, "type": "planet", "x": 120 },
