@@ -474,3 +474,100 @@ The file must exist and every field is required. An unknown field, a missing fie
 | `slash_color` | `"#ff00ae"` | `#rrggbb` | Color of the slash. Only the art script reads it. |
 
 The colors are baked into the picture. After you change a color or `size`, run `python tools/art/mute_icon.py --ship` to redraw it. Changing `margin` needs no redraw.
+
+---
+
+# demo.json
+
+The demo flight: the short scripted flight that plays the first time Play is picked after a page load, before the run starts. It shows how the ship drifts and what a coin is. Enter or Space skips it. A page reload shows it again; nothing is saved. You edit it by hand. The game reads it once at startup, in both run modes, so change a value and reload the page.
+
+The loader is `game/app/demo_tuning.py`. The schema is `docs/contracts/schemas/demo.schema.json`. The spec is `docs/contracts/systems/demo.md`.
+
+The file must exist and every field is required. Nothing has a default in code. A missing field, an unknown field, a value out of range or a bad type shows the error screen with the file and the field.
+
+Time is in ticks. 60 ticks = 1 second.
+
+## Top level
+
+| Field | Value now | Range | What it does |
+|---|---|---|---|
+| `enabled` | `true` | `true` or `false` | `false` turns the demo off: Play starts the run at once. |
+| `steps` | 8 steps, 388 ticks (about 6.5 s) | a list, 1 step or more | The script, played in order. See Steps below. |
+| `coin_step` | `5` | a step's index, counting from 0 | The step at whose last tick the ship reaches the coin. The game flies the script ahead once and puts the coin where the ship is then, so the coin is always collected, whatever the ship's values. |
+| `coin_type` | `"coin"` | a drifter type | What the ship collects. It must be a pickup. |
+| `coin_variant` | `"common"` | a variant of `coin_type` | `"rare"` shows the rare coin and pays its points. |
+| `fade_out_ticks` | `0` | whole number, 0 or more | The last ticks of the demo, in which the play area fades to black. `0` goes straight to the run: the ship ends hovering in the middle, where the run starts it, so no fade is needed. |
+| `pilot` | see Autopilot | object | How the autopilot taps the arrows. |
+
+## Steps
+
+Each step is one row in `steps`.
+
+| Field | Range | What it does |
+|---|---|---|
+| `keys` | a list of `"up"`, `"down"`, `"left"`, `"right"`, each once at most | The arrows the script holds through the step. They light up on the key caps and thrust the ship. `[]` holds nothing: the ship drifts. |
+| `ticks` | whole number, 1 or more | How long the step lasts. |
+| `caption` | text, or `null` | The caption shown from this step on. `null` keeps the last caption. Write it in capitals, as the other screens do. |
+| `stand` | `true` or `false` | `true` keeps the ship still, with no flame and the keys dark, as it waits to respawn. Use it at the start only: mid-air it looks frozen. A standing step holds no keys and has no `pilot_to`. |
+| `pilot_to` | `null`, or `[x, y]` inside 640 x 480 | The autopilot flies the ship to that spot and hovers there, tapping the real arrows as a player would; the keys light with each tap. Such a step has `"keys": []` and `"stand": false`. The middle of the play area, where a run starts, is `[320, 240]`. |
+
+The script now: stand 60 (HOLD UP TO THRUST), hold up 18, let go 60 (LET GO AND GRAVITY PULLS YOU DOWN), hover in the middle 50 (TAP UP TO HOVER) and 40 more (HOLD UP + RIGHT TO STEER), hold up and right 20 (the coin), fly back to the middle 90 (COINS ARE POINTS) and hover 50 (START).
+
+A caption set on a hover step shows before the move it names, so the player reads it first.
+
+## Autopilot
+
+`pilot`. Speeds are px per tick, distances px. These change how the autopilot flies, so after a change check the ship still settles (see Quick recipes).
+
+| Field | Value now | Range | What it does |
+|---|---|---|---|
+| `gain` | `0.06` | above 0 | Speed wanted per px of distance to the spot. Bigger flies in harder and can overshoot. |
+| `max_speed` | `3.0` | above 0 | Fastest speed the autopilot asks for up or down. Sideways it allows 1.5 times this. |
+| `band` | `0.35` | above 0 | How far the speed may stray before a key goes down or up. Bigger gives longer, calmer taps and a little more bob while hovering. |
+| `near_px` | `6` | 0 or more | Within this distance sideways, and slower than `near_speed`, no side key is tapped: drag settles the rest. Stops the left-right twitching near the spot. |
+| `near_speed` | `0.8` | 0 or more | See `near_px`. |
+
+## look
+
+How the overlay looks. Colors and the font come from `screens.json` (`frame_lights` cyan, `panel_body`, `plating`). These values never change play.
+
+| Field | Value now | Range | What it does |
+|---|---|---|---|
+| `key_size` | `30` | whole number, 1 or more | Side of each arrow key cap, in px. |
+| `key_gap` | `6` | whole number, 0 or more | Space between key caps, in px. |
+| `key_radius` | `5` | whole number, 0 or more | Corner radius of a key cap, in px. |
+| `key_bottom` | `28` | whole number, 0 or more | Gap from the play area's bottom edge to the bottom row of keys, in px. |
+| `arrow_size` | `6` | whole number, 1 or more | Half the width of the arrow on a key cap, in px. |
+| `key_fade_ticks` | `5` | whole number, 1 or more | Ticks a key takes to light up or go dark. Short taps light it only partly. |
+| `press_depth` | `2` | whole number, 0 or more | How far a held key sinks, in px. `0` keeps it still. |
+| `idle_fill_alpha` | `26` | 0 to 255 | Fill of a key cap that is not held. |
+| `idle_border_alpha` | `153` | 0 to 255 | Border of a key cap that is not held. |
+| `lit_fill_alpha` | `235` | 0 to 255 | Fill of a held key cap. |
+| `caption_role` | `"menu_item"` | a text role in `screens.json` `fonts` | Size and letter-spacing of the caption. |
+| `caption_gap` | `18` | whole number, 0 or more | Gap from the caption's bottom to the top key, in px. |
+| `caption_fade_ticks` | `10` | whole number, 1 or more | Ticks a new caption takes to fade in. |
+| `caption_rise` | `6` | whole number, 0 or more | How far a new caption rises while it fades in, in px. `0` keeps it still. |
+| `skip_margin` | `12` | whole number, 0 or more | Gap from the play area's top and right edges to the ENTER SPACE SKIP hint, in px. |
+| `skip_word` | `"SKIP"` | text | The word after the skip keys. |
+| `fade_in_ticks` | `0` | whole number, 0 or more | Ticks the run after the demo takes to fade in from black. `0` turns it off. |
+| `coin_ring_radius` | `20` | whole number, 0 or more | Middle radius of the pulsing ring round the waiting coin, in px. `0` turns the ring off. |
+| `coin_ring_pulse` | `3` | whole number, 0 or more | How far the ring's radius swings either way, in px. |
+| `coin_ring_period_ticks` | `40` | whole number, 1 or more | Ticks of one pulse. Bigger is slower. |
+| `coin_ring_alpha` | `200` | 0 to 255 | Brightness of the ring at its brightest. |
+| `start_text` | `"START"` | text | The word that shows at the end, as the run is about to start. |
+| `start_role` | `"menu_title"` | a text role in `screens.json` `fonts` | Size and letter-spacing of the start word. |
+| `start_ticks` | `50` | whole number, 0 or more | The last ticks of the demo in which the start word shows instead of the caption. The HUD score goes back to 0 then. `0`: no start word. |
+| `start_pop_ticks` | `12` | whole number, 1 or more | Ticks the start word takes to fade in and shrink to its size. |
+| `start_scale` | `1.6` | number, 1 or more | How big the start word starts, times its size. `1` just fades in. |
+| `start_y` | `150` | whole number, 0 or more | Height of the start word's center, px from the play area's top. |
+
+## Quick recipes
+
+| I want | Change |
+|---|---|
+| Longer or shorter hovers | `ticks` of the `pilot_to` steps. 60 is 1 s. |
+| A longer START | `start_ticks`, and the same number more on the last hover step. |
+| A different move | `keys` and `ticks` of a step. The coin follows the path on its own. Check the ship stays on screen: `game/tests/check.sh ui -k shipped_script`. |
+| No demo | `enabled`: `false`. |
+| Show the rare coin | `coin_variant`: `"rare"`. |
+| No ring round the coin | `coin_ring_radius`: `0`. |
