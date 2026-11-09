@@ -24,6 +24,7 @@ import logging
 import random
 import time
 from collections.abc import Sequence
+from dataclasses import replace
 
 import pygame
 
@@ -38,6 +39,7 @@ from app.audio import AudioPlayer, load_audio
 from app.audio_tuning import AudioLevels, load_audio_levels
 from app.background_tuning import load_background_rules
 from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_debug_spawns
+from app.demo_tuning import load_demo
 from app.drifter_looks_tuning import install_drifter_looks
 from app.hud_tuning import load_hud_rules
 from app.level_up_tuning import load_level_up
@@ -51,6 +53,7 @@ from app.start_wave import start_book
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
 from app.version import load_version
 from app.waves import load_wave_book
+from core.demo import Demo, DemoRules, start_demo
 from core.drifters.spawner import Placement
 from core.drifters.tuning import DrifterTuning
 from core.game_flow import (
@@ -74,6 +77,7 @@ from ui.background_view import BackgroundArt, draw_background
 from ui.burst_view import draw_burst
 from ui.credits import draw_credits
 from ui.debug_overlay import draw_debug_hitboxes, draw_debug_overlay, draw_debug_wave_lines
+from ui.demo_view import DemoLook, draw_demo, draw_fade_in, starting
 from ui.drifters.registry import render_drifter
 from ui.game_over import (
     draw_final_score,
@@ -175,7 +179,12 @@ async def frame_loop(mode: RunMode) -> None:
         graze_rules=graze_rules,
         last_life_rules=last_life_rules,
     )
-    flow: GameFlow = start_flow(run, saves)
+    demo_rules: DemoRules | None
+    demo_look: DemoLook
+    demo_rules, demo_look = load_demo(tuning, screen_rules)
+    demo: Demo | None = start_demo(demo_rules, tuning) if demo_rules is not None else None
+    flow: GameFlow = start_flow(run, saves, demo)
+    after_demo: bool = False
     overlay_visible: bool = debug
     focus_lost_pending: bool = False
     accumulator: float = 0.0
@@ -198,6 +207,7 @@ async def frame_loop(mode: RunMode) -> None:
         if flow.screen is not Screen.PAUSED:
             background_ticks += min(now - previous, BACKGROUND_MAX_STEP) * TICK_RATE
         previous = now
+        screen_before: Screen = flow.screen
         flow, accumulator, focus_lost_pending = _run_ticks(
             flow,
             thrust,
@@ -209,6 +219,7 @@ async def frame_loop(mode: RunMode) -> None:
             tuning,
             audio,
         )
+        after_demo = _follows_demo(after_demo, screen_before, flow.screen)
         was_capped = _apply_cap(accumulator, was_capped)
         if was_capped:
             accumulator = 0.0
@@ -227,10 +238,23 @@ async def frame_loop(mode: RunMode) -> None:
             mute_icon_view,
             audio is not None and audio.music_paused,
             version,
+            demo_look,
+            after_demo,
         )
         pygame.display.flip()
         await asyncio.sleep(0)
     log.info("quit")
+
+
+def _follows_demo(after_demo: bool, before: Screen, now: Screen) -> bool:
+    """Return True while the run that the demo led into plays or pauses.
+
+    Set when the screen leaves DEMO for PLAYING, cleared once it shows neither PLAYING nor
+    PAUSED. The run's fade-in from black reads it. Source: systems/demo.md, Rules, Fade.
+    """
+    if before is Screen.DEMO and now is Screen.PLAYING:
+        return True
+    return after_demo and now in (Screen.PLAYING, Screen.PAUSED)
 
 
 def _freeze_startup_heap() -> None:
@@ -350,6 +374,8 @@ def _run_ticks(
         focus_lost_pending = False
         if audio is not None and flow.run_stepped:
             audio.play_cues(flow.run.sound_cues)
+        if audio is not None and flow.screen is Screen.DEMO and flow.demo is not None:
+            audio.play_cues(flow.demo.sound_cues)
         due: Sequence[Placement] = (
             debug_spawns_due(spawn_list, flow.run.scroll.ticks)
             if spawn_list is not None and list_plays
@@ -401,6 +427,8 @@ def _draw(
     mute_icon_view: MuteIconView | None = None,
     music_muted: bool = False,
     version: str | None = None,
+    demo_look: DemoLook | None = None,
+    after_demo: bool = False,
 ) -> None:
     """Draw the screen the flow shows on the window.
 
@@ -411,12 +439,29 @@ def _draw(
     on it. The mute icon (when `music_muted`) goes in before the dim, so the dim darkens it and the
     boxes sit over it; on the menu and the pages it is the last call. The `version` label (when not
     None) shows in the bottom-left corner of the menu and the pages only, never on a run screen.
+    The demo (with a `demo_look`) draws the background and the still starfield, the demo flight
+    on `field`, then the HUD of the waiting run, its score showing the demo's coin points until
+    the start word shows (then 0, as the run will start), and
+    the mute icon. The run after the demo (`after_demo`) fades in from black on `field` in its
+    first ticks.
     Source: systems/app/frame-loop.md, Rules, Draw, The mute icon and The version label;
-    systems/game-flow.md, Presentation.
+    systems/game-flow.md, Presentation; systems/demo.md, App.
     """
+    if flow.screen is Screen.DEMO and flow.demo is not None and demo_look is not None:
+        draw_background(field, background, background_ticks)
+        draw_starfield(field, flow.run.scroll)
+        draw_demo(field, flow.demo, demo_look, look, ship_look, int(background_ticks))
+        points: int = 0 if starting(flow.demo, demo_look) else flow.demo.points
+        shown: Run = replace(flow.run, coin_points=points)
+        hud.draw(window, shown, flow.best, int(background_ticks))
+        if mute_icon_view is not None:
+            mute_icon_view.draw(window, music_muted)
+        return
     if flow.screen in _RUN_SCREENS:
         draw_background(field, background, background_ticks)
         _draw_run(field, flow, overlay_visible, ship_look, int(background_ticks), level_up_view)
+        if after_demo and demo_look is not None:
+            draw_fade_in(field, flow.run.scroll.ticks, demo_look)
         banner: LevelUpBanner | None = flow.run.level_up if level_up_view is not None else None
         offset: int = level_up_view.bump_offset(banner) if level_up_view is not None else 0
         if offset != 0:
