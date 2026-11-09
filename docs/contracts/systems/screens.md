@@ -1,13 +1,13 @@
 # Screens look
 Version: 1
 Status: draft
-Features: DRA-147, Credits page
+Features: DRA-147, Credits page, Version label and mute hint
 Created by: architect
 
 ## Purpose
 Give the menu, the pause box, the game-over screens, the instructions page, the leaderboard and the credits page one look: Glass Cockpit, in the Mono Violet colors, with soft glow, in a mono font. This contract owns that look, its tuning file and the views that draw it. What each screen shows and which key does what stay in `docs/contracts/systems/game-flow.md`.
 
-It closes UI-03 and UI-04. It replaces the white default-font stand-ins of DRA-125 and DRA-126. Where each screen sits in the window is unchanged (`10-ui.md`, `window_screens`). Source: scope report `docs/reports/scope/DRA-147.md`; `10-ui.md`, rows `screens_look`, `pause_look`, `game_over_look`, `menu_look`, `leaderboard_look`, `instructions_text_and_look`, `ui_font`, `ui_glow`, `screen_colors`; `12-art-and-audio.md`, Screen colors. The credits page came later (2026-11-08, no pipeline): `10-ui.md`, `credits_page` and `credits_look`; `02-game-flow.md`, rule 14.
+It closes UI-03 and UI-04. It replaces the white default-font stand-ins of DRA-125 and DRA-126. Where each screen sits in the window is unchanged (`10-ui.md`, `window_screens`). Source: scope report `docs/reports/scope/DRA-147.md`; `10-ui.md`, rows `screens_look`, `pause_look`, `game_over_look`, `menu_look`, `leaderboard_look`, `instructions_text_and_look`, `ui_font`, `ui_glow`, `screen_colors`; `12-art-and-audio.md`, Screen colors. The credits page came later (2026-11-08, no pipeline): `10-ui.md`, `credits_page` and `credits_look`; `02-game-flow.md`, rule 14. The version label and the footer's mute key came later still (2026-11-08, no pipeline): `10-ui.md`, `version_label` and `instructions_text_and_look`; `91-decision-log.md`, rows 153 and 154.
 
 ## Diagram
 ```
@@ -18,7 +18,8 @@ It closes UI-03 and UI-04. It replaces the white default-font stand-ins of DRA-1
  |:  | card   |  | card   |   :|     +------------------+   soft glow round the lines (off: strength 0)
  |:  +--------+  +--------+   :|     320 × 120 pause, 320 × 160 game over,
  |:   [ENTER][SPACE] BACK     :|     400 × 280 game over with the picker
- +------------------------------+     (: = ruler ticks on both sides)
+ |v1.0.0                        |     (: = ruler ticks on both sides; v1.0.0 = the version label,
+ +------------------------------+      on the menu and the pages only)
 ```
 ```mermaid
 flowchart LR
@@ -52,9 +53,10 @@ class ScreenRules:
     pause: PauseRules                 # w, h, gap, blur
     game_over: GameOverRules          # box sizes, padding, score cells, picker slots and cursor, blur
     menu: MenuRules                   # item size and gaps, title gap, hint distance
-    instructions: InstructionsRules   # margins, bands, card grid, icon box, blur
+    instructions: InstructionsRules   # margins, bands, card grid, icon box, foot_group_gap, blur
     leaderboard: LeaderboardRules     # margins, bands, table and row sizes, column widths, blur
     credits: CreditsRules             # margins, bands, card width, padding and gaps, text and link alphas, blur
+    version: VersionRules             # margin_left, margin_bottom, text_alpha: the version label
 ```
 ```python
 # game/app/screens_tuning.py. Not a startup module (imports ui); only app.frame imports it, inside the guard.
@@ -65,6 +67,12 @@ def load_screen_rules() -> ScreenRules: ...         # read once at startup; chec
     # glass.blur_down >= 1, instructions.columns >= 1, any other number >= 0. Palette: exactly PALETTE_KEYS, #rrggbb.
     # fonts.roles: every role in FONT_ROLES once, no other. rulers.major_pitch a multiple of minor_pitch.
     # game_over.picker_w, picker_h >= w, h.
+
+# game/app/version.py. Standard library only; only app.frame imports it, inside the guard.
+VERSION_FILE: Path                                  # game/VERSION, one line MAJOR.MINOR.PATCH, ships in the build
+VERSION_FORMAT: re.Pattern[str]                     # three whole numbers joined by dots, no leading zeros
+def load_version() -> str: ...                      # read once at startup, e.g. "1.0.0"; logs INFO "version %s"
+    # Missing file: FileNotFoundError. Any other text: ValueError naming "VERSION".
 
 # game/app/assets.py
 def load_screen_fonts(rules: ScreenRules) -> dict[str, pygame.font.Font]: ...   # one Font per role at its size, after pygame.init()
@@ -116,6 +124,11 @@ def draw_menu(surface: pygame.Surface, look: ScreenLook, selection: MenuItem) ->
 
 # game/ui/instructions.py. Imports: pygame, ui.screen_look.
 INSTRUCTION_SECTIONS: tuple[tuple[str, str], ...]   # the six (topic, caption) pairs, in card order
+BACK_KEYS: tuple[str, ...]        # ("ENTER", "SPACE")
+BACK_WORD: str                    # "BACK"
+MUTE_KEYS: tuple[str, ...]        # ("M",)
+MUTE_WORD: str                    # "MUSIC ON / OFF"
+FOOTER_GROUPS: tuple[tuple[tuple[str, ...], str], ...]   # (BACK_KEYS, BACK_WORD), (MUTE_KEYS, MUTE_WORD), left to right
 def draw_instructions(surface: pygame.Surface, look: ScreenLook) -> None: ...
 def card_rects(look: ScreenLook, size: tuple[int, int]) -> list[pygame.Rect]: ...   # the six card rects
 def icon_rect(look: ScreenLook, card: pygame.Rect) -> pygame.Rect: ...
@@ -141,6 +154,10 @@ BACK_KEYS: tuple[str, ...]        # ("ENTER", "SPACE")
 BACK_WORD: str                    # "BACK"
 def draw_credits(surface: pygame.Surface, look: ScreenLook) -> None: ...
 def card_rects(look: ScreenLook, size: tuple[int, int]) -> list[pygame.Rect]: ...   # one rect per card, in card order
+
+# game/ui/version_label.py. Imports: pygame, ui.screen_look.
+VERSION_PREFIX: str               # "v"
+def draw_version(surface: pygame.Surface, look: ScreenLook, version: str) -> None: ...   # "1.0.0" shows as v1.0.0
 ```
 `app.frame` builds the look once, after the window opens: `ScreenLook(screen_rules, load_screen_fonts(screen_rules))`, and passes it to `_draw`, which hands it to every view above.
 
@@ -171,7 +188,9 @@ Every view draws on the surface it is given and works from `surface.get_size()`:
 
 **Credits cards.** Order and words as in `CREDIT_CARDS` (`10-ui.md`, `credits_page`): MUSIC (heading `ship_lines_light`), LEVEL-UP SOUND (`level`), ALSO USED (`frame_lights`). In a card the heading (role `card_title`, glow) sits `pad_y` below the top and `pad_x` from the left; `heading_gap` below it come the lines (role `card_text`, no glow), one under the other, left-aligned, each followed by `line_gap`. A plain line is plating at `text_alpha`; a link line is `frame_lights` at `link_alpha`. A card is as tall as its padding, heading and lines. Lines are not wrapped: the words are written to fit `card_w`.
 
-**Footer.** The ENTER and SPACE key caps and the word BACK, centered in the foot band (instructions, leaderboard, credits).
+**Footer.** The ENTER and SPACE key caps and the word BACK, centered in the foot band (instructions, leaderboard, credits). On the instructions page the footer is two groups in one row, `instructions.foot_group_gap` apart, the row centered in the foot band: ENTER, SPACE and BACK, then the M key cap and MUSIC ON / OFF (`FOOTER_GROUPS`). It shows even when the game has no sound device.
+
+**Version label.** `v` and the version (`draw_version`), role `hint`, plating at `version.text_alpha`, no glow. The text's left edge is `version.margin_left` from the surface's left edge and its bottom `version.margin_bottom` above the surface's bottom. The app draws it on the menu and the full-window pages only (`systems/app/frame-loop.md`, The version label).
 
 **Rulers.** Short ticks every `minor_pitch` rows and a long one every `major_pitch`, down both sides of a full-window page, `inset_x` from the side and `inset_y` from the top and bottom.
 
@@ -182,7 +201,7 @@ Every view draws on the surface it is given and works from `surface.get_size()`:
 - The blur is the one live cost: the picture behind a box is made smaller and scaled back up every frame. Each screen has its own `blur` switch (`pause`, `game_over`, `instructions`, `leaderboard`, `credits`) and `glass.blur_down` sets the strength (1 is off). It is on for the pause box and the game-over box, where the picture behind is frozen, and off for the instructions page, the leaderboard and the credits page, where the background moves. Source: 15-tech-constraints.md, rules 5 and 6; to be measured in the browser build.
 - Glow is soft and only on the screens. The HUD stays flat. Source: 10-ui.md, `ui_glow`.
 - Key hints are on: the pause box, the name picker and the page footers. A key is drawn as a key cap, the arrows as small triangles. Source: 10-ui.md, `pause_box`, `game_over_look`, `instructions_text_and_look`, `credits_look`.
-- No corner labels, no page label and no invented text on any screen. Source: 10-ui.md, `screens_look`.
+- No corner labels, no page label and no invented text on any screen. The one exception is the version label in the bottom-left corner of the menu and the pages. Source: 10-ui.md, `screens_look` and `version_label`.
 - The window size is never written here: the views read `surface.get_size()`. The numbers fit 856 × 518 (`hud.json`, `window`). Source: 10-ui.md, `window_screens`.
 - The screens use their own palette, not the HUD's. Both stay separate files. Source: 10-ui.md, `screen_colors`.
 - The locked words stay as written: PAUSE, RETRY, MENU, NEW BEST SCORE, TOP 3, TOP 10, GAME OVER. Source: 10-ui.md, rule 6.
@@ -215,3 +234,5 @@ Every view draws on the surface it is given and works from `surface.get_size()`:
 - The WARNING icon is one plain sign, not a drifter, so it names no hazard.
 - The credits page (2026-11-08) reuses the `card_title` and `card_text` roles of the instructions cards, so no font role was added. Its words live in code as content, like the instructions captions. Links are text only: the page takes no mouse.
 - The ruler ticks stay as pure shapes; the corner texts of the mock-up are dropped.
+- The version (2026-11-08) lives in its own plain-text file, `game/VERSION`, not in a tuning file: it is not a look value, and CI reads it to check that a change to the shipped game raises it. The label's look (margins, alpha) is in `tuning/screens.json` like every other screen value.
+- The instructions footer's mute group (2026-11-08) has its own gap, `foot_group_gap` (48 px), wider than `keycap.group_gap`, to match the mock-up the Director approved.

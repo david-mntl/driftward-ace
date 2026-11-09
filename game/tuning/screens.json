@@ -210,6 +210,7 @@
     "pad_y": 6,
     "text_gap": 12,
     "caption_gap": 3,
+    "foot_group_gap": 48,
     "blur": false,
     "caption_alpha": 224
   },
@@ -252,5 +253,10 @@
     "text_alpha": 224,
     "link_alpha": 224,
     "blur": false
+  },
+  "version": {
+    "margin_left": 14,
+    "margin_bottom": 10,
+    "text_alpha": 150
   }
 }

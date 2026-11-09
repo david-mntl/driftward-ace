@@ -259,3 +259,10 @@
 - `systems/app/frame-loop.md` and `systems/app/general.md` (in `systems/app.md`): the Draw rule calls `draw_credits` on CREDITS. Version unchanged.
 - `schemas/screens.schema.json`: new required section `credits`. `tuning/screens.json` gains it.
 - `game/assets/CREDITS.md`: new Audio section with the shipped sounds' sources and licenses.
+
+## Version label and mute hint, 2026-11-08
+- The Director's call in the main session, no pipeline. The instructions footer names the music mute (M, MUSIC ON / OFF) after BACK; the cards don't change. Changes the locked `instructions_page`. The game shows its version, `v1.0.0`, in the bottom-left corner of the menu and the pages, never during a run. GDD: `10-ui.md` (`instructions_page`, `instructions_text_and_look`, `screens_look`, new `version_label`), `91-decision-log.md` rows 153 and 154.
+- `systems/screens.md`: new `app/version.py` (`load_version`) and `ui/version_label.py` (`draw_version`), new record `VersionRules`, `InstructionsRules.foot_group_gap`, the instructions footer's `FOOTER_GROUPS`; Presentation (Footer, Version label) and the corner-label rule's one exception. Draft, version stays 1.
+- `systems/app/frame-loop.md` (in `systems/app.md`): `_draw` takes a trailing `version`; new rule The version label. Version unchanged.
+- `schemas/screens.schema.json`: new required section `version`, new required field `instructions.foot_group_gap`. `tuning/screens.json` gains both.
+- New file `game/VERSION` (`1.0.0`). The release package check now requires it. CI: new workflow `version.yml` (the version must go up when a shipped file changes, unless the PR has the `no-version-bump` label; a merge to main tags `v<version>`).

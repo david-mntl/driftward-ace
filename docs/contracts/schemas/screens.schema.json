@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "driftward-ace/screens.schema.json",
   "title": "Screens values",
-  "description": "The file game/tuning/screens.json: the look of the menu, the pause box, the game-over screens, the instructions page, the leaderboard and the credits page: colors, glow, glass, fonts and the size and gaps of each screen, read in both run modes. Every field is required: no default lives in code. Nothing is baked into a picture file: the glass, the glow, the icons and the text are drawn once at startup. Range by field name: a name ending _alpha is a whole number 0 to 255, _strength a number 0 to 1, and _size, _w, _h and _pitch (and a field named w, h or size) a whole number of 1 or more; any other whole number is 0 or more, and any other number is 0 or more. All values are guesses from the screens brainstorm (10-ui.md, screens_look). Loaded and checked by game/app/screens_tuning.py at startup into ui.screen_rules.ScreenRules. Look only: no field changes play. Owner of the schema: architect.",
+  "description": "The file game/tuning/screens.json: the look of the menu, the pause box, the game-over screens, the instructions page, the leaderboard, the credits page and the version label: colors, glow, glass, fonts and the size and gaps of each screen, read in both run modes. Every field is required: no default lives in code. Nothing is baked into a picture file: the glass, the glow, the icons and the text are drawn once at startup. Range by field name: a name ending _alpha is a whole number 0 to 255, _strength a number 0 to 1, and _size, _w, _h and _pitch (and a field named w, h or size) a whole number of 1 or more; any other whole number is 0 or more, and any other number is 0 or more. All values are guesses from the screens brainstorm (10-ui.md, screens_look). Loaded and checked by game/app/screens_tuning.py at startup into ui.screen_rules.ScreenRules. Look only: no field changes play. Owner of the schema: architect.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,8 @@
     "menu",
     "instructions",
     "leaderboard",
-    "credits"
+    "credits",
+    "version"
   ],
   "properties": {
     "palette": {
@@ -735,6 +736,7 @@
         "pad_y",
         "text_gap",
         "caption_gap",
+        "foot_group_gap",
         "blur",
         "caption_alpha"
       ],
@@ -801,6 +803,11 @@
         },
         "caption_gap": {
           "description": "Space between a card's topic and its caption, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "foot_group_gap": {
+          "description": "Space between the footer's two key groups (BACK and the music mute), px.",
           "type": "integer",
           "minimum": 0
         },
@@ -1051,6 +1058,34 @@
         "blur": {
           "description": "Whether the picture behind the cards is blurred, drawn live every frame. Off keeps the frame rate on the moving background.",
           "type": "boolean"
+        }
+      }
+    },
+    "version": {
+      "description": "The version label: small dim text in the bottom-left corner of the menu and the full-window pages, never during a run. Role hint, plating, no glow.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "margin_left",
+        "margin_bottom",
+        "text_alpha"
+      ],
+      "properties": {
+        "margin_left": {
+          "description": "Distance of the text's left edge from the window's left edge, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "margin_bottom": {
+          "description": "Distance of the text's bottom from the window's bottom edge, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_alpha": {
+          "description": "How bright the text is, 0 to 255.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
         }
       }
     }

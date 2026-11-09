@@ -1,5 +1,5 @@
 """Instructions page: the title, six glass cards, each an icon with a topic and a short caption, and
-the footer.
+the footer with the BACK keys and the music mute key.
 
 Source: docs/contracts/systems/screens.md, Interface (ui/instructions.py); 10-ui.md,
 `instructions_text_and_look`. The view takes the surface and the look and only draws. It never
@@ -52,6 +52,18 @@ BACK_KEYS: Final[tuple[str, ...]] = ("ENTER", "SPACE")
 BACK_WORD: Final[str] = "BACK"
 """The word after the footer's key caps. 10-ui.md, instructions_text_and_look."""
 
+MUTE_KEYS: Final[tuple[str, ...]] = ("M",)
+"""The music mute key, shown in the footer after BACK. 10-ui.md, instructions_text_and_look."""
+
+MUTE_WORD: Final[str] = "MUSIC ON / OFF"
+"""The word after the mute key cap. 10-ui.md, instructions_text_and_look."""
+
+FOOTER_GROUPS: Final[tuple[tuple[tuple[str, ...], str], ...]] = (
+    (BACK_KEYS, BACK_WORD),
+    (MUTE_KEYS, MUTE_WORD),
+)
+"""The footer's key groups, left to right."""
+
 _DESIGN_W: Final[int] = 176
 _DESIGN_H: Final[int] = 96
 """The icons' drawing space, the mock-up's 176 x 96. Each icon is scaled to fit its box."""
@@ -91,11 +103,12 @@ def draw_instructions(surface: pygame.Surface, look: ScreenLook) -> None:
 
     The title sits at the top of the head band. The cards fill the window between the head band and
     the footer band inside the margins, ``columns`` to a row, ``gap`` apart. In a card the icon is
-    on the left and the topic and caption are a block centered on the right. The footer's key caps
-    and word are centered in the footer band. Needs ``pygame.font`` initialized.
+    on the left and the topic and caption are a block centered on the right. The footer's two key
+    groups, BACK and the music mute, are one row centered in the footer band. Needs ``pygame.font``
+    initialized.
     """
     rules = look.rules.instructions
-    width, height = surface.get_size()
+    width: int = surface.get_width()
     look.blit_rulers(surface)
     look.blit_text(
         surface,
@@ -106,8 +119,20 @@ def draw_instructions(surface: pygame.Surface, look: ScreenLook) -> None:
     )
     for index, rect in enumerate(card_rects(look, surface.get_size())):
         _draw_card(surface, look, index, rect)
-    foot_centery: int = height - rules.margin_bottom - rules.foot_h // 2
-    look.blit_keys(surface, BACK_KEYS, BACK_WORD, {"center": (width // 2, foot_centery)})
+    _draw_footer(surface, look)
+
+
+def _draw_footer(surface: pygame.Surface, look: ScreenLook) -> None:
+    """Draw the footer's key groups in a row, ``foot_group_gap`` apart, the row centered in the
+    foot band."""
+    rules = look.rules.instructions
+    width, height = surface.get_size()
+    centery: int = height - rules.margin_bottom - rules.foot_h // 2
+    sizes: list[int] = [look.keys_size(keys, word)[0] for keys, word in FOOTER_GROUPS]
+    left: int = width // 2 - (sum(sizes) + rules.foot_group_gap * (len(sizes) - 1)) // 2
+    for (keys, word), group_w in zip(FOOTER_GROUPS, sizes, strict=True):
+        look.blit_keys(surface, keys, word, {"midleft": (left, centery)})
+        left += group_w + rules.foot_group_gap
 
 
 def card_rects(look: ScreenLook, size: tuple[int, int]) -> list[pygame.Rect]:

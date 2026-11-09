@@ -47,6 +47,7 @@ from app.screens_tuning import load_screen_rules
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE, TICK_SNAP_SECONDS
 from app.ship_tuning import load_ship_look
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
+from app.version import load_version
 from app.waves import load_wave_book
 from core.drifters.spawner import Placement
 from core.drifters.tuning import DrifterTuning
@@ -93,6 +94,7 @@ from ui.screen_look import ScreenLook
 from ui.screen_rules import ScreenRules
 from ui.ship_view import ShipLook, draw_ship
 from ui.starfield import draw_starfield
+from ui.version_label import draw_version
 from ui.window_view import WindowBackdrop
 
 log = logging.getLogger(__name__)
@@ -142,6 +144,7 @@ async def frame_loop(mode: RunMode) -> None:
     )
     screen_rules: ScreenRules = load_screen_rules()
     look: ScreenLook = ScreenLook(screen_rules, load_screen_fonts(screen_rules))
+    version: str = load_version()
     backdrop: WindowBackdrop = WindowBackdrop(window.get_size())
     background: BackgroundArt = load_background(load_background_rules())
     ship_look: ShipLook = load_ship_look()
@@ -219,6 +222,7 @@ async def frame_loop(mode: RunMode) -> None:
             level_up_view,
             mute_icon_view,
             audio is not None and audio.music_paused,
+            version,
         )
         pygame.display.flip()
         await asyncio.sleep(0)
@@ -392,6 +396,7 @@ def _draw(
     level_up_view: LevelUpView | None = None,
     mute_icon_view: MuteIconView | None = None,
     music_muted: bool = False,
+    version: str | None = None,
 ) -> None:
     """Draw the screen the flow shows on the window.
 
@@ -400,8 +405,10 @@ def _draw(
     the background and the run's world on `field`, the play area (_draw_run), then the panel and
     frame on the window. Paused and game over then dim the whole window and draw their box centered
     on it. The mute icon (when `music_muted`) goes in before the dim, so the dim darkens it and the
-    boxes sit over it; on the menu and the pages it is the last call. Source:
-    systems/app/frame-loop.md, Rules, Draw and The mute icon; systems/game-flow.md, Presentation.
+    boxes sit over it; on the menu and the pages it is the last call. The `version` label (when not
+    None) shows in the bottom-left corner of the menu and the pages only, never on a run screen.
+    Source: systems/app/frame-loop.md, Rules, Draw, The mute icon and The version label;
+    systems/game-flow.md, Presentation.
     """
     if flow.screen in _RUN_SCREENS:
         draw_background(field, background, background_ticks)
@@ -431,6 +438,8 @@ def _draw(
         draw_leaderboard(window, look, flow.leaderboard)
     elif flow.screen is Screen.CREDITS:
         draw_credits(window, look)
+    if version is not None:
+        draw_version(window, look, version)
     if mute_icon_view is not None:
         mute_icon_view.draw(window, music_muted)
 
