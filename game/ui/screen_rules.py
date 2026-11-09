@@ -230,6 +230,12 @@ class InstructionsRules:
     caption_alpha: int
     foot_group_gap: int
     blur: bool
+    coin_scale: float
+    """The COINS card's game coins, times their sprite size (1.0 is the size in play)."""
+    common_coin_frame: int
+    """The frame of the common coin's strip the COINS card shows, from 0."""
+    rare_coin_frame: int
+    """The frame of the rare coin's strip the COINS card shows, from 0: one with its glint."""
 
 
 @dataclass(frozen=True)

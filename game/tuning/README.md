@@ -215,7 +215,7 @@ Field names carry their range. `*_alpha` is a whole number from 0 to 255. `*_str
 | `pause` | The pause box's size. `blur` turns the blur behind it off. |
 | `game_over` | The game-over box with and without the name picker: sizes, padding, the score cells, the slots, the cursor. |
 | `menu` | The menu's items, gaps and hint. |
-| `instructions` | The page's margins, the card grid and the icon box. |
+| `instructions` | The page's margins, the card grid and the icon box. `coin_scale`, `common_coin_frame` and `rare_coin_frame` pick the size and the frame of the real coin sprites on the COINS card (scale 1.0 is the size in play; frames count from 0). |
 | `leaderboard` | The page's margins, the table and the row sizes. |
 | `credits` | The page's margins, the card width, padding and gaps, and how bright the text and the links are. |
 
