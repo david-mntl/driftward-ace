@@ -5,7 +5,8 @@ their sprites, the graze values, the last-life
 values, the saves from the browser's localStorage and the wave files (both modes) and, in debug
 mode only, the debug test spawn list, then builds the first run and wraps it with the saves in the
 game flow, which opens on the menu. The run plays the
-waves, except in debug mode when the spawn list plays (its `play` is "list", the default). Each
+waves, except in debug mode when the spawn list plays (its `play` is "list", the default). In
+debug mode a start wave (app.start_wave) beats the spawn list and starts the waves near it. Each
 frame: read events (arrows, Enter and Space, F3, the page losing focus), build the thrust from the
 held arrows and the confirm flag from Enter or Space, run up to MAX_TICKS_PER_FRAME ticks (one
 core.game_flow.step_flow each, then the due drifters, the waves' or the spawn list's, through
@@ -40,12 +41,13 @@ from app.debug_spawns import PLAY_LIST, DebugSpawnList, debug_spawns_due, load_d
 from app.drifter_looks_tuning import install_drifter_looks
 from app.hud_tuning import load_hud_rules
 from app.level_up_tuning import load_level_up
-from app.mode import RunMode
+from app.mode import RunMode, read_start_wave
 from app.mute_icon_tuning import load_mute_icon_look
 from app.saves import load_saves, write_saves
 from app.screens_tuning import load_screen_rules
 from app.settings import MAX_TICKS_PER_FRAME, TICK_RATE, TICK_SNAP_SECONDS
 from app.ship_tuning import load_ship_look
+from app.start_wave import start_book
 from app.tuning import load_graze_rules, load_last_life_rules, load_tuning
 from app.version import load_version
 from app.waves import load_wave_book
@@ -164,8 +166,10 @@ async def frame_loop(mode: RunMode) -> None:
     level_up_view: LevelUpView = _build_level_up_view(hud_rules, level_up_look, hud)
     saves: Saves | None = load_saves()
     book: WaveBook = load_wave_book(tuning)
+    start_wave: str | None = read_start_wave() if debug else None
+    book = start_book(book, start_wave)
     spawn_list: DebugSpawnList | None = load_debug_spawns(tuning) if debug else None
-    list_plays: bool = spawn_list is not None and spawn_list.play == PLAY_LIST
+    list_plays: bool = spawn_list is not None and spawn_list.play == PLAY_LIST and not start_wave
     run: Run = start_run(
         waves=None if list_plays else start_waves(book, random.getrandbits(64), level_up_rules),
         graze_rules=graze_rules,

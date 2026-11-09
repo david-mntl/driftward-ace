@@ -22,6 +22,8 @@ The game is Python built for the browser. These limits are hard: breaking one br
 | debug_switch_desktop | environment variable `DRIFTWARD_DEBUG=1` | — | — | locked | Director |
 | debug_switch_launcher | the local launch script's debug option, which prints the debug URL | — | — | locked | Director |
 | debug_switch_other_value | any value other than `1` (including `0`) means normal mode, plus one WARNING naming the value. No switch at all means normal, with no warning | — | — | locked | Director |
+| debug_start_wave | debug only. URL parameter `wave=<wave id>`, environment variable `DRIFTWARD_WAVE` on desktop, or the launch script's `--wave` option. While the script runs with `--wave`, the plain game URL goes to that wave too, so opening `localhost:6060` is enough. The run starts just before the level-up into that wave's level, then plays that wave first, then the rest of the level and the levels after it as normal. Retry starts the same way. A Level 1 wave has no level-up. An unknown id plays the normal waves, plus one WARNING | — | — | locked | Director, 2026-11-09 |
+| debug_start_lead | 3 | s | — | guess | Director, 2026-11-09: "seconds before the level up banner". The time from the start of play to that level-up. The world is still for the first `scroll_start_delay`, then scrolls at Level 1 speed with no drifters |
 | log_level_normal | INFO | — | — | locked | Director |
 | log_level_debug | DEBUG | — | — | locked | Director |
 | log_format | `HH:MM:SS LEVEL logger: message` | — | — | locked | Director |
@@ -34,7 +36,7 @@ The game is Python built for the browser. These limits are hard: breaking one br
 4. **No server.** No server code, no paid services, no online features.
 5. **Browser performance.** Python in WebAssembly is slow. Glow is pre-rendered and particles are capped ([12-art-and-audio.md](12-art-and-audio.md)).
 6. **Done means it runs in a real browser.** A desktop run doesn't count.
-7. **Run modes.** Normal by default. Debug is chosen once, at launch, by one of the debug switches. Game rules are the same in both modes; debug only adds logs, the debug overlay ([10-ui.md](10-ui.md)) and a test spawn list that places drifters for testing.
+7. **Run modes.** Normal by default. Debug is chosen once, at launch, by one of the debug switches. Game rules are the same in both modes; debug only adds logs, the debug overlay ([10-ui.md](10-ui.md)), a test spawn list that places drifters for testing, and a start wave (`debug_start_wave`) for playing one wave without the waves before it.
 8. **Errors never freeze the page.** An unexpected error is logged with its full trace and shows the error screen ([10-ui.md](10-ui.md)).
 9. **Logging.** Log by event, never by tick: a line every tick floods the console and slows the game (rule 5).
 10. **No garbage-collector freezes.** Everything loaded before the first frame is taken out of Python's garbage collector (collected once, then frozen). A full collection over the whole startup memory holds one frame for 30 to 60 ms in the browser, at a random moment.

@@ -112,6 +112,13 @@ def read_switch() -> str | None:
     # None when the switch is absent. Present with an empty value returns "".
 
 
+def read_start_wave() -> str | None:
+    ...
+    # Browser: the first value of URL query parameter `wave`. Desktop: environment variable
+    # DRIFTWARD_WAVE. None when absent. Read by app.frame, in debug mode only.
+    # Source: 15-tech-constraints.md, debug_start_wave.
+
+
 def choose_mode(raw: str | None) -> ModeChoice:
     ...
     # Pure. No logging, no I/O.
