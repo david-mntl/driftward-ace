@@ -260,13 +260,23 @@ def _step_menu(flow: GameFlow, presses: _Presses) -> GameFlow:
         case MenuItem.PLAY:
             if flow.demo is not None:
                 return _enter(_with_fresh_run(flow), Screen.DEMO)
-            return _enter(_with_fresh_run(flow), Screen.PLAYING)
+            return _start_play(_with_fresh_run(flow))
         case MenuItem.INSTRUCTIONS:
             return _enter(flow, Screen.INSTRUCTIONS)
         case MenuItem.LEADERBOARD:
             return _enter(flow, Screen.LEADERBOARD)
         case MenuItem.CREDITS:
             return _enter(flow, Screen.CREDITS)
+
+
+def _start_play(flow: GameFlow) -> GameFlow:
+    """Return the flow on PLAYING with its run waiting: the ship holds at the center until the
+    first arrow press, while the scroll, the waves and the drifters run. Every run starts so:
+    from Play, after the demo and on RETRY. The arrows held on the last tick go in as held, so
+    an arrow held through the start is no press, as in the respawn wait. Source:
+    02-game-flow.md, rule 5; 05-lives-and-damage.md, rule 2.5."""
+    waiting: Run = replace(flow.run, waiting=True, held=flow.arrows_held)
+    return _enter(replace(flow, run=waiting), Screen.PLAYING)
 
 
 def _with_fresh_run(flow: GameFlow) -> GameFlow:
@@ -289,7 +299,7 @@ def _step_demo(flow: GameFlow, presses: _Presses) -> GameFlow:
     rule 5a."""
     if flow.demo is None or presses.confirm or flow.demo.done:
         log.debug("demo end by=%s", "key" if presses.confirm else "time")
-        return _enter(replace(flow, demo=None), Screen.PLAYING)
+        return _start_play(replace(flow, demo=None))
     return replace(flow, demo=step_demo(flow.demo))
 
 
@@ -353,7 +363,7 @@ def _step_choices(flow: GameFlow, presses: _Presses) -> GameFlow:
         return replace(flow, game_over_selection=moved)
     match flow.game_over_selection:
         case GameOverChoice.RETRY:
-            return _enter(replace(flow, run=next_run(flow.run)), Screen.PLAYING)
+            return _start_play(replace(flow, run=next_run(flow.run)))
         case GameOverChoice.MENU:
             return _enter_menu(flow)
 

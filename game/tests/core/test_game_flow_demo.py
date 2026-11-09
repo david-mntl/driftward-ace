@@ -100,3 +100,44 @@ def test_after_the_demo_the_next_play_starts_the_run_at_once() -> None:
 def test_without_a_demo_play_starts_the_run_at_once() -> None:
     flow = _press_play(_menu(None))
     assert flow.screen is Screen.PLAYING
+
+
+def _after_demo() -> GameFlow:
+    """The flow on PLAYING right after a skipped demo, no key held."""
+    flow = step_flow(_press_play(_menu(_demo())), NOTHING)
+    return step_flow(step_flow(flow, CONFIRM), NOTHING)
+
+
+def test_every_run_starts_with_the_ship_holding_at_the_center_until_an_arrow() -> None:
+    flow = _after_demo()
+    assert flow.screen is Screen.PLAYING
+    start = flow.run.ship
+    scroll_before: int = flow.run.scroll.ticks
+    for _ in range(90):
+        flow = step_flow(flow, NOTHING)
+        assert flow.run.waiting
+        assert flow.run.ship == start, "the ship holds until an arrow goes down"
+    assert flow.run.scroll.ticks == scroll_before + 90, "the world runs on meanwhile"
+    flow = step_flow(flow, TickInput(thrust=Thrust(up=True)))
+    assert not flow.run.waiting
+    assert flow.run.ship != start
+
+
+def test_an_arrow_held_through_the_start_is_no_press() -> None:
+    flow = step_flow(_press_play(_menu(_demo())), NOTHING)
+    held = TickInput(thrust=Thrust(left=True))
+    flow = step_flow(flow, held)
+    flow = step_flow(flow, TickInput(confirm=True, thrust=Thrust(left=True)))
+    assert flow.screen is Screen.PLAYING
+    for _ in range(10):
+        flow = step_flow(flow, held)
+        assert flow.run.waiting
+    flow = step_flow(flow, NOTHING)
+    flow = step_flow(flow, held)
+    assert not flow.run.waiting
+
+
+def test_play_from_the_menu_without_a_demo_also_waits() -> None:
+    flow = _press_play(_menu(None))
+    assert flow.run.waiting
+    assert step_flow(flow, NOTHING).run.ship == flow.run.ship
