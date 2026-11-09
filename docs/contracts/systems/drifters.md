@@ -11,9 +11,9 @@ Every drifter in the game, hazards, pickups and blockers, is built on one shared
 <!-- parts:begin -->
 | Part | Holds | Read when | Size |
 |---|---|---|---|
-| [shared/base-interface](drifters/shared/base-interface.md) | Interface | you write or review code in `game/core/drifters/base.py`. | 15.5 KB |
+| [shared/base-interface](drifters/shared/base-interface.md) | Interface | you write or review code in `game/core/drifters/base.py`. | 16.0 KB |
 | [shared/base](drifters/shared/base.md) | Purpose, Diagram, Rules | you change what every drifter shares: phases, warning, hitbox, start, re-hit. | 25.9 KB |
-| [shared/collision](drifters/shared/collision.md) | Interface, Rules | you change hitbox shapes, the overlap test or the push-out. | 12.0 KB |
+| [shared/collision](drifters/shared/collision.md) | Interface, Rules | you change hitbox shapes, the overlap test or the push-out. | 13.2 KB |
 | [shared/rationale](drifters/shared/rationale.md) | Rationale | you ask why a shared rule is the way it is. A drifter's own why is in its `rationale` part. | 13.8 KB |
 | [shared/spawner-registry-tuning](drifters/shared/spawner-registry-tuning.md) | Diagram, Interface, Rules | you change levels, the registry, the spawner or the shared tuning, or add a drifter. | 19.2 KB |
 | [shared/views](drifters/shared/views.md) | Diagram, Interface, Presentation | you change how drifters are drawn: view registry, brightness, entry warning, shapes. | 14.7 KB |
@@ -44,7 +44,7 @@ Every drifter in the game, hazards, pickups and blockers, is built on one shared
 | [planet/rationale](drifters/planet/rationale.md) | Rationale | you ask why the planet is built the way it is. | 3.5 KB |
 | [planet/tuning](drifters/planet/tuning.md) | Rules | you change the planet's tuning file or its checks. | 1.5 KB |
 | [planet/view](drifters/planet/view.md) | Interface, Presentation | you change how the planet looks. | 3.9 KB |
-| [satellite/core](drifters/satellite/core.md) | Diagram, Interface, Rules | you change how the satellite behaves (`satellite.py`). | 6.3 KB |
+| [satellite/core](drifters/satellite/core.md) | Diagram, Interface, Rules | you change how the satellite behaves (`satellite.py`). | 6.7 KB |
 | [satellite/rationale](drifters/satellite/rationale.md) | Rationale | you ask why the satellite is built the way it is. | 1.3 KB |
 | [satellite/view](drifters/satellite/view.md) | Interface, Presentation | you change how the satellite looks. | 1.7 KB |
 | [ufo/core](drifters/ufo/core.md) | Diagram, Interface, Rules | you change how the UFO behaves (`ufo.py`). | 20.5 KB |
