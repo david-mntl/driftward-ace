@@ -3,7 +3,7 @@ Status: draft
 Depends on: [05-lives-and-damage.md](05-lives-and-damage.md), [10-ui.md](10-ui.md), [11-save-data.md](11-save-data.md)
 
 ## Summary
-The game moves through a few fixed states. The start page comes first: the game's name over the menu's painting, a loading bar, then a prompt. One click or key press unlocks audio and opens the menu. Then the main menu shows: Play, Instructions, Leaderboard, Credits. A run plays until the last life is lost. The ship bursts, the world runs on for two seconds, then the game-over screen shows. If the score made the top 10, the player enters a name there first. RETRY starts a new run; MENU goes back to the menu.
+The game moves through a few fixed states. The start page comes first: the game's name over a live black hole with the ship circling it, a loading bar, then a prompt. One click or key press unlocks audio and opens the menu. Then the main menu shows: Play, Instructions, Leaderboard, Credits. A run plays until the last life is lost. The ship bursts, the world runs on for two seconds, then the game-over screen shows. If the score made the top 10, the player enters a name there first. RETRY starts a new run; MENU goes back to the menu.
 
 ```mermaid
 stateDiagram-v2
