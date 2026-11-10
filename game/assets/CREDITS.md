@@ -5,6 +5,7 @@
 - background.png: the far painting, still. Made by the Director in an AI image tool, resized to 640x480. Own work. The game doesn't load it: it's the source for the sway frames.
 - background_sway_00.png to background_sway_11.png: the far painting's slow sway, a loop of 12 frames baked from background.png by tools/art/background_sway.py. Own work.
 - bg_planet_0.png to bg_planet_5.png: the broken planets of the middle layer. Cut from a sheet the Director made in an AI image tool. Own work.
+- bg_item_0.png to bg_item_5.png: the wrecks and debris that take turns with the planets in the middle layer. Cut and shrunk by tools/art/background_items.py from a sheet the Director made in an AI image tool: staging/art-inbox/background-items.png. Own work.
 
 ## Audio
 

@@ -34,21 +34,46 @@ PLANET_FILES: tuple[str, ...] = tuple(f"bg_planet_{index}.png" for index in rang
 """The broken planets of the middle layer, each cut to its own bounds. Source:
 12-art-and-audio.md, Background, middle layer."""
 
+ITEM_FILES: tuple[str, ...] = tuple(f"bg_item_{index}.png" for index in range(6))
+"""The wrecks and debris that share the middle layer with the planets, each cut to its own
+bounds by tools/art/background_items.py."""
+
 
 MUTE_ICON_PICTURE: str = "mute_icon.png"
 """The muted-music icon's picture, in ASSETS_DIR. Baked by tools/art/mute_icon.py."""
 
 
 def load_background(rules: BackgroundRules) -> BackgroundArt:
-    """Load the painting's sway frames and the planets, and build the background from them.
+    """Load the painting's sway frames, the planets and the wrecks, and build the background.
 
-    Call it once, after the display is open. A missing file raises FileNotFoundError (from
-    pygame). A frame that is not SCREEN_W x SCREEN_H raises ValueError naming the file.
+    The middle layer's looks alternate: a planet, then a wreck, and so on, so the view's walk
+    through them mixes the two. Call it once, after the display is open. A missing file raises
+    FileNotFoundError (from pygame). A frame that is not SCREEN_W x SCREEN_H raises ValueError
+    naming the file.
     """
     sway: tuple[pygame.Surface, ...] = tuple(_load_frame(name) for name in SWAY_FILES)
     planets: tuple[pygame.Surface, ...] = tuple(_load(name, alpha=True) for name in PLANET_FILES)
-    log.info("background loaded %d painting frames and %d planets", len(sway), len(planets))
-    return build_background(sway, planets, rules)
+    items: tuple[pygame.Surface, ...] = tuple(_load(name, alpha=True) for name in ITEM_FILES)
+    log.info(
+        "background loaded %d painting frames, %d planets and %d wrecks",
+        len(sway),
+        len(planets),
+        len(items),
+    )
+    return build_background(sway, _alternate(planets, items), rules)
+
+
+def _alternate(
+    first: tuple[pygame.Surface, ...], second: tuple[pygame.Surface, ...]
+) -> tuple[pygame.Surface, ...]:
+    """Return the sprites of both lists in turn: first[0], second[0], first[1], second[1], ...
+
+    When one list is longer, its extra sprites follow at the end.
+    """
+    mixed: list[pygame.Surface] = []
+    for index in range(max(len(first), len(second))):
+        mixed.extend(group[index] for group in (first, second) if index < len(group))
+    return tuple(mixed)
 
 
 def _load_frame(file: str) -> pygame.Surface:
