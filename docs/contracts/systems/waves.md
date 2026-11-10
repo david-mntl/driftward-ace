@@ -1,5 +1,5 @@
 # Waves: wave files, the wave book, the wave clock, playlists and the random picker
-Version: 4
+Version: 5
 Status: frozen
 Features: DRA-76, DRA-104, DRA-111, DRA-148
 Created by: architect
@@ -7,7 +7,7 @@ Created by: architect
 ## Purpose
 A normal run is made of waves. A wave is a hand-authored group of drifters, each placed at a scroll distance from the wave's start; it plays as the world scrolls past. This contract holds the waves and playlists as core data (the wave book), the check that turns the decoded wave and playlist files into a book or refuses them, the wave state one run carries (the level, the wave playing, the rest gap, the next random pick), its one-tick step (the wave clock and the playlist runner), and the random picker.
 
-Every run opens with Wave 0 at Level 1. Then each level plays its playlist: its fixed waves in order, then `random_count` random picks. When the last wave of a level's playlist ends, the level goes up by one on that tick. After Level 8's playlist, random picks play forever at Level 8. A random pick is a pool wave allowed at the current level, never the wave that just played, and new every run. Between two waves there is a rest gap: `rest_gap_base` × the level's Rest gap × (0 ticks for now), plus the extra rest of the wave that ended. When the wave that ended raised the level, a fixed level-up rest is added on top (`docs/contracts/systems/level-up/core.md`). The world keeps scrolling through it.
+Every run opens with Wave 0 at Level 1. Then each level plays its playlist: its fixed waves in order, then `random_count` random picks. When the last wave of a level's playlist ends, the level goes up by one on that tick. After Level 8's playlist, random picks play forever at Level 8. A random pick is a pool wave allowed at the current level, not yet played in the current cycle and not among the last `repeat_window` waves played, and new every run. Between two waves there is a rest gap: `rest_gap_base` × the level's Rest gap × (0 ticks for now), plus the extra rest of the wave that ended. When the wave that ended raised the level, a fixed level-up rest is added on top (`docs/contracts/systems/level-up/core.md`). The world keeps scrolling through it.
 
 The wave state lives inside the run (`docs/contracts/systems/run.md`, `Run.waves`): it freezes at game over, and a retry starts it again from Wave 0 with new picks. Its level is the run's level: the scroll speed (`docs/contracts/systems/scroll.md`) and the spawner read it. A run with no wave state plays no waves and stays at Level 1: that is the debug test spawn list.
 
@@ -270,13 +270,15 @@ The wave clock (`step_waves`, steps as in the Diagram). Source: 09-waves.md, rul
 
 Starting a wave (not Wave 0). Source: 09-waves.md, rule 4:
 - If `next_slot < len(level_slots(level))`: take that slot and add 1 to `next_slot`. Else (only at Level 8, after its playlist): a random slot, `next_slot` unchanged.
-- A wave id slot: `wave_id` is that id. A random slot: `chooser = random.Random(pick_seed)`, `wave_id = pick_pool_wave(book, level, <the wave_id before this start>, chooser)`, then `pick_seed = chooser.getrandbits(64)`.
+- A wave id slot: `wave_id` is that id. A random slot: `chooser = random.Random(pick_seed)`, `wave_id = pick_pool_wave(book, level, <the wave_id before this start>, chooser)`, then `pick_seed = chooser.getrandbits(64)`. A random slot also sets `played_ids` and `recent_ids` from `pick_in_cycle`; a fixed slot adds its wave to both.
 - Then `spawned = 0`, `resting = False`, `rest_ticks_left = 0`, and `start_px` as the caller set it.
 
 Random picks (`pick_pool_wave`). Source: 09-waves.md, rules 4 and 10; 91-decision-log.md, row 66; scope report DRA-76, Limits ("The random picker"):
-- Candidates: `book.pool_ids(level)`, pool waves with `min_level <= level`, sorted by id so the same seed always gives the same pick.
-- With more than one candidate, `last_wave_id` is left out: never the wave that just played. That is the wave before this start, whatever played it: Wave 0, a fixed slot or a random one, in this level or the last.
-- With one candidate, it plays even if it just played.
+- Pool: `book.pool_ids(level)`, pool waves with `min_level <= level`, sorted by id so the same seed always gives the same pick.
+- State (`WaveRun`): `played_ids`, the waves played in the current cycle of this level, and `recent_ids`, the last waves played across cycles and levels (at most one per pool wave). Every wave that starts is added to both, fixed slots included. `_end_wave` empties `played_ids` when the level rises; `recent_ids` carries over. Both start empty.
+- `repeat_window(n)` = 0 for `n < 2`, else `max(1, floor(n × REPEAT_WINDOW_SHARE))`, with `REPEAT_WINDOW_SHARE = 0.5` (guess). Never above `n - 1`.
+- `pick_in_cycle(book, level, last_wave_id, played_ids, recent_ids, chooser)` returns the pick, the new `played_ids` and the new `recent_ids`. Candidates: pool waves not in `played_ids`, not among the last `repeat_window` of `recent_ids` and not `last_wave_id`. When there are none, the cycle starts over: `played_ids` is emptied and the same exclusions (without `played_ids`) apply. If that is still empty, the pool waves other than `last_wave_id`, or the whole pool when it is one wave: it plays again.
+- So every allowed wave plays once before any comes back, and no wave comes back within `repeat_window` picks, also across a cycle start. `pick_pool_wave(book, level, last_wave_id, chooser)` keeps its signature: `pick_in_cycle` with both lists empty.
 - `chooser.choice(candidates)`. The function draws from `chooser` and nothing else. The load check makes sure a level with a random slot has a candidate (Wave files), so core never picks from none.
 - No tier check: `min_level` is set by hand while DF-01 is open. Source: scope report DRA-76, Out.
 

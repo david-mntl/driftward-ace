@@ -266,3 +266,10 @@
 - `systems/app/frame-loop.md` (in `systems/app.md`): `_draw` takes a trailing `version`; new rule The version label. Version unchanged.
 - `schemas/screens.schema.json`: new required section `version`, new required field `instructions.foot_group_gap`. `tuning/screens.json` gains both.
 - New file `game/VERSION` (`1.0.0`). The release package check now requires it. CI: new workflow `version.yml` (the version must go up when a shipped file changes, unless the PR has the `no-version-bump` label; a merge to main tags `v<version>`).
+
+## Piskel credit, 2026-11-10
+- The Director's call in the main session, no pipeline. The credits page's ALSO USED card gains a line, "Sprites made in Piskel (Apache 2.0)", after the two fonts. GDD: `10-ui.md` (`credits_page`), `91-decision-log.md` row 162. `game/ui/credits.py`: `CREDIT_CARDS`. `game/assets/CREDITS.md`: new Tools section. `systems/screens.md` names the cards, not their lines: unchanged.
+
+## No early wave repeats, 2026-11-10
+- The Director's call in the main session, no pipeline. A random wave is never one already played in the level's current cycle, and never one of the last `repeat_window` waves played (half the allowed pool, at least 1). When every allowed wave has played, the cycle starts over. At Level 8 this runs forever. GDD: `09-waves.md` rule 4 and `repeat_window`, `91-decision-log.md` row 161.
+- `systems/waves.md`: 4 to 5. New `WaveRun.played_ids` and `recent_ids`, new `pick_in_cycle` and `repeat_window`, new `REPEAT_WINDOW_SHARE`. `pick_pool_wave` keeps its signature.

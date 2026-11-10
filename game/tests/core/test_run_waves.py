@@ -260,17 +260,28 @@ def picks_book() -> WaveBook:
 def expected_picks(seed: int, count: int) -> list[str]:
     """The first `count` picks of `picks_book` from `seed`, replayed here from the contract.
 
-    Each pick: a `random.Random(pick_seed)`, `choice` over the pool ids sorted by id without the
-    wave before it, then the next seed from `getrandbits(64)`. Source: waves.md, Rules, Starting a
-    wave and Random picks.
+    Each pick: a `random.Random(pick_seed)`, `choice` over the pool ids sorted by id that are not
+    played this cycle, not among the last two waves (half of the four) and not the wave before
+    it; when none is left the cycle starts over. Then the next seed from `getrandbits(64)`.
+    Source: waves.md, Rules, Starting a wave and Random picks.
     """
     last: str = WAVE_ZERO
+    played: list[str] = []
+    recent: list[str] = []
     picks: list[str] = []
     for _ in range(count):
         chooser: random.Random = random.Random(seed)
-        candidates: list[str] = [wave_id for wave_id in POOL_IDS if wave_id != last]
+        blocked: list[str] = [*recent[-2:], last]
+        candidates: list[str] = [
+            wave_id for wave_id in POOL_IDS if wave_id not in played and wave_id not in blocked
+        ]
+        if not candidates:
+            played = []
+            candidates = [wave_id for wave_id in POOL_IDS if wave_id not in blocked]
         last = chooser.choice(candidates)
         seed = chooser.getrandbits(SEED_BITS)
+        played.append(last)
+        recent.append(last)
         picks.append(last)
     return picks
 

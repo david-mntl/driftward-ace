@@ -107,9 +107,10 @@ def test_the_source_never_holds_text_the_pygbag_build_rewrites() -> None:
     assert "Rain, sheet roof.wav" in _card_text("MUSIC")
 
 
-def test_the_courtesy_card_names_the_game_over_sound_and_both_fonts() -> None:
+def test_the_courtesy_card_names_the_game_over_sound_both_fonts_and_piskel() -> None:
     text = _card_text("ALSO USED")
-    for part in ("Game Over Arcade", "Mountain_Man", "CC0", "Exo 2", "Share Tech Mono", "OFL"):
+    parts = ("Game Over Arcade", "Mountain_Man", "CC0", "Exo 2", "Share Tech Mono", "OFL")
+    for part in (*parts, "Piskel", "Apache 2.0"):
         assert part in text, f"{part!r} is missing"
 
 

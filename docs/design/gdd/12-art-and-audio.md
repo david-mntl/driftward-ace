@@ -121,7 +121,7 @@ The screens (menu, pause box, game over, instructions, leaderboard) have their o
 ### Background
 - **Far layer.** One large painting. Rivers of stars, gas and debris curve toward a dim, distant black hole at the bottom left, mostly off screen. The rays sway very slowly, and a soft patch of light turns along the hole's rim. It is a loop of frames made ahead of time, faded from one to the next, and it keeps the painting's brightness. The sway is slow and small, so it never pulls the eye off the objects.
 - **River light.** Small glowing specks and streaks travel along the curves into the black hole, so the rivers look like they flow. Their number is capped. A small swirl loops around the black hole.
-- **Middle layer.** Dark outlines of broken planets, scrolling straight down, slowly.
+- **Middle layer.** Dark outlines of broken planets and drifting wrecks, scrolling straight down, slowly. They take turns: a planet, then a wreck, then the next planet.
 - **Near layer.** A few dust streaks, scrolling straight down, faster.
 - **Bottom glow.** A faint fuchsia glow along the bottom edge: where the pull comes from, and where falling costs a life.
 

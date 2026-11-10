@@ -5,6 +5,7 @@
 - background.png: the far painting, still. Made by the Director in an AI image tool, resized to 640x480. Own work. The game doesn't load it: it's the source for the sway frames.
 - background_sway_00.png to background_sway_11.png: the far painting's slow sway, a loop of 12 frames baked from background.png by tools/art/background_sway.py. Own work.
 - bg_planet_0.png to bg_planet_5.png: the broken planets of the middle layer. Cut from a sheet the Director made in an AI image tool. Own work.
+- bg_item_0.png to bg_item_5.png: the wrecks and debris that take turns with the planets in the middle layer. Cut and shrunk by tools/art/background_items.py from a sheet the Director made in an AI image tool: staging/art-inbox/background-items.png. Own work.
 
 ## Audio
 
@@ -48,3 +49,7 @@ All own work, drawn by script (Pillow + numpy) from the designs the Director pic
 - sprites/island_ground_1.png, island_ground_2.png and island_ground_3.png: the three floating-island grounds, 320x120 each, copied unchanged from floating-island-d1-r3, d2-r3 and d3-r3 (tools/art/floating-island-d1.py to d3.py).
 - sprites/meteorite_rock_a.png to meteorite_rock_d.png: the meteorite's four rock looks, 32 frames of 36x36 each, the rock turning on a tilted axis. tools/art/meteorite-d11.py --round 2 (3D bodies, style from meteorite-d10.py), own work, style described in words from a Director reference (the reference itself is not used or shipped). Picked by the Director 2026-11-05.
 - mute_icon.png: the muted-music icon, a pale violet-white speaker with a fuchsia slash, 24x24, one still picture. tools/art/mute_icon.py (Pillow) from tuning/mute_icon.json, master at 8x (192x192) kept in staging/assets/ui/mute_icon-master.png. Own work. docs/contracts/DRA-159/tasks/DRA-159-01-art-audio-engineer.md, 2026-11-07
+
+## Tools
+
+- Piskel, the free sprite editor, https://github.com/piskelapp/piskel. Used for sprites. Licensed under the Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.

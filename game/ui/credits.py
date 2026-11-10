@@ -70,6 +70,7 @@ CREDIT_CARDS: Final[tuple[CreditCard, ...]] = (
             CreditLine('Game over sound: "Game Over Arcade" by Mountain_Man (CC0)'),
             CreditLine("Font: Exo 2, by The Exo 2 Project Authors (SIL OFL 1.1)"),
             CreditLine("Font: Share Tech Mono, by Carrois Type Design (SIL OFL 1.1)"),
+            CreditLine("Sprites made in Piskel (Apache 2.0)"),
         ),
     ),
 )
