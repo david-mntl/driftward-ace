@@ -28,6 +28,10 @@ REST_GAP_BASE_TICKS: Final[int] = 0
 """Rest gap before the level multiplier, ticks. Source: 08-difficulty.md, rest_gap_base
 (guess; the real value is DF-02)."""
 
+REPEAT_WINDOW_SHARE: Final[float] = 0.5
+"""Share of the allowed pool waves a random pick leaves out because they played last. A wave
+comes back no sooner than this share of the pool later. Source: 09-waves.md, rule 4 (guess)."""
+
 SEED_BITS: Final[int] = 64
 """Width of the next seed drawn from a generator, bits. Source: docs/contracts/systems/waves.md,
 Interface (`getrandbits(64)`)."""
@@ -157,6 +161,14 @@ class WaveRun:
     run_seed: int
     """The seed this run's waves started from, >= 0."""
 
+    played_ids: tuple[str, ...] = ()
+    """Waves played in the current pick cycle of this level, in order. A random pick leaves these
+    out until every other allowed pool wave has played, then the cycle starts over."""
+
+    recent_ids: tuple[str, ...] = ()
+    """The last waves played, oldest first, across cycles and levels, at most one per allowed pool
+    wave. A random pick leaves out the last `repeat_window` of them."""
+
     spawns_due: tuple[Placement, ...] = ()
     """Placements that came due on the last tick, in order."""
 
@@ -236,10 +248,51 @@ def pick_pool_wave(book: WaveBook, level: int, last_wave_id: str, chooser: rando
     With more than one candidate, `last_wave_id` is left out. With one, it plays even if it just
     played. Source: waves.md, Rules, Random picks.
     """
-    candidates: tuple[str, ...] = book.pool_ids(level)
-    if len(candidates) > 1:
-        candidates = tuple(wave_id for wave_id in candidates if wave_id != last_wave_id)
-    return chooser.choice(candidates)
+    return pick_in_cycle(book, level, last_wave_id, (), (), chooser)[0]
+
+
+def repeat_window(pool_size: int) -> int:
+    """Return how many of the last waves a random pick leaves out: half the pool, at least 1.
+
+    0 for a pool of one wave, which has to repeat. Never the whole pool but one, so a pick always
+    has a candidate. Source: waves.md, Rules, Random picks (REPEAT_WINDOW_SHARE).
+    """
+    if pool_size < 2:
+        return 0
+    return max(1, math.floor(pool_size * REPEAT_WINDOW_SHARE))
+
+
+def pick_in_cycle(
+    book: WaveBook,
+    level: int,
+    last_wave_id: str,
+    played_ids: tuple[str, ...],
+    recent_ids: tuple[str, ...],
+    chooser: random.Random,
+) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+    """Return one pool wave allowed at `level`, then the played and recent lists after it.
+
+    The pick is never in `played_ids`, never one of the last `repeat_window` waves of `recent_ids`
+    and never `last_wave_id`. When no wave is left, the cycle starts over with `played_ids` empty;
+    the recent waves still count. With one allowed wave, it plays again.
+    Draws from `chooser` and nothing else. Source: waves.md, Rules, Random picks.
+    """
+    pool: tuple[str, ...] = book.pool_ids(level)
+    window: int = repeat_window(len(pool))
+    blocked: tuple[str, ...] = (*recent_ids[-window:], last_wave_id) if window else ()
+    fresh: tuple[str, ...] = tuple(
+        wave_id for wave_id in pool if wave_id not in played_ids and wave_id not in blocked
+    )
+    if not fresh:
+        played_ids = ()
+        fresh = tuple(wave_id for wave_id in pool if wave_id not in blocked) or pool
+    picked: str = chooser.choice(fresh)
+    return picked, (*played_ids, picked), _remember(recent_ids, picked, len(pool))
+
+
+def _remember(recent_ids: tuple[str, ...], wave_id: str, pool_size: int) -> tuple[str, ...]:
+    """Return `recent_ids` with `wave_id` added, keeping the last `pool_size` (at least 1)."""
+    return (*recent_ids, wave_id)[-max(1, pool_size) :]
 
 
 def rest_gap_ticks(level: int, extra_rest_ticks: int) -> int:
@@ -269,10 +322,12 @@ def _end_wave(state: WaveRun, wave: Wave) -> WaveRun:
     log.debug("wave end id=%s", wave.wave_id)
     level: int = state.level
     next_slot: int = state.next_slot
+    played_ids: tuple[str, ...] = state.played_ids
     rose: bool = False
     if next_slot >= len(state.book.level_slots(level)) and level < LEVEL_COUNT:
         level = _next_level_with_slots(state.book, level)
         next_slot = 0
+        played_ids = ()
         rose = True
         log.debug("level up level=%d", level)
     rest: int = rest_gap_ticks(level, wave.extra_rest_ticks)
@@ -284,6 +339,7 @@ def _end_wave(state: WaveRun, wave: Wave) -> WaveRun:
         state,
         level=level,
         next_slot=next_slot,
+        played_ids=played_ids,
         resting=rest > 0,
         rest_ticks_left=rest,
         level_rose=state.level_rose or rose,
@@ -302,7 +358,8 @@ def _start_next_wave(state: WaveRun, start_px: float) -> WaveRun:
     """Return the state with the next wave of the playlist started at `start_px`.
 
     Never Wave 0. A wave id slot plays that wave; a random slot, or the slots past Level 8's
-    playlist, plays `pick_pool_wave` and stores the next pick seed.
+    playlist, plays `pick_in_cycle` and stores the next pick seed. Either way the wave joins the
+    played and recent lists.
     """
     slots: tuple[str | None, ...] = state.book.level_slots(state.level)
     next_slot: int = state.next_slot
@@ -311,13 +368,19 @@ def _start_next_wave(state: WaveRun, start_px: float) -> WaveRun:
         slot = slots[next_slot]
         next_slot += 1
     pick_seed: int = state.pick_seed
+    played_ids: tuple[str, ...] = state.played_ids
+    recent_ids: tuple[str, ...] = state.recent_ids
     wave_id: str
     if slot is None:
         chooser: random.Random = random.Random(pick_seed)
-        wave_id = pick_pool_wave(state.book, state.level, state.wave_id, chooser)
+        wave_id, played_ids, recent_ids = pick_in_cycle(
+            state.book, state.level, state.wave_id, played_ids, recent_ids, chooser
+        )
         pick_seed = chooser.getrandbits(SEED_BITS)
     else:
         wave_id = slot
+        played_ids = (*played_ids, wave_id)
+        recent_ids = _remember(recent_ids, wave_id, len(state.book.pool_ids(state.level)))
     log.debug("wave start id=%s level=%d random=%s", wave_id, state.level, slot is None)
     return replace(
         state,
@@ -328,4 +391,6 @@ def _start_next_wave(state: WaveRun, start_px: float) -> WaveRun:
         start_px=start_px,
         spawned=0,
         pick_seed=pick_seed,
+        played_ids=played_ids,
+        recent_ids=recent_ids,
     )

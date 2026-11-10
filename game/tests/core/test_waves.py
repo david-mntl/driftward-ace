@@ -487,6 +487,75 @@ def test_a_random_slot_never_repeats_the_last_wave_after_zero_fixed_rest_or_rise
         assert all(left != right for left, right in pairwise(played))
 
 
+def test_a_level_plays_every_pool_wave_before_any_returns_and_none_returns_too_soon() -> None:
+    ids: list[str] = [f"p{index}" for index in range(6)]
+    book: WaveBook = book_of(
+        [wave(WAVE_ZERO, 10.0), *(pool(wave_id) for wave_id in ids)],
+        [LevelPlaylist(random_count=18)],
+    )
+    for seed in range(60):
+        played: list[str] = started(walk(start_waves(book, seed), every(10.0, 18)))[1:]
+        assert len(played) == 18
+        # The first cycle is all six waves, each once.
+        assert sorted(played[:6]) == ids
+        # Half the pool, three waves, must play before one comes back: no wave twice within
+        # four picks, also across the end of a cycle.
+        for index, wave_id in enumerate(played):
+            assert wave_id not in played[max(0, index - 3) : index]
+
+
+def test_a_wave_played_in_a_fixed_slot_is_left_out_of_the_random_picks_of_that_level() -> None:
+    book: WaveBook = book_of(
+        [wave(WAVE_ZERO, 10.0), pool("f1"), pool("p"), pool("q")],
+        [LevelPlaylist(fixed=("f1",), random_count=2)],
+    )
+    for seed in range(40):
+        played: list[str] = started(walk(start_waves(book, seed), every(10.0, 3)))
+        assert played[1] == "f1"
+        assert sorted(played[2:]) == ["p", "q"]
+
+
+def test_a_new_level_starts_its_cycle_over_but_never_with_the_wave_that_just_played() -> None:
+    book: WaveBook = book_of(
+        [wave(WAVE_ZERO, 10.0), pool("p"), pool("q"), pool("r")],
+        [LevelPlaylist(random_count=3), LevelPlaylist(random_count=3)],
+    )
+    for seed in range(60):
+        played: list[str] = started(walk(start_waves(book, seed), every(10.0, 6)))[1:]
+        assert sorted(played[:3]) == ["p", "q", "r"]
+        # Level 2 starts a new cycle, and the wave that closed Level 1 still counts as recent.
+        assert sorted(played[3:]) == ["p", "q", "r"]
+        assert played[3] != played[2]
+
+
+def test_a_pool_of_one_wave_plays_again_and_a_pool_of_two_alternates() -> None:
+    lone: WaveBook = book_of([wave(WAVE_ZERO, 10.0), pool("solo")], [LevelPlaylist(random_count=4)])
+    assert started(walk(start_waves(lone, 3), every(10.0, 4)))[1:] == ["solo"] * 4
+    pair: WaveBook = book_of(
+        [wave(WAVE_ZERO, 10.0), pool("p"), pool("q")], [LevelPlaylist(random_count=6)]
+    )
+    for seed in range(20):
+        played: list[str] = started(walk(start_waves(pair, seed), every(10.0, 6)))[1:]
+        assert all(left != right for left, right in pairwise(played))
+
+
+def test_level_8_plays_every_allowed_wave_before_it_repeats_one_forever() -> None:
+    ids: list[str] = [f"p{index}" for index in range(5)]
+    book: WaveBook = book_of(
+        [
+            wave(WAVE_ZERO, 10.0),
+            *(pool(wave_id, min_level=min(index + 1, 8)) for index, wave_id in enumerate(ids)),
+        ],
+        [LevelPlaylist() for _ in range(LAST_LEVEL)],
+    )
+    for seed in range(40):
+        played: list[str] = started(walk(start_waves(book, seed), every(10.0, 40)))[1:]
+        assert len(played) == 40
+        assert sorted(played[:5]) == ids
+        for index, wave_id in enumerate(played):
+            assert wave_id not in played[max(0, index - 2) : index]
+
+
 @pytest.mark.determinism
 def test_the_same_seed_gives_the_same_waves_and_next_run_waves_restarts_with_a_new_seed() -> None:
     book: WaveBook = book_of(
