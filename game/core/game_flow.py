@@ -15,6 +15,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Final
 
+from core.demo import Demo, step_demo
 from core.drifters.spawner import Placement
 from core.drifters.tuning import DrifterTuning
 from core.run import Run, add_drifters, hold_arrows, next_run, step_run
@@ -43,6 +44,8 @@ class Screen(Enum):
     INSTRUCTIONS = "instructions"
     LEADERBOARD = "leaderboard"
     CREDITS = "credits"
+    DEMO = "demo"
+    """The demo flight plays before the first run of a page load. The run waits."""
     PLAYING = "playing"
     """The run is stepped, its last life too (`run.last_life`)."""
     PAUSED = "paused"
@@ -122,6 +125,10 @@ class GameFlow:
     saves_changed: bool = False
     """An entry was saved on the last tick: the app writes `saves`."""
 
+    demo: Demo | None = None
+    """The demo flight still to play before a run. None: it has played, was skipped, or is off.
+    Source: 02-game-flow.md, rule 5a."""
+
     @property
     def best(self) -> int | None:
         """The #1 score saved so far, or None without saves. Source: systems/game-flow.md, Rules."""
@@ -148,12 +155,13 @@ class _Presses:
     right: bool
 
 
-def start_flow(run: Run, saves: Saves | None = None) -> GameFlow:
+def start_flow(run: Run, saves: Saves | None = None, demo: Demo | None = None) -> GameFlow:
     """Return the flow at the menu with `run` as the app's first run and `saves` as given.
 
     Every key counts as held, so a key already down when the menu shows does nothing until it is
-    released and pressed again. `saves` None: saves don't work. Source: systems/game-flow.md,
-    Rules, Start; 02-game-flow.md, rules 1, 2 and 12.
+    released and pressed again. `saves` None: saves don't work. `demo` is the demo flight the
+    first Play shows, None for none. Source: systems/game-flow.md, Rules, Start; 02-game-flow.md,
+    rules 1, 2, 5a and 12.
     """
     return GameFlow(
         screen=Screen.MENU,
@@ -164,6 +172,7 @@ def start_flow(run: Run, saves: Saves | None = None) -> GameFlow:
         arrows_held=_ALL_ARROWS,
         run_stepped=False,
         saves=saves,
+        demo=demo,
     )
 
 
@@ -195,6 +204,8 @@ def step_flow(flow: GameFlow, keys: TickInput) -> GameFlow:
             stepped = _step_menu(idle, presses)
         case Screen.INSTRUCTIONS | Screen.LEADERBOARD | Screen.CREDITS:
             stepped = _step_page(idle, presses)
+        case Screen.DEMO:
+            stepped = _step_demo(idle, presses)
         case Screen.PLAYING:
             stepped = _step_playing(idle, keys, presses)
         case Screen.PAUSED:
@@ -247,13 +258,25 @@ def _step_menu(flow: GameFlow, presses: _Presses) -> GameFlow:
         return replace(flow, menu_selection=moved)
     match flow.menu_selection:
         case MenuItem.PLAY:
-            return _enter(_with_fresh_run(flow), Screen.PLAYING)
+            if flow.demo is not None:
+                return _enter(_with_fresh_run(flow), Screen.DEMO)
+            return _start_play(_with_fresh_run(flow))
         case MenuItem.INSTRUCTIONS:
             return _enter(flow, Screen.INSTRUCTIONS)
         case MenuItem.LEADERBOARD:
             return _enter(flow, Screen.LEADERBOARD)
         case MenuItem.CREDITS:
             return _enter(flow, Screen.CREDITS)
+
+
+def _start_play(flow: GameFlow) -> GameFlow:
+    """Return the flow on PLAYING with its run waiting: the ship holds at the center until the
+    first arrow press, while the scroll, the waves and the drifters run. Every run starts so:
+    from Play, after the demo and on RETRY. The arrows held on the last tick go in as held, so
+    an arrow held through the start is no press, as in the respawn wait. Source:
+    02-game-flow.md, rule 5; 05-lives-and-damage.md, rule 2.5."""
+    waiting: Run = replace(flow.run, waiting=True, held=flow.arrows_held)
+    return _enter(replace(flow, run=waiting), Screen.PLAYING)
 
 
 def _with_fresh_run(flow: GameFlow) -> GameFlow:
@@ -268,6 +291,16 @@ def _step_page(flow: GameFlow, presses: _Presses) -> GameFlow:
     if presses.confirm:
         return _enter_menu(flow)
     return flow
+
+
+def _step_demo(flow: GameFlow, presses: _Presses) -> GameFlow:
+    """DEMO: a confirm press skips it, else it plays one tick. Either way, once over, the run
+    starts and the demo is dropped, so it shows once per page load. Source: 02-game-flow.md,
+    rule 5a."""
+    if flow.demo is None or presses.confirm or flow.demo.done:
+        log.debug("demo end by=%s", "key" if presses.confirm else "time")
+        return _start_play(replace(flow, demo=None))
+    return replace(flow, demo=step_demo(flow.demo))
 
 
 def _step_playing(flow: GameFlow, keys: TickInput, presses: _Presses) -> GameFlow:
@@ -330,7 +363,7 @@ def _step_choices(flow: GameFlow, presses: _Presses) -> GameFlow:
         return replace(flow, game_over_selection=moved)
     match flow.game_over_selection:
         case GameOverChoice.RETRY:
-            return _enter(replace(flow, run=next_run(flow.run)), Screen.PLAYING)
+            return _start_play(replace(flow, run=next_run(flow.run)))
         case GameOverChoice.MENU:
             return _enter_menu(flow)
 

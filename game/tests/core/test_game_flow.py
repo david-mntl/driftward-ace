@@ -172,7 +172,10 @@ def advanced(run: Run, ticks: int, thrust: Thrust = NO_KEY) -> Run:
     return run
 
 
-MOVING: Run = advanced(RUN, 10)
+FLYING: Run = replace(RUN, waiting=False)
+"""A fresh run whose start wait is over (an arrow was pressed): the ship flies."""
+
+MOVING: Run = advanced(FLYING, 10)
 """A run that has flown 10 ticks: the ship falls, so a frozen run is easy to tell."""
 
 
@@ -204,6 +207,7 @@ def last_life_run(*, waves: WaveRun | None = None) -> Run:
         start_run(waves, last_life_rules=rules),
         ship=FALLING_SHIP,
         lives=1,
+        waiting=False,
     )
 
 
@@ -461,11 +465,12 @@ def test_play_starts_the_apps_run_untouched_and_after_a_game_over_it_starts_next
 
     pick: GameFlow = step_flow(menu, CONFIRM)
     assert pick.screen is Screen.PLAYING
-    assert pick.run == first, "the app's first run is not replaced"
+    assert pick.run == replace(first, waiting=True), "the app's first run, waiting for an arrow"
     assert not pick.run_stepped
 
     stepped: GameFlow = step_flow(pick, TickInput(thrust=UP))
-    assert stepped.run == step_run(first, UP), "the run is first stepped on the next tick"
+    assert stepped.run == step_run(pick.run, UP), "the run is first stepped on the next tick"
+    assert not stepped.run.waiting, "an arrow press ends the start wait"
     assert stepped.run_stepped
 
     # After a game over and MENU, Play starts next_run.
@@ -479,11 +484,13 @@ def test_play_starts_the_apps_run_untouched_and_after_a_game_over_it_starts_next
 
     play: GameFlow = step_flow(at_menu, CONFIRM)
     assert play.screen is Screen.PLAYING
-    assert play.run == next_run(over.run)
+    assert play.run == replace(next_run(over.run), waiting=True)
     assert not play.run.game_over
     assert play.run.lives == LIVES_START
     assert not play.run_stepped
-    assert step_flow(play, IDLE).run == step_run(next_run(over.run), NO_KEY)
+    idle: GameFlow = step_flow(play, IDLE)
+    assert idle.run == step_run(play.run, NO_KEY)
+    assert idle.run.ship == play.run.ship, "the ship holds at the center until an arrow"
 
 
 def test_a_confirm_or_a_focus_loss_pauses_and_only_a_fresh_confirm_resumes() -> None:
@@ -658,7 +665,7 @@ def test_retry_gives_next_run_and_playing_at_once_and_menu_gives_the_menu_with_p
 
     retry: GameFlow = step_flow(over, CONFIRM)
     assert retry.screen is Screen.PLAYING
-    assert retry.run == next_run(over.run)
+    assert retry.run == replace(next_run(over.run), waiting=True)
     assert not retry.run_stepped
     assert retry.run.lives == LIVES_START
     assert not retry.run.game_over
@@ -668,7 +675,7 @@ def test_retry_gives_next_run_and_playing_at_once_and_menu_gives_the_menu_with_p
     # A down on the same tick as the confirm does not move the choice first.
     both: GameFlow = step_flow(over, TickInput(confirm=True, thrust=DOWN))
     assert both.screen is Screen.PLAYING
-    assert both.run == next_run(over.run)
+    assert both.run == replace(next_run(over.run), waiting=True)
 
     chosen: GameFlow = replace(over, game_over_selection=GameOverChoice.MENU)
     menu: GameFlow = step_flow(chosen, CONFIRM)
@@ -1559,7 +1566,7 @@ def test_the_confirm_that_saves_never_picks_retry_held_and_a_fresh_press_does(bl
     assert flow.screen is Screen.GAME_OVER
     retried: GameFlow = step_flow(flow, CONFIRM)  # tick S + 32: a fresh press
     assert retried.screen is Screen.PLAYING
-    assert retried.run == next_run(over.run)
+    assert retried.run == replace(next_run(over.run), waiting=True)
 
 
 def test_saves_are_kept_through_retry_menu_and_later_runs() -> None:

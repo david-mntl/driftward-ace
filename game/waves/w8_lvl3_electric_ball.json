@@ -1,6 +1,7 @@
 {
   "length_px": 1100,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 3,
   "placements": [
     { "at_px": 121, "type": "satellite", "y": 430, "variant": "flat", "invert": true },
     { "at_px": 130, "type": "satellite", "y": 320, "variant": "angled" },

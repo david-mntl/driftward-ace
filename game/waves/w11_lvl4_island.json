@@ -1,6 +1,7 @@
 {
   "length_px": 1320,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 4,
   "placements": [
     { "at_px": 140, "type": "meteorite", "x": 318, "variant": "small" },
     { "at_px": 175, "type": "floating_island", "x": 539, "variant": "triangle" },

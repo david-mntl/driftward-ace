@@ -2,7 +2,8 @@
 footer, in the Glass Cockpit look.
 
 Spec: 10-ui.md, `instructions_text_and_look`, `screens_look` and `window_screens`; the values are
-in tuning/screens.json (the `screen_rules` fixture). The look is the `look` fixture.
+in tuning/screens.json (the `screen_rules` fixture). The look is the `look` fixture. The COINS card
+draws the game's coin sprites, so the real drifter sprites are installed for every test here.
 
 Positions and colors are read from the drawn pixels, never from a font metric. The page is drawn
 on a black surface, so any lit pixel is ink: text, an icon, the rulers or glow. The glass is read
@@ -14,8 +15,12 @@ from dataclasses import replace
 from itertools import combinations
 
 import pygame
+import pytest
 
 from app.assets import load_screen_fonts
+from app.drifter_looks_tuning import install_drifter_looks
+from app.tuning import load_tuning
+from ui.drifters.sprites import Sprites, installed_sprites
 from ui.instructions import (
     CARD_COLOR_KEYS,
     FOOTER_GROUPS,
@@ -52,6 +57,17 @@ BLEND_TOLERANCE: int = 3
 
 LIT: int = 120
 """A channel above this is a line or text. The glass fill and its scan lines stay well below."""
+
+
+COINS_CARD: int = 5
+"""The COINS card's index."""
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _real_sprites(look: ScreenLook) -> None:
+    """Install the game's drifter sprites, as the app does before the first frame."""
+    pygame.display.set_mode((1, 1))
+    install_drifter_looks(load_tuning())
 
 
 def _page(look: ScreenLook, size: tuple[int, int] = WINDOW, grey: int = 0) -> pygame.Surface:
@@ -329,3 +345,54 @@ def test_each_card_takes_the_palette_key_the_gdd_gives_it() -> None:
         "FALL": "ship_lines",
         "COINS": "level",
     }
+
+
+def _coin_frame(rare: bool, frame: int) -> pygame.Surface:
+    """The coin strip frame the card should show, at full brightness and play size."""
+    sprites: Sprites = installed_sprites()
+    rule = sprites.looks.coin.rare if rare else sprites.looks.coin.common
+    return sprites.image(rule, frame, sprites.level(1.0))
+
+
+def _find_sprite(
+    surface: pygame.Surface, area: pygame.Rect, sprite: pygame.Surface
+) -> list[tuple[int, int]]:
+    """Return every top-left in ``area`` where each fully opaque pixel of ``sprite`` shows as is."""
+    opaque: list[tuple[int, int, tuple[int, ...]]] = [
+        (x, y, tuple(sprite.get_at((x, y)))[:3])
+        for x in range(sprite.get_width())
+        for y in range(sprite.get_height())
+        if sprite.get_at((x, y)).a == 255
+    ]
+    assert opaque, "the frame has opaque pixels"
+    first_x, first_y, first_color = opaque[0]
+    found: list[tuple[int, int]] = []
+    for px in range(area.left, area.right - sprite.get_width() + 1):
+        for py in range(area.top, area.bottom - sprite.get_height() + 1):
+            if tuple(surface.get_at((px + first_x, py + first_y)))[:3] != first_color:
+                continue
+            if all(tuple(surface.get_at((px + x, py + y)))[:3] == color for x, y, color in opaque):
+                found.append((px, py))
+    return found
+
+
+def test_the_coins_card_shows_the_common_and_the_rare_game_coin(look: ScreenLook) -> None:
+    rules = look.rules.instructions
+    surface: pygame.Surface = _page(look)
+    card: pygame.Rect = card_rects(look, WINDOW)[COINS_CARD]
+    box: pygame.Rect = icon_rect(look, card)
+    common = _find_sprite(surface, box, _coin_frame(False, rules.common_coin_frame))
+    rare = _find_sprite(surface, box, _coin_frame(True, rules.rare_coin_frame))
+    assert len(common) == 1
+    assert len(rare) == 1
+    assert common != rare
+    for index in range(COINS_CARD):
+        other: pygame.Rect = icon_rect(look, card_rects(look, WINDOW)[index])
+        assert not _find_sprite(surface, other, _coin_frame(False, rules.common_coin_frame))
+
+
+def test_a_coin_frame_past_the_end_of_its_strip_raises(look: ScreenLook) -> None:
+    rules = replace(look.rules.instructions, rare_coin_frame=999)
+    bad = ScreenLook(replace(look.rules, instructions=rules), load_screen_fonts(look.rules))
+    with pytest.raises(ValueError, match="frame 999"):
+        _page(bad)

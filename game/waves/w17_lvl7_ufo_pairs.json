@@ -1,6 +1,7 @@
 {
   "length_px": 1100,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 7,
   "placements": [
     { "at_px": 114, "type": "coin", "x": 330, "variant": "common" },
     { "at_px": 123, "type": "chain_lightning", "x": 301, "variant": "trio_triangle" },

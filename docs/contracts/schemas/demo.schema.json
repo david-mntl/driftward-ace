@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "driftward-ace/demo.schema.json",
+  "title": "Demo flight",
+  "description": "The file game/tuning/demo.json: the demo flight the first Play of a page load shows, its script, its coin and its look, read in both run modes by game/app/demo_tuning.py. The file must exist and every field is required: nothing has a default in code. Rules the schema cannot express: coin_step names a step; a standing step holds no keys; coin_type is a pickup (checked by core.demo.start_demo); coin_variant is a variant of coin_type's tuning; caption_role is a screens text role. Contract: docs/contracts/systems/demo.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled",
+    "steps",
+    "coin_step",
+    "coin_type",
+    "coin_variant",
+    "fade_out_ticks",
+    "pilot",
+    "look"
+  ],
+  "properties": {
+    "enabled": {
+      "description": "false: no demo; Play starts the run at once.",
+      "type": "boolean"
+    },
+    "steps": {
+      "description": "The script, in order.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keys",
+          "ticks",
+          "caption",
+          "stand",
+          "pilot_to"
+        ],
+        "properties": {
+          "keys": {
+            "description": "The arrows held through the step. [] for a standing step and an autopilot step.",
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "up",
+                "down",
+                "left",
+                "right"
+              ]
+            }
+          },
+          "ticks": {
+            "description": "How long the step lasts, ticks.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "caption": {
+            "description": "The caption shown from this step on. null: the last caption stays.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "stand": {
+            "description": "true: the ship stands still through the step, as in the respawn wait. A standing step holds no keys and flies nowhere.",
+            "type": "boolean"
+          },
+          "pilot_to": {
+            "description": "null, or [x, y] inside the 640 x 480 play area: the autopilot taps the arrows itself to fly to that spot and hover there. A step that flies by the autopilot holds no keys and does not stand.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    },
+    "coin_step": {
+      "description": "Index of the step at whose last tick the ship reaches the coin.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "coin_type": {
+      "description": "The drifter type of the coin, a pickup.",
+      "type": "string"
+    },
+    "coin_variant": {
+      "description": "The coin's variant in its type's tuning.",
+      "type": "string"
+    },
+    "fade_out_ticks": {
+      "description": "The last ticks of the demo, in which the play area fades to black.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "pilot": {
+      "description": "How the autopilot taps the arrows. Speeds px/tick, distances px.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gain",
+        "max_speed",
+        "band",
+        "near_px",
+        "near_speed"
+      ],
+      "properties": {
+        "gain": {
+          "description": "Speed wanted per px of distance to the spot. Bigger flies in harder.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_speed": {
+          "description": "Fastest speed asked for, up or down, px/tick. Sideways 1.5 times this.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "band": {
+          "description": "How far the speed may stray from the wanted one before a key goes down or up, px/tick. Bigger gives longer taps and a little more bob.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "near_px": {
+          "description": "Sideways distance to the spot within which, with sideways speed under near_speed, no side key is tapped.",
+          "type": "number",
+          "minimum": 0
+        },
+        "near_speed": {
+          "description": "See near_px, px/tick.",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "look": {
+      "description": "Sizes and timings of the demo's overlay. Colors and the font are the screens' (screens.json).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key_size",
+        "key_gap",
+        "key_radius",
+        "key_bottom",
+        "arrow_size",
+        "key_fade_ticks",
+        "press_depth",
+        "idle_fill_alpha",
+        "idle_border_alpha",
+        "lit_fill_alpha",
+        "caption_role",
+        "caption_gap",
+        "caption_fade_ticks",
+        "caption_rise",
+        "skip_margin",
+        "skip_word",
+        "fade_in_ticks",
+        "coin_ring_radius",
+        "coin_ring_pulse",
+        "coin_ring_period_ticks",
+        "coin_ring_alpha",
+        "start_text",
+        "start_role",
+        "start_ticks",
+        "start_pop_ticks",
+        "start_scale",
+        "start_y"
+      ],
+      "properties": {
+        "key_size": {
+          "description": "A key cap's side, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "key_gap": {
+          "description": "Space between key caps, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "key_radius": {
+          "description": "A key cap's corner radius, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "key_bottom": {
+          "description": "Gap from the play area's bottom edge to the bottom row of keys, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "arrow_size": {
+          "description": "Half the arrow's width on a key cap, px.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "key_fade_ticks": {
+          "description": "Ticks a key's glow takes to fill or drain.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "press_depth": {
+          "description": "How far a held key sinks, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "idle_fill_alpha": {
+          "description": "A key cap's fill when not held.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "idle_border_alpha": {
+          "description": "A key cap's border when not held.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "lit_fill_alpha": {
+          "description": "A key cap's fill when held.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "caption_role": {
+          "description": "The screens' text role of the caption: a role name in screens.json fonts.roles.",
+          "type": "string"
+        },
+        "caption_gap": {
+          "description": "Gap from the caption's bottom to the top row of keys, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "caption_fade_ticks": {
+          "description": "Ticks a new caption takes to fade in.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "caption_rise": {
+          "description": "How far a new caption rises while it fades in, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "skip_margin": {
+          "description": "Gap from the play area's top and right edges to the skip hint, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "skip_word": {
+          "description": "The word after the ENTER and SPACE key caps of the skip hint.",
+          "type": "string",
+          "minLength": 1
+        },
+        "fade_in_ticks": {
+          "description": "Ticks the run after the demo takes to fade in from black. 0: no fade.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "coin_ring_radius": {
+          "description": "The pulsing ring round the waiting coin: its middle radius, px. 0: no ring.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "coin_ring_pulse": {
+          "description": "How far the ring's radius swings either way, px.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "coin_ring_period_ticks": {
+          "description": "Ticks of one pulse.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "coin_ring_alpha": {
+          "description": "The ring's alpha at its brightest.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "start_text": {
+          "description": "The word that shows in the last start_ticks, as the run is about to start.",
+          "type": "string",
+          "minLength": 1
+        },
+        "start_role": {
+          "description": "The screens' text role of the start word: a role name in screens.json fonts.roles.",
+          "type": "string"
+        },
+        "start_ticks": {
+          "description": "The last ticks of the demo in which the start word shows instead of the caption. 0: no start word.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "start_pop_ticks": {
+          "description": "Ticks the start word takes to fade in and shrink to its size.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "start_scale": {
+          "description": "How big the start word starts, times its size. It shrinks to 1.",
+          "type": "number",
+          "minimum": 1
+        },
+        "start_y": {
+          "description": "The start word's center, px from the play area's top edge.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

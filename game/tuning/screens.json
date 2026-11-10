@@ -212,7 +212,10 @@
     "caption_gap": 3,
     "foot_group_gap": 48,
     "blur": false,
-    "caption_alpha": 224
+    "caption_alpha": 224,
+    "coin_scale": 1.0,
+    "common_coin_frame": 0,
+    "rare_coin_frame": 3
   },
   "leaderboard": {
     "margin_top": 20,

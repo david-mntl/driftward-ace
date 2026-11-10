@@ -17,8 +17,9 @@ from typing import Final
 
 import pygame
 
+from ui.drifters.sprites import Sprites, installed_sprites, scaled_size
 from ui.screen_look import ScreenLook, halo
-from ui.screen_rules import RGB
+from ui.screen_rules import RGB, InstructionsRules
 
 log = logging.getLogger(__name__)
 
@@ -239,16 +240,24 @@ def _icon(look: ScreenLook, index: int) -> tuple[pygame.Surface, int]:
     )
     labels: list[tuple[str, str, RGB, Point]] = _DRAWERS[index](canvas)
     small: pygame.Surface = pygame.transform.smoothscale(big, (rules.icon_w, rules.icon_h))
-    for string, role, color, (x, y) in labels:
-        center: tuple[int, int] = (
-            round((canvas.offset[0] + x * canvas.scale) / _SUPERSAMPLE),
-            round((canvas.offset[1] + y * canvas.scale) / _SUPERSAMPLE),
+    for image, (x, y) in _sprites(canvas, rules):
+        small.blit(image, image.get_rect(center=_final_point(canvas, (x, y))))
+    for string, role, color, point in labels:
+        look.blit_text(
+            small, string, role, color, {"center": _final_point(canvas, point)}, glow=False
         )
-        look.blit_text(small, string, role, color, {"center": center}, glow=False)
     glow = look.rules.glow
     if glow.icon_strength <= 0:
         return small, 0
     return halo(small, glow.icon_radius, glow.icon_strength), 2 * glow.icon_radius
+
+
+def _final_point(canvas: "_Canvas", point: Point) -> tuple[int, int]:
+    """Return the pixel of design ``point`` on the icon after it is scaled down."""
+    return (
+        round((canvas.offset[0] + point[0] * canvas.scale) / _SUPERSAMPLE),
+        round((canvas.offset[1] + point[1] * canvas.scale) / _SUPERSAMPLE),
+    )
 
 
 class _Canvas:
@@ -267,6 +276,9 @@ class _Canvas:
         self.palette: Mapping[str, RGB] = palette
         self.key_color: str = "frame_lights"
         """The palette key the current icon's lines use. Set by each drawer."""
+        self.coins: list[tuple[bool, Point]] = []
+        """Game coin sprites to set on the icon after it is scaled down, so the pixel art stays
+        sharp: (rare, design center). Set by a drawer."""
 
     def color(self, key: str) -> RGB:
         """Return the palette color ``key``."""
@@ -562,21 +574,47 @@ def _draw_fall(c: _Canvas) -> list[Label]:
 
 
 def _draw_coins(c: _Canvas) -> list[Label]:
-    """COINS: a rock with coins near it, ``+50`` and a sparkle."""
+    """COINS: a rock with the game's two coins near it, the common one paying ``+50`` and the rare
+    one ``+100``, and a sparkle."""
     k: RGB = c.color("level")
     c.key_color = "level"
     light: RGB = c.color("ship_lines_light")
     rock: list[Point] = [(14, 48), (22, 30), (42, 24), (58, 38), (60, 60), (44, 76), (22, 72)]
     c.polygon(rock, fill=_mix(light, c.color("panel_body"), 0.22), outline=light)
     c.dashed_circle((38, 50), 40, light, alpha=0.45)
-    body: RGB = _mix(k, c.color("panel_body"), 0.28)
-    for center, outer, inner in (((86, 30), 13, 8.5), ((112, 58), 13, 8.5), ((78, 68), 10, 6)):
-        c.circle(center, outer, fill=body, outline=k, width=1.8)
-        c.circle(center, inner, outline=k, width=1.0, alpha=0.6)
-    for cx, cy in ((86, 30), (112, 58)):
-        c.polygon([(cx, cy - 6), (cx + 4, cy), (cx, cy + 6), (cx - 4, cy)], fill=k)
-    c.star(154, 59, 6)
-    return [("+50", "row", k, (146, 34))]
+    c.coins.extend(((False, _COMMON_COIN), (True, _RARE_COIN)))
+    c.star(_RARE_COIN[0] + 15, _RARE_COIN[1] - 13, 4)
+    return [
+        ("+50", "row", k, (_COMMON_COIN[0] + 36, _COMMON_COIN[1])),
+        ("+100", "row", k, (_RARE_COIN[0] + 40, _RARE_COIN[1])),
+    ]
+
+
+_COMMON_COIN: Final[Point] = (86, 28)
+"""The common coin's center on the COINS icon, design units."""
+
+_RARE_COIN: Final[Point] = (98, 66)
+"""The rare coin's center on the COINS icon, design units."""
+
+
+def _sprites(c: _Canvas, rules: InstructionsRules) -> list[tuple[pygame.Surface, Point]]:
+    """Return each coin a drawer set: its card frame at ``coin_scale`` times its size, full
+    bright, and its design center. Needs the drifter sprites installed. Raises ValueError when a
+    card frame is not in its strip."""
+    if not c.coins:
+        return []
+    sprites: Sprites = installed_sprites()
+    found: list[tuple[pygame.Surface, Point]] = []
+    for rare, center in c.coins:
+        rule = sprites.looks.coin.rare if rare else sprites.looks.coin.common
+        frame: int = rules.rare_coin_frame if rare else rules.common_coin_frame
+        if frame >= sprites.count(rule):
+            raise ValueError(f"instructions coin frame {frame} is past the end of {rule.file}")
+        image: pygame.Surface = sprites.image(
+            rule, frame, sprites.level(1.0), size=scaled_size(rule, rules.coin_scale)
+        )
+        found.append((image, center))
+    return found
 
 
 _DRAWERS: Final[tuple[Callable[[_Canvas], list[Label]], ...]] = (

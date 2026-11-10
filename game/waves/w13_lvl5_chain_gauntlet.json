@@ -1,6 +1,7 @@
 {
   "length_px": 1100,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 5,
   "placements": [
     { "at_px": 120, "type": "chain_lightning", "x": 140, "variant": "trio_line" },
     { "at_px": 120, "type": "chain_lightning", "x": 500, "variant": "trio_line" },

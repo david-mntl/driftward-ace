@@ -1,0 +1,118 @@
+{
+  "enabled": true,
+  "steps": [
+    {
+      "keys": [],
+      "ticks": 60,
+      "caption": "HOLD UP TO THRUST",
+      "stand": true,
+      "pilot_to": null
+    },
+    {
+      "keys": [
+        "up"
+      ],
+      "ticks": 18,
+      "caption": null,
+      "stand": false,
+      "pilot_to": null
+    },
+    {
+      "keys": [],
+      "ticks": 60,
+      "caption": "LET GO AND GRAVITY PULLS YOU DOWN",
+      "stand": false,
+      "pilot_to": null
+    },
+    {
+      "keys": [],
+      "ticks": 50,
+      "caption": "TAP UP TO HOVER",
+      "stand": false,
+      "pilot_to": [
+        320,
+        240
+      ]
+    },
+    {
+      "keys": [],
+      "ticks": 40,
+      "caption": "HOLD UP + RIGHT TO STEER",
+      "stand": false,
+      "pilot_to": [
+        320,
+        240
+      ]
+    },
+    {
+      "keys": [
+        "up",
+        "right"
+      ],
+      "ticks": 20,
+      "caption": null,
+      "stand": false,
+      "pilot_to": null
+    },
+    {
+      "keys": [],
+      "ticks": 90,
+      "caption": "COINS ARE POINTS",
+      "stand": false,
+      "pilot_to": [
+        320,
+        240
+      ]
+    },
+    {
+      "keys": [],
+      "ticks": 50,
+      "caption": null,
+      "stand": false,
+      "pilot_to": [
+        320,
+        240
+      ]
+    }
+  ],
+  "coin_step": 5,
+  "coin_type": "coin",
+  "coin_variant": "common",
+  "fade_out_ticks": 0,
+  "pilot": {
+    "gain": 0.06,
+    "max_speed": 3.0,
+    "band": 0.35,
+    "near_px": 6,
+    "near_speed": 0.8
+  },
+  "look": {
+    "key_size": 30,
+    "key_gap": 6,
+    "key_radius": 5,
+    "key_bottom": 28,
+    "arrow_size": 6,
+    "key_fade_ticks": 5,
+    "press_depth": 2,
+    "idle_fill_alpha": 26,
+    "idle_border_alpha": 153,
+    "lit_fill_alpha": 235,
+    "caption_role": "menu_item",
+    "caption_gap": 18,
+    "caption_fade_ticks": 10,
+    "caption_rise": 6,
+    "skip_margin": 12,
+    "skip_word": "SKIP",
+    "fade_in_ticks": 0,
+    "coin_ring_radius": 20,
+    "coin_ring_pulse": 3,
+    "coin_ring_period_ticks": 40,
+    "coin_ring_alpha": 200,
+    "start_text": "START",
+    "start_role": "menu_title",
+    "start_ticks": 50,
+    "start_pop_ticks": 12,
+    "start_scale": 1.6,
+    "start_y": 150
+  }
+}

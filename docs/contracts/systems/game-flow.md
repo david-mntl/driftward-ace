@@ -1,7 +1,7 @@
 # Game flow: menu, instructions, leaderboard, credits, pause, game over and name entry
 Version: 2
 Status: draft
-Features: DRA-125, DRA-126, HUD-PANEL, DRA-147, Credits page
+Features: DRA-125, DRA-126, HUD-PANEL, DRA-147, Credits page, DEMO-FLIGHT
 Created by: architect
 
 ## Purpose
@@ -27,6 +27,8 @@ stateDiagram-v2
     MENU --> CREDITS: confirm press on Credits
     CREDITS --> MENU: confirm press, Play selected
     MENU --> PLAYING: confirm press on Play<br/>(next_run first if the run is over)
+    MENU --> DEMO: confirm press on Play while flow.demo is set (DEMO-FLIGHT)
+    DEMO --> PLAYING: fresh confirm press or the demo done; flow.demo = None
     PLAYING --> PAUSED: confirm press or focus lost,<br/>not in the last life
     PAUSED --> PLAYING: confirm press
     PLAYING --> PLAYING: step_run; the last life runs here too
@@ -393,6 +395,8 @@ The burst is presented in `docs/contracts/systems/run.md`, Presentation (Burst).
 
 ## Rules
 Values. Every key and screen value comes from the GDD or the scope report; none is restated here.
+- Demo flight (DEMO-FLIGHT): the `DEMO` screen, `GameFlow.demo` and `start_flow`'s `demo` argument are specified in `docs/contracts/systems/demo.md`. Play enters DEMO instead of PLAYING while `flow.demo` is not None; DEMO never steps the run.
+- Start wait (DEMO-FLIGHT, decision 159): every entry into PLAYING that starts a run (Play, the end of the demo, RETRY) sets `run.waiting = True` and `run.held = flow.arrows_held`, so the ship holds at spawn until a fresh arrow press, by the run's respawn-wait rule (`systems/run.md`). Resuming from PAUSED does not. The flow logs nothing more for it; the run logs `respawn wait end` on the press.
 - Confirm keys: Enter or Space, both the same everywhere (02-game-flow.md, confirm_keys, locked). The app maps them to `TickInput.confirm` (`systems/app/frame-loop.md`). The arrows are the only other keys (01-vision.md, locked decision 1).
 - Menu items and order: 02-game-flow.md, menu_items (locked). Start selection: menu_start_selection (guess).
 - Game-over choices, order and start selection: 02-game-flow.md, game_over_choices (locked).

@@ -1,6 +1,7 @@
 {
   "length_px": 1100,
-  "kind": "fixed",
+  "kind": "pool",
+  "min_level": 7,
   "placements": [
     { "at_px": 120, "type": "chain_lightning", "x": 450, "variant": "trio_l" },
     { "at_px": 122, "type": "planet", "x": 100, "variant": "standard" },

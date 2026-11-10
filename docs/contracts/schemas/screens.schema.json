@@ -738,7 +738,10 @@
         "caption_gap",
         "foot_group_gap",
         "blur",
-        "caption_alpha"
+        "caption_alpha",
+        "coin_scale",
+        "common_coin_frame",
+        "rare_coin_frame"
       ],
       "properties": {
         "margin_x": {
@@ -820,6 +823,21 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 255
+        },
+        "coin_scale": {
+          "description": "The COINS card's game coin sprites, times their size in play (1.0 is the size in play).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "common_coin_frame": {
+          "description": "The frame of the common coin's strip the COINS card shows, from 0. Must be in the strip.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "rare_coin_frame": {
+          "description": "The frame of the rare coin's strip the COINS card shows, from 0: one that shows its glint. Must be in the strip.",
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
