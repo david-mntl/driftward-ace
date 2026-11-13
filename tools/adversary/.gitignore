@@ -1,0 +1,13 @@
+# Run outputs are rebuilt by re-running the scripts. Keep only each engine's FINDINGS.md
+# and the screenshots, as a snapshot of the last hunt.
+/out/**
+!/out/*/
+!/out/*/FINDINGS.md
+!/out/perf/shots/
+!/out/perf/shots/*.png
+!/out/perf/shots_v2/
+!/out/perf/shots_v2/*.png
+# Mislabeled: taken 10 minutes into the tail. The true first endless wave is in shots_v2.
+/out/perf/shots/3_first_endless_wave.png
+# Runtime state of the browser probe server (perf/start-probe.sh). Never commit.
+/perf/server.pid
