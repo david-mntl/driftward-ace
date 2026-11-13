@@ -1,0 +1,33 @@
+# Lint and format rules for tools/adversary. game/ruff.toml does not apply here: this is a command-line
+# harness, so print() is how scripts report, and the game's docstring and annotation rules would only add noise.
+target-version = "py312"
+line-length = 120
+extend-exclude = ["out"]
+
+[lint]
+# No "I" (import order) on purpose. Order is meaning here: `import simkit` puts game/ on sys.path, so it must come
+# before the first import of core, app or ui. A sorter puts `core` first (alphabetical) and the scripts fail.
+select = [
+  "E", "W",  # pycodestyle
+  "F",       # pyflakes: unused and undefined names, star imports
+  "B",       # bugbear: common bug patterns
+  "UP",      # modern Python syntax
+  "SIM", "RET", "C4", "PIE", "PERF", "RUF",  # simpler code
+]
+ignore = [
+  "E402",    # imports after the one-line sys.path setup are how a script finds simkit and paths
+  "E401",    # `import a, b` is fine in a script
+  "SIM115",  # fine for the few long-lived handles
+  "RUF005",  # [a] + b reads fine
+  "PERF203", # try/except inside a loop is intended in the fuzzers
+  "PERF401", # appends under a condition inside nested loops read better than a comprehension
+  "C408",    # dict(a=1) is the house style for result records
+  "SIM102",  # the checkers keep one condition per line, with a comment each
+  "SIM108",  # a long ternary is harder to read than the if/else it replaces
+  "E501",    # ruff format wraps code; what is left is long strings and comments
+]
+
+[lint.per-file-ignores]
+# `l` is "left" in the u/d/l/r thrust helpers, which callers pass by keyword.
+"soak/bots.py" = ["E741"]
+"flow_collision/flowlib.py" = ["E741"]
